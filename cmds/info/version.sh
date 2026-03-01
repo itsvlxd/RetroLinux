@@ -1,0 +1,17 @@
+#!/bin/bash
+
+cmd_version() {
+    local version=$(git describe --tags --abbrev=0 2>/dev/null)
+
+    if [[ -z "$version" ]]; then
+        version=$(git rev-parse --short HEAD 2>/dev/null)
+    fi
+
+    if [[ -z "$version" ]]; then
+        version="rolling-release"
+    fi
+
+    echo "$version"
+}
+
+register_command "INFO" "-v|--version" "Display current version and system info" "cmd_version"
