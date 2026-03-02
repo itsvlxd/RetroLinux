@@ -6,7 +6,7 @@ show_usage() {
     local GRAY='\e[38;5;244m'
     local RESET='\e[0m'
 
-    echo -e "${PINK}  USAGE:${RESET} retro [option] [module|all]\n"
+    echo -e "${PINK}  USAGE:${RESET} retro [option] [module|all] [-y]\n"
 
     local current_group=""
 

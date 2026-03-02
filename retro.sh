@@ -10,10 +10,21 @@ source "$REPO_DIR/lib/git.sh"
 source "$REPO_DIR/lib/log.sh"
 source "$REPO_DIR/lib/logo.sh"
 source "$REPO_DIR/lib/module.sh"
+source "$REPO_DIR/lib/pacman.sh"
 source "$REPO_DIR/lib/manager.sh"
 
-CMD=$1
-TARGET=$2
+SKIP_PROMPT=false
+CLEAN_ARGS=()
+
+for arg in "$@"; do
+    case "$arg" in
+    -y | --yes) SKIP_PROMPT=true ;;
+    *) CLEAN_ARGS+=("$arg") ;;
+    esac
+done
+
+CMD="${CLEAN_ARGS[0]}"
+TARGET="${CLEAN_ARGS[1]}"
 
 PINK='\033[38;5;201m'
 RESET='\033[0m'

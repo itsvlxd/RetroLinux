@@ -13,7 +13,9 @@ run_task() {
     if [[ "$module" == "all" || -z "$module" ]]; then
         for dir in "$REPO_DIR"/modules/*/; do
             [[ -d "$dir" ]] || continue
+
             local m_name=$(basename "$dir")
+
             execute_logic "$type" "$m_name"
         done
     else
@@ -24,15 +26,31 @@ run_task() {
 execute_logic() {
     local type="$1"
     local name="$2"
-    local script="$REPO_DIR/modules/$name/${type}.sh"
+
+    local mod_path="$REPO_DIR/modules/$name"
+    local script="$mod_path/${type}.sh"
+
+    if [[ ! -d "$mod_path" ]]; then
+        rx_log "error" "Module '$name' not found in $REPO_DIR/modules/"
+        return 1
+    fi
+
+    if [[ "$SKIP_PROMPT" == "false" ]]; then
+        echo -ne " ${PINK}󰄾${RESET} Execute ${PINK}$type${RESET} on module ${PINK}$name${RESET}? [Y/n]: "
+        read -r opt
+        [[ "$opt" =~ ^[Nn]$ ]] && {
+            rx_log "info" "Skipping $name..."
+            return 0
+        }
+    fi
 
     if [[ -f "$script" ]]; then
         rx_log "info" "Using custom $type script for $name"
-
-        (cd "$REPO_DIR/modules/$name" && bash "./${type}.sh")
+        (cd "$mod_path" && bash "./${type}.sh")
     else
         case "$type" in
         "install") rx_default_install "$name" ;;
+        "uninstall") rx_default_uninstall "$name" ;;
         "pull") rx_default_pull "$name" ;;
         "mirror") rx_default_mirror "$name" ;;
         esac
@@ -99,4 +117,22 @@ rx_default_mirror() {
     else
         rx_log "error" "No config folder found for $mod_name"
     fi
+}
+
+rx_default_uninstall() {
+    local mod_name="$1"
+    local mod_path="$REPO_DIR/modules/$mod_name"
+    local target_path=$(get_target_path "$mod_name")
+
+    rx_log "info" "Reverting $mod_name..."
+
+    if [[ -f "$mod_path/pkg.list" ]]; then
+        local pkgs=$(grep -v '^#' "$mod_path/pkg.list" | xargs)
+        if [[ -n "$pkgs" ]]; then
+            rx_log "info" "Purging $mod_name packages..."
+            sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
+        fi
+    fi
+
+    rx_restore "$target_path"
 }
