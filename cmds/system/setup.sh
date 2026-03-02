@@ -4,6 +4,7 @@ cmd_setup() {
     rx_logo
     rx_log "info" "Setting up RetroArch..."
 
+    rx_optimize_pacman
     rx_bootstrap_pkg_manager
 
     local source_bin=$(readlink -f "$0")

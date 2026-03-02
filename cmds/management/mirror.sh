@@ -7,4 +7,4 @@ cmd_mirror() {
     run_task "mirror" "$target"
 }
 
-register_command "MANAGEMENT" "-m|--mirror" "Hard copy repo files to system )" "cmd_mirror"
+register_command "MANAGEMENT" "-m|--mirror" "Hard copy repo files to system (Stability / Testing)" "cmd_mirror"
