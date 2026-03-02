@@ -1,17 +1,11 @@
 #!/bin/bash
 
-REPO_DIR="$(dirname "$(readlink -f "$0")")"
-
-source "$REPO_DIR/lib/fs.sh"
-source "$REPO_DIR/lib/log.sh"
-source "$REPO_DIR/lib/pkg.sh"
-
 run_task() {
     local type="$1"
     local module="$2"
 
     if [[ "$module" == "all" || -z "$module" ]]; then
-        for dir in "$REPO_DIR"/modules/*/; do
+        for dir in "$RETRO_DIR"/modules/*/; do
             [[ -d "$dir" ]] || continue
 
             local m_name=$(basename "$dir")
@@ -27,11 +21,11 @@ execute_logic() {
     local type="$1"
     local name="$2"
 
-    local mod_path="$REPO_DIR/modules/$name"
+    local mod_path="$RETRO_DIR/modules/$name"
     local script="$mod_path/${type}.sh"
 
     if [[ ! -d "$mod_path" ]]; then
-        rx_log "error" "Module '$name' not found in $REPO_DIR/modules/"
+        rx_log "error" "Module '$name' not found in $RETRO_DIR/modules/"
         return 1
     fi
 
@@ -46,7 +40,8 @@ execute_logic() {
 
     if [[ -f "$script" ]]; then
         rx_log "info" "Using custom $type script for $name"
-        (cd "$mod_path" && bash "./${type}.sh")
+
+        (cd "$mod_path" && source "./${type}.sh")
     else
         case "$type" in
         "install") rx_default_install "$name" ;;
@@ -59,7 +54,7 @@ execute_logic() {
 
 get_target_path() {
     local mod_name="$1"
-    local target_file="$REPO_DIR/modules/$mod_name/.target"
+    local target_file="$RETRO_DIR/modules/$mod_name/.target"
     local raw_path
 
     if [[ -f "$target_file" ]]; then
@@ -72,7 +67,7 @@ get_target_path() {
 
 rx_default_install() {
     local mod_name="$1"
-    local mod_path="$REPO_DIR/modules/$mod_name"
+    local mod_path="$RETRO_DIR/modules/$mod_name"
     local target_path=$(get_target_path "$mod_name")
 
     rx_log "info" "Installing $mod_name"
@@ -86,7 +81,7 @@ rx_default_install() {
 
 rx_default_pull() {
     local mod_name="$1"
-    local mod_path="$REPO_DIR/modules/$mod_name"
+    local mod_path="$RETRO_DIR/modules/$mod_name"
     local target_path=$(get_target_path "$mod_name")
 
     rx_log "info" "Backing up $mod_name"
@@ -105,7 +100,7 @@ rx_default_pull() {
 
 rx_default_mirror() {
     local mod_name="$1"
-    local mod_path="$REPO_DIR/modules/$mod_name"
+    local mod_path="$RETRO_DIR/modules/$mod_name"
     local target_path=$(get_target_path "$mod_name")
 
     rx_log "info" "Mirroring $mod_name to $target_path"
@@ -121,15 +116,15 @@ rx_default_mirror() {
 
 rx_default_uninstall() {
     local mod_name="$1"
-    local mod_path="$REPO_DIR/modules/$mod_name"
+    local mod_path="$RETRO_DIR/modules/$mod_name"
     local target_path=$(get_target_path "$mod_name")
 
-    rx_log "info" "Reverting $mod_name..."
+    rx_log "info" "Uninstalling module: $mod_name"
 
     if [[ -f "$mod_path/pkg.list" ]]; then
         local pkgs=$(grep -v '^#' "$mod_path/pkg.list" | xargs)
         if [[ -n "$pkgs" ]]; then
-            rx_log "info" "Purging $mod_name packages..."
+            rx_log "info" "Purging packages for $mod_name..."
             sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
         fi
     fi

@@ -1,17 +1,22 @@
 #!/bin/bash
 
-REPO_DIR="$(dirname "$(readlink -f "$0")")"
+if [[ -z "$RETRO_DIR" ]]; then
+    export RETRO_DIR="$(dirname "$(readlink -f "$0")")"
+else
+    export RETRO_DIR="$RETRO_DIR"
+fi
 
 declare -a CMDS_HELP
 declare -A CMDS_EXEC
 
-source "$REPO_DIR/lib/fs.sh"
-source "$REPO_DIR/lib/git.sh"
-source "$REPO_DIR/lib/log.sh"
-source "$REPO_DIR/lib/logo.sh"
-source "$REPO_DIR/lib/module.sh"
-source "$REPO_DIR/lib/pacman.sh"
-source "$REPO_DIR/lib/manager.sh"
+source "$RETRO_DIR/lib/fs.sh"
+source "$RETRO_DIR/lib/git.sh"
+source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/lib/pkg.sh"
+source "$RETRO_DIR/lib/logo.sh"
+source "$RETRO_DIR/lib/module.sh"
+source "$RETRO_DIR/lib/pacman.sh"
+source "$RETRO_DIR/lib/manager.sh"
 
 SKIP_PROMPT=false
 CLEAN_ARGS=()
@@ -29,15 +34,6 @@ TARGET="${CLEAN_ARGS[1]}"
 PINK='\033[38;5;201m'
 RESET='\033[0m'
 
-if ! command -v retro >/dev/null 2>&1; then
-    if [[ "$CMD" != "-s" && "$CMD" != "--setup" ]]; then
-        rx_logo
-        rx_log "warn" "The 'retro' command is not linked to your system PATH."
-        rx_log "info" "Run ${PINK}./retro.sh --setup${RESET} to enable global access."
-        echo -e ""
-    fi
-fi
-
 register_command() {
     local group="$1"
     local aliases="$2"
@@ -52,9 +48,9 @@ register_command() {
     done
 }
 
-if [ -d "$REPO_DIR/cmds" ]; then
+if [ -d "$RETRO_DIR/cmds" ]; then
     shopt -s globstar
-    for f in "$REPO_DIR/cmds"/**/*.sh; do
+    for f in "$RETRO_DIR/cmds"/**/*.sh; do
         [[ -f "$f" ]] || continue
         source "$f"
     done

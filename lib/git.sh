@@ -1,9 +1,7 @@
 #!/bin/bash
 
-REPO_DIR="$(dirname "$(readlink -f "$0")")"
-
 rx_git_run() {
-    git -C "$REPO_DIR" "$@" 2>/dev/null | xargs
+    git -C "$RETRO_DIR" "$@" 2>/dev/null | xargs
 }
 
 rx_git_branch() {

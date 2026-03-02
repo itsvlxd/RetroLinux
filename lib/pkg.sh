@@ -1,9 +1,5 @@
 #!/bin/bash
 
-REPO_DIR="$(dirname "$(readlink -f "$0")")"
-
-source "$REPO_DIR/lib/log.sh"
-
 rx_pkg_install() {
     local list_file="$1"
     if [[ ! -f "$list_file" ]]; then

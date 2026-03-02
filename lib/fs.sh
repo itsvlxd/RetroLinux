@@ -1,9 +1,5 @@
 #!/bin/bash
 
-REPO_DIR="$(dirname "$(readlink -f "$0")")"
-
-source "$REPO_DIR/lib/log.sh"
-
 rx_link() {
     local source_in_repo=$(readlink -f "$1")
     local target_on_system="$2"
@@ -73,5 +69,22 @@ rx_sanitize() {
         rx_log "info" "Sanitizing user paths in $target_dir"
         find "$target_dir" -type f \( -name "*.json" -o -name "*.conf" -o -name "prefs.js" \) \
             -exec sed -i "s|/home/[^/]*|/home/$USER|g" {} + 2>/dev/null
+    fi
+}
+
+rx_restore() {
+    local target="$1"
+    local backup="${target}.bak"
+
+    if [[ -L "$target" || -e "$target" ]]; then
+        rx_log "info" "Removing system files at $target"
+        rm -rf "$target"
+    fi
+
+    if [[ -e "$backup" ]]; then
+        mv "$backup" "$target"
+        rx_log "success" "Backup restored to $target"
+    else
+        rx_log "warn" "No backup found for $target. System path is now clean."
     fi
 }
