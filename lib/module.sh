@@ -74,6 +74,16 @@ rx_default_install() {
 
     [[ -f "$mod_path/pkg.list" ]] && rx_pkg_install "$mod_path/pkg.list"
 
+    if [[ -e "$target_path" && ! -L "$target_path" ]]; then
+        if [[ ! -e "${target_path}.bak" ]]; then
+            rx_log "warn" "Existing config found. Creating backup: ${target_path}.bak"
+            mv "$target_path" "${target_path}.bak"
+        else
+            rx_log "warn" "Target exists but a backup is already present. Skipping backup to avoid overwriting original data."
+            mv "$target_path" "${target_path}.dirty.$(date +%s)"
+        fi
+    fi
+
     if [[ -d "$mod_path/config" ]]; then
         rx_link "$mod_path/config" "$target_path"
     fi
@@ -121,12 +131,21 @@ rx_default_uninstall() {
 
     rx_log "info" "Uninstalling module: $mod_name"
 
+    if [[ -L "$target_path" ]]; then
+        local link_destination=$(readlink -f "$target_path")
+        if [[ "$link_destination" != "$mod_path"* ]]; then
+            rx_log "error" "Target $target_path is a link but doesn't point to this module. Aborting to save your files!"
+            return 1
+        fi
+    elif [[ -e "$target_path" ]]; then
+        rx_log "warn" "$target_path is a real file/directory. Skipping deletion to prevent data loss."
+        [[ -e "${target_path}.bak" ]] && rx_log "info" "Backup exists, but I won't overwrite current config with it."
+        return 0
+    fi
+
     if [[ -f "$mod_path/pkg.list" ]]; then
         local pkgs=$(grep -v '^#' "$mod_path/pkg.list" | xargs)
-        if [[ -n "$pkgs" ]]; then
-            rx_log "info" "Purging packages for $mod_name..."
-            sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
-        fi
+        [[ -n "$pkgs" ]] && sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
     fi
 
     rx_restore "$target_path"

@@ -2,9 +2,9 @@
 
 cmd_update() {
     local target="$1"
-    rx_log "info" "Syncing repository with origin/main"
+    rx_log "info" "Syncing repository with $(rx_git_branch)"
 
-    if git pull origin main; then
+    if git pull; then
         rx_log "success" "Git pull successful"
         cmd_install "$target"
     else
