@@ -29,6 +29,21 @@ execute_logic() {
         return 1
     fi
 
+    if [[ "$type" == "install" || "$type" == "mirror" ]]; then
+        if [[ -f "$mod_path/pkg.list" ]]; then
+            rx_log "info" "Syncing dependencies for $name..."
+            rx_pkg_install "$mod_path/pkg.list"
+        fi
+    fi
+
+    if [[ "$type" == "uninstall" && -f "$mod_path/pkg.list" ]]; then
+        local pkgs=$(grep -v '^#' "$mod_path/pkg.list" | xargs)
+        if [[ -n "$pkgs" ]]; then
+            rx_log "info" "Purging dependencies for $name..."
+            sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
+        fi
+    fi
+
     if [[ "$SKIP_PROMPT" == "false" ]]; then
         echo -ne " ${PINK}󰄾${RESET} Execute ${PINK}$type${RESET} on module ${PINK}$name${RESET}? [Y/n]: "
         read -r opt
@@ -45,9 +60,9 @@ execute_logic() {
     else
         case "$type" in
         "install") rx_default_install "$name" ;;
-        "uninstall") rx_default_uninstall "$name" ;;
         "pull") rx_default_pull "$name" ;;
         "mirror") rx_default_mirror "$name" ;;
+        "uninstall") rx_default_uninstall "$name" ;;
         esac
     fi
 }
@@ -71,8 +86,6 @@ rx_default_install() {
     local target_path=$(get_target_path "$mod_name")
 
     rx_log "info" "Installing $mod_name"
-
-    [[ -f "$mod_path/pkg.list" ]] && rx_pkg_install "$mod_path/pkg.list"
 
     if [[ -e "$target_path" && ! -L "$target_path" ]]; then
         if [[ ! -e "${target_path}.bak" ]]; then
@@ -115,8 +128,6 @@ rx_default_mirror() {
 
     rx_log "info" "Mirroring $mod_name to $target_path"
 
-    [[ -f "$mod_path/pkg.list" ]] && rx_pkg_install "$mod_path/pkg.list"
-
     if [[ -d "$mod_path/config" ]]; then
         rx_mirror_install "$mod_path/config" "$target_path"
     else
@@ -141,11 +152,6 @@ rx_default_uninstall() {
         rx_log "warn" "$target_path is a real file/directory. Skipping deletion to prevent data loss."
         [[ -e "${target_path}.bak" ]] && rx_log "info" "Backup exists, but I won't overwrite current config with it."
         return 0
-    fi
-
-    if [[ -f "$mod_path/pkg.list" ]]; then
-        local pkgs=$(grep -v '^#' "$mod_path/pkg.list" | xargs)
-        [[ -n "$pkgs" ]] && sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
     fi
 
     rx_restore "$target_path"
