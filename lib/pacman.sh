@@ -1,10 +1,6 @@
 #!/bin/bash
 
 rx_optimize_pacman() {
-    local PINK='\e[38;5;201m'
-    local GRAY='\e[38;5;244m'
-    local RESET='\e[0m'
-
     echo -e " This will enable ${PINK}Color${RESET}, ${PINK}ILoveCandy${RESET}, and ${PINK}Multilib${RESET} in /etc/pacman.conf."
     echo -ne " ${PINK}󰄾 ${RESET}Allow retro to modify pacman.conf? [y/N]: "
     read -r allow

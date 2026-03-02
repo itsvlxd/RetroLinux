@@ -2,10 +2,6 @@
 
 rx_logo() {
     clear
-    local PINK='\e[38;5;201m'
-    local GRAY='\e[38;5;244m'
-    local RESET='\e[0m'
-
     local version=$(rx_git_version)
     local branch=$(rx_git_branch)
 
@@ -19,5 +15,5 @@ rx_logo() {
   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
 EOF
 
-    echo -e "               󰯉 ${RESET}Just another midnight override ${PINK}| ${GRAY}${version} ${PINK}󰊢 ${GRAY}${branch}${RESET}\n"
+    echo -e "               󰯉 ${RESET}Just another midnight override ${PINK}| ${GRAY}${version} ${PINK}󰘬 ${GRAY}${branch}${RESET}\n"
 }

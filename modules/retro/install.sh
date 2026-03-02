@@ -1,5 +1,6 @@
 #!/bin/bash
 
+RETRO_CACHE="$HOME/.cache/retro"
 source_bin="$RETRO_DIR/retro.sh"
 bin_dir="$HOME/.local/bin"
 cmd_name="retro"
@@ -19,16 +20,23 @@ else
 fi
 
 if [[ -f "$shell_conf" ]]; then
-    if ! grep -q "export RETRO_DIR=" "$shell_conf"; then
-        echo "export RETRO_DIR=\"$RETRO_DIR\"" >>"$shell_conf"
-        rx_log "success" "RETRO_DIR exported to $(basename "$shell_conf")"
-    fi
-
     if ! grep -q "# RetroArch PATH" "$shell_conf"; then
         echo -e '\n# RetroArch PATH' >>"$shell_conf"
         echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$shell_conf"
         rx_log "success" "Patched PATH in $(basename "$shell_conf")"
     fi
+
+    if ! grep -q "export RETRO_DIR=" "$shell_conf"; then
+        echo "export RETRO_DIR=\"$RETRO_DIR\"" >>"$shell_conf"
+        rx_log "success" "RETRO_DIR exported to $(basename "$shell_conf")"
+    fi
+
+    if ! grep -q "export RETRO_CACHE=" "$shell_conf"; then
+        echo "export RETRO_CACHE=\"$RETRO_CACHE\"" >>"$shell_conf"
+        rx_log "success" "RETRO_CACHE exported to $(basename "$shell_conf")"
+    fi
+
+    [[ ! -d "$RETRO_CACHE" ]] && mkdir -p "$RETRO_CACHE"
 fi
 
 rx_log "success" "Global command ${PINK}${cmd_name}${RESET} is ready."

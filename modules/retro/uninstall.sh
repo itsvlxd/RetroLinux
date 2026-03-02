@@ -2,9 +2,6 @@
 
 RETRO_DIR="$(dirname "$(dirname "$(dirname "$(readlink -f "$0")")")")"
 
-source "$RETRO_DIR/lib/log.sh"
-source "$RETRO_DIR/lib/fs.sh"
-
 target="$HOME/.local/bin/retro"
 
 if [[ -L "$target" ]]; then
@@ -15,9 +12,17 @@ fi
 shell_conf="$HOME/.zshrc"
 [[ "$SHELL" == *"bash"* ]] && shell_conf="$HOME/.bashrc"
 
+sleep 0.5
+
 if [[ -f "$shell_conf" ]]; then
     if grep -q "# RetroArch PATH" "$shell_conf"; then
         sed -i '/# RetroArch PATH/,+1d' "$shell_conf"
+
+        if grep -q "export RETRO_CACHE=" "$shell_conf"; then
+            rx_log "success" "Cleaned RETRO_CACHE from $shell_conf"
+
+            sed -i '/export RETRO_CACHE=/d' "$shell_conf"
+        fi
 
         if grep -q "export RETRO_DIR=" "$shell_conf"; then
             rx_log "success" "Cleaned RETRO_DIR from $shell_conf"

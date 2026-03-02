@@ -2,9 +2,6 @@
 
 show_usage() {
     rx_logo
-    local PINK='\e[38;5;201m'
-    local GRAY='\e[38;5;244m'
-    local RESET='\e[0m'
 
     echo -e "${PINK}  USAGE:${RESET} retro <command> [module/sub-command] [options]\n"
 

@@ -1,10 +1,6 @@
 #!/bin/bash
 
 rx_bootstrap_pkg_manager() {
-    local PINK='\e[38;5;201m'
-    local GRAY='\e[38;5;244m'
-    local RESET='\e[0m'
-
     local has_yay=false
     local has_paru=false
     command -v yay >/dev/null 2>&1 && has_yay=true
@@ -14,6 +10,9 @@ rx_bootstrap_pkg_manager() {
     local label_2="Install paru"
     $has_yay && label_1="Update yay"
     $has_paru && label_2="Update paru"
+
+    # TODO: Add a log message like now please select the package manager you want to use
+    # ALSO Make a var to like RETRO_PKG_HELPER and we will use that when pkg install
 
     echo -e " ${PINK}󰄾${RESET} Select Operation:"
     echo -e "  ${PINK}1)${RESET} $label_1 ${GRAY}(Go)${RESET}"

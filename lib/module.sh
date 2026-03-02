@@ -1,5 +1,6 @@
 #!/bin/bash
-
+#TODO: Add y/n for pkg.list
+#TODO Add the option to check the module for a post.sh or pre.sh to run acordingly
 run_task() {
     local type="$1"
     local module="$2"

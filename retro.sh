@@ -6,6 +6,14 @@ else
     export RETRO_DIR="$RETRO_DIR"
 fi
 
+if [[ -z "$RETRO_CACHE" ]]; then
+    export RETRO_CACHE="$HOME/.cache/retro"
+else
+    export RETRO_CACHE="$RETRO_CACHE"
+fi
+
+mkdir -p $RETRO_CACHE
+
 declare -a CMDS_HELP
 declare -A CMDS_EXEC
 
@@ -13,7 +21,9 @@ source "$RETRO_DIR/lib/fs.sh"
 source "$RETRO_DIR/lib/git.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/pkg.sh"
+source "$RETRO_DIR/lib/vars.sh"
 source "$RETRO_DIR/lib/logo.sh"
+source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/module.sh"
 source "$RETRO_DIR/lib/pacman.sh"
 source "$RETRO_DIR/lib/manager.sh"
@@ -30,9 +40,6 @@ done
 
 CMD="${CLEAN_ARGS[0]}"
 TARGET="${CLEAN_ARGS[1]}"
-
-PINK='\033[38;5;201m'
-RESET='\033[0m'
 
 register_command() {
     local group="$1"

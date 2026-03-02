@@ -1,15 +1,5 @@
 #!/bin/bash
 
-RESET='\033[0m'
-BOLD='\033[1m'
-
-CLR_PINK='\033[38;5;201m'
-CLR_SUCCESS='\033[38;5;76m'
-CLR_WARN='\033[38;5;214m'
-CLR_ERROR='\033[38;5;196m'
-
-CLR_LABEL='\033[38;5;244m'
-
 rx_log() {
     local level="${1^^}"
     local message="$2"
@@ -20,19 +10,19 @@ rx_log() {
     case "${level^^}" in
     "INFO")
         icon=" "
-        color="$CLR_PINK"
+        color="$PINK"
         ;;
     "SUCCESS")
         icon=" "
-        color="$CLR_SUCCESS"
+        color="$SUCCESS"
         ;;
     "WARN")
         icon=" "
-        color="$CLR_WARN"
+        color="$WARN"
         ;;
     "ERROR")
         icon="󰅙 "
-        color="$CLR_ERROR"
+        color="$ERROR"
         ;;
     *)
         icon="󰀦 "
