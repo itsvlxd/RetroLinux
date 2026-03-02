@@ -29,6 +29,15 @@ execute_logic() {
         return 1
     fi
 
+    if [[ "$SKIP_PROMPT" == "false" ]]; then
+        echo -ne " ${PINK}󰄾${RESET} Execute ${PINK}$type${RESET} on module ${PINK}$name${RESET}? [Y/n]: "
+        read -r opt
+        [[ "$opt" =~ ^[Nn]$ ]] && {
+            rx_log "info" "Skipping $name..."
+            return 0
+        }
+    fi
+
     if [[ "$type" == "install" || "$type" == "mirror" ]]; then
         if [[ -f "$mod_path/pkg.list" ]]; then
             rx_log "info" "Syncing dependencies for $name..."
@@ -42,15 +51,6 @@ execute_logic() {
             rx_log "info" "Purging dependencies for $name..."
             sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
         fi
-    fi
-
-    if [[ "$SKIP_PROMPT" == "false" ]]; then
-        echo -ne " ${PINK}󰄾${RESET} Execute ${PINK}$type${RESET} on module ${PINK}$name${RESET}? [Y/n]: "
-        read -r opt
-        [[ "$opt" =~ ^[Nn]$ ]] && {
-            rx_log "info" "Skipping $name..."
-            return 0
-        }
     fi
 
     if [[ -f "$script" ]]; then
