@@ -8,9 +8,9 @@ declare -A CMDS_EXEC
 source "$REPO_DIR/lib/fs.sh"
 source "$REPO_DIR/lib/git.sh"
 source "$REPO_DIR/lib/log.sh"
-source "$REPO_DIR/lib/yay.sh"
 source "$REPO_DIR/lib/logo.sh"
 source "$REPO_DIR/lib/module.sh"
+source "$REPO_DIR/lib/manager.sh"
 
 CMD=$1
 TARGET=$2

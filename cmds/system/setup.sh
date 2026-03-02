@@ -2,10 +2,20 @@
 
 cmd_setup() {
     rx_logo
-    rx_log "info" "Setting up retroArch core"
+    rx_log "info" "Setting up RetroArch..."
 
-    rx_bootstrap_yay
-    rx_link_bin "$0"
+    rx_bootstrap_pkg_manager
+
+    local source_bin=$(readlink -f "$0")
+    local bin_dir="$HOME/.local/bin"
+    local cmd_name=$(basename "$0" .sh)
+    local target="$bin_dir/$cmd_name"
+
+    chmod +x "$source_bin"
+
+    rx_link "$source_bin" "$target"
+
+    rx_log "success" "Command ${PINK}${cmd_name}${RESET} is now available globally."
 
     if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
         rx_log "warn" "Detecting missing PATH entry for ~/.local/bin"
@@ -14,7 +24,7 @@ cmd_setup() {
         [[ "$SHELL" == *"bash"* ]] && shell_conf="$HOME/.bashrc"
 
         if ! grep -q ".local/bin" "$shell_conf"; then
-            echo -e '\n# retroArch PATH' >>"$shell_conf"
+            echo -e '\n# RetroArch PATH' >>"$shell_conf"
 
             echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$shell_conf"
 

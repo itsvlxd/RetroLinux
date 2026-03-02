@@ -65,25 +65,6 @@ rx_mirror_install() {
     rx_sanitize "$system_path"
 }
 
-rx_link_bin() {
-    local source_bin=$(readlink -f "$1")
-    local bin_dir="$HOME/.local/bin"
-    local cmd_name=$(basename "$1" .sh)
-    local target="$bin_dir/$cmd_name"
-
-    mkdir -p "$bin_dir"
-
-    if [[ -L "$target" ]]; then
-        rx_log "info" "Updating existing binary link: $target"
-        rm "$target"
-    fi
-
-    ln -sf "$source_bin" "$target"
-    chmod +x "$source_bin"
-
-    rx_log "success" "Command '$PINK$cmd_name$RESET' is now available globally."
-}
-
 rx_sanitize() {
     local target_dir="$1"
     if [[ -f "$target_dir" ]]; then
