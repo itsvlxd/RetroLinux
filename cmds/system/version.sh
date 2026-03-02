@@ -14,4 +14,4 @@ cmd_version() {
     echo "$version"
 }
 
-register_command "INFO" "-v|--version" "Display current version and system info" "cmd_version"
+register_command "SYSTEM" "-v|--version" "Display current version and system info" "cmd_version"

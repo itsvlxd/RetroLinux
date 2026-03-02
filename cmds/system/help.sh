@@ -6,7 +6,7 @@ show_usage() {
     local GRAY='\e[38;5;244m'
     local RESET='\e[0m'
 
-    echo -e "${PINK}  USAGE:${RESET} retro [option] [module] [-y]\n"
+    echo -e "${PINK}  USAGE:${RESET} retro <command> [module/sub-command] [options]\n"
 
     local current_group=""
 
@@ -32,4 +32,4 @@ show_usage() {
     echo ""
 }
 
-register_command "INFO" "-h|--help" "Show this interface" "show_usage"
+register_command "SYSTEM" "-h|--help" "Show this interface" "show_usage"

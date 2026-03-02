@@ -67,7 +67,7 @@ if [[ -z "$CMD" || "$CMD" == "-h" || "$CMD" == "--help" ]]; then
 fi
 
 if [[ -n "${CMDS_EXEC[$CMD]}" ]]; then
-    ${CMDS_EXEC[$CMD]} "$TARGET"
+    ${CMDS_EXEC[$CMD]} "${CLEAN_ARGS[@]:1}"
 else
     rx_log "error" "Unrecognized option: $CMD"
     rx_log "info" "Try 'retro --help' for a list of valid commands."
