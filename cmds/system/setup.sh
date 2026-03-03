@@ -4,7 +4,7 @@ cmd_setup() {
     rx_logo
     rx_log "info" "Setting up RetroArch..."
 
-    rx_vars_defaults
+    rx_vars_defaults "$1"
     rx_optimize_pacman
     rx_bootstrap_pkg_manager
 

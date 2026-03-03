@@ -3,8 +3,6 @@
 VARS_DIR="$RETRO_CACHE"
 VARS_FILE="$VARS_DIR/variables.sh"
 
-# TODO: Maybe add support to have these variables in the bashrc or zshrc also
-
 [[ ! -d "$VARS_DIR" ]] && mkdir -p "$VARS_DIR"
 [[ ! -f "$VARS_FILE" ]] && touch "$VARS_FILE"
 
@@ -51,9 +49,5 @@ case $1 in
     ;;
 "list")
     cat "$VARS_FILE" | sed 's/export //g'
-    ;;
-*)
-    echo "Usage: vars.sh [get|set|del|toggle|list] [KEY] [VALUE]"
-    exit 1
     ;;
 esac

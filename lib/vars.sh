@@ -12,13 +12,14 @@ rx_vars_defaults() {
         "BAT_NOTIFY_CRITICAL_THRESHOLD|15"
 
         "BAT_SAVER_ACTIVE|false"
+        "BAT_SAVER_FORCED|false"
     )
 
     local count=0
     for entry in "${defaults[@]}"; do
         IFS='|' read -r key val <<<"$entry"
 
-        if [[ "$force_flag" == "force" || "$force_flag" == "--force" ]]; then
+        if [[ "$force_flag" == "-f" || "$force_flag" == "--force" ]]; then
             bash "$var_script" set "$key" "$val"
             ((count++))
         elif [[ -z $(bash "$var_script" get "$key") ]]; then
@@ -27,7 +28,7 @@ rx_vars_defaults() {
         fi
     done
 
-    if [[ "$force_flag" == "force" || "$force_flag" == "--force" ]]; then
+    if [[ "$force_flag" == "-f" || "$force_flag" == "--force" ]]; then
         rx_log "success" "Vars reset: $count values forced to defaults."
     elif [[ "$count" -gt 0 ]]; then
         rx_log "success" "Vars updated: $count missing values added."

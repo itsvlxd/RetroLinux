@@ -11,8 +11,7 @@ rx_bootstrap_pkg_manager() {
     $has_yay && label_1="Update yay"
     $has_paru && label_2="Update paru"
 
-    # TODO: Add a log message like now please select the package manager you want to use
-    # ALSO Make a var to like RETRO_PKG_HELPER and we will use that when pkg install
+    rx_log "info" "Select the AUR helper you want to use for this system."
 
     echo -e " ${PINK}󰄾${RESET} Select Operation:"
     echo -e "  ${PINK}1)${RESET} $label_1 ${GRAY}(Go)${RESET}"
@@ -24,20 +23,28 @@ rx_bootstrap_pkg_manager() {
 
     case "$choice" in
     1)
+        local helper="yay"
         if $has_yay; then
             rx_log "info" "Syncing system via yay..."
+
             yay -Syu --noconfirm
         else
-            rx_install_helper "yay"
+            rx_install_helper "$helper"
         fi
+
+        bash "$RETRO_VAR" set "RETRO_PKG_HELPER" "$helper"
         ;;
     2)
+        local helper="paru"
         if $has_paru; then
             rx_log "info" "Syncing system via paru..."
+
             paru -Syu --noconfirm
         else
-            rx_install_helper "paru"
+            rx_install_helper "$helper"
         fi
+
+        bash "$RETRO_VAR" set "RETRO_PKG_HELPER" "$helper"
         ;;
     *)
         return 0
@@ -64,5 +71,6 @@ rx_install_helper() {
     else
         rx_log "error" "AUR connection failed."
         rm -rf "$temp_dir"
+        return 1
     fi
 }

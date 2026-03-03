@@ -17,6 +17,8 @@ mkdir -p $RETRO_CACHE
 declare -a CMDS_HELP
 declare -A CMDS_EXEC
 
+RETRO_VAR="$RETRO_DIR/scripts/var_core.sh"
+
 source "$RETRO_DIR/lib/fs.sh"
 source "$RETRO_DIR/lib/git.sh"
 source "$RETRO_DIR/lib/log.sh"

@@ -71,7 +71,4 @@ cmd_var() {
     esac
 }
 
-# TODO: Add the --f / force implementation for rx_vars_defaults
-# TODO: make the args with dash for both battery and others
-
 register_command "TOOLS" "-var|--variable" "Manage global state and persistent variables" "cmd_var"

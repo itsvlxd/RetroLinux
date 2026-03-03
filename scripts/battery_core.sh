@@ -32,30 +32,53 @@ get_info() {
     local model=$(cat "$BAT_PATH/model_name" 2>/dev/null || echo "Generic")
     local p_raw=$(cat "$BAT_PATH/power_now" 2>/dev/null || echo "0")
     local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")
+    local saver=$(get_var "BAT_SAVER_ACTIVE")
 
     if [[ "$p_raw" -eq 0 ]]; then
         local i_raw=$(cat "$BAT_PATH/current_now" 2>/dev/null || echo "0")
         p_raw=$((i_raw * v_raw / 1000000))
     fi
 
-    echo "$cap|$stat|$health|$p_raw|$v_raw|$model"
+    local saver_label="OFF"
+
+    if [[ "$saver" == "true" ]]; then
+        saver_label="ON"
+    fi
+
+    echo "$cap|$stat|$health|$p_raw|$v_raw|$model|$saver_label"
 }
 
 set_limit() {
     local limit="$1"
     local path="$BAT_PATH/charge_control_end_threshold"
+
     [[ -f "$path" ]] && echo "$limit" | sudo tee "$path" >/dev/null || return 1
 }
 
 set_saver() {
     local val="$1"
-    if [[ "$val" == "true" || "$val" == "false" ]]; then
-        set_var "BAT_SAVER_FORCED" "$val"
+    local force="$2"
+
+    if [[ "$val" == "true" ]]; then
+        set_var "BAT_SAVER_FORCED" "true"
+        set_var "BAT_SAVER_ACTIVE" "true"
         return 0
+
+    elif [[ "$val" == "false" ]]; then
+        if [[ "$force" == "-f" || "$force" == "--force" ]]; then
+            set_var "BAT_SAVER_FORCED" "true"
+            set_var "BAT_SAVER_ACTIVE" "false"
+        else
+            set_var "BAT_SAVER_FORCED" "false"
+        fi
+        return 0
+
     elif [[ "$val" =~ ^[0-9]+$ ]]; then
         set_var "BAT_SAVER_THRESHOLD" "$val"
+        set_var "BAT_SAVER_FORCED" "false"
         return 0
     fi
+
     return 1
 }
 
@@ -66,17 +89,19 @@ run_loop() {
 
     while true; do
         local current_stat=$(get_status_raw)
-        local current_cap=$(cat "$BAT_PATH/capacity")
+        local current_cap=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "0")
 
-        local saver_threshold=$(get_var "BAT_SAVER_THRESHOLD")
-        local notify_threshold=$(get_var "BAT_NOTIFY_THRESHOLD")
-        local critical_threshold=$(get_var "BAT_NOTIFY_CRITICAL_THRESHOLD")
-        local current_saver_state=$(get_var "BAT_SAVER_ACTIVE")
+        local threshold=$(get_var "BAT_SAVER_THRESHOLD")
+        local forced=$(get_var "BAT_SAVER_FORCED")
+        local current_active=$(get_var "BAT_SAVER_ACTIVE")
+        local crit_thresh=$(get_var "BAT_NOTIFY_CRITICAL_THRESHOLD")
+        local low_thresh=$(get_var "BAT_NOTIFY_THRESHOLD")
 
-        : ${saver_threshold:=20}
-        : ${notify_threshold:=30}
-        : ${critical_threshold:=15}
-        : ${current_saver_state:="false"}
+        : ${threshold:=20}
+        : ${forced:="false"}
+        : ${current_active:="false"}
+        : ${crit_thresh:=15}
+        : ${low_thresh:=30}
 
         if [[ "$current_stat" != "$last_stat" ]]; then
             [[ "$current_stat" == "charging" ]] && notify-send -i battery-charging "󱐋 Power Connected"
@@ -84,21 +109,39 @@ run_loop() {
             last_stat="$current_stat"
         fi
 
-        local target_state="$current_saver_state"
+        local target_state="$current_active"
 
-        if [[ "$current_stat" == "discharging" || "$current_stat" == "full" ]]; then
-            if [[ "$current_cap" -le "$saver_threshold" ]]; then
-                target_state="true"
+        if [[ "$forced" == "true" ]]; then
+            target_state="$current_active"
+        else
+            if [[ "$current_stat" == "discharging" || "$current_stat" == "full" ]]; then
+                if [[ "$threshold" -ne 0 && "$current_cap" -le "$threshold" ]]; then
+                    target_state="true"
+                else
+                    target_state="false"
+                fi
             else
                 target_state="false"
             fi
+        fi
 
-            if [[ "$current_cap" -le "$critical_threshold" ]]; then
+        if [[ "$target_state" != "$current_active" ]]; then
+            set_var "BAT_SAVER_ACTIVE" "$target_state"
+
+            if [[ "$target_state" == "true" ]]; then
+                notify-send -u normal -i power-profile-saver "󰂯 Battery Saver" "Optimization Enabled ($current_cap%)"
+            else
+                notify-send -u normal -i power-profile-balanced "󰂯 Battery Saver" "Performance Restored"
+            fi
+        fi
+
+        if [[ "$current_stat" == "discharging" ]]; then
+            if [[ "$current_cap" -le "$crit_thresh" ]]; then
                 if [[ "$current_cap" -ne "$last_critical_notified" ]]; then
                     notify-send -u critical -i battery-empty "󰂃 Battery Critical!" "Level: ${current_cap}%"
                     last_critical_notified="$current_cap"
                 fi
-            elif [[ "$current_cap" -le "$notify_threshold" ]]; then
+            elif [[ "$current_cap" -le "$low_thresh" ]]; then
                 if [[ "$current_cap" -ne "$last_notified_cap" ]]; then
                     notify-send -u normal -i battery-low "󰂃 Battery Low" "Level: ${current_cap}%"
                     last_notified_cap="$current_cap"
@@ -107,17 +150,6 @@ run_loop() {
         else
             last_notified_cap=0
             last_critical_notified=0
-            target_state="false"
-        fi
-
-        if [[ "$target_state" != "$current_saver_state" ]]; then
-            bash "$RETRO_DIR/scripts/var_core.sh" set "BAT_SAVER_ACTIVE" "$target_state"
-
-            if [[ "$target_state" == "true" ]]; then
-                notify-send -u normal -i power-profile-saver "󰂯 Battery Saver" "Optimization Active ($current_cap%)"
-            else
-                notify-send -u normal -i power-profile-balanced "󰂯 Battery Saver" "Performance Restored"
-            fi
         fi
 
         sleep 5
@@ -125,9 +157,9 @@ run_loop() {
 }
 
 case "$1" in
-"--raw") get_status_raw ;;
-"--info") get_info ;;
-"--limit") set_limit "$2" ;;
-"--loop") run_loop ;;
-"--saver") set_saver "$2" ;;
+"raw") get_status_raw ;;
+"info") get_info ;;
+"limit") set_limit "$2" ;;
+"loop") run_loop ;;
+"saver") set_saver "$2" "$3" ;;
 esac
