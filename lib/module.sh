@@ -1,6 +1,5 @@
 #!/bin/bash
-#TODO: Add y/n for pkg.list
-#TODO Add the option to check the module for a post.sh or pre.sh to run acordingly
+
 run_task() {
     local type="$1"
     local module="$2"
@@ -24,6 +23,8 @@ execute_logic() {
 
     local mod_path="$RETRO_DIR/modules/$name"
     local script="$mod_path/${type}.sh"
+    local pre_script="$mod_path/pre.sh"
+    local post_script="$mod_path/post.sh"
 
     if [[ ! -d "$mod_path" ]]; then
         rx_log "error" "Module '$name' not found in $RETRO_DIR/modules/"
@@ -39,18 +40,36 @@ execute_logic() {
         }
     fi
 
+    if [[ -f "$pre_script" ]]; then
+        rx_log "info" "Running pre-hook for $name..."
+        (cd "$mod_path" && bash "./pre.sh" "$type")
+    fi
+
     if [[ "$type" == "install" || "$type" == "mirror" ]]; then
         if [[ -f "$mod_path/pkg.list" ]]; then
-            rx_log "info" "Syncing dependencies for $name..."
-            rx_pkg_install "$mod_path/pkg.list"
+            echo -ne " ${PINK}󰄾${RESET} Sync dependencies for ${PINK}$name${RESET}? [Y/n]: "
+            read -r pkg_opt
+
+            if [[ ! "$pkg_opt" =~ ^[Nn]$ ]]; then
+                rx_log "info" "Syncing dependencies for $name..."
+                rx_pkg_install "$mod_path/pkg.list"
+            else
+                rx_log "warn" "Skipping dependencies for $name"
+            fi
         fi
     fi
 
     if [[ "$type" == "uninstall" && -f "$mod_path/pkg.list" ]]; then
         local pkgs=$(grep -v '^#' "$mod_path/pkg.list" | xargs)
+
         if [[ -n "$pkgs" ]]; then
-            rx_log "info" "Purging dependencies for $name..."
-            sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
+            echo -ne " ${PINK}󰄾${RESET} Purge dependencies for ${PINK}$name${RESET}? [y/N]: "
+            read -r purge_opt
+
+            if [[ "$purge_opt" =~ ^[Yy]$ ]]; then
+                rx_log "info" "Purging dependencies for $name..."
+                sudo pacman -Rs $pkgs --noconfirm 2>/dev/null
+            fi
         fi
     fi
 
@@ -65,6 +84,11 @@ execute_logic() {
         "mirror") rx_default_mirror "$name" ;;
         "uninstall") rx_default_uninstall "$name" ;;
         esac
+    fi
+
+    if [[ -f "$post_script" ]]; then
+        rx_log "info" "Running post-hook for $name..."
+        (cd "$mod_path" && bash "./post.sh" "$type")
     fi
 }
 
