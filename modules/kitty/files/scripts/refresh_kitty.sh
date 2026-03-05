@@ -1,14 +1,7 @@
 #!/bin/bash
 
-VARS="$HOME/.config/hypr/scripts/vars.sh"
+OPACITY=$(retro -var get transparency)
 THEME_FILE="$HOME/.cache/retro/themes/kitty-colors.conf"
-
-CURRENT_STATE=$(bash "$VARS" get transparency)
-if [ "$CURRENT_STATE" = "true" ]; then
-    OPACITY="0.85"
-else
-    OPACITY="1.0"
-fi
 
 apply_theme() {
     local target=$1
