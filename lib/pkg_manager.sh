@@ -22,39 +22,39 @@ rx_bootstrap_pkg_manager() {
     read -r choice
 
     case "$choice" in
-    1)
-        local helper="yay"
-        if $has_yay; then
-            rx_log "info" "Syncing system via yay..."
+        1)
+            local helper="yay"
+            if $has_yay; then
+                rx_log "info" "Syncing system via yay..."
 
-            yay -Syu --noconfirm
-        else
-            rx_install_helper "$helper"
-        fi
+                yay -Syu --noconfirm
+            else
+                rx_install_helper "$helper"
+            fi
 
-        bash "$RETRO_VAR" set "RETRO_PKG_HELPER" "$helper"
-        ;;
-    2)
-        local helper="paru"
-        if $has_paru; then
-            rx_log "info" "Syncing system via paru..."
+            bash "$RETRO_VAR" set "RETRO_PKG_HELPER" "$helper"
+            ;;
+        2)
+            local helper="paru"
+            if $has_paru; then
+                rx_log "info" "Syncing system via paru..."
 
-            paru -Syu --noconfirm
-        else
-            rx_install_helper "$helper"
-        fi
+                paru -Syu --noconfirm
+            else
+                rx_install_helper "$helper"
+            fi
 
-        bash "$RETRO_VAR" set "RETRO_PKG_HELPER" "$helper"
-        ;;
-    *)
-        return 0
-        ;;
+            bash "$RETRO_VAR" set "RETRO_PKG_HELPER" "$helper"
+            ;;
+        *)
+            return 0
+            ;;
     esac
 }
 
 rx_install_helper() {
     local target="$1"
-    [[ -z "$target" ]] && return 1
+    [[ -z $target ]] && return 1
 
     rx_log "info" "Installing ${PINK}${target}${RESET}..."
 

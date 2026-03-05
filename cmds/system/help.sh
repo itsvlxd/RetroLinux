@@ -13,8 +13,8 @@ show_usage() {
         local aliases="${remainder%|*}"
         local desc="${remainder##*|}"
 
-        if [[ "$group" != "$current_group" ]]; then
-            if [[ -n "$current_group" ]]; then
+        if [[ $group != "$current_group" ]]; then
+            if [[ -n $current_group ]]; then
                 echo ""
             fi
 
@@ -23,7 +23,7 @@ show_usage() {
         fi
 
         local display_aliases=$(echo "$aliases" | sed 's/|/, /g')
-        printf "    ${PINK}%-16s ${GRAY}-${RESET} %s\n" "$display_aliases" "$desc"
+        printf "    ${PINK}%-20s ${GRAY}-${RESET} %s\n" "$display_aliases" "$desc"
     done
 
     echo ""

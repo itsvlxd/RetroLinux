@@ -3,11 +3,11 @@
 cmd_version() {
     local version=$(rx_git_run describe --tags --abbrev=0 2>/dev/null)
 
-    if [[ -z "$version" ]]; then
+    if [[ -z $version ]]; then
         version=$(rx_git_run rev-parse --short HEAD 2>/dev/null)
     fi
 
-    if [[ -z "$version" ]]; then
+    if [[ -z $version ]]; then
         version="rolling-release"
     fi
 

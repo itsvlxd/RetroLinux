@@ -1,16 +1,15 @@
 #!/bin/bash
 
-# TODO: If battery = static wallpapers
-
 BAT_PATH=$(find /sys/class/power_supply/ -name "BAT*" | head -n 1)
 AC_PATH=$(find /sys/class/power_supply/ \( -name "AC*" -o -name "ADP*" \) | head -n 1)
-VAR_SCRIPT="$RETRO_DIR/scripts/var_core.sh"
+VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
+WALL_SCRIPT="$RETRO_DIR/scripts/wallpaper_core.sh"
 
 get_var() { bash "$VAR_SCRIPT" get "$1"; }
 set_var() { bash "$VAR_SCRIPT" set "$1" "$2"; }
 
 get_status_raw() {
-    if [[ -z "$AC_PATH" ]]; then
+    if [[ -z $AC_PATH ]]; then
         cat "$BAT_PATH/status" 2>/dev/null | tr '[:upper:]' '[:lower:]'
         return
     fi
@@ -18,8 +17,8 @@ get_status_raw() {
     local ac_online=$(cat "$AC_PATH/online" 2>/dev/null || echo "0")
     local cap=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "0")
 
-    if [[ "$ac_online" -eq 1 ]]; then
-        [[ "$cap" -eq 100 ]] && echo "full" || echo "charging"
+    if [[ $ac_online -eq 1 ]]; then
+        [[ $cap -eq 100 ]] && echo "full" || echo "charging"
     else
         echo "discharging"
     fi
@@ -34,14 +33,14 @@ get_info() {
     local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")
     local saver=$(get_var "BAT_SAVER_ACTIVE")
 
-    if [[ "$p_raw" -eq 0 ]]; then
+    if [[ $p_raw -eq 0 ]]; then
         local i_raw=$(cat "$BAT_PATH/current_now" 2>/dev/null || echo "0")
         p_raw=$((i_raw * v_raw / 1000000))
     fi
 
     local saver_label="OFF"
 
-    if [[ "$saver" == "true" ]]; then
+    if [[ $saver == "true" ]]; then
         saver_label="ON"
     fi
 
@@ -52,20 +51,20 @@ set_limit() {
     local limit="$1"
     local path="$BAT_PATH/charge_control_end_threshold"
 
-    [[ -f "$path" ]] && echo "$limit" | sudo tee "$path" >/dev/null || return 1
+    [[ -f $path ]] && echo "$limit" | sudo tee "$path" >/dev/null || return 1
 }
 
 set_saver() {
     local val="$1"
     local force="$2"
 
-    if [[ "$val" == "true" ]]; then
+    if [[ $val == "true" ]]; then
         set_var "BAT_SAVER_FORCED" "true"
         set_var "BAT_SAVER_ACTIVE" "true"
         return 0
 
-    elif [[ "$val" == "false" ]]; then
-        if [[ "$force" == "-f" || "$force" == "--force" ]]; then
+    elif [[ $val == "false" ]]; then
+        if [[ $force == "-f" || $force == "--force" ]]; then
             set_var "BAT_SAVER_FORCED" "true"
             set_var "BAT_SAVER_ACTIVE" "false"
         else
@@ -73,7 +72,7 @@ set_saver() {
         fi
         return 0
 
-    elif [[ "$val" =~ ^[0-9]+$ ]]; then
+    elif [[ $val =~ ^[0-9]+$ ]]; then
         set_var "BAT_SAVER_THRESHOLD" "$val"
         set_var "BAT_SAVER_FORCED" "false"
         return 0
@@ -84,6 +83,7 @@ set_saver() {
 
 run_loop() {
     local last_stat=$(get_status_raw)
+    local last_active=$(get_var "BAT_SAVER_ACTIVE")
     local last_notified_cap=0
     local last_critical_notified=0
 
@@ -103,19 +103,19 @@ run_loop() {
         : ${crit_thresh:=15}
         : ${low_thresh:=30}
 
-        if [[ "$current_stat" != "$last_stat" ]]; then
-            [[ "$current_stat" == "charging" ]] && notify-send -i battery-charging "󱐋 Power Connected"
-            [[ "$current_stat" == "discharging" ]] && notify-send -i battery-caution "󰂃 Power Disconnected"
+        if [[ $current_stat != "$last_stat" ]]; then
+            [[ $current_stat == "charging" || $current_stat == "full" ]] && notify-send -i battery-charging "󱐋 Power Connected"
+            [[ $current_stat == "discharging" ]] && notify-send -i battery-caution "󰂃 Power Disconnected"
             last_stat="$current_stat"
         fi
 
         local target_state="$current_active"
 
-        if [[ "$forced" == "true" ]]; then
+        if [[ $forced == "true" ]]; then
             target_state="$current_active"
         else
-            if [[ "$current_stat" == "discharging" || "$current_stat" == "full" ]]; then
-                if [[ "$threshold" -ne 0 && "$current_cap" -le "$threshold" ]]; then
+            if [[ $current_stat == "discharging" || $current_stat == "full" ]]; then
+                if [[ $threshold -ne 0 && $current_cap -le $threshold ]]; then
                     target_state="true"
                 else
                     target_state="false"
@@ -125,24 +125,28 @@ run_loop() {
             fi
         fi
 
-        if [[ "$target_state" != "$current_active" ]]; then
+        if [[ $target_state != "$last_active" ]]; then
             set_var "BAT_SAVER_ACTIVE" "$target_state"
 
-            if [[ "$target_state" == "true" ]]; then
+            bash "$WALL_SCRIPT" --restore
+
+            if [[ $target_state == "true" ]]; then
                 notify-send -u normal -i power-profile-saver "󰂯 Battery Saver" "Optimization Enabled ($current_cap%)"
             else
                 notify-send -u normal -i power-profile-balanced "󰂯 Battery Saver" "Performance Restored"
             fi
+
+            last_active="$target_state"
         fi
 
-        if [[ "$current_stat" == "discharging" ]]; then
-            if [[ "$current_cap" -le "$crit_thresh" ]]; then
-                if [[ "$current_cap" -ne "$last_critical_notified" ]]; then
+        if [[ $current_stat == "discharging" ]]; then
+            if [[ $current_cap -le $crit_thresh ]]; then
+                if [[ $current_cap -ne $last_critical_notified ]]; then
                     notify-send -u critical -i battery-empty "󰂃 Battery Critical!" "Level: ${current_cap}%"
                     last_critical_notified="$current_cap"
                 fi
-            elif [[ "$current_cap" -le "$low_thresh" ]]; then
-                if [[ "$current_cap" -ne "$last_notified_cap" ]]; then
+            elif [[ $current_cap -le $low_thresh ]]; then
+                if [[ $current_cap -ne $last_notified_cap ]]; then
                     notify-send -u normal -i battery-low "󰂃 Battery Low" "Level: ${current_cap}%"
                     last_notified_cap="$current_cap"
                 fi
@@ -152,14 +156,16 @@ run_loop() {
             last_critical_notified=0
         fi
 
+        last_active=$(get_var "BAT_SAVER_ACTIVE")
+
         sleep 5
     done
 }
 
 case "$1" in
-"raw") get_status_raw ;;
-"info") get_info ;;
-"limit") set_limit "$2" ;;
-"loop") run_loop ;;
-"saver") set_saver "$2" "$3" ;;
+    "raw") get_status_raw ;;
+    "info") get_info ;;
+    "limit") set_limit "$2" ;;
+    "loop") run_loop ;;
+    "saver") set_saver "$2" "$3" ;;
 esac

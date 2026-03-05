@@ -5,7 +5,7 @@ rx_optimize_pacman() {
     echo -ne " ${PINK}󰄾 ${RESET}Allow retro to modify pacman.conf? [y/N]: "
     read -r allow
 
-    if [[ ! "$allow" =~ ^[Yy]$ ]]; then
+    if [[ ! $allow =~ ^[Yy]$ ]]; then
         rx_log "info" "Optimization skipped."
         return 0
     fi

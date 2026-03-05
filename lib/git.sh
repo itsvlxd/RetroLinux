@@ -16,8 +16,8 @@ rx_git_commit() {
 
 rx_git_version() {
     local version=$(rx_git_run describe --tags --abbrev=0)
-    [[ -z "$version" ]] && version=$(rx_git_commit)
-    [[ "$version" == "N/A" ]] && version="Latest"
+    [[ -z $version ]] && version=$(rx_git_commit)
+    [[ $version == "N/A" ]] && version="Latest"
 
     echo "$version"
 }

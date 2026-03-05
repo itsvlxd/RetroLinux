@@ -3,7 +3,6 @@ mode = "dark"
 contrast = 0.2
 lightness_dark = -0.1
 source_color_index = 0
-scheme_type = "fruit-salad"
 
 [templates.hyprland]
 input_path = '~/.config/matugen/templates/hyprland.conf'

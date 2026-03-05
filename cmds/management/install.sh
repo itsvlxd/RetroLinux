@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cmd_install() {
-    local target="${1:-all}"
+    local target="${1}"
 
     rx_log "info" "Starting installation for: ${PINK}${target:-all}${RESET}"
 

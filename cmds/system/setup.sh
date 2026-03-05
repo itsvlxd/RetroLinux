@@ -1,12 +1,23 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/setup/wallpapers.sh"
+source "$RETRO_DIR/lib/setup/pacman.sh"
+source "$RETRO_DIR/lib/setup/vars.sh"
+
 cmd_setup() {
     rx_logo
     rx_log "info" "Setting up RetroArch..."
 
+    SKIP_PROMPT=true
+
+    execute_logic "install" "retro"
+
     rx_vars_defaults "$1"
+
     rx_optimize_pacman
     rx_bootstrap_pkg_manager
+
+    rx_setup_wallpapers
 
     rx_log "success" "Setup complete!"
 
