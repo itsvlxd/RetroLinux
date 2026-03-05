@@ -1,12 +1,12 @@
 #!/bin/bash
 
-if [[ -z "$RETRO_DIR" ]]; then
+if [[ -z $RETRO_DIR ]]; then
     export RETRO_DIR="$(dirname "$(readlink -f "$0")")"
 else
     export RETRO_DIR="$RETRO_DIR"
 fi
 
-if [[ -z "$RETRO_CACHE" ]]; then
+if [[ -z $RETRO_CACHE ]]; then
     export RETRO_CACHE="$HOME/.cache/retro"
 else
     export RETRO_CACHE="$RETRO_CACHE"
@@ -17,26 +17,24 @@ mkdir -p $RETRO_CACHE
 declare -a CMDS_HELP
 declare -A CMDS_EXEC
 
-RETRO_VAR="$RETRO_DIR/scripts/var_core.sh"
+RETRO_VAR="$RETRO_DIR/scripts/variable_core.sh"
 
 source "$RETRO_DIR/lib/fs.sh"
 source "$RETRO_DIR/lib/git.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/pkg.sh"
-source "$RETRO_DIR/lib/vars.sh"
 source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/module.sh"
-source "$RETRO_DIR/lib/pacman.sh"
-source "$RETRO_DIR/lib/manager.sh"
+source "$RETRO_DIR/lib/pkg_manager.sh"
 
 SKIP_PROMPT=false
 CLEAN_ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
-    -y | --yes) SKIP_PROMPT=true ;;
-    *) CLEAN_ARGS+=("$arg") ;;
+        -y | --yes) SKIP_PROMPT=true ;;
+        *) CLEAN_ARGS+=("$arg") ;;
     esac
 done
 
@@ -60,13 +58,13 @@ register_command() {
 if [ -d "$RETRO_DIR/cmds" ]; then
     shopt -s globstar
     for f in "$RETRO_DIR/cmds"/**/*.sh; do
-        [[ -f "$f" ]] || continue
+        [[ -f $f ]] || continue
         source "$f"
     done
     shopt -u globstar
 fi
 
-if [[ -z "$CMD" || "$CMD" == "-h" || "$CMD" == "--help" ]]; then
+if [[ -z $CMD || $CMD == "-h" || $CMD == "--help" ]]; then
     if command -v show_usage >/dev/null; then
         show_usage
     else
@@ -75,7 +73,7 @@ if [[ -z "$CMD" || "$CMD" == "-h" || "$CMD" == "--help" ]]; then
     exit 0
 fi
 
-if [[ -n "${CMDS_EXEC[$CMD]}" ]]; then
+if [[ -n ${CMDS_EXEC[$CMD]} ]]; then
     ${CMDS_EXEC[$CMD]} "${CLEAN_ARGS[@]:1}"
 else
     rx_log "error" "Unrecognized option: $CMD"

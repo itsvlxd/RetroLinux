@@ -6,7 +6,7 @@ rx_link() {
 
     mkdir -p "$(dirname "$target_on_system")"
 
-    if [[ -e "$target_on_system" && ! -L "$target_on_system" ]]; then
+    if [[ -e $target_on_system && ! -L $target_on_system ]]; then
         rx_log "warn" "Found existing data at $target_on_system. Creating backup..."
         mv "$target_on_system" "${target_on_system}.bak"
     fi
@@ -26,7 +26,7 @@ rx_mirror_pull() {
 
     mkdir -p "$repo_data_path"
 
-    if [[ -d "$system_path" ]]; then
+    if [[ -d $system_path ]]; then
         rsync -av --delete \
             --exclude='**lock' --exclude='**Cache**' --exclude='**tmp**' \
             "$system_path/" "$repo_data_path/"
@@ -41,17 +41,17 @@ rx_mirror_install() {
 
     rx_log "info" "Installing physical copies to $system_path"
 
-    if [[ -L "$system_path" ]]; then
+    if [[ -L $system_path ]]; then
         rx_log "warn" "Removing existing symlink at $system_path"
         unlink "$system_path"
-    elif [[ -e "$system_path" ]]; then
+    elif [[ -e $system_path ]]; then
         rx_log "warn" "Found real data at $system_path. Creating backup..."
         mv "$system_path" "${system_path}.bak"
     fi
 
     mkdir -p "$(dirname "$system_path")"
 
-    if [[ -d "$repo_data_path" ]]; then
+    if [[ -d $repo_data_path ]]; then
         mkdir -p "$system_path"
         rsync -av --delete "$repo_data_path/" "$system_path/"
     else
@@ -63,9 +63,9 @@ rx_mirror_install() {
 
 rx_sanitize() {
     local target_dir="$1"
-    if [[ -f "$target_dir" ]]; then
+    if [[ -f $target_dir ]]; then
         sed -i "s|/home/[^/]*|/home/$USER|g" "$target_dir" 2>/dev/null
-    elif [[ -d "$target_dir" ]]; then
+    elif [[ -d $target_dir ]]; then
         rx_log "info" "Sanitizing user paths in $target_dir"
         find "$target_dir" -type f \( -name "*.json" -o -name "*.conf" -o -name "prefs.js" \) \
             -exec sed -i "s|/home/[^/]*|/home/$USER|g" {} + 2>/dev/null
@@ -76,12 +76,12 @@ rx_restore() {
     local target="$1"
     local backup="${target}.bak"
 
-    if [[ -L "$target" || -e "$target" ]]; then
+    if [[ -L $target || -e $target ]]; then
         rx_log "info" "Removing system files at $target"
         rm -rf "$target"
     fi
 
-    if [[ -e "$backup" ]]; then
+    if [[ -e $backup ]]; then
         mv "$backup" "$target"
         rx_log "success" "Backup restored to $target"
     else

@@ -2,12 +2,12 @@
 
 rx_pkg_install() {
     local list_file="$1"
-    if [[ ! -f "$list_file" ]]; then
+    if [[ ! -f $list_file ]]; then
         return 0
     fi
 
     local pkgs=$(grep -v '^#' "$list_file" | xargs)
-    if [[ -z "$pkgs" ]]; then
+    if [[ -z $pkgs ]]; then
         return 0
     fi
 

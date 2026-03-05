@@ -8,26 +8,26 @@ rx_log() {
     local color=""
 
     case "${level^^}" in
-    "INFO")
-        icon=" "
-        color="$PINK"
-        ;;
-    "SUCCESS")
-        icon=" "
-        color="$SUCCESS"
-        ;;
-    "WARN")
-        icon=" "
-        color="$WARN"
-        ;;
-    "ERROR")
-        icon="󰅙 "
-        color="$ERROR"
-        ;;
-    *)
-        icon="󰀦 "
-        color="$RESET"
-        ;;
+        "INFO")
+            icon=" "
+            color="$PINK"
+            ;;
+        "SUCCESS")
+            icon=" "
+            color="$SUCCESS"
+            ;;
+        "WARN")
+            icon=" "
+            color="$WARN"
+            ;;
+        "ERROR")
+            icon="󰅙 "
+            color="$ERROR"
+            ;;
+        *)
+            icon="󰀦 "
+            color="$RESET"
+            ;;
     esac
 
     echo -e "${color}[${icon}${level}]${RESET} ${message}"
