@@ -48,9 +48,10 @@ set_wallpaper() {
     local color_source=$(generate_cache "$wall_path")
 
     if [[ $engine == "matugen" ]]; then
-        matugen image "$color_source" --source-color-index 0
+        matugen image -b wal "$color_source" --source-color-index 0
     else
         wal -i "$color_source" -n -q -e
+
     fi
 
     pkill mpvpaper
