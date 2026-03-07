@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPACITY=$(retro -var get transparency)
+OPACITY=$(retro -var get THM_TRANSPARENCY)
 THEME_FILE="$HOME/.cache/retro/themes/kitty-colors.conf"
 
 apply_theme() {

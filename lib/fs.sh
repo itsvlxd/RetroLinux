@@ -4,17 +4,23 @@ rx_link() {
     local source_in_repo=$(readlink -f "$1")
     local target_on_system="$2"
 
-    mkdir -p "$(dirname "$target_on_system")"
+    if [[ -L $target_on_system ]]; then
+        if [[ "$(readlink -f "$target_on_system")" == "$source_in_repo" ]]; then
+            return 0
+        fi
+    fi
 
     if [[ -e $target_on_system && ! -L $target_on_system ]]; then
-        rx_log "warn" "Found existing data at $target_on_system. Creating backup..."
+        rx_log "warn" "Found existing data at $target_on_system. Backing up..."
         mv "$target_on_system" "${target_on_system}.bak"
     fi
 
-    if ln -sf "$source_in_repo" "$target_on_system"; then
-        rx_log "success" "Linked to $target_on_system"
+    mkdir -p "$(dirname "$target_on_system")"
+
+    if ln -sfnT "$source_in_repo" "$target_on_system"; then
+        rx_log "success" "Linked: ${PINK}$(basename "$target_on_system")${RESET}"
     else
-        rx_log "error" "Failed to create link at $target_on_system"
+        rx_log "error" "Failed to link $target_on_system"
     fi
 }
 
@@ -39,23 +45,21 @@ rx_mirror_install() {
     local repo_data_path="$1"
     local system_path="$2"
 
+    if [[ -e $system_path && ! -L $system_path ]]; then
+        return 0
+    fi
+
     rx_log "info" "Installing physical copies to $system_path"
 
-    if [[ -L $system_path ]]; then
-        rx_log "warn" "Removing existing symlink at $system_path"
-        unlink "$system_path"
-    elif [[ -e $system_path ]]; then
-        rx_log "warn" "Found real data at $system_path. Creating backup..."
-        mv "$system_path" "${system_path}.bak"
-    fi
+    [[ -L $system_path ]] && unlink "$system_path"
 
     mkdir -p "$(dirname "$system_path")"
 
     if [[ -d $repo_data_path ]]; then
         mkdir -p "$system_path"
-        rsync -av --delete "$repo_data_path/" "$system_path/"
+        rsync -a --delete "$repo_data_path/" "$system_path/"
     else
-        rsync -av "$repo_data_path" "$system_path"
+        rsync -a "$repo_data_path" "$system_path"
     fi
 
     rx_sanitize "$system_path"
@@ -63,11 +67,13 @@ rx_mirror_install() {
 
 rx_sanitize() {
     local target_dir="$1"
+
+    [[ -d $target_dir ]] && rx_log "info" "Sanitizing paths for $USER..."
+
     if [[ -f $target_dir ]]; then
         sed -i "s|/home/[^/]*|/home/$USER|g" "$target_dir" 2>/dev/null
     elif [[ -d $target_dir ]]; then
-        rx_log "info" "Sanitizing user paths in $target_dir"
-        find "$target_dir" -type f \( -name "*.json" -o -name "*.conf" -o -name "prefs.js" \) \
+        find "$target_dir" -type f \( -name "*.json" -o -name "*.conf" -o -name "*.toml" \) \
             -exec sed -i "s|/home/[^/]*|/home/$USER|g" {} + 2>/dev/null
     fi
 }

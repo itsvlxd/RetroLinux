@@ -2,7 +2,7 @@
 contrast = 1.0
 base16_backend = "wal"
 source_color_index = 0
-type = "scheme-rainbow"
+type = "scheme-vibrant"
 
 [templates.hyprland]
 input_path = '~/.config/matugen/templates/hyprland.conf'

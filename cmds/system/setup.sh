@@ -1,8 +1,10 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/setup/directories.sh"
 source "$RETRO_DIR/lib/setup/wallpapers.sh"
+source "$RETRO_DIR/lib/setup/variables.sh"
 source "$RETRO_DIR/lib/setup/pacman.sh"
-source "$RETRO_DIR/lib/setup/vars.sh"
+source "$RETRO_DIR/lib/setup/power.sh"
 
 cmd_setup() {
     rx_logo
@@ -12,7 +14,10 @@ cmd_setup() {
 
     execute_logic "install" "retro"
 
+    rx_default_directories
+
     rx_vars_defaults "$1"
+    rx_optimize_cpu_defaults
 
     rx_optimize_pacman
     rx_bootstrap_pkg_manager

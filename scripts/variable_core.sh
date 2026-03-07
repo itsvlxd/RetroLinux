@@ -32,22 +32,22 @@ del_var() {
 }
 
 case $1 in
-    "get")
+    "--get")
         get_var "$2"
         ;;
 
-    "set")
+    "--set")
         set_var "$2" "$3"
         ;;
-    "del")
+    "--del")
         del_var "$2"
         ;;
-    "toggle")
+    "--toggle")
         current_val=$(get_var "$2")
         [[ $current_val == "true" ]] && set_var "$2" "false" || set_var "$2" "true"
         get_var "$2"
         ;;
-    "list")
+    "--list")
         cat "$VARS_FILE" | sed 's/export //g'
         ;;
 esac
