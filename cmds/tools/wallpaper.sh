@@ -2,6 +2,7 @@
 
 cmd_wallpaper() {
     local wall_script="$RETRO_DIR/scripts/wallpaper_core.sh"
+    local var_script="$RETRO_DIR/scripts/variable_core.sh"
     local wall_dir="$HOME/.cache/retro/wallpapers"
     local action="$1"
     local value="$2"
@@ -9,17 +10,36 @@ cmd_wallpaper() {
 
     case "$action" in
         "set")
-            [[ -z $value ]] && rx_log "error" "Provide a wallpaper name or path." && return 1
+            [[ -z $value ]] && rx_log "error" "I need a wallpaper name or a path to set it." && return 1
 
             if bash "$wall_script" --set "$value"; then
-                rx_log "success" "Wallpaper set: ${PINK}${value}${RESET}"
+                rx_log "success" "Wallpaper's all set to: ${PINK}${value}${RESET}"
             else
-                rx_log "error" "Failed to set wallpaper: $value"
+                rx_log "error" "I couldn't set that wallpaper: $value"
             fi
+            ;;
+        "static")
+            local current_state=$(bash "$var_script" --get "WALL_STATIC_FORCED")
+            local new_state=""
+
+            case "$value" in
+                "on" | "true") new_state="true" ;;
+                "off" | "false") new_state="false" ;;
+                "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
+            esac
+
+            bash "$var_script" --set "WALL_STATIC_FORCED" "$new_state"
+
+            local status_text="${PINK}ENABLED${RESET}"
+            [[ $new_state == "false" ]] && status_text="${MUTE}DISABLED${RESET}"
+
+            rx_log "success" "Static mode is now $status_text"
+            rx_log "info" "Updating the wallpaper..."
+            bash "$wall_script" --restore
             ;;
 
         "list")
-            echo -e "\n ${PINK}󰸉 Available Wallpapers: ${RESET}$wall_dir"
+            echo -e "\n ${PINK}󰸉 Your Wallpapers: ${RESET}$wall_dir"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
             while read -r file; do
                 local icon="${PINK}󰋫${RESET}"
@@ -34,13 +54,13 @@ cmd_wallpaper() {
             ;;
 
         "cache")
-            rx_log "info" "Generating wallpaper frame cache..."
-            bash "$wall_script" --cache "$value" && rx_log "success" "Cache ready." || rx_log "error" "Cache failed."
+            rx_log "info" "Building the frame cache... this might take a second."
+            bash "$wall_script" --cache "$value" && rx_log "success" "Cache is ready." || rx_log "error" "I couldn't build the cache."
             ;;
 
         "restore")
-            rx_log "info" "Restoring wallpaper state..."
-            bash "$wall_script" --restore && rx_log "success" "Restored." || rx_log "error" "Nothing to restore."
+            rx_log "info" "Putting the wallpaper back how it was..."
+            bash "$wall_script" --restore && rx_log "success" "Wallpaper restored." || rx_log "error" "Nothing to restore."
             ;;
 
         "status")
@@ -58,17 +78,17 @@ cmd_wallpaper() {
                 type_icon="󰈫"
             fi
 
-            echo -e "\n ${PINK}󰸉 Wallpaper Engine${RESET}"
+            echo -e "\n ${PINK}󰸉 Wallpaper Status${RESET}"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}󰀻${RESET} %-14s %s\n" "Name:" "$wall_name"
-            printf " ${PINK}${type_icon}${RESET} %-14s %s\n" "Type:" "$type"
-            printf " ${PINK}󰉖${RESET} %-14s %s\n" "Location:" "${current_wall/$HOME/\~}"
+            printf " ${PINK}󰀻${RESET} %-14s %s\n" "Active:" "$wall_name"
+            printf " ${PINK}${type_icon}${RESET} %-14s %s\n" "Style:" "$type"
+            printf " ${PINK}󰉖${RESET} %-14s %s\n" "Path:" "${current_wall/$HOME/\~}"
             printf " ${PINK}󰓅${RESET} %-14s %s\n" "Engine:" "${engine^^}"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
             ;;
 
-        *) rx_log "info" "Usage: retro --wallpaper [set|list|picker|cache|restore|status]" ;;
+        *) rx_log "info" "Usage: retro --wallpaper [set|static|list|picker|cache|restore|status]" ;;
     esac
 }
 
-register_command "TOOLS" "-wall|--wallpaper" "Dynamic wallpaper and theme utility" "cmd_wallpaper"
+register_command "TOOLS" "-wall|--wallpaper" "Manage your wallpaper and theme" "cmd_wallpaper"

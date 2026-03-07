@@ -1,31 +1,13 @@
 #!/bin/bash
 
-BAT_PATH=$(find /sys/class/power_supply/ -name "BAT*" | head -n 1)
-AC_PATH=$(find /sys/class/power_supply/ \( -name "AC*" -o -name "ADP*" \) | head -n 1)
-VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
-WALL_SCRIPT="$RETRO_DIR/scripts/wallpaper_core.sh"
+source "$RETRO_DIR/scripts/lib/battery.sh"
+source "$RETRO_DIR/scripts/lib/variable.sh"
 
-get_var() { bash "$VAR_SCRIPT" get "$1"; }
-set_var() { bash "$VAR_SCRIPT" set "$1" "$2"; }
-
-get_status_raw() {
-    if [[ -z $AC_PATH ]]; then
-        cat "$BAT_PATH/status" 2>/dev/null | tr '[:upper:]' '[:lower:]'
-        return
-    fi
-
-    local ac_online=$(cat "$AC_PATH/online" 2>/dev/null || echo "0")
-    local cap=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "0")
-
-    if [[ $ac_online -eq 1 ]]; then
-        [[ $cap -eq 100 ]] && echo "full" || echo "charging"
-    else
-        echo "discharging"
-    fi
-}
+WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
+PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 
 get_info() {
-    local stat=$(get_status_raw)
+    local stat=$(get_bat_status)
     local cap=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "0")
     local health=$(cat "$BAT_PATH/capacity_level" 2>/dev/null || echo "N/A")
     local model=$(cat "$BAT_PATH/model_name" 2>/dev/null || echo "Generic")
@@ -81,91 +63,10 @@ set_saver() {
     return 1
 }
 
-run_loop() {
-    local last_stat=$(get_status_raw)
-    local last_active=$(get_var "BAT_SAVER_ACTIVE")
-    local last_notified_cap=0
-    local last_critical_notified=0
-
-    while true; do
-        local current_stat=$(get_status_raw)
-        local current_cap=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "0")
-
-        local threshold=$(get_var "BAT_SAVER_THRESHOLD")
-        local forced=$(get_var "BAT_SAVER_FORCED")
-        local current_active=$(get_var "BAT_SAVER_ACTIVE")
-        local crit_thresh=$(get_var "BAT_NOTIFY_CRITICAL_THRESHOLD")
-        local low_thresh=$(get_var "BAT_NOTIFY_THRESHOLD")
-
-        : ${threshold:=20}
-        : ${forced:="false"}
-        : ${current_active:="false"}
-        : ${crit_thresh:=15}
-        : ${low_thresh:=30}
-
-        if [[ $current_stat != "$last_stat" ]]; then
-            [[ $current_stat == "charging" || $current_stat == "full" ]] && notify-send -i battery-charging "󱐋 Power Connected"
-            [[ $current_stat == "discharging" ]] && notify-send -i battery-caution "󰂃 Power Disconnected"
-            last_stat="$current_stat"
-        fi
-
-        local target_state="$current_active"
-
-        if [[ $forced == "true" ]]; then
-            target_state="$current_active"
-        else
-            if [[ $current_stat == "discharging" || $current_stat == "full" ]]; then
-                if [[ $threshold -ne 0 && $current_cap -le $threshold ]]; then
-                    target_state="true"
-                else
-                    target_state="false"
-                fi
-            else
-                target_state="false"
-            fi
-        fi
-
-        if [[ $target_state != "$last_active" ]]; then
-            set_var "BAT_SAVER_ACTIVE" "$target_state"
-
-            bash "$WALL_SCRIPT" --restore
-
-            if [[ $target_state == "true" ]]; then
-                notify-send -u normal -i power-profile-saver "󰂯 Battery Saver" "Optimization Enabled ($current_cap%)"
-            else
-                notify-send -u normal -i power-profile-balanced "󰂯 Battery Saver" "Performance Restored"
-            fi
-
-            last_active="$target_state"
-        fi
-
-        if [[ $current_stat == "discharging" ]]; then
-            if [[ $current_cap -le $crit_thresh ]]; then
-                if [[ $current_cap -ne $last_critical_notified ]]; then
-                    notify-send -u critical -i battery-empty "󰂃 Battery Critical!" "Level: ${current_cap}%"
-                    last_critical_notified="$current_cap"
-                fi
-            elif [[ $current_cap -le $low_thresh ]]; then
-                if [[ $current_cap -ne $last_notified_cap ]]; then
-                    notify-send -u normal -i battery-low "󰂃 Battery Low" "Level: ${current_cap}%"
-                    last_notified_cap="$current_cap"
-                fi
-            fi
-        else
-            last_notified_cap=0
-            last_critical_notified=0
-        fi
-
-        last_active=$(get_var "BAT_SAVER_ACTIVE")
-
-        sleep 5
-    done
-}
-
 case "$1" in
-    "raw") get_status_raw ;;
-    "info") get_info ;;
-    "limit") set_limit "$2" ;;
-    "loop") run_loop ;;
-    "saver") set_saver "$2" "$3" ;;
+    "--raw") get_bat_status ;;
+    "--info") get_info ;;
+    "--limit") set_limit "$2" ;;
+    "--loop") run_loop ;;
+    "--saver") set_saver "$2" "$3" ;;
 esac

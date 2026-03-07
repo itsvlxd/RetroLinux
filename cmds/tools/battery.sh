@@ -8,10 +8,10 @@ cmd_battery() {
 
     case "$action" in
         "raw")
-            echo "$($battery_script raw)"
+            echo "$($battery_script --raw)"
             ;;
         "status")
-            local raw_output=$($battery_script info)
+            local raw_output=$($battery_script --info)
             IFS='|' read -r cap stat health power volt model saver <<<"$raw_output"
 
             local watts=$(awk "BEGIN {printf \"%.2f\", $power / 1000000}")
@@ -28,9 +28,9 @@ cmd_battery() {
 
             printf " ${theme_color}󰁹${RESET} %-14s %s%% (%s)\n" "Charge:" "$cap" "$stat"
             printf " ${theme_color}󰚥${RESET} %-14s %s\n" "Health:" "$health"
-            printf " ${theme_color}󱐋${RESET} %-14s %s W\n" "Usage:" "$watts"
+            printf " ${theme_color}󱐋${RESET} %-14s %s W\n" "Current Draw:" "$watts"
             printf " ${theme_color}󱈑${RESET} %-14s %s V\n" "Voltage:" "$volts"
-            printf " ${theme_color}󰌪${RESET} %-14s %s\n" "Saver:" "$saver"
+            printf " ${theme_color}󰌪${RESET} %-14s %s\n" "Saver Mode:" "$saver"
 
             echo -e " ${theme_color}󰇝${MUTE} ───────────────────────────────────────"
 
@@ -53,7 +53,7 @@ cmd_battery() {
             echo -e "]\n"
             ;;
         "limit")
-            $battery_script limit "$value" "$options" && rx_log "success" "Limit set to $2%" || rx_log "error" "Not supported"
+            $battery_script --limit "$value" "$options" && rx_log "success" "Battery limit is now $2%" || rx_log "error" "Your hardware doesn't support charge limits."
             ;;
         "saver")
             [[ -z $value ]] && rx_log "info" "Usage: retro --battery saver [true|false|0-100]" && return 1
@@ -63,28 +63,21 @@ cmd_battery() {
                 force_tag=" ${GRAY}(Forced)${RESET}"
             fi
 
-            if $battery_script saver "$value" "$options"; then
+            if $battery_script --saver "$value" "$options"; then
                 if [[ $value == "true" ]]; then
-                    rx_log "success" "Battery Saver: ${PINK}ON${RESET}$force_tag"
+                    rx_log "success" "Battery Saver is now ${PINK}ON${RESET}$force_tag"
                 elif [[ $value == "false" ]]; then
-                    rx_log "success" "Battery Saver: ${PINK}OFF${RESET}$force_tag"
+                    rx_log "success" "Battery Saver is now ${PINK}OFF${RESET}$force_tag"
                 elif [[ $value == "0" ]]; then
-                    rx_log "success" "Battery Saver threshold: ${PINK}Disabled${RESET}"
+                    rx_log "success" "Auto-saver is now ${PINK}disabled${RESET}."
                 else
-                    rx_log "success" "Battery Saver threshold set to: ${PINK}${value}%${RESET}"
+                    rx_log "success" "Got it. Auto-saver will kick in at ${PINK}${value}%${RESET}."
                 fi
             else
-                rx_log "error" "Could not update saver state."
+                rx_log "error" "Couldn't update the saver settings."
             fi
             ;;
-        "loop")
-            pkill -f "battery_core.sh loop"
-            rx_log "info" "Starting Battery Monitor Daemon..."
-
-            nohup bash "$battery_script" loop >/dev/null 2>&1 &
-            rx_log "success" "Daemon is now monitoring in background."
-            ;;
-        *) rx_log "info" "Usage: retro --battery [status|limit|saver|loop|raw]" ;;
+        *) rx_log "info" "Usage: retro --battery [status|limit|saver|raw]" ;;
     esac
 }
 
