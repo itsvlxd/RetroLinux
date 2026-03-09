@@ -37,7 +37,7 @@ set_wallpaper() {
     if [[ -f $input_path ]]; then
         wall_path="$input_path"
     elif [[ -f "$WALL_DIR/$input_path" ]]; then
-        wall_path="$wall_path"
+        wall_path="$WALL_DIR/$input_path"
     else
         return 1
     fi
@@ -46,41 +46,43 @@ set_wallpaper() {
     local is_video=false
     [[ $filename =~ \.(mp4|mkv|webm)$ ]] && is_video=true
 
+    local is_saver=$(get_var "BAT_SAVER_ACTIVE" "false")
+    local force_static=$(get_var "WALL_STATIC_FORCED" "false")
+    local static_on_bat=$(get_var "WALL_STATIC_ON_BAT" "false")
+    local on_bat=$(is_on_battery)
+
+    local should_be_static=false
+    if [[ $is_saver == "true" || $force_static == "true" ]]; then
+        should_be_static=true
+    elif [[ $on_bat == "true" && $static_on_bat == "true" ]]; then
+        should_be_static=true
+    fi
+
     local is_first_load=false
     if ! pgrep -x "awww-daemon" >/dev/null; then
         is_first_load=true
         nohup awww-daemon >/dev/null 2>&1 &
-        sleep 0.1
+        while ! awww query >/dev/null 2>&1; do sleep 0.05; done
     fi
 
     local static_source="$wall_path"
-    if [[ $is_video == "true" ]]; then
-        static_source=$(generate_cache "$wall_path")
-    fi
+    [[ $is_video == "true" ]] && static_source=$(generate_cache "$wall_path")
 
     if [[ $is_first_load == "true" ]]; then
-        awww img "$static_source" --transition-type fade --transition-duration 0
+        awww img "$static_source" --transition-type none
     else
         awww img "$static_source" --transition-type grow --transition-duration 2.5 --transition-fps 120
     fi
 
     (
+        pkill mpvpaper
+
         matugen image -b wal "$static_source" --source-color-index 0 >/dev/null 2>&1
 
-        if [[ $is_video == "true" ]]; then
-            local is_saver=$(get_var "BAT_SAVER_ACTIVE" "false")
-            local force_static=$(get_var "WALL_STATIC_FORCED" "false")
-            local static_on_bat=$(get_var "WALL_STATIC_ON_BAT" "false")
-            local on_bat=$(is_on_battery)
+        if [[ $is_video == "true" && $should_be_static == "false" ]]; then
+            [[ $is_first_load == "false" ]] && sleep 2.2
 
-            if [[ $is_saver == "false" && $force_static == "false" ]]; then
-                if [[ $on_bat == "false" || $static_on_bat == "false" ]]; then
-                    pkill mpvpaper
-                    [[ $is_first_load == "false" ]] && sleep 2.2
-
-                    NV_PRIME_RENDER_OFFLOAD=0 mpvpaper -o "--loop --hwdec=vaapi --panscan=1.0 --no-audio" "*" "$wall_path" &
-                fi
-            fi
+            NV_PRIME_RENDER_OFFLOAD=0 mpvpaper -o "--loop --hwdec=vaapi --panscan=1.0 --no-audio" "*" "$wall_path" &
         fi
     ) &
 
