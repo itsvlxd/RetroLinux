@@ -78,4 +78,4 @@ cmd_event() {
     esac
 }
 
-register_command "TOOLS" "-evt|--event" "Manage system events and hooks" "cmd_event"
+register_command "TOOLS" "-ev|--event" "Manage system events and hooks" "cmd_event"

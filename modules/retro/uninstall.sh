@@ -49,15 +49,17 @@ remove_retro_command() {
         fi
     done
 
-    if [[ $1 == "--purge" ]]; then
-        rx_log "warn" "Purging cache directory..."
-        rm -rf "$HOME/.cache/retro"
-        rx_log "success" "Cache cleared."
-    fi
+    #if [[ $1 == "--purge" ]]; then
+    #    rx_log "warn" "Purging cache directory..."
+    #    rm -rf "$HOME/.cache/retro"
+    #    rx_log "success" "Cache cleared."
+    #fi
 
     rx_log "success" "Uninstall complete. ${PINK}retro${RESET} is no longer global."
     rx_log "info" "Note: Environment changes require a logout/login to fully clear from Hyprland."
 }
+
+retro -fp uninstall
 
 remove_power_permissions
 remove_retro_command

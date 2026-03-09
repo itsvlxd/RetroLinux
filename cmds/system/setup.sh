@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # TODO: Add a default text editor variable
-# TODO: Make also a fingerprint setup if it detects that the device has
-# fingerprint capabilities
 
 source "$RETRO_DIR/lib/setup/directories.sh"
+source "$RETRO_DIR/lib/setup/fingerprint.sh"
 source "$RETRO_DIR/lib/setup/wallpapers.sh"
 source "$RETRO_DIR/lib/setup/variables.sh"
 source "$RETRO_DIR/lib/setup/pacman.sh"
@@ -27,6 +26,7 @@ cmd_setup() {
     rx_bootstrap_pkg_manager
 
     rx_setup_wallpapers
+    rx_setup_fingerprint
 
     rx_log "success" "Setup complete!"
 
