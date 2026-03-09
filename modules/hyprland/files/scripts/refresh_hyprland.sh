@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# TODO: Make a script that also generates custom windowrules
+# and make a variable like RETRO_OPACITY_SKIP awhich will be
+# a arrway of apps that will not be affected by the opacity
+# or even better i think I should make a variable array
+# of apps that should have opacity
+
 OUTPUT="$HOME/.cache/retro/themes/variables.conf"
 TEMP_FILE=$(mktemp)
 
