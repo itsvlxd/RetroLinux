@@ -35,7 +35,6 @@ cmd_fingerprint() {
                 rx_log "success" "Fingerprint registered!"
 
                 if ! grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
-                    echo ""
                     rx_log "info" "Enable biometric auth for sudo/login? ${PINK}[y/N]${RESET}: "
                     read -r auth_choice
                     [[ $auth_choice =~ ^[Yy]$ ]] && setup_pam_auth
