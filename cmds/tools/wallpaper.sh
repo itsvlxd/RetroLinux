@@ -91,4 +91,4 @@ cmd_wallpaper() {
     esac
 }
 
-register_command "TOOLS" "-wall|--wallpaper" "Manage your wallpaper and theme" "cmd_wallpaper"
+register_command "TOOLS" "-wal|--wallpaper" "Manage your wallpaper and theme" "cmd_wallpaper"

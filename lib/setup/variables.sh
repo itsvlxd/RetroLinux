@@ -1,21 +1,30 @@
 #!/bin/bash
 
+# TODO: Add the edit command which open the variables file
+# using the default text editor
+
 rx_vars_defaults() {
     local force_flag="$1"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
     local defaults=(
+        # Retro
+        "RETRO_ACTIVE_OPACITY|0.9"
+        "RETRO_INACTIVE_OPACITY|0.8"
+        "RETRO_ROUNDING|10"
+        "RETRO_GAP_IN|5"
+        "RETRO_GAP_OUT|20"
+
         # Battery
         "BAT_SAVER_THRESHOLD|50"
         "BAT_SAVER_ACTIVE|false"
         "BAT_SAVER_FORCED|false"
-        "BAT_SAVER_ON_PWR_DIS|true"
+        "BAT_SAVER_ON_PWR_DIS|false"
+
         "BAT_NOTIFY_THRESHOLD|30"
         "BAT_NOTIFY_CRITICAL_THRESHOLD|15"
 
-        # Theme
-        "THM_TRANSPARENCY|0.8"
-        "CLR_ENGINE|matugen"
+        # Wallpaper
         "WALL_STATIC_FORCED|false"
         "WALL_STATIC_ON_BAT|true"
 
@@ -28,6 +37,12 @@ rx_vars_defaults() {
         "PWR_AC_SAVER|15"
         "PWR_AC_BALANCED|28"
         "PWR_AC_PERFORMANCE|65"
+
+        # Kitty
+        "KITTY_FONT|JetBrainsMono Nerd Font"
+        "KITTY_FONT_SIZE|9.5"
+        "KITTY_PADDING_WIDTH|5"
+        "KITTY_PADDING_HEIGHT|5"
     )
 
     local count=0

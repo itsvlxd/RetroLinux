@@ -7,8 +7,17 @@ VARS_FILE="$VARS_DIR/variables.sh"
 [[ ! -f $VARS_FILE ]] && touch "$VARS_FILE"
 
 get_var() {
-    local key=$1
-    (source "$VARS_FILE" &>/dev/null && echo "${!key}")
+    local key="$1"
+
+    (
+        source "$VARS_FILE" &>/dev/null
+        if [[ -v $key ]]; then
+            echo "${!key}"
+            exit 0
+        else
+            exit 1
+        fi
+    )
 }
 
 set_var() {

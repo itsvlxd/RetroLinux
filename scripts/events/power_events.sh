@@ -8,6 +8,8 @@ BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
 VAR_CORE="$RETRO_DIR/scripts/variable_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 
+# TODO: Make a on idle event
+
 on_power_disconnect() {
     local cap="$1"
 
