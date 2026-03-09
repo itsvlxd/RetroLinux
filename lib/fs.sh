@@ -1,5 +1,19 @@
 #!/bin/bash
 
+rx_get_json() {
+    local file="$1"
+    local key="$2"
+    local default="$3"
+
+    if [[ -f $file ]] && command -v jq >/dev/null; then
+        local val=$(jq -r ".$key // empty" "$file")
+        val="${val/#\~/$HOME}"
+        echo "${val:-$default}"
+    else
+        echo "$default"
+    fi
+}
+
 rx_link() {
     local source_in_repo=$(readlink -f "$1")
     local target_on_system="$2"
@@ -11,7 +25,7 @@ rx_link() {
     fi
 
     if [[ -e $target_on_system && ! -L $target_on_system ]]; then
-        rx_log "warn" "Found existing data at $target_on_system. Backing up..."
+        rx_log "warn" "Found existing data at $target_on_system. Creating backup..."
         mv "$target_on_system" "${target_on_system}.bak"
     fi
 
@@ -28,16 +42,18 @@ rx_mirror_pull() {
     local system_path="$1"
     local repo_data_path="$2"
 
-    rx_log "info" "Pulling system files to repository"
+    [[ ! -e $system_path ]] && return 0
+
+    rx_log "info" "Pulling system files to repository..."
 
     mkdir -p "$repo_data_path"
 
     if [[ -d $system_path ]]; then
-        rsync -av --delete \
+        rsync -au --delete \
             --exclude='**lock' --exclude='**Cache**' --exclude='**tmp**' \
             "$system_path/" "$repo_data_path/"
     else
-        rsync -av "$system_path" "$repo_data_path/"
+        rsync -au "$system_path" "$repo_data_path/"
     fi
 }
 
@@ -66,14 +82,15 @@ rx_mirror_install() {
 }
 
 rx_sanitize() {
-    local target_dir="$1"
+    local target="$1"
 
-    [[ -d $target_dir ]] && rx_log "info" "Sanitizing paths for $USER..."
+    [[ ! -e $target ]] && return 0
 
-    if [[ -f $target_dir ]]; then
-        sed -i "s|/home/[^/]*|/home/$USER|g" "$target_dir" 2>/dev/null
-    elif [[ -d $target_dir ]]; then
-        find "$target_dir" -type f \( -name "*.json" -o -name "*.conf" -o -name "*.toml" \) \
+    if [[ -f $target ]]; then
+        sed -i "s|/home/[^/]*|/home/$USER|g" "$target" 2>/dev/null
+    elif [[ -d $target ]]; then
+        rx_log "info" "Sanitizing paths for $USER..."
+        find "$target" -type f \( -name "*.json" -o -name "*.conf" -o -name "*.toml" -o -name "*.yaml" \) \
             -exec sed -i "s|/home/[^/]*|/home/$USER|g" {} + 2>/dev/null
     fi
 }
@@ -91,6 +108,6 @@ rx_restore() {
         mv "$backup" "$target"
         rx_log "success" "Backup restored to $target"
     else
-        rx_log "warn" "No backup found for $target. System path is now clean."
+        rx_log "warn" "No backup found for $(basename "$target"). System path is now clean."
     fi
 }

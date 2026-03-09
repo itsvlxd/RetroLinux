@@ -48,7 +48,7 @@ cmd_power() {
 
             if bash "$pwr_script" --restore; then
                 local limit=$(bash "$pwr_script" --get-val "$current_mode")
-                rx_log "success" "Hardware refreshed (${limit}W applied)."
+                rx_log "success" "Hardware refreshed ${GRAY}(${limit}W Max Usage)${RESET}"
             else
                 rx_log "error" "Failed to refresh hardware."
             fi

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# TODO: Add a default text editor variable
+# TODO: Make also a fingerprint setup if it detects that the device has
+# fingerprint capabilities
+
 source "$RETRO_DIR/lib/setup/directories.sh"
 source "$RETRO_DIR/lib/setup/wallpapers.sh"
 source "$RETRO_DIR/lib/setup/variables.sh"

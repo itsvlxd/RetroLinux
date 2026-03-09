@@ -1,0 +1,40 @@
+#!/bin/bash
+
+OUTPUT="$HOME/.cache/retro/themes/variables.conf"
+TEMP_FILE=$(mktemp)
+
+mkdir -p "$(dirname "$OUTPUT")"
+
+get_val() {
+    local val=$(retro -var get "$1" 2>/dev/null)
+    echo "${val:-$2}"
+}
+
+ROUNDING=$(get_val "RETRO_ROUNDING" "10")
+GAP_IN=$(get_val "RETRO_GAP_IN" "5")
+GAP_OUT=$(get_val "RETRO_GAP_OUT" "20")
+TRANS=$(get_val "RETRO_ACTIVE_OPACITY" "1.0")
+INACTIVE_TRANS=$(get_val "RETRO_INACTIVE_OPACITY" "0.8")
+
+cat <<EOF >"$TEMP_FILE"
+##########################################
+###   RETRO AUTO-GENERATED VARIABLES   ###
+##########################################
+# Generated on: $(date)
+# Do not edit manually.
+
+\$retro_rounding = $ROUNDING
+\$retro_gap_in = $GAP_IN
+\$retro_gap_out = $GAP_OUT
+\$retro_opacity = $TRANS
+\$retro_inactive_opacity = $INACTIVE_TRANS
+EOF
+
+if mv "$TEMP_FILE" "$OUTPUT"; then
+    chmod 644 "$OUTPUT"
+
+    hyprctl reload >/dev/null 2>&1
+else
+    rm -f "$TEMP_FILE"
+    exit 1
+fi
