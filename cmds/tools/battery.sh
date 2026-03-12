@@ -20,23 +20,19 @@ cmd_battery() {
             [[ $watts == .* ]] && watts="0$watts"
             [[ $volts == .* ]] && volts="0$volts"
 
-            local theme_color="$PINK"
-            [[ $cap -lt 20 ]] && theme_color="\e[31m"
+            echo -e "\n ${PINK}󱐋 Battery: ${RESET}${model^^}"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
 
-            echo -e "\n ${theme_color}󱐋 Battery: ${RESET}${model^^}"
-            echo -e " ${theme_color}󰇝${MUTE} ───────────────────────────────────────"
+            printf " ${PINK}󰁹${RESET} %-14s %s%% (%s)\n" "Charge:" "$cap" "$stat"
+            printf " ${PINK}󰚥${RESET} %-14s %s\n" "Health:" "$health"
+            printf " ${PINK}󱐋${RESET} %-14s %s W\n" "Usage Draw:" "$watts"
+            printf " ${PINK}󱈑${RESET} %-14s %s V\n" "Voltage:" "$volts"
+            printf " ${PINK}󰌪${RESET} %-14s %s\n" "Saver Mode:" "$saver"
 
-            printf " ${theme_color}󰁹${RESET} %-14s %s%% (%s)\n" "Charge:" "$cap" "$stat"
-            printf " ${theme_color}󰚥${RESET} %-14s %s\n" "Health:" "$health"
-            printf " ${theme_color}󱐋${RESET} %-14s %s W\n" "Current Draw:" "$watts"
-            printf " ${theme_color}󱈑${RESET} %-14s %s V\n" "Voltage:" "$volts"
-            printf " ${theme_color}󰌪${RESET} %-14s %s\n" "Saver Mode:" "$saver"
-
-            echo -e " ${theme_color}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
 
             local filled=$((cap / 5))
-            local empty=$((20 - filled))
-            printf " ${theme_color}󰈈${RESET} ["
+            printf " ${PINK}󰈈${RESET} ["
 
             for ((i = 0; i < 20; i++)); do
                 if ((i < filled)); then

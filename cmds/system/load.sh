@@ -1,0 +1,93 @@
+#!/bin/bash
+
+cmd_load() {
+    local var_script="$RETRO_DIR/scripts/variable_core.sh"
+    local action="$1"
+
+    local startup_tasks=(
+        "retro --wallpaper restore|Applying last used wallpaper"
+        "retro --power restore|Restoring hardware power profiles"
+        "retro --event restart|Initializing event loop and custom hooks"
+        "wl-paste --type text --watch cliphist store|Starting cliphist text store watcher"
+        "wl-paste --type image --watch cliphist store|Starting cliphist image store watcher"
+    )
+
+    local custom_tasks=()
+    local custom_raw=$(bash "$var_script" --get "RETRO_CUSTOM_LOAD")
+
+    if [[ -n $custom_raw && $custom_raw != "null" ]]; then
+        IFS='|' read -ra custom_parts <<<"$custom_raw"
+        for c_cmd in "${custom_parts[@]}"; do
+            local clean_cmd=$(echo "$c_cmd" | xargs)
+            [[ -n $clean_cmd ]] && custom_tasks+=("$clean_cmd")
+        done
+    fi
+
+    local final_tasks=("${startup_tasks[@]}")
+    for c in "${custom_tasks[@]}"; do final_tasks+=("$c|Starting Custom User Tasks"); done
+
+    case "$action" in
+        "list")
+            echo -e "\n ${PINK}󱗼 Startup Sequence${RESET}"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+
+            for task in "${startup_tasks[@]}"; do
+                IFS='|' read -r cmd desc <<<"$task"
+                printf " ${PINK}󰄾${RESET} %-35s ${MUTE}\n   ${GRAY}%s\n" "$cmd" "$desc"
+            done
+
+            if [[ ${#custom_tasks[@]} -gt 0 ]]; then
+                echo -e "\n ${PINK}󱗼 Custom Sequence${RESET}"
+                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+                for task in "${custom_tasks[@]}"; do
+                    IFS='|' read -r cmd desc <<<"$task"
+                    [[ -n $cmd ]] && printf " ${PINK}󰄾${RESET} %-35s\n" "$cmd"
+                done
+            fi
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            ;;
+
+        "all" | "")
+            rx_log "info" "Syncing startup state..."
+
+            for task in "${final_tasks[@]}"; do
+                IFS='|' read -r cmd desc <<<"$task"
+
+                local bin_name=$(echo "$cmd" | awk '{print $1}')
+                local needs_kill=false
+                local pkill_cmd=""
+
+                if [[ $bin_name == "retro" ]]; then
+                    local sub_arg=$(echo "$cmd" | awk '{print $2}')
+                    if pgrep -f "retro $sub_arg" >/dev/null 2>&1; then
+                        needs_kill=true
+                        pkill_cmd="pkill -f \"retro $sub_arg\""
+                    fi
+                else
+                    if pgrep -f "^$cmd" >/dev/null 2>&1; then
+                        needs_kill=true
+                        pkill_cmd="pkill -f \"^$cmd\""
+                    fi
+                fi
+
+                if [[ $needs_kill == "true" ]]; then
+                    rx_log "info" "Refreshing: ${PINK}$bin_name${RESET}"
+                    eval "$pkill_cmd" >/dev/null 2>&1
+                    sleep 0.2
+                fi
+
+                rx_log "info" "$desc..."
+                nohup bash -c "$cmd" >/dev/null 2>&1 &
+                disown
+            done
+
+            rx_log "success" "Startup sequence synchronized."
+            ;;
+        *)
+            rx_log "info" "Usage: retro --load [all|list]"
+            ;;
+    esac
+}
+
+register_command "SYSTEM" "-l|--load" "Execute or list the system startup sequence" "cmd_load"

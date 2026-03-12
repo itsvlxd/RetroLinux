@@ -6,6 +6,8 @@ source "$RETRO_DIR/scripts/lib/variable.sh"
 PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 
+#TODO: make the monitor go into lower hz to saver battery
+
 on_battery_saver_enabled() {
     bash "$PWR_CORE" --set saver
 

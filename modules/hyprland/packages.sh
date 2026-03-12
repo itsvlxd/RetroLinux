@@ -1,1 +1,2 @@
-
+cliphist
+wl-clipboard

@@ -1,9 +1,11 @@
 bc
+jq
 git
-rsync
 sed
 grep
+rsync
 fprintd
+net-tools
 inetutils
 base-devel
 
