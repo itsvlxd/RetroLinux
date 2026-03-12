@@ -9,6 +9,8 @@ rx_vars_defaults() {
 
     local defaults=(
         # Retro
+        "RETRO_CUSTOM_LOAD|hyprland-welcome"
+
         "RETRO_ACTIVE_OPACITY|0.9"
         "RETRO_INACTIVE_OPACITY|0.8"
         "RETRO_ROUNDING|10"

@@ -1,0 +1,170 @@
+@import                          "~/.cache/retro/themes/rofi-colors.rasi"
+@import                          "~/.cache/retro/themes/variables.rasi"
+@import                          "fonts.rasi"
+
+configuration {
+    show-icons:                 true;
+    display-Clipboard:          " Clipboard"; 
+    display-Emoji:              "󰞅 Emojis"; 
+    display-Giphy:              "󰕧 Gifs"; 
+    display-Delete:             " History";
+
+    kb-move-char-back:          "";
+    kb-move-char-forward:       "";
+
+    kb-mode-next:               "Tab";
+    kb-mode-previous:           "";
+
+    kb-row-left:                "";
+    kb-row-right:               "";
+
+    kb-element-next:            "";
+    kb-element-prev:            "";
+
+    hover-select:               true;
+    me-select-entry:            "";
+    me-accept-entry:            "MousePrimary";
+    click-to-exit:              true;
+}
+
+window {
+    transparency:                "real";
+    location:                    north;
+    anchor:                      north;
+    fullscreen:                  false;
+    width:                       300px;
+    x-offset:                    0px;
+    y-offset:                    40%;
+
+    enabled:                     true;
+    margin:                      0px;
+    padding:                     0px;
+    border:                      2px solid;
+    border-radius:               @retro-border;
+    border-color:                @background-alt;
+    background-color:            @background;
+    cursor:                      "default";
+}
+
+mainbox {
+    enabled:                     true;
+    spacing:                     0px;
+    margin:                      0px;
+    padding:                     0px;
+    border:                      0px solid;
+    border-radius:               0px 0px 0px 0px;
+    border-color:                @selected;
+    background-color:            transparent;
+    children:                    [ "inputbar", "listview", "mode-switcher" ];
+}
+
+inputbar {
+    enabled:                     true;
+    spacing:                     15px;
+    margin:                      10px;
+    padding:                     12px 20px;
+    border:                      0px solid;
+    border-radius:               @retro-border;
+    border-color:                @selected;
+    text-color:                  @foreground;
+    children:                    [ "textbox-icon", "entry" ];
+}
+
+entry {
+    enabled:                     true;
+    background-color:            transparent;
+    text-color:                  @foreground;
+    cursor:                      none;
+    placeholder:                 "Search...";
+    placeholder-color:           inherit;
+}
+
+
+textbox-icon {
+    expand:     false;
+    str:        " ";
+    text-color: @highlight;
+    background-color: transparent;
+    vertical-align: 0;
+}
+
+listview {
+    enabled:                     true;
+    columns:                     1;
+    lines:                       12;
+    cycle:                       false;
+    dynamic:                     true;
+    scrollbar:                   false;
+    layout:                      vertical;
+    reverse:                     false;
+    fixed-height:                true;
+    fixed-columns:               true;
+    
+    spacing:                     5px;
+    margin:                      0px;
+    padding:                     5px 10px;
+    border:                      0px solid;
+    border-radius:               0px;
+    border-color:                @selected;
+    background-color:            transparent;
+    text-color:                  @foreground;
+    cursor:                      "default";
+}
+
+element {
+    enabled:                     true;
+    spacing:                     0px;
+    margin:                      0px;
+    padding:                     5px 15px;
+    border:                      0px solid;
+    border-radius:               @retro-border;
+    border-color:                @selected;
+    background-color:            transparent;
+    text-color:                  @foreground;
+    cursor:                      pointer;
+}
+
+element normal.normal {
+    text-color:                  @foreground;
+}
+
+element selected.normal {
+    text-color:                  @selected; 
+    border-color:                @selected;
+}
+
+element-icon {
+    background-color:            transparent;
+    text-color:                  inherit;
+    size:                        0px;
+    cursor:                      inherit;
+}
+
+element-text {
+    background-color:            transparent;
+    text-color:                  inherit;
+    highlight:                   inherit;
+    cursor:                      inherit;
+    vertical-align:              0.5;
+    horizontal-align:            0.0;
+}
+
+mode-switcher {
+    enabled:                     true;
+    spacing:                     10px;
+    margin:                      10px;
+    background-color:            transparent;
+}
+
+button {
+    padding:                     5px;
+    border-radius:               @retro-border;
+    background-color:            @background-alt;
+    text-color:                  @foreground;
+    cursor:                      pointer;
+}
+
+button selected {
+    background-color:            @selected; 
+    text-color:                  @foreground;
+}

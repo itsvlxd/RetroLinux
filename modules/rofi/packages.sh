@@ -1,0 +1,2 @@
+rofi-wayland
+rofimoji

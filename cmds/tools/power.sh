@@ -22,13 +22,14 @@ cmd_power() {
 
     case "$action" in
         "set")
-            [[ -z $val1 ]] && rx_log "error" "Please provide a profile: [performance|balanced|saver]" && return 1
+            [[ -z $val1 ]] && rx_log "error" "Please provide a profile: [SAVER|BALANCED|PERFORMANCE]" && return 1
             bash "$pwr_script" --set "$val1" && rx_log "success" "Profile set to: ${PINK}${val1^^}${RESET}" || rx_log "error" "Couldn't set profile."
             ;;
 
         "tune")
-            [[ -z $val3 ]] && rx_log "error" "Usage: --power tune [BAT|AC] [profile] [watts]" && return 1
-            bash "$pwr_script" --tune "$val1" "$val2" "$val3" && rx_log "success" "Updated ${PINK}${val1}_${val2}${RESET} to ${val3}W" || rx_log "error" "Couldn't update settings."
+            [[ -z $val3 ]] && rx_log "error" "Usage: --power tune [BAT|AC] [SAVER|BALANCED|PERFORMANCE] [WATTS]" && return 1
+            bash "$pwr_script" --tune "$val1" "$val2" "$val3" && rx_log "success" "Updated ${PINK}PWR_${val1^^}_${val2^^}${RESET} to ${val3}W" || rx_log "error" "Couldn't update settings."
+            cmd_power "restore"
             ;;
 
         "toggle")
@@ -93,7 +94,7 @@ cmd_power() {
             echo -e "\n ${PINK}󰯉 System Power Status${RESET}"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
             printf " ${PINK}󰍛${RESET} %-14s ${brand_color}%s${RESET}\n" "CPU Model:" "$model"
-            printf " ${PINK}󱐌${RESET} %-14s %s GHz\n" "Live Clock:" "$ghz"
+            printf " ${PINK}󱐌${RESET} %-14s %s GHz\n" "CPU Clock:" "$ghz"
             printf " ${PINK}${src_icon}${RESET} %-14s %s\n" "Power Source:" "$([[ $source == "true" ]] && echo -e "Battery" || echo "Wall/AC")"
             printf " ${PINK}󱐋${RESET} %-14s ${PINK}%s${RESET}\n" "Active Plan:" "${current^^}"
             printf " ${PINK}󱖫${RESET} %-14s %sW\n" "Current Cap:" "$limit"

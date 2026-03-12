@@ -17,3 +17,8 @@ post_hook = 'bash ~/.config/kitty/scripts/refresh_kitty.sh'
 [templates.nvim]
 input_path = '~/.config/matugen/templates/nvim.json'
 output_path = '~/.cache/retro/themes/nvim-colors.json'
+
+[templates.rofi]
+input_path = '~/.config/matugen/templates/rofi.rasm'
+output_path = '~/.cache/retro/themes/rofi-colors.rasi'
+post_hook = 'bash ~/.config/rofi/scripts/refresh_rofi.sh'

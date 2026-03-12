@@ -57,10 +57,10 @@ set_profile() {
     local profile="${1#--}"
     profile="${profile,,}"
 
-    local current=$(get_var "PWR_CURRENT")
-    if [[ $profile == "$current" ]]; then
-        return 0
-    fi
+    #local current=$(get_var "PWR_CURRENT")
+    #if [[ $profile == "$current" ]]; then
+    #    return 0
+    #fi
 
     local prev=$(get_var "PWR_CURRENT")
     set_var "PWR_PREVIOUS" "$prev"
@@ -140,7 +140,6 @@ toggle_profile() {
     fi
 
     set_profile "$prev"
-    echo "$prev"
 }
 
 tune_settings() {

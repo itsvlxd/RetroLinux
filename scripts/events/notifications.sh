@@ -29,12 +29,20 @@ on_battery_saver_disabled() {
 
 on_battery_low() {
     local cap="$1"
-    notify-send -u normal -i battery-low \
-        "Battery Low" "${cap}% remaining — find a plug soon"
+
+    if [[ $cap == "30" ]]; then
+        notify-send -u normal -i battery-low \
+            "Battery Low" "${cap}% remaining — find a plug soon"
+
+    fi
 }
 
 on_battery_critical() {
     local cap="$1"
-    notify-send -u critical -i battery-empty \
-        "Battery Critical" "Only ${cap}% left. Connect power now."
+
+    if [[ $cap == "15" ]]; then
+        notify-send -u critical -i battery-empty \
+            "Battery Critical" "Only ${cap}% left. Connect power now."
+
+    fi
 }
