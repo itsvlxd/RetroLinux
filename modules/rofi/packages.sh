@@ -1,2 +1,4 @@
-rofi-wayland
+rbw
+rofi
 rofimoji
+rofi-rbw

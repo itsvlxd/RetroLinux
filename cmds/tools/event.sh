@@ -2,7 +2,7 @@
 
 cmd_event() {
     local event_script="$RETRO_DIR/scripts/event_core.sh"
-    local hook_dir="$RETRO_DIR/scripts/hooks"
+    local hook_dir="$RETRO_DIR/scripts/events"
     local action="$1"
     local value="$2"
     local args="${@:3}"

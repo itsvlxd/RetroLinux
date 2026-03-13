@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/cmds/tools/fingerprint.sh"
+
 rx_setup_fingerprint() {
     local hostname=$(cat /proc/sys/kernel/hostname 2>/dev/null || echo "Arch-Machine")
 
@@ -40,5 +42,5 @@ rx_setup_fingerprint() {
         return 0
     fi
 
-    retro -fp "setup"
+    cmd_fingerprint "setup"
 }

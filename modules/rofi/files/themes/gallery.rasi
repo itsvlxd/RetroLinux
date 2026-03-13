@@ -3,35 +3,21 @@
 
 configuration {
     show-icons:                  true;
-    display-Clipboard:           "  "; 
-    display-Emoji:               " 󰞅 "; 
-    display-Bitwarden:           "  "; 
-
-    kb-move-char-back:           "";
-    kb-move-char-forward:        "";
-
-    kb-mode-next:                "Tab";
-    kb-mode-previous:            "";
-
-    kb-row-left:                 "";
-    kb-row-right:                "";
-
-    kb-element-next:             "";
-    kb-element-prev:             "";
-
+    hover-select:                true;
     hover-select:                true;
     me-select-entry:             "";
-    me-accept-entry:             "MousePrimary";
+    me-select-entry:             "MousePrimary";
+    me-accept-entry:             "!MousePrimary";
     click-to-exit:               true;
 }
 
 window {
     font:                        @rofi-font;
     transparency:                "real";
-    location:                    north;
-    anchor:                      north;
+    location:                    center;
+    anchor:                      center;
     fullscreen:                  false;
-    width:                       350px;
+    width:                       800px;
     x-offset:                    0px;
     y-offset:                    40%;
 
@@ -73,7 +59,7 @@ entry {
     enabled:                     true;
     background-color:            transparent;
     text-color:                  @foreground;
-    cursor:                      none;
+    cursor:                      text;
     cursor-width:                1px;
     placeholder:                 "Search...";
     placeholder-color:           inherit;
@@ -87,13 +73,23 @@ textbox-icon {
     vertical-align:              0;
 }
 
+scrollbar {
+    width:                       1px;
+    border:                      0;
+    handle-width:                2px;
+    handle-color:                @highlight; 
+    padding:                     0;
+    background-color:            @background-alt; 
+    border-radius:               @rofi-radius;
+}
+
 listview {
     enabled:                     true;
-    columns:                     1;
-    lines:                       12;
-    cycle:                       false;
-    dynamic:                     true;
-    scrollbar:                   false;
+    columns:                     4;
+    lines:                       2;
+    cycle:                       true;
+    dynamic:                     false;
+    scrollbar:                   true;
     layout:                      vertical;
     reverse:                     false;
     fixed-height:                true;
@@ -112,6 +108,7 @@ listview {
 
 element {
     enabled:                     true;
+    orientation:                 vertical;
     spacing:                     0px;
     margin:                      0px;
     padding:                     @rofi-padding;
@@ -121,7 +118,7 @@ element {
     background-color:            transparent;
     text-color:                  @foreground;
     cursor:                      pointer;
-    children:                    [ "element-text" ];
+    children:                    [ "element-icon", "element-text" ];
 }
 
 element normal.normal {
@@ -136,7 +133,7 @@ element selected.normal {
 element-icon {
     background-color:            transparent;
     text-color:                  inherit;
-    size:                        0px;
+    size:                        128px;
     cursor:                      inherit;
 }
 
@@ -145,9 +142,9 @@ element-text {
     text-color:                  inherit;
     highlight:                   inherit;
     cursor:                      inherit;
-    margin:                      0px 10px;
-    vertical-align:              0.5;
-    horizontal-align:            0.0;
+    margin:                      0px 0px 5px 0px;
+    vertical-align:              0.0;
+    horizontal-align:            0.5;
     markup:                      true;
 }
 

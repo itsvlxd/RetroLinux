@@ -8,4 +8,4 @@ cmd_install() {
     run_task "install" "$target"
 }
 
-register_command "MANAGEMENT" "-i|--install" "Link repo files to system (Active Ricing)" "cmd_install"
+register_command "MODULES" "-i|--install" "Link repo files to system (Active Ricing)" "cmd_install"

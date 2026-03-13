@@ -1,19 +1,24 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/helpers.sh"
+
 cmd_load() {
-    local var_script="$RETRO_DIR/scripts/variable_core.sh"
     local action="$1"
 
     local startup_tasks=(
         "retro --wallpaper restore|Applying last used wallpaper"
         "retro --power restore|Restoring hardware power profiles"
         "retro --event restart|Initializing event loop and custom hooks"
-        "wl-paste --type text --watch cliphist store|Starting cliphist text store watcher"
-        "wl-paste --type image --watch cliphist store|Starting cliphist image store watcher"
+
+        "wl-paste --type text --watch cliphist store -ignore-secrets|Starting cliphist text store watcher"
+        "wl-paste --type image --watch cliphist store -ignore-secrets|Starting cliphist image store watcher"
+
+        "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
+        "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
     )
 
     local custom_tasks=()
-    local custom_raw=$(bash "$var_script" --get "RETRO_CUSTOM_LOAD")
+    local custom_raw=$(get_var "RETRO_CUSTOM_LOAD")
 
     if [[ -n $custom_raw && $custom_raw != "null" ]]; then
         IFS='|' read -ra custom_parts <<<"$custom_raw"
@@ -37,7 +42,6 @@ cmd_load() {
             done
 
             if [[ ${#custom_tasks[@]} -gt 0 ]]; then
-                echo -e "\n ${PINK}󱗼 Custom Sequence${RESET}"
                 echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
                 for task in "${custom_tasks[@]}"; do
                     IFS='|' read -r cmd desc <<<"$task"

@@ -3,11 +3,11 @@
 rx_log() {
     local level="${1^^}"
     local message="$2"
-
     local icon=""
     local color=""
+    local echo_opts="-e"
 
-    case "${level^^}" in
+    case "${level}" in
         "INFO")
             icon=" "
             color="$PINK"
@@ -30,5 +30,9 @@ rx_log() {
             ;;
     esac
 
-    echo -e "${color}[${icon}${level}]${RESET} ${message}"
+    if [[ $message == *": " ]] && [[ $message =~ \[.*\] ]]; then
+        echo_opts="-ne"
+    fi
+
+    echo $echo_opts "${color}[${icon}${level}]${RESET} ${message}"
 }

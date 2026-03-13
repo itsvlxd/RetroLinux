@@ -5,7 +5,7 @@ get_var() {
     echo "${val:-$2}"
 }
 
-OPACITY=$(get_var "RETRO_ACTIVE_OPACITY" "1.0")
+OPACITY=$(get_var "RETRO_OPACITY" "1.0")
 FONT=$(get_var "KITTY_FONT" "JetBrainsMono Nerd Font")
 SIZE=$(get_var "KITTY_FONT_SIZE" "9.5")
 PW=$(get_var "KITTY_PADDING_WIDTH" "5")
