@@ -11,7 +11,7 @@ rx_default_directories() {
     [[ ${#missing[@]} -eq 0 ]] && return 0
 
     rx_log "info" "Some standard folders are missing: ${PINK}${missing[*]}${RESET}"
-    echo -ne " ${PINK}󰄾 ${RESET}Would you like me to create them? [y/N]: "
+    rx_log "info" "Would you like me to create them? ${PINK}[y/N]${RESET}: "
     read -r allow
 
     if [[ ! $allow =~ ^[Yy]$ ]]; then

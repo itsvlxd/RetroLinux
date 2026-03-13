@@ -10,20 +10,20 @@ get_val() {
     echo "${val:-$2}"
 }
 
-ROUNDING=$(get_val "RETRO_ROUNDING" "10")
-#OPACITY=$(get_val "RETRO_OPACITY" "0.9")
-#SELECTED=$(get_val "RETRO_COLOR_SELECTED" "#BD93F9")
-#BG=$(get_val "RETRO_COLOR_BG" "#282A36")
-#FG=$(get_val "RETRO_COLOR_FG" "#F8F8F2")
+FONT=$(get_val "ROFI_FONT" "JetBrains Mono Nerd Font")
+FONT_SIZE=$(get_val "ROFI_FONT_SIZE" "9.5")
+ROUNDING=$(get_val "ROFI_ROUNDING" "10")
+PADDING=$(get_val "ROFI_PADDING" "5")
 
 cat <<EOF >"$TEMP_FILE"
 /**
- * RETRO AUTO-GENERATED ROFI VARIABLES
+ * RETRO AUTO-GENERATED VARIABLES
  **/
 
 * {
-    retro-border: ${ROUNDING}px;
-    retro-rounding: ${ROUNDING}px 15px;
+    rofi-font:          "$FONT $FONT_SIZE";
+    rofi-radius:        ${ROUNDING}px;
+    rofi-padding:       ${PADDING}px;
 }
 EOF
 

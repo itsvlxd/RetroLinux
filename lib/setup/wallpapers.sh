@@ -23,8 +23,8 @@ rx_setup_wallpapers() {
     cp -r "$SOURCE_WALLS"/* "$CACHE_WALLS/"
 
     if [[ -f $WALL_CORE ]]; then
-        bash "$WALL_CORE" "--cache"
-        bash "$WALL_CORE" "--set" "car-in-neon-gas-station.1920x1080.mp4" >/dev/null 2>&1 &
+        bash "$WALL_CORE" --cache
+        bash "$WALL_CORE" --set "car-in-neon-gas-station.1920x1080.mp4" >/dev/null 2>&1 &
     else
         rx_log "error" "Wallpaper core script missing."
         return 1

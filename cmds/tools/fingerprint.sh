@@ -2,6 +2,42 @@
 
 # TODO: Find a way in the future if we can implement it inside SDDM
 
+setup_pam_auth() {
+    rx_log "info" "Configuring PAM for biometric authentication..."
+
+    if ! grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
+        sudo sed -i '1i auth      sufficient  pam_fprintd.so' /etc/pam.d/sudo
+        rx_log "success" "Sudo fingerprint auth enabled."
+    else
+        rx_log "info" "Sudo auth already configured."
+    fi
+
+    if ! grep -q "pam_fprintd.so" /etc/pam.d/system-local-login; then
+        sudo sed -i '1i auth      sufficient  pam_fprintd.so' /etc/pam.d/system-local-login
+        rx_log "success" "System login auth enabled."
+    else
+        rx_log "info" "System login already configured."
+    fi
+}
+
+remove_pam_auth() {
+    rx_log "info" "Deactivating biometric authentication..."
+
+    if grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
+        sudo sed -i '/pam_fprintd.so/d' /etc/pam.d/sudo
+        rx_log "success" "Sudo fingerprint auth removed."
+    else
+        rx_log "info" "Sudo auth was already clean."
+    fi
+
+    if grep -q "pam_fprintd.so" /etc/pam.d/system-local-login; then
+        sudo sed -i '/pam_fprintd.so/d' /etc/pam.d/system-local-login
+        rx_log "success" "System login auth removed."
+    else
+        rx_log "info" "System login auth was already clean."
+    fi
+}
+
 cmd_fingerprint() {
     local action="$1"
     local target_user="$USER"
@@ -96,42 +132,6 @@ cmd_fingerprint() {
 
         *) rx_log "info" "Usage: retro --fingerprint [enroll|list|status|clear|uninstall]" ;;
     esac
-}
-
-setup_pam_auth() {
-    rx_log "info" "Configuring PAM for biometric authentication..."
-
-    if ! grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
-        sudo sed -i '1i auth      sufficient  pam_fprintd.so' /etc/pam.d/sudo
-        rx_log "success" "Sudo fingerprint auth enabled."
-    else
-        rx_log "info" "Sudo auth already configured."
-    fi
-
-    if ! grep -q "pam_fprintd.so" /etc/pam.d/system-local-login; then
-        sudo sed -i '1i auth      sufficient  pam_fprintd.so' /etc/pam.d/system-local-login
-        rx_log "success" "System login auth enabled."
-    else
-        rx_log "info" "System login already configured."
-    fi
-}
-
-remove_pam_auth() {
-    rx_log "info" "Deactivating biometric authentication..."
-
-    if grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
-        sudo sed -i '/pam_fprintd.so/d' /etc/pam.d/sudo
-        rx_log "success" "Sudo fingerprint auth removed."
-    else
-        rx_log "info" "Sudo auth was already clean."
-    fi
-
-    if grep -q "pam_fprintd.so" /etc/pam.d/system-local-login; then
-        sudo sed -i '/pam_fprintd.so/d' /etc/pam.d/system-local-login
-        rx_log "success" "System login auth removed."
-    else
-        rx_log "info" "System login auth was already clean."
-    fi
 }
 
 register_command "TOOLS" "-fp|--fingerprint" "Biometric security management" "cmd_fingerprint"

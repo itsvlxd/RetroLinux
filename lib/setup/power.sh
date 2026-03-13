@@ -1,4 +1,6 @@
-rx_optimize_cpu_defaults() {
+#!/bin/bash
+
+rx_optimize_cpu() {
     local pwr_script="$RETRO_DIR/scripts/power_core.sh"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
@@ -21,7 +23,7 @@ rx_optimize_cpu_defaults() {
     fi
 
     rx_log "info" "I found some power optimizations for your ${PINK}$c_name${RESET}."
-    echo -ne " ${PINK}󰄾 ${RESET}Would you like to apply these settings? [y/N]: "
+    rx_log "info" "Would you like to apply these settings? ${PINK}[y/N]${RESET}: "
     read -r allow
 
     if [[ ! $allow =~ ^[Yy]$ ]]; then
@@ -29,5 +31,5 @@ rx_optimize_cpu_defaults() {
         return 0
     fi
 
-    bash "$RETRO_DIR/retro.sh" --power optimize
+    bash "$RETRO_DIR/retro.sh" --power "optimize"
 }

@@ -12,7 +12,7 @@ rx_bootstrap_pkg_manager() {
 
     if [[ -n $saved_helper ]]; then
         if command -v "$saved_helper" >/dev/null 2>&1; then
-            return 0 # Already set up, stay silent.
+            return 0
         fi
     fi
 
@@ -26,9 +26,9 @@ rx_bootstrap_pkg_manager() {
 
     rx_log "info" "No AUR helper configured. Let's pick one."
 
-    echo -e " ${PINK}1)${RESET} yay ${GRAY}(Go - Most Popular)${RESET}"
-    echo -e " ${PINK}2)${RESET} paru ${GRAY}(Rust - Feature Rich)${RESET}"
-    echo -e " ${PINK}3)${RESET} Skip / Manual"
+    echo -e "   ${PINK}1)${RESET} yay ${GRAY}(Go - Most Popular)${RESET}"
+    echo -e "   ${PINK}2)${RESET} paru ${GRAY}(Rust - Feature Rich)${RESET}"
+    echo -e "   ${PINK}3)${RESET} Skip / Manual"
 
     echo -ne "\n ${PINK}󰄾 ${RESET}Select: "
     read -r choice

@@ -13,7 +13,7 @@ WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 on_power_disconnect() {
     local cap="$1"
 
-    if [[ $(get_var "BAT_SAVER_ON_PWR_DIS") == "true" ]]; then
+    if [[ $(get_var "BAT_SAVER_ON_PWR_DIS") == "true" && $(get_var "BAT_SAVER_ACTIVE") != "true" ]]; then
         bash "$BAT_CORE" --saver "true"
         bash "$PWR_CORE" --set "saver"
     fi

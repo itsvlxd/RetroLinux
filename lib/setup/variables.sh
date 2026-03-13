@@ -11,11 +11,22 @@ rx_vars_defaults() {
         # Retro
         "RETRO_CUSTOM_LOAD|hyprland-welcome"
 
-        "RETRO_ACTIVE_OPACITY|0.9"
+        "RETRO_OPACITY|0.9"
         "RETRO_INACTIVE_OPACITY|0.8"
         "RETRO_ROUNDING|10"
         "RETRO_GAP_IN|5"
         "RETRO_GAP_OUT|20"
+
+        # Rofi
+        "ROFI_FONT|JetBrainsMono Nerd Font"
+        "ROFI_FONT_SIZE|9.5"
+        "ROFI_ROUDING|10"
+        "ROFI_PADDING|5"
+
+        # Clipboard
+        "CLIP_WARDEN_SYNC|900"
+        "CLIP_WARDEN_TIMEOUT|600"
+        "CLIP_WARDEN_DESTRUCT|30"
 
         # Battery
         "BAT_SAVER_THRESHOLD|50"

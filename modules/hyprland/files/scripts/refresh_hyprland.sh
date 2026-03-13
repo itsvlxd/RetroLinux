@@ -19,7 +19,7 @@ get_val() {
 ROUNDING=$(get_val "RETRO_ROUNDING" "10")
 GAP_IN=$(get_val "RETRO_GAP_IN" "5")
 GAP_OUT=$(get_val "RETRO_GAP_OUT" "20")
-TRANS=$(get_val "RETRO_ACTIVE_OPACITY" "1.0")
+TRANS=$(get_val "RETRO_OPACITY" "1.0")
 INACTIVE_TRANS=$(get_val "RETRO_INACTIVE_OPACITY" "0.8")
 
 cat <<EOF >"$TEMP_FILE"

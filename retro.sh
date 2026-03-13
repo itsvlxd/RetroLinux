@@ -17,8 +17,6 @@ mkdir -p $RETRO_CACHE
 declare -a CMDS_HELP
 declare -A CMDS_EXEC
 
-RETRO_VAR="$RETRO_DIR/scripts/variable_core.sh"
-
 source "$RETRO_DIR/lib/fs.sh"
 source "$RETRO_DIR/lib/git.sh"
 source "$RETRO_DIR/lib/log.sh"
@@ -26,6 +24,7 @@ source "$RETRO_DIR/lib/pkg.sh"
 source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/module.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/pkg_manager.sh"
 
 SKIP_PROMPT=false
@@ -46,6 +45,10 @@ register_command() {
     local aliases="$2"
     local desc="$3"
     local func="$4"
+
+    local primary_alias="${aliases%%|*}"
+
+    [[ -n ${CMDS_EXEC[$primary_alias]} ]] && return 0
 
     CMDS_HELP+=("$group|$aliases|$desc")
 
