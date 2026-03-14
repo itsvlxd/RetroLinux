@@ -8,12 +8,15 @@ source "$RETRO_DIR/lib/setup/wallpapers.sh"
 source "$RETRO_DIR/lib/setup/variables.sh"
 source "$RETRO_DIR/lib/setup/bitwarden.sh"
 source "$RETRO_DIR/lib/setup/pacman.sh"
+source "$RETRO_DIR/lib/setup/system.sh"
 source "$RETRO_DIR/lib/setup/emojis.sh"
 source "$RETRO_DIR/lib/setup/power.sh"
 
 cmd_setup() {
     rx_logo
     rx_log "info" "Setting up RetroArch..."
+
+    setup_system
 
     SKIP_PROMPT=true
 

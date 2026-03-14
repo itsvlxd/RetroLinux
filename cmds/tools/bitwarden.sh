@@ -203,7 +203,7 @@ cmd_bw() {
             fi
             ;;
         "setup")
-            mkdir -p ~/.cacbe/rbw
+            mkdir -p ~/.cache/rbw
 
             echo -e "\n ${PINK} Bitwarden Setup Instructions${RESET}"
             echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────${RESET}"
