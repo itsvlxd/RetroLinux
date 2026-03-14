@@ -44,6 +44,7 @@ rx_vars_defaults() {
         # Power
         "PWR_CURRENT|balanced"
         "PWR_PREVIOUS|saver"
+
         "PWR_BAT_SAVER|7"
         "PWR_BAT_BALANCED|14"
         "PWR_BAT_PERFORMANCE|35"

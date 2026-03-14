@@ -39,7 +39,7 @@ EOF
 if mv "$TEMP_FILE" "$OUTPUT"; then
     chmod 644 "$OUTPUT"
 
-    hyprctl reload >/dev/null 2>&1
+    hyprctl reload 2>/dev/null
 else
     rm -f "$TEMP_FILE"
     exit 1
