@@ -38,11 +38,7 @@ del_var() {
 
     local regex_key="${key//\*/.*}"
 
-    if [[ $key == *"*"* ]]; then
-        sed -i "/^export $regex_key=/d" "$VARS_FILE"
-    else
-        sed -i "/^export $key=/d" "$VARS_FILE"
-    fi
+    sed -i "/^export $regex_key=/d" "$VARS_FILE"
 }
 
 case $1 in
