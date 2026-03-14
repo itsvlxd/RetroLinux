@@ -60,13 +60,31 @@ cmd_var() {
             if [[ -z $raw_list ]]; then
                 echo -e " ${GRAY}  (Everything is empty)${RESET}"
             else
-                while IFS='=' read -r k v; do
+                local first_order=("RETRO_" "BAT_" "PWR_")
+                local processed_keys=""
+                local final_output=""
+
+                for prefix in "${first_order[@]}"; do
+                    local tier=$(echo "$raw_list" | grep "^$prefix" | sort)
+                    if [[ -n $tier ]]; then
+                        final_output+="${tier}\n"
+                        processed_keys+="$(echo "$tier" | cut -d'=' -f1 | tr '\n' '|') "
+                    fi
+                done
+
+                local exclude_regex=$(echo "$processed_keys" | sed 's/|/\\|/g; s/ $//')
+                local remainder=$(echo "$raw_list" | grep -v "^\(${exclude_regex}\)=" | sort)
+
+                final_output+="${remainder}"
+
+                echo -e "$final_output" | sed '/^$/d' | while IFS='=' read -r k v; do
                     [[ -z $k ]] && continue
+
                     v="${v%\"}"
                     v="${v#\"}"
 
                     local val_color="$GRAY"
-                    if [[ $v =~ ^[0-9]+$ ]]; then
+                    if [[ $v =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
                         val_color="$INFO"
                     elif [[ $v == "true" ]]; then
                         val_color="$SUCCESS"
@@ -75,11 +93,12 @@ cmd_var() {
                     fi
 
                     printf " ${PINK}󰋙${RESET} %-30s ${val_color}%s${RESET}\n" "$k:" "$v"
-                done <<<"$raw_list"
+                done
             fi
 
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
             ;;
+
         *)
             rx_log "info" "Usage: retro --variable [get|set|del|toggle|list|reset]"
             ;;
