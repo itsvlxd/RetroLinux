@@ -77,10 +77,45 @@ set_saver() {
     return 1
 }
 
+log_battery_event() {
+    local type="$1"
+    local val="$2"
+    local today=$(date +%Y-%m-%d)
+
+    local entry_0=$(get_var "BAT_STATS_0")
+
+    if [[ $entry_0 == "null" || -z $entry_0 || $entry_0 != *"|"* ]]; then
+        entry_0="$today|0|0"
+    fi
+
+    IFS='|' read -r d_date d_cycles d_seconds <<<"$entry_0"
+
+    if [[ $d_date != "$today" ]]; then
+        for i in {5..0}; do
+            local next_idx=$((i + 1))
+            local moving_data=$(get_var "BAT_STATS_$i")
+            [[ $moving_data == "null" ]] && moving_data="0000-00-00|0|0"
+            set_var "BAT_STATS_$next_idx" "$moving_data"
+        done
+        d_date="$today"
+        d_cycles=0
+        d_seconds=0
+    fi
+
+    if [[ $type == "cycle" ]]; then
+        d_cycles=$((d_cycles + val))
+    else
+        d_seconds=$((d_seconds + val))
+    fi
+
+    set_var "BAT_STATS_0" "${d_date}|${d_cycles}|${d_seconds}"
+}
+
 case "$1" in
     "--raw") get_bat_status ;;
     "--info") get_info ;;
     "--limit") set_limit "$2" ;;
     "--loop") run_loop ;;
     "--saver") set_saver "$2" "$3" ;;
+    "--log") log_battery_event "$2" "$3" ;;
 esac

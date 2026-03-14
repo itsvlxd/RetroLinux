@@ -65,3 +65,32 @@ get_opacity_hex() {
 
     printf "%02x" "$opacity_int"
 }
+
+get_battery_icon() {
+    local cap=$1
+    local stat=$2
+
+    [[ $stat == *"charging"* && $stat != *"discharging"* ]] && echo "󱐋" && return
+
+    if ((cap >= 95)); then
+        echo "󰁹"
+    elif ((cap >= 85)); then
+        echo "󰂂"
+    elif ((cap >= 75)); then
+        echo "󰂁"
+    elif ((cap >= 65)); then
+        echo "󰂀"
+    elif ((cap >= 55)); then
+        echo "󰁿"
+    elif ((cap >= 45)); then
+        echo "󰁾"
+    elif ((cap >= 35)); then
+        echo "󰁽"
+    elif ((cap >= 25)); then
+        echo "󰁼"
+    elif ((cap >= 15)); then
+        echo "󰁻"
+    else
+        echo "󰂃"
+    fi
+}

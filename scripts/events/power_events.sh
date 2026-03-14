@@ -47,9 +47,10 @@ on_power_connect() {
     if [[ -n $start && $start != "null" ]]; then
         local end=$(date +%s)
         local total_sec=$((end - start))
-        local human_time=$(rx_format_time "$total_sec")
 
-        set_var "BAT_LAST_BENCHMARK" "$human_time"
+        bash "$BAT_CORE" --log "duration" "$total_sec"
+        bash "$BAT_CORE" --log "cycle" "1"
+
         set_var "BAT_DISCONNECT_TIME" "null"
     fi
 }
