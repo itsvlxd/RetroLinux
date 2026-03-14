@@ -10,6 +10,7 @@ cmd_battery() {
         "raw")
             echo "$($battery_script --raw)"
             ;;
+
         "status")
             local raw_output=$($battery_script --info)
             IFS='|' read -r cap stat health power volt model saver sot <<<"$raw_output"
@@ -20,10 +21,12 @@ cmd_battery() {
             [[ $watts == .* ]] && watts="0$watts"
             [[ $volts == .* ]] && volts="0$volts"
 
-            echo -e "\n ${PINK}󱐋 Battery: ${RESET}${model^^}"
+            local bat_icon=$(get_battery_icon "$cap" "$stat")
+
+            echo -e "\n ${PINK}󰂀 Battery: ${RESET}${model^^}"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
 
-            printf " ${PINK}󰁹${RESET} %-14s %s%% (%s)\n" "Charge:" "$cap" "$stat"
+            printf " ${PINK}%s${RESET} %-14s %s%% (%s)\n" "$bat_icon" "Charge:" "$cap" "$stat"
             printf " ${PINK}󰚥${RESET} %-14s %s\n" "Health:" "$health"
             printf " ${PINK}󱐋${RESET} %-14s %s W\n" "Usage Draw:" "$watts"
             printf " ${PINK}󱈑${RESET} %-14s %s V\n" "Voltage:" "$volts"
@@ -37,7 +40,7 @@ cmd_battery() {
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
 
             local filled=$((cap / 5))
-            printf " ${PINK}󰈈${RESET} ["
+            printf " ${PINK}󰈈${RESET} "
 
             for ((i = 0; i < 20; i++)); do
                 if ((i < filled)); then
@@ -51,11 +54,43 @@ cmd_battery() {
                 fi
             done
 
-            echo -e "]\n"
+            echo -e "\n"
             ;;
+
+        "stats")
+            echo -e "\n ${PINK}󰂀 Battery Usage Stats: ${RESET}Last 7 Days"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+
+            for i in {0..6}; do
+                local entry=$(get_var "BAT_STATS_$i")
+                [[ -z $entry || $entry == "null" ]] && continue
+
+                IFS='|' read -r d_date d_cycles d_seconds <<<"$entry"
+
+                local day_name=$(date -d "$d_date" +%a)
+
+                local divisor=$d_cycles
+                ((divisor == 0)) && divisor=1
+                local avg_min=$(((d_seconds / divisor) / 60))
+
+                local bar_size=$((avg_min / 30))
+                ((bar_size > 15)) && bar_size=15
+
+                local bar=""
+                for ((j = 0; j < bar_size; j++)); do bar+="${PINK}█${RESET}"; done
+                for ((j = bar_size; j < 15; j++)); do bar+="${MUTE}░${RESET}"; done
+
+                printf " ${PINK} ${RESET}%s ${RESET}%b [${PINK}%s${RESET} charge(s)] Avg: ${PINK}%sm${RESET}\n" \
+                    "$day_name" "$bar" "$d_cycles" "$avg_min"
+            done
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            ;;
+
         "limit")
             $battery_script --limit "$value" "$options" && rx_log "success" "Battery limit is now $2%" || rx_log "error" "Your hardware doesn't support charge limits."
             ;;
+
         "saver")
             [[ -z $value ]] && rx_log "info" "Usage: retro --battery saver [true|false|0-100]" && return 1
 
@@ -78,7 +113,8 @@ cmd_battery() {
                 rx_log "error" "Couldn't update the saver settings."
             fi
             ;;
-        *) rx_log "info" "Usage: retro --battery [status|limit|saver|raw]" ;;
+
+        *) rx_log "info" "Usage: retro --battery [status|stats|limit|saver|raw]" ;;
     esac
 }
 
