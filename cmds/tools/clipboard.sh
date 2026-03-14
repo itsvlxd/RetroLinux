@@ -2,6 +2,9 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 
+# FIX: Fix the screenshot clipboard generating the screenshots and saving them twice
+# in .cache and ~/Pictures/Screenshots
+
 cmd_clipboard() {
     local action="$1"
     local selection="$2"
