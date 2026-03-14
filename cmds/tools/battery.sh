@@ -40,7 +40,7 @@ cmd_battery() {
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
 
             local filled=$((cap / 5))
-            printf " ${PINK}󰈈${RESET} "
+            printf " ${PINK}󰏰${RESET} "
 
             for ((i = 0; i < 20; i++)); do
                 if ((i < filled)); then
