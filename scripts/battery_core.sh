@@ -1,10 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/scripts/lib/battery.sh"
-source "$RETRO_DIR/scripts/lib/variable.sh"
-
-WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
-PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 
 get_info() {
     local stat=$(get_bat_status)
@@ -14,6 +11,23 @@ get_info() {
     local p_raw=$(cat "$BAT_PATH/power_now" 2>/dev/null || echo "0")
     local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")
     local saver=$(get_var "BAT_SAVER_ACTIVE")
+
+    if [[ $stat == *"discharging"* ]]; then
+        local start_ts=$(get_var "BAT_DISCONNECT_TIME")
+
+        if [[ -n $start_ts && $start_ts != "null" ]]; then
+            local now=$(date +%s)
+            local diff=$((now - start_ts))
+            sot_label=$(rx_format_time "$diff")
+        else
+            local now=$(date +%s)
+            set_var "BAT_DISCONNECT_TIME" "$now"
+            sot_label="N/A"
+        fi
+    else
+        local last=$(get_var "BAT_LAST_BENCHMARK")
+        sot_label="Last: ${last:-0s}"
+    fi
 
     if [[ $p_raw -eq 0 ]]; then
         local i_raw=$(cat "$BAT_PATH/current_now" 2>/dev/null || echo "0")
@@ -26,7 +40,7 @@ get_info() {
         saver_label="ON"
     fi
 
-    echo "$cap|$stat|$health|$p_raw|$v_raw|$model|$saver_label"
+    echo "$cap|$stat|$health|$p_raw|$v_raw|$model|$saver_label|$sot_label"
 }
 
 set_limit() {

@@ -12,7 +12,7 @@ cmd_battery() {
             ;;
         "status")
             local raw_output=$($battery_script --info)
-            IFS='|' read -r cap stat health power volt model saver <<<"$raw_output"
+            IFS='|' read -r cap stat health power volt model saver sot <<<"$raw_output"
 
             local watts=$(awk "BEGIN {printf \"%.2f\", $power / 1000000}")
             local volts=$(awk "BEGIN {printf \"%.2f\", $volt / 1000000}")
@@ -27,6 +27,11 @@ cmd_battery() {
             printf " ${PINK}󰚥${RESET} %-14s %s\n" "Health:" "$health"
             printf " ${PINK}󱐋${RESET} %-14s %s W\n" "Usage Draw:" "$watts"
             printf " ${PINK}󱈑${RESET} %-14s %s V\n" "Voltage:" "$volts"
+
+            if [[ $sot != "N/A" ]]; then
+                printf " ${PINK}󰔚${RESET} %-14s %b\n" "On Battery:" "${sot}"
+            fi
+
             printf " ${PINK}󰌪${RESET} %-14s %s\n" "Saver Mode:" "$saver"
 
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
