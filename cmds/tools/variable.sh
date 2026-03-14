@@ -25,10 +25,14 @@ cmd_var() {
         "del")
             [[ -z $key ]] && rx_log "error" "Which key do you want to delete?" && return 1
 
-            local old_val=$(bash "$var_script" --get "$key")
-
-            if bash "$var_script" --del "$key"; then
-                rx_log "success" "Removed ${PINK}$key${RESET} from the cache."
+            if [[ $key == *"*"* ]]; then
+                if bash "$var_script" --del "$key"; then
+                    rx_log "success" "Bulk deleted all variables matching: ${PINK}$key${RESET}"
+                fi
+            else
+                if bash "$var_script" --del "$key"; then
+                    rx_log "success" "Removed ${PINK}$key${RESET} from the cache."
+                fi
             fi
             ;;
 
