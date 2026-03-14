@@ -1,7 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/scripts/lib/battery.sh"
-source "$RETRO_DIR/scripts/lib/variable.sh"
 
 PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
@@ -23,6 +23,8 @@ on_power_disconnect() {
     if [[ $(get_var "WALL_STATIC_ON_BAT") == "true" ]]; then
         bash "$WALL_CORE" --restore
     fi
+
+    set_var "BAT_DISCONNECT_TIME" "$(date +%s)"
 }
 
 on_power_connect() {
@@ -38,6 +40,17 @@ on_power_connect() {
 
     if [[ $(get_var "WALL_STATIC_ON_BAT") == "true" ]]; then
         bash "$WALL_CORE" --restore
+    fi
+
+    local start=$(get_var "BAT_DISCONNECT_TIME")
+
+    if [[ -n $start && $start != "null" ]]; then
+        local end=$(date +%s)
+        local total_sec=$((end - start))
+        local human_time=$(rx_format_time "$total_sec")
+
+        set_var "BAT_LAST_BENCHMARK" "$human_time"
+        set_var "BAT_DISCONNECT_TIME" "null"
     fi
 }
 
