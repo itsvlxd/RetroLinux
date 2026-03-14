@@ -26,7 +26,7 @@ set_var() {
     [[ -z $key ]] && return 1
 
     if grep -q "^export $key=" "$VARS_FILE"; then
-        sed -i "s|^export $key=.*|export $key=\"$value\"|" "$VARS_FILE"
+        sed -i "s@^export $key=.*@export $key=\"$value\"@" "$VARS_FILE"
     else
         echo "export $key=\"$value\"" >>"$VARS_FILE"
     fi
@@ -34,10 +34,15 @@ set_var() {
 
 del_var() {
     local key=$1
-
     [[ -z $key ]] && return 1
 
-    sed -i "/^export $key=/d" "$VARS_FILE"
+    local regex_key="${key//\*/.*}"
+
+    if [[ $key == *"*"* ]]; then
+        sed -i "/^export $regex_key=/d" "$VARS_FILE"
+    else
+        sed -i "/^export $key=/d" "$VARS_FILE"
+    fi
 }
 
 case $1 in
