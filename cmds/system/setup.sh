@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# TODO: Add a default text editor variable
-
 source "$RETRO_DIR/lib/setup/directories.sh"
 source "$RETRO_DIR/lib/setup/fingerprint.sh"
 source "$RETRO_DIR/lib/setup/wallpapers.sh"
 source "$RETRO_DIR/lib/setup/variables.sh"
 source "$RETRO_DIR/lib/setup/bitwarden.sh"
+source "$RETRO_DIR/lib/setup/editor.sh"
 source "$RETRO_DIR/lib/setup/pacman.sh"
 source "$RETRO_DIR/lib/setup/system.sh"
 source "$RETRO_DIR/lib/setup/emojis.sh"
@@ -17,6 +16,7 @@ cmd_setup() {
     rx_log "info" "Setting up RetroArch..."
 
     setup_system
+    setup_editors
 
     SKIP_PROMPT=true
 
