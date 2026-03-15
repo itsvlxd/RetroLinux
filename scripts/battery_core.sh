@@ -25,8 +25,7 @@ get_info() {
             sot_label="N/A"
         fi
     else
-        local last=$(get_var "BAT_LAST_BENCHMARK")
-        sot_label="Last: ${last:-0s}"
+        sot_label="N/A"
     fi
 
     if [[ $p_raw -eq 0 ]]; then

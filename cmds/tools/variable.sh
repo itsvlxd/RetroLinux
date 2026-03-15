@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/setup/variables.sh"
+source "$RETRO_DIR/cmds/system/setup/variables.sh"
 
 cmd_var() {
     local var_script="$RETRO_DIR/scripts/variable_core.sh"

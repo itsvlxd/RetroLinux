@@ -70,6 +70,10 @@ set_profile() {
     local microwatts=$((watts * 1000000))
 
     if [[ $CPU_VENDOR == "GenuineIntel" ]]; then
+        if [[ ! -d /sys/class/powercap/intel-rapl:0 ]]; then
+            sudo modprobe intel_rapl_msr 2>/dev/null
+        fi
+
         case "$profile" in
             "performance")
                 echo "0" >/sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null
@@ -107,7 +111,12 @@ set_profile() {
                 fi
 
                 [[ -d /sys/class/powercap/intel-rapl:1 ]] &&
-                    echo "3000000" >/sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw 2>/dev/null
+                    #echo "3000000" >/sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw 2>/dev/null
+                    echo "$microwatts" >/sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw 2>/dev/null
+
+                if [[ -d /sys/class/powercap/intel-rapl:0:1 ]]; then
+                    echo "3000000" >/sys/class/powercap/intel-rapl:0:1/constraint_0_power_limit_uw 2>/dev/null
+                fi
 
                 bash "$BAT_CORE" --saver "true"
                 ;;

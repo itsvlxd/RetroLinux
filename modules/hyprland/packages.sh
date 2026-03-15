@@ -1,2 +1,4 @@
+hyprland
+
 cliphist
 wl-clipboard
