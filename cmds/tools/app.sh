@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# TODO: Add the option to use all for all the available modules
+# and also maybe add a settings section for each app based on variables
+
 get_scripts_path() {
     local mod_path="$1"
     local config_rel=$(rx_get_json "$mod_path/targets.json" "config" "files")

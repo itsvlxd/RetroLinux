@@ -3,7 +3,8 @@
 # TODO: Add a option to cache reset so it deleted the wallpapers saved in cache and
 # the cache of the wallpaper frames to generate new ones
 #
-# also add a command to add a wallpaper inside the wallpaper menu
+# TODO: also add a command to add a wallpaper inside the wallpaper menu
+# TODO: add slideshow mode
 
 source "$RETRO_DIR/lib/helpers.sh"
 

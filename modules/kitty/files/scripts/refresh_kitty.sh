@@ -8,6 +8,7 @@ get_var() {
 
 OPACITY=$(get_var "RETRO_OPACITY" "1.0")
 FONT=$(get_var "KITTY_FONT" "JetBrainsMono Nerd Font")
+EMOJI=$(get_var "RETRO_FONT_EMOJI" "Apple Color Emoji")
 SIZE=$(get_var "KITTY_FONT_SIZE" "9.5")
 P_WIDTH=$(get_var "KITTY_PADDING_WIDTH" "5")
 P_HEIGHT=$(get_var "KITTY_PADDING_HEIGHT" "5")
@@ -23,6 +24,7 @@ apply_settings() {
     kitty @ $target set-font-size "$SIZE"
     kitty @ $target set-background-opacity "$OPACITY"
     kitty @ $target set-font-symbols --ranges U+E000-U+F8FF,U+F0000-U+FFFFF "$FONT"
+    kitty @ $target set-font-symbols --ranges U+1F300-U+1F9FF,U+1F600-U+1F64F "$EMOJI"
 
     kitty @ $target set-spacing \
         padding-top="$P_HEIGHT" \

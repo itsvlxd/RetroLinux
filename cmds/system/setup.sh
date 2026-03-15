@@ -1,15 +1,15 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/setup/directories.sh"
-source "$RETRO_DIR/lib/setup/fingerprint.sh"
-source "$RETRO_DIR/lib/setup/wallpapers.sh"
-source "$RETRO_DIR/lib/setup/variables.sh"
-source "$RETRO_DIR/lib/setup/bitwarden.sh"
-source "$RETRO_DIR/lib/setup/editor.sh"
-source "$RETRO_DIR/lib/setup/pacman.sh"
-source "$RETRO_DIR/lib/setup/system.sh"
-source "$RETRO_DIR/lib/setup/emojis.sh"
-source "$RETRO_DIR/lib/setup/power.sh"
+source "$RETRO_DIR/cmds/system/setup/directories.sh"
+source "$RETRO_DIR/cmds/system/setup/fingerprint.sh"
+source "$RETRO_DIR/cmds/system/setup/wallpapers.sh"
+source "$RETRO_DIR/cmds/system/setup/variables.sh"
+source "$RETRO_DIR/cmds/system/setup/bitwarden.sh"
+source "$RETRO_DIR/cmds/system/setup/editor.sh"
+source "$RETRO_DIR/cmds/system/setup/pacman.sh"
+source "$RETRO_DIR/cmds/system/setup/system.sh"
+source "$RETRO_DIR/cmds/system/setup/emojis.sh"
+source "$RETRO_DIR/cmds/system/setup/power.sh"
 
 cmd_setup() {
     rx_logo
