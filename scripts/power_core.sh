@@ -69,6 +69,9 @@ set_profile() {
     local watts=$(get_pwr_var "$profile")
     local microwatts=$((watts * 1000000))
 
+    # TODO: Add support for adding the bluetooth and wifi in power saving mode
+    # TODO: Do more research on how to extend the battery life of the laptop
+
     if [[ $CPU_VENDOR == "GenuineIntel" ]]; then
         if [[ ! -d /sys/class/powercap/intel-rapl:0 ]]; then
             sudo modprobe intel_rapl_msr 2>/dev/null

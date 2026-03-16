@@ -10,6 +10,10 @@ get_info() {
     local model=$(cat "$BAT_PATH/model_name" 2>/dev/null || echo "Generic")
     local p_raw=$(cat "$BAT_PATH/power_now" 2>/dev/null || echo "0")
     local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")
+    local energy=$(cat "$BAT_PATH/energy_now" 2>/dev/null || cat "$BAT_PATH/charge_now" 2>/dev/null || echo "0")
+    local power=$(cat "$BAT_PATH/power_now" 2>/dev/null || cat "$BAT_PATH/current_now" 2>/dev/null || echo "0")
+    local estimate="N/A"
+
     local saver=$(get_var "BAT_SAVER_ACTIVE")
 
     if [[ $stat == *"discharging"* ]]; then
@@ -18,14 +22,42 @@ get_info() {
         if [[ -n $start_ts && $start_ts != "null" ]]; then
             local now=$(date +%s)
             local diff=$((now - start_ts))
-            sot_label=$(rx_format_time "$diff")
+
+            local days=$((diff / 86400))
+            local hrs=$(((diff % 86400) / 3600))
+            local mins=$(((diff % 3600) / 60))
+            local secs=$((diff % 60))
+
+            if ((days > 0)); then
+                sot_label="${days}d $(printf "%02dh %02dm %02ds" $hrs $mins $secs)"
+            elif ((hrs > 0)); then
+                sot_label="$(printf "%02dh %02dm %02ds" $hrs $mins $secs)"
+            else
+                sot_label="$(printf "%02dm %02ds" $mins $secs)"
+            fi
         else
             local now=$(date +%s)
             set_var "BAT_DISCONNECT_TIME" "$now"
-            sot_label="N/A"
+            sot_label="00m 00s"
         fi
     else
         sot_label="N/A"
+    fi
+
+    if [[ $stat == *"discharging"* && $power -gt 0 ]]; then
+        local seconds_left=$((energy * 3600 / power))
+
+        local e_hrs=$((seconds_left / 3600))
+        local e_mins=$(((seconds_left % 3600) / 60))
+
+        estimate="$(printf "%dh %dm" $e_hrs $e_mins)"
+    elif [[ $stat == *"charging"* && $power -gt 0 ]]; then
+        local full_energy=$(cat "$BAT_PATH/energy_full" 2>/dev/null || cat "$BAT_PATH/charge_full" 2>/dev/null || echo "0")
+        local needed=$((full_energy - energy))
+        if [[ $needed -gt 0 ]]; then
+            local seconds_to_full=$((needed * 3600 / power))
+            estimate="$(printf "%dh %dm to full" $((seconds_to_full / 3600)) $(((seconds_to_full % 3600) / 60)))"
+        fi
     fi
 
     if [[ $p_raw -eq 0 ]]; then
@@ -39,7 +71,7 @@ get_info() {
         saver_label="ON"
     fi
 
-    echo "$cap|$stat|$health|$p_raw|$v_raw|$model|$saver_label|$sot_label"
+    echo "$cap|$stat|$health|$p_raw|$v_raw|$model|$saver_label|$sot_label|$estimate"
 }
 
 set_limit() {
@@ -110,11 +142,41 @@ log_battery_event() {
     set_var "BAT_STATS_0" "${d_date}|${d_cycles}|${d_seconds}"
 }
 
+get_usage() {
+    local limit="${1:-10}"
+
+    local p_raw=$(cat "$BAT_PATH/power_now" 2>/dev/null || echo "0")
+    local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")
+
+    if [[ $p_raw -eq 0 ]]; then
+        local i_raw=$(cat "$BAT_PATH/current_now" 2>/dev/null || echo "0")
+        p_raw=$((i_raw * v_raw / 1000000))
+    fi
+
+    [[ $p_raw -le 0 ]] && p_raw=10000
+    local total_watts=$(awk "BEGIN {printf \"%.2f\", $p_raw / 1000000}")
+
+    local proc_data=$(ps -eo %cpu,comm --sort=-%cpu | grep -vE '(%CPU|\[|ps|grep|awk|retro)' | awk '
+    {
+        name=$2;
+        if (name ~ /Isolated/) name="Zen-Worker";
+        if (name ~ /Web/) name="Web-Content";
+        sum[name]+=$1
+    } 
+    END {
+        for (i in sum) print sum[i]"|"i
+    }' | sort -rn | head -n "$limit")
+
+    echo "$total_watts"
+    echo "$proc_data"
+}
+
 case "$1" in
     "--raw") get_bat_status ;;
     "--info") get_info ;;
     "--limit") set_limit "$2" ;;
     "--loop") run_loop ;;
+    "--usage") get_usage "$2" ;;
     "--saver") set_saver "$2" "$3" ;;
     "--log") log_battery_event "$2" "$3" ;;
 esac
