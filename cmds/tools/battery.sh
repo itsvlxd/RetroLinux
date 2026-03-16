@@ -13,7 +13,7 @@ cmd_battery() {
 
         "status")
             local raw_output=$($battery_script --info)
-            IFS='|' read -r cap stat health power volt model saver sot <<<"$raw_output"
+            IFS='|' read -r cap stat health power volt model saver sot est <<<"$raw_output"
 
             local watts=$(awk "BEGIN {printf \"%.2f\", $power / 1000000}")
             local volts=$(awk "BEGIN {printf \"%.2f\", $volt / 1000000}")
@@ -33,6 +33,12 @@ cmd_battery() {
 
             if [[ $sot != "N/A" ]]; then
                 printf " ${PINK}󰔚${RESET} %-14s %b\n" "On Battery:" "${sot}"
+            fi
+
+            if [[ $est != "N/A" ]]; then
+                local est_icon="󱎫"
+                [[ $stat == *"charging"* ]] && est_icon="󱐋"
+                printf " ${PINK}%s${RESET} %-14s %s\n" "$est_icon" "Remaining:" "$est"
             fi
 
             printf " ${PINK}󰌪${RESET} %-14s %s\n" "Saver Mode:" "$saver"
@@ -82,6 +88,42 @@ cmd_battery() {
 
                 printf " ${PINK} ${RESET}%s ${RESET}%b [${PINK}%s${RESET} charge(s)] Avg: ${PINK}%sm${RESET}\n" \
                     "$day_name" "$bar" "$d_cycles" "$avg_min"
+            done
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            ;;
+
+        "usage")
+            local raw_output=$($battery_script --raw)
+
+            if [[ $raw_output != "discharging" ]]; then
+                rx_log "error" "Cannot calculate app usage while charging or fully charged."
+                return 1
+            fi
+
+            local requested_count="${value:-10}"
+            [[ ! $requested_count =~ ^[0-9]+$ ]] && requested_count=10
+
+            local raw_data=$($battery_script --usage "$requested_count")
+            local total_watts=$(echo "$raw_data" | head -n 1)
+            local procs=$(echo "$raw_data" | tail -n +2)
+
+            echo -e "\n ${PINK}󱈑 Power Consumption: ${RESET}${total_watts}W Total"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+
+            local count=0
+            while IFS='|' read -r cpu cmd; do
+                [[ -z $cpu || $cpu == "0.0" ]] && continue
+                ((count++))
+
+                local est_w=$(awk "BEGIN {printf \"%.2f\", ($cpu / 100) * $total_watts}")
+
+                printf " ${PINK}󰣖 ${RESET}%-22s ${GRAY}%-12s${RESET} ${PINK}%sW${RESET}\n" \
+                    "${cmd:0:20}" "${cpu}%" "$est_w"
+            done <<<"$procs"
+
+            for ((i = count; i < requested_count; i++)); do
+                printf " ${MUTE}%-22s %-12s %-8s${RESET}\n" "---" "0.0%" "0.00W"
             done
 
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
