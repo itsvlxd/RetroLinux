@@ -96,7 +96,13 @@ set_wallpaper() {
     (
         pkill mpvpaper
 
-        matugen image -b wal "$static_source" --source-color-index 0 >/dev/null 2>&1
+        COLOR=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info:)
+
+        if [ "$(echo "$COLOR < 1.0" | bc)" -eq 1 ]; then
+            matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
+        else
+            matugen image -b wal "$static_source" --source-color-index 0 >/dev/null 2>&1
+        fi
 
         if [[ $is_video == "true" && $should_be_static == "false" ]]; then
             [[ $is_first_load == "false" ]] && sleep 2.2
