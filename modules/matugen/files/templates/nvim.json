@@ -1,28 +1,27 @@
 {
     "wallpaper": "{{image}}",
     "alpha": "100",
-
     "special": {
         "background": "{{colors.surface.default.hex}}",
         "foreground": "{{colors.on_surface.default.hex}}",
         "cursor": "{{colors.on_surface.default.hex}}"
     },
     "colors": {
-        "color0": "{{colors.surface.default.hex}}",
-        "color1": "{{colors.primary.default.hex}}",
-        "color2": "{{colors.secondary.default.hex}}",
-        "color3": "{{colors.tertiary.default.hex}}",
-        "color4": "{{colors.primary_container.default.hex}}",
-        "color5": "{{colors.secondary_container.default.hex}}",
-        "color6": "{{colors.tertiary_container.default.hex}}",
+        "color0": "{{base16.base00.default.hex}}",
+        "color1": "{{base16.base04.default.hex}}",
+        "color2": "{{base16.base08.default.hex}}",
+        "color3": "{{base16.base06.default.hex}}",
+        "color4": "{{colors.primary.default.hex}}",
+        "color5": "{{colors.source_color.default.hex}}",
+        "color6": "{{base16.base08.default.hex}}",
         "color7": "{{colors.on_surface_variant.default.hex}}",
-        "color8": "{{colors.surface_bright.default.hex}}",
-        "color9": "{{colors.primary.default.hex}}",
-        "color10": "{{colors.secondary.default.hex}}",
-        "color11": "{{colors.tertiary.default.hex}}",
-        "color12": "{{colors.primary_container.default.hex}}",
-        "color13": "{{colors.secondary_container.default.hex}}",
-        "color14": "{{colors.tertiary_container.default.hex}}",
+        "color8": "{{base16.base03.default.hex}}",
+        "color9": "{{base16.base03.default.hex}}",
+        "color10": "{{base16.base08.default.hex}}",
+        "color11": "{{base16.base04.default.hex}}",
+        "color12": "{{colors.primary_fixed.default.hex}}",
+        "color13": "{{colors.source_color.default.hex}}",
+        "color14": "{{base16.base09.default.hex}}",
         "color15": "{{colors.on_surface.default.hex}}"
     }
 }
