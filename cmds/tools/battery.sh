@@ -156,7 +156,7 @@ cmd_battery() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro --battery [status|stats|limit|saver|raw]" ;;
+        *) rx_log "info" "Usage: retro --battery [status|stats|usage|limit|saver|raw]" ;;
     esac
 }
 
