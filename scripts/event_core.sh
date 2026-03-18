@@ -103,6 +103,61 @@ run_event_loop() {
             last_pwr_profile="$current_pwr_profile"
         fi
 
+        if ((tick_counter % 15 == 0)) && [[ $current_on_battery == "true" ]]; then
+            local p_raw=$(cat "$BAT_PATH/power_now" 2>/dev/null || echo "0")
+            if [[ $p_raw -eq 0 ]]; then
+                local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")
+                local i_raw=$(cat "$BAT_PATH/current_now" 2>/dev/null || echo "0")
+                p_raw=$((i_raw * v_raw / 1000000))
+            fi
+            local total_w=$(awk "BEGIN {printf \"%.2f\", $p_raw / 1000000}")
+
+            local proc_list=$(ps -eo %cpu,comm --sort=-%cpu | grep -vE '(%CPU|\[|ps|grep|awk|retro)' | head -n 10 | awk '{print $1"|"$2}')
+
+            local outlier_data=$(echo "$proc_list" | awk -F'|' -v total_w="$total_w" '
+            {
+                cpu[NR]=$1; name[NR]=$2;
+                sum += $1;
+            }
+            END {
+                if (NR < 3) exit; 
+                
+                top_cpu = cpu[1];
+                top_name = name[1];
+                
+                others_sum = sum - top_cpu;
+                avg_others = others_sum / (NR - 1);
+                app_w = (top_cpu / 100) * total_w;
+                
+                if (avg_others > 0 && top_cpu > (avg_others * 3) && top_cpu > 5.0 && app_w > 2.0) {
+                    printf "true|%s|%.2f", top_name, app_w;
+                } else {
+                    print "false|none|0";
+                }
+            }')
+
+            IFS='|' read -r is_outlier rogue_name rogue_watts <<<"$outlier_data"
+
+            if [[ $is_outlier == "true" ]]; then
+                local now=$(date +%s)
+                local last_app=$(get_var "BAT_LAST_NOTIFIED_APP")
+                local last_time=$(get_var "BAT_LAST_NOTIFIED_TIME")
+                [[ -z $last_time || $last_time == "null" ]] && last_time=0
+
+                local cooldown=600
+                local time_diff=$((now - last_time))
+
+                if [[ $rogue_name != "$last_app" || -z $last_app ]] || ((time_diff > cooldown)); then
+                    broadcast_event "on_battery_usage_high" "$rogue_name" "$rogue_watts"
+
+                    set_var "BAT_LAST_NOTIFIED_APP" "$rogue_name"
+                    set_var "BAT_LAST_NOTIFIED_TIME" "$now"
+                fi
+            else
+                set_var "BAT_LAST_NOTIFIED_APP" "none"
+            fi
+        fi
+
         ((tick_counter++))
         sleep 1
     done
