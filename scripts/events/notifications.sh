@@ -27,6 +27,13 @@ on_battery_saver_disabled() {
         "Battery Saver" "Standard power limits restored"
 }
 
+on_battery_usage_high() {
+    local app="$1"
+    local watts="$2"
+
+    notify-send -u critical -i dialog-warning "Battery Usage" "High battery usage has been detected.\n<b>$app</b> is pulling ${watts}W"
+}
+
 on_battery_low() {
     local cap="$1"
 
