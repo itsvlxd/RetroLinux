@@ -30,8 +30,28 @@ on_battery_saver_disabled() {
 on_battery_usage_high() {
     local app="$1"
     local watts="$2"
+    local cpu="$3"
+    local pid="$4"
 
-    notify-send -u critical -i dialog-warning "Battery Usage" "High battery usage has been detected.\n<b>$app</b> is pulling ${watts}W"
+    ACTION=$(notify-send -u critical -i dialog-warning \
+        "Battery Usage" \
+        "High battery usage detected.\n<b>$app ($pid)</b> is pulling ${watts}W and ${cpu}% CPU" \
+        -A "terminate=Terminate Process" \
+        -A "ignore=Ignore $app")
+
+    case "$ACTION" in
+        "terminate")
+            kill -15 "$pid" 2>/dev/null
+            ;;
+        "ignore")
+            local current_list=$(get_var "BAT_IGNORE_APPS")
+            if [[ $current_list == "null" || -z $current_list ]]; then
+                set_var "BAT_IGNORE_APPS" "$app"
+            else
+                set_var "BAT_IGNORE_APPS" "${current_list}|$app"
+            fi
+            ;;
+    esac
 }
 
 on_battery_low() {
