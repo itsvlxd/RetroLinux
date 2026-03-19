@@ -111,32 +111,32 @@ run_event_loop() {
                 p_raw=$((i_raw * v_raw / 1000000))
             fi
             local total_w=$(awk "BEGIN {printf \"%.2f\", $p_raw / 1000000}")
-
-            local proc_list=$(ps -eo %cpu,comm --sort=-%cpu | grep -vE '(%CPU|\[|ps|grep|awk|retro)' | head -n 10 | awk '{print $1"|"$2}')
+            local proc_list=$(ps -eo %cpu,pid,comm --sort=-%cpu | grep -vE '(%CPU|\[|ps|grep|awk|retro)' | head -n 10 | awk '{print $1"|"$2"|"$3}')
 
             local outlier_data=$(echo "$proc_list" | awk -F'|' -v total_w="$total_w" '
             {
-                cpu[NR]=$1; name[NR]=$2;
+                n=$3; 
+                if (n ~ /Isolated/) n="Zen-Worker"; 
+                if (n ~ /Web/) n="Web-Content";
+                
+                cpu[NR]=$1; pid[NR]=$2; name[NR]=n;
                 sum += $1;
             }
             END {
-                if (NR < 3) exit; 
-                
-                top_cpu = cpu[1];
-                top_name = name[1];
-                
+                if (NR < 3) exit;
+                top_cpu = cpu[1]; top_pid = pid[1]; top_name = name[1];
                 others_sum = sum - top_cpu;
                 avg_others = others_sum / (NR - 1);
-                app_w = (top_cpu / 100) * total_w;
+                app_w = (top_cpu/100) * total_w;
                 
                 if (avg_others > 0 && top_cpu > (avg_others * 3) && top_cpu > 5.0 && app_w > 2.0) {
-                    printf "true|%s|%.2f", top_name, app_w;
+                    printf "true|%s|%.2f|%s|%s", top_name, app_w, top_cpu, top_pid;
                 } else {
-                    print "false|none|0";
+                    print "false|none|0|0|0";
                 }
             }')
 
-            IFS='|' read -r is_outlier rogue_name rogue_watts <<<"$outlier_data"
+            IFS='|' read -r is_outlier rogue_name rogue_watts rogue_cpu rogue_pid <<<"$outlier_data"
 
             if [[ $is_outlier == "true" ]]; then
                 local now=$(date +%s)
@@ -146,9 +146,10 @@ run_event_loop() {
 
                 local cooldown=600
                 local time_diff=$((now - last_time))
+                local ignore_list=$(get_var "BAT_IGNORE_APPS")
 
-                if [[ $rogue_name != "$last_app" || -z $last_app ]] || ((time_diff > cooldown)); then
-                    broadcast_event "on_battery_usage_high" "$rogue_name" "$rogue_watts"
+                if [[ "|$ignore_list|" != *"|$rogue_name|"* ]] && { [[ $rogue_name != "$last_app" ]] || ((time_diff > cooldown)); }; then
+                    broadcast_event "on_battery_usage_high" "$rogue_name" "$rogue_watts" "$rogue_cpu" "$rogue_pid"
 
                     set_var "BAT_LAST_NOTIFIED_APP" "$rogue_name"
                     set_var "BAT_LAST_NOTIFIED_TIME" "$now"
