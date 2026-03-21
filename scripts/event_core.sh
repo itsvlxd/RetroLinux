@@ -5,6 +5,8 @@ source "$RETRO_DIR/scripts/lib/variable.sh"
 
 EVENT_DIR="$RETRO_DIR/scripts/events"
 
+# TODO: add modules rules like no_deps_uninstall
+
 broadcast_event() {
     local event_name="$1"
     local args="${@:2}"
@@ -25,7 +27,11 @@ run_event_loop() {
     local last_bat_stat=$(get_bat_status)
     local last_on_battery=$(is_on_battery)
     local last_bat_saver=$(get_var "BAT_SAVER_ACTIVE")
+
+    local last_usb_list=""
+    local mount_root="$HOME/Mounts"
     local last_notified_level=0
+    mkdir -p "$mount_root"
 
     local low_thresh=$(get_var "BAT_NOTIFY_THRESHOLD")
     local crit_thresh=$(get_var "BAT_NOTIFY_CRITICAL_THRESHOLD")
@@ -157,6 +163,35 @@ run_event_loop() {
             else
                 set_var "BAT_LAST_NOTIFIED_APP" "none"
             fi
+        fi
+
+        if ((tick_counter % 2 == 0)); then
+            local current_usb_list=$(lsblk -nlo NAME,RM,TYPE | awk '$2=="1" && $3=="part" {print $1}' | xargs)
+
+            for dev_name in $current_usb_list; do
+                if [[ ! " $last_usb_list " =~ " $dev_name " ]]; then
+                    local dev_path="/dev/$dev_name"
+                    local label=$(lsblk -nlo LABEL "$dev_path" | xargs)
+                    [[ -z $label ]] && label="USB_Drive"
+
+                    local mount_point="$mount_root/${label}_${dev_name}"
+                    mkdir -p "$mount_point"
+
+                    if mount "$dev_path" "$mount_point" 2>/dev/null || udisksctl mount -b "$dev_path" >/dev/null 2>&1; then
+                        local actual_mount=$(findmnt -nlo TARGET "$dev_path")
+
+                        broadcast_event "on_usb_connected" "$label" "$actual_mount"
+                    fi
+                fi
+            done
+
+            for old_dev in $last_usb_list; do
+                if [[ ! " $current_usb_list " =~ " $old_dev " ]]; then
+                    broadcast_event "on_usb_disconnected" "$old_dev" "$mount_root"
+                fi
+            done
+
+            last_usb_list="$current_usb_list"
         fi
 
         ((tick_counter++))

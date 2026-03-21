@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/cmds/system/open.sh"
+
 on_power_disconnect() {
     local cap="$1"
     notify-send -u normal -i battery-caution \
@@ -71,5 +74,40 @@ on_battery_critical() {
         notify-send -u critical -i battery-empty \
             "Battery Critical" "Only ${cap}% left. Connect power now."
 
+    fi
+}
+
+on_usb_connected() {
+    local label="$1"
+    local mount_path="$2"
+
+    local fm_name=$(get_var "RETRO_FILEMANAGER_CMD")
+    local fm_display="${fm_name^}"
+
+    ACTION=$(
+        notify-send -u normal -i drive-removable-media-symbolic -t 10000 \
+            "USB Drive Detected" \
+            "<b>$label</b> has been mounted.\nLocation: $mount_path" \
+            -A "open=Open in $fm_display"
+    )
+
+    case "$ACTION" in
+        "open")
+            cmd_open "filemanager" "$mount_path" &
+            ;;
+    esac
+}
+
+on_usb_disconnected() {
+    local dev_name="$1"
+    local mount_root="$2"
+
+    notify-send -u normal -i drive-removable-media-symbolic -t 10000 \
+        "USB Drive Removed" \
+        "Device <b>$dev_name</b> has been disconnected."
+
+    local target=$(find "$mount_root" -maxdepth 1 -name "*$dev_name*" -type d)
+    if [[ -d $target ]]; then
+        rmdir "$target" 2>/dev/null
     fi
 }
