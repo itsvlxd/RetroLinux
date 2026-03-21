@@ -52,7 +52,7 @@ cmd_clipboard() {
         (sleep 0.1 && cliphist list | head -n 1 | cliphist delete) &
         (sleep "$CLIP_WARDEN_DESTRUCT" && [[ "$(wl-paste)" == "$text" ]] && wl-copy --clear) &
         notify-send "Retro Vault" "$msg\nThe copy will destruct in ${CLIP_WARDEN_DESTRUCT}s" -i "security-high"
-        pkill rofi
+        pkill -f rofi
     }
 
     case "$action" in
