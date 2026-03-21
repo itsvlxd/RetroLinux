@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/cmds/system/setup/directories.sh"
 source "$RETRO_DIR/cmds/system/setup/fingerprint.sh"
+source "$RETRO_DIR/cmds/system/setup/filemanager.sh"
 source "$RETRO_DIR/cmds/system/setup/wallpapers.sh"
 source "$RETRO_DIR/cmds/system/setup/variables.sh"
 source "$RETRO_DIR/cmds/system/setup/bitwarden.sh"
@@ -27,9 +28,10 @@ cmd_setup() {
 
     rx_vars_defaults "$2"
 
+    setup_file_manager
+
     rx_optimize_cpu
     rx_optimize_pacman
-
     rx_bootstrap_pkg_manager
 
     rx_setup_wallpapers
