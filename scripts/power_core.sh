@@ -70,6 +70,7 @@ set_profile() {
     local microwatts=$((watts * 1000000))
 
     # TODO: Add support for adding the bluetooth and wifi in power saving mode
+    # TODO: Make sure to have the intel-rapl:1 error fixed and proper sync with power-profiles-daemon
     # TODO: Do more research on how to extend the battery life of the laptop
 
     if [[ $CPU_VENDOR == "GenuineIntel" ]]; then

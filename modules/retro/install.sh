@@ -10,16 +10,11 @@ tmp_file="/etc/tmpfiles.d/retro-power.conf"
 setup_power_permissions() {
     read -r -d '' expected_content <<EOF
 # Retro Power Management Permissions
-f /sys/devices/system/cpu/intel_pstate/no_turbo                          0666 root root -   -
-f /sys/devices/system/cpu/intel_pstate/max_perf_pct                      0666 root root -   -
-z /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference 0666 root root -   -
-z /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 0666 root root -   -
-f /sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw        0666 root root -   -
-f /sys/class/powercap/intel-rapl:0/constraint_1_power_limit_uw        0666 root root -   -
-f /sys/class/powercap/intel-rapl:0/constraint_0_time_window_us        0666 root root -   -
-f /sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw        0666 root root -   -
+f /sys/devices/system/cpu/intel_pstate/no_turbo                                 0666 root root -   -
+f /sys/devices/system/cpu/intel_pstate/max_perf_pct                             0666 root root -   -
+w /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference            -    -    -    -   0666
+z /sys/class/powercap/intel-rapl*                                               0666 root root -   -
 EOF
-
     if [[ -f $tmp_file ]]; then
         echo "$expected_content" >/tmp/retro_pwr_check
         if diff -q /tmp/retro_pwr_check "$tmp_file" >/dev/null 2>&1; then
