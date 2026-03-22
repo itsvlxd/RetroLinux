@@ -165,6 +165,8 @@ run_event_loop() {
             fi
         fi
 
+        # TODO: add a feature where u can ignore notifications about a specific drive name
+
         if ((tick_counter % 2 == 0)); then
             local current_usb_list=$(lsblk -nlo NAME,RM,TYPE | awk '$2=="1" && $3=="part" {print $1}' | xargs)
 
@@ -174,11 +176,11 @@ run_event_loop() {
                     local label=$(lsblk -nlo LABEL "$dev_path" | xargs)
                     [[ -z $label ]] && label="USB_Drive"
 
-                    if mount "$dev_path" "$mount_point" 2>/dev/null || udisksctl mount -b "$dev_path" >/dev/null 2>&1; then
+                    if mount "$dev_path" 2>/dev/null || udisksctl mount -b "$dev_path" >/dev/null 2>&1; then
 
                         local actual_mount=$(findmnt -nlo TARGET "$dev_path")
 
-                        local symlink_path="$mount_root/${label}_${dev_name}"
+                        local symlink_path="$mount_root/$label"
                         ln -sfn "$actual_mount" "$symlink_path"
 
                         broadcast_event "on_usb_connected" "$label" "$symlink_path"

@@ -20,7 +20,6 @@ cmd_apps() {
     local extra_args="$@"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
-    # 1. Listing Logic (Rule 1 & 2)
     if [[ $app_name == "list" || -z $app_name ]]; then
         rx_log "info" "Available Applications:"
         local v_apps=$(bash "$var_script" --list 2>/dev/null | grep "RETRO_.*_CMD" | cut -d'=' -f1 | sed 's/RETRO_//;s/_CMD//' | tr '[:upper:]' '[:lower:]')
@@ -37,7 +36,6 @@ cmd_apps() {
         return 0
     fi
 
-    # 2. "All" Functionality
     if [[ $app_name == "all" ]]; then
         [[ -z $action ]] && rx_log "error" "An action [open|refresh|close] must be specified for 'all'." && return 1
         rx_log "info" "Executing '${action}' for all valid modules..."
@@ -46,7 +44,6 @@ cmd_apps() {
         return 0
     fi
 
-    # 3. Component Discovery
     local var_key="RETRO_${app_name^^}_CMD"
     local target_cmd=$(get_var "$var_key")
     local mod_path="$RETRO_DIR/modules/$app_name"
@@ -58,7 +55,6 @@ cmd_apps() {
     [[ -f "$s_dir/refresh_${app_name}.sh" ]] && actions+=("refresh")
     [[ -f "$s_dir/close_${app_name}.sh" ]] && actions+=("close")
 
-    # Show Usage if no action or invalid action provided
     if [[ -z $action || $action == "list" ]]; then
         [[ ${#actions[@]} -eq 0 ]] && rx_log "error" "No actions available for '${app_name}'." && return 1
         rx_log "info" "Usage: retro -app $app_name [$(
@@ -68,9 +64,6 @@ cmd_apps() {
         return 0
     fi
 
-    # 4. Execution Priority Logic (Variable > Script)
-
-    # Priority A: Open via Variable
     if [[ $action == "open" && -n $target_cmd && $target_cmd != "null" ]]; then
         rx_log "info" "Launching ${app_name^}..."
         if is_tui "$target_cmd"; then
@@ -80,10 +73,9 @@ cmd_apps() {
         else
             (setsid $target_cmd $extra_args >/dev/null 2>&1 &)
         fi
-        return 0 # Exit immediately on success
+        return 0
     fi
 
-    # Priority B: Close via Variable (only if no custom script exists)
     if [[ $action == "close" && -n $target_cmd && $target_cmd != "null" ]]; then
         if [[ ! -f "$s_dir/close_${app_name}.sh" ]]; then
             pkill -f "$target_cmd" && rx_log "success" "Stopped ${app_name^}."
@@ -91,7 +83,6 @@ cmd_apps() {
         fi
     fi
 
-    # Priority C: Module Scripts (Open, Refresh, or Close)
     local custom_script="$s_dir/${action}_${app_name}.sh"
     if [[ -f $custom_script ]]; then
         rx_log "info" "Executing ${action} script for ${app_name^}..."
@@ -99,7 +90,6 @@ cmd_apps() {
         return $?
     fi
 
-    # 5. Final Fallback
     rx_log "error" "The action '${action}' is not supported for ${app_name}."
     return 1
 }
