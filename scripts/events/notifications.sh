@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/cmds/system/open.sh"
+source "$RETRO_DIR/cmds/tools/app.sh"
 
 on_power_disconnect() {
     local cap="$1"
@@ -93,7 +93,7 @@ on_usb_connected() {
 
     case "$ACTION" in
         "open")
-            cmd_open "filemanager" "$mount_path" &
+            cmd_apps "filemanager" open "$mount_path"
             ;;
     esac
 }
@@ -106,9 +106,12 @@ on_usb_disconnected() {
         "USB Drive Removed" \
         "Device <b>$dev_name</b> has been disconnected."
 
-    local target=$(find "$mount_root" -maxdepth 1 -name "*_$dev_name" -type l)
-
-    if [[ -n $target ]]; then
-        rm "$target"
-    fi
+    for link in "$mount_root"/*; do
+        if [[ -L $link ]]; then
+            local target=$(readlink "$link")
+            if [[ ! -e $target ]]; then
+                rm "$link"
+            fi
+        fi
+    done
 }
