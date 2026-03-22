@@ -36,7 +36,7 @@ on_battery_usage_high() {
     local cpu="$3"
     local pid="$4"
 
-    ACTION=$(notify-send -u critical -i dialog-warning \
+    ACTION=$(notify-send -u normal -i dialog-warning-symbolic -t 15000 \
         "Battery Usage" \
         "High battery usage detected.\n<b>$app ($pid)</b> is pulling ${watts}W and ${cpu}% CPU" \
         -A "terminate=Terminate Process" \
@@ -106,8 +106,9 @@ on_usb_disconnected() {
         "USB Drive Removed" \
         "Device <b>$dev_name</b> has been disconnected."
 
-    local target=$(find "$mount_root" -maxdepth 1 -name "*$dev_name*" -type d)
-    if [[ -d $target ]]; then
-        rmdir "$target" 2>/dev/null
+    local target=$(find "$mount_root" -maxdepth 1 -name "*_$dev_name" -type l)
+
+    if [[ -n $target ]]; then
+        rm "$target"
     fi
 }
