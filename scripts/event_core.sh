@@ -45,6 +45,8 @@ run_event_loop() {
     broadcast_event "on_event_loop_start"
 
     while true; do
+        local notify_on_high_bat_usage=$(get_var "NOTIFY_ON_HIGH_BAT_USAGE")
+
         local current_bat_stat=$(get_bat_status)
         local current_on_battery=$(is_on_battery)
         local current_pwr_profile=$(get_var "PWR_CURRENT")
@@ -165,10 +167,9 @@ run_event_loop() {
             fi
         fi
 
-        # TODO: add a feature where u can ignore notifications about a specific drive name
-
-        if ((tick_counter % 2 == 0)); then
+        if ((tick_counter % 2 == 0)) && [[ $notify_on_high_bat_usage == "true" ]]; then
             local current_usb_list=$(lsblk -nlo NAME,RM,TYPE | awk '$2=="1" && $3=="part" {print $1}' | xargs)
+            local ignore_list=$(get_var "USB_IGNORE_DRIVES")
 
             for dev_name in $current_usb_list; do
                 if [[ ! " $last_usb_list " =~ " $dev_name " ]]; then
@@ -177,13 +178,13 @@ run_event_loop() {
                     [[ -z $label ]] && label="USB_Drive"
 
                     if mount "$dev_path" 2>/dev/null || udisksctl mount -b "$dev_path" >/dev/null 2>&1; then
-
                         local actual_mount=$(findmnt -nlo TARGET "$dev_path")
-
                         local symlink_path="$mount_root/$label"
                         ln -sfn "$actual_mount" "$symlink_path"
 
-                        broadcast_event "on_usb_connected" "$label" "$symlink_path"
+                        if [[ "|$ignore_list|" != *"|$label|"* ]]; then
+                            broadcast_event "on_usb_connected" "$label" "$symlink_path"
+                        fi
                     fi
                 fi
             done
