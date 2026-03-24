@@ -17,11 +17,8 @@ rx_vars_defaults() {
         "RETRO_GAP_IN|5"
         "RETRO_GAP_OUT|20"
 
-        # Rofi
-        "ROFI_FONT|JetBrainsMono Nerd Font"
-        "ROFI_FONT_SIZE|9.5"
-        "ROFI_ROUDING|10"
-        "ROFI_PADDING|5"
+        # Events
+        "NOTIFY_ON_HIGH_BAT_USAGE|true"
 
         # Clipboard
         "CLIP_WARDEN_SYNC|900"
@@ -57,6 +54,12 @@ rx_vars_defaults() {
         "KITTY_FONT_SIZE|9.5"
         "KITTY_PADDING_WIDTH|5"
         "KITTY_PADDING_HEIGHT|5"
+
+        # Rofi
+        "ROFI_FONT|JetBrainsMono Nerd Font"
+        "ROFI_FONT_SIZE|9.5"
+        "ROFI_ROUDING|10"
+        "ROFI_PADDING|5"
     )
 
     local count=0

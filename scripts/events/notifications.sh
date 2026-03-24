@@ -84,32 +84,50 @@ on_usb_connected() {
     local fm_name=$(get_var "RETRO_FILEMANAGER_CMD")
     local fm_display="${fm_name^}"
 
-    ACTION=$(
-        notify-send -u normal -i drive-removable-media-symbolic -t 10000 \
-            "USB Drive Detected" \
-            "<b>$label</b> has been mounted.\nLocation: $mount_path" \
-            -A "open=Open in $fm_display"
-    )
+    (
+        ACTION=$(
+            notify-send -u normal -i drive-removable-media-symbolic -t 10000 -w \
+                "USB Drive Detected" \
+                "<b>$label</b> has been mounted.\nLocation: $mount_path" \
+                -A "open=Open in $fm_display" \
+                -A "ignore=Ignore $label"
+        )
 
-    case "$ACTION" in
-        "open")
-            cmd_apps "filemanager" open "$mount_path"
-            ;;
-    esac
+        case "$ACTION" in
+            "open")
+                cmd_apps "filemanager" "open" "$mount_path"
+                ;;
+            "ignore")
+                local current_list=$(get_var "USB_IGNORE_DRIVES")
+                if [[ $current_list == "null" || -z $current_list ]]; then
+                    set_var "USB_IGNORE_DRIVES" "$label"
+                else
+                    set_var "USB_IGNORE_DRIVES" "${current_list}|$label"
+                fi
+                rx_log "info" "Drive '$label' added to ignore list."
+                ;;
+        esac
+    ) &
 }
 
 on_usb_disconnected() {
     local dev_name="$1"
     local mount_root="$2"
-
-    notify-send -u normal -i drive-removable-media-symbolic -t 10000 \
-        "USB Drive Removed" \
-        "Device <b>$dev_name</b> has been disconnected."
+    local ignore_list=$(get_var "USB_IGNORE_DRIVES")
 
     for link in "$mount_root"/*; do
         if [[ -L $link ]]; then
             local target=$(readlink "$link")
+
             if [[ ! -e $target ]]; then
+                local label=$(basename "$link")
+
+                if [[ "|$ignore_list|" != *"|$label|"* ]]; then
+                    notify-send -u normal -i drive-removable-media-symbolic -t 10000 \
+                        "USB Drive Removed" \
+                        "Drive <b>$label</b> ($dev_name) has been disconnected."
+                fi
+
                 rm "$link"
             fi
         fi
