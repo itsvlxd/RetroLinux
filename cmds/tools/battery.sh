@@ -50,13 +50,9 @@ cmd_battery() {
 
             for ((i = 0; i < 20; i++)); do
                 if ((i < filled)); then
-                    r=$((200 + (41 * i / 19)))
-                    g=$((200 - (86 * i / 19)))
-                    b=$((200 + (7 * i / 19)))
-
-                    printf "\e[38;2;${r};${g};${b}m█\e[0m"
+                    printf "${PINK}█${RESET}"
                 else
-                    printf "\e[38;2;69;71;90m░\e[0m"
+                    printf "${GRAY}░${RESET}"
                 fi
             done
 
