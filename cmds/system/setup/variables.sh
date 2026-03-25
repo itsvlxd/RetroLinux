@@ -10,12 +10,15 @@ rx_vars_defaults() {
     local defaults=(
         # Retro
         "RETRO_CUSTOM_LOAD|hyprland-welcome"
+        "RETRO_TERMINAL_CMD|kitty"
 
         "RETRO_OPACITY|0.9"
         "RETRO_INACTIVE_OPACITY|0.8"
         "RETRO_ROUNDING|10"
         "RETRO_GAP_IN|5"
         "RETRO_GAP_OUT|20"
+        "RETRO_SHADOW|true"
+        "RETRO_BLUR|true"
 
         # Events
         "NOTIFY_ON_HIGH_BAT_USAGE|true"
@@ -52,8 +55,9 @@ rx_vars_defaults() {
         # Kitty
         "KITTY_FONT|JetBrainsMono Nerd Font"
         "KITTY_FONT_SIZE|9.5"
-        "KITTY_PADDING_WIDTH|5"
-        "KITTY_PADDING_HEIGHT|5"
+        "KITTY_PADDING|5"
+
+        "KITTY_SHRINK_PADDING_FULLSCREEN|true"
 
         # Rofi
         "ROFI_FONT|JetBrainsMono Nerd Font"
