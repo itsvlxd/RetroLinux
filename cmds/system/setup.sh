@@ -5,6 +5,7 @@ source "$RETRO_DIR/cmds/system/setup/fingerprint.sh"
 source "$RETRO_DIR/cmds/system/setup/filemanager.sh"
 source "$RETRO_DIR/cmds/system/setup/wallpapers.sh"
 source "$RETRO_DIR/cmds/system/setup/variables.sh"
+source "$RETRO_DIR/cmds/system/setup/auto-save.sh"
 source "$RETRO_DIR/cmds/system/setup/bitwarden.sh"
 source "$RETRO_DIR/cmds/system/setup/editor.sh"
 source "$RETRO_DIR/cmds/system/setup/pacman.sh"
@@ -34,6 +35,7 @@ cmd_setup() {
     rx_optimize_pacman
     rx_bootstrap_pkg_manager
 
+    rx_setup_session_service
     rx_setup_wallpapers
 
     rx_setup_emojis "$2"
