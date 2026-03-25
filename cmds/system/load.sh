@@ -2,6 +2,8 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 
+# TODO: Add also boot time metric and change from list to status
+
 cmd_load() {
     local action="$1"
 
@@ -16,6 +18,11 @@ cmd_load() {
         "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
     )
+
+    local auto_load=$(get_var "RETRO_SESSION_AUTOLOAD")
+    if [[ $auto_load == "true" ]]; then
+        startup_tasks+=("retro --window restore|Restoring the last Hyprland window snapshot")
+    fi
 
     local custom_tasks=()
     local custom_raw=$(get_var "RETRO_CUSTOM_LOAD")
