@@ -46,6 +46,47 @@ get_theme_dir() {
     fi
 }
 
+add_wallpaper() {
+    local source_file="$1"
+    if [[ ! -f $source_file ]]; then
+        rx_log "error" "File not found: $source_file"
+        return 1
+    fi
+
+    local ext="${source_file##*.}"
+    if [[ ! ${ext,,} =~ ^(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$ ]]; then
+        rx_log "error" "Unsupported file format! Please use a standard image or video."
+        return 1
+    fi
+
+    local theme=$(get_var "RETRO_THEME" "retro")
+    local target_dir="$WALL_DIR/$theme"
+    mkdir -p "$target_dir"
+
+    local filename=$(basename "$source_file")
+    local target_file="$target_dir/$filename"
+
+    cp "$source_file" "$target_file"
+    generate_cache "$target_file" >/dev/null
+
+    set_wallpaper "$target_file"
+}
+
+slideshow_next() {
+    local target_dir=$(get_theme_dir)
+    local current=$(get_var "WALL_CURRENT")
+
+    local next_wall=$(find "$target_dir" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null |
+        grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" |
+        grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" |
+        grep -vF "$current" |
+        shuf -n 1)
+
+    if [[ -n $next_wall ]]; then
+        set_wallpaper "$next_wall"
+    fi
+}
+
 optimize_wallpapers() {
     local res_map=$(get_var "WALL_RES_MAP")
     if [[ -z $res_map || $res_map == "null" ]]; then
@@ -293,6 +334,8 @@ launch_picker() {
 
 case "$1" in
     "--set") set_wallpaper "$2" ;;
+    "--add") add_wallpaper "$2" ;;
+    "--slideshow-next") slideshow_next ;;
     "--optimize") optimize_wallpapers ;;
     "--cache")
         rm -rf "$FRAME_CACHE"
