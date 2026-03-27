@@ -39,6 +39,9 @@ run_event_loop() {
 
     local last_pwr_profile=$(get_var "PWR_CURRENT")
 
+    local slideshow_tick=0
+    local current_rand_target=0
+
     local tick_counter=0
 
     # TODO: Need to implement the on_event_loop_start logic
@@ -109,6 +112,30 @@ run_event_loop() {
 
             last_notified_level=0
             last_pwr_profile="$current_pwr_profile"
+        fi
+
+        local slideshow_active=$(get_var "WALL_SLIDESHOW_ACTIVE" "false")
+
+        if [[ $slideshow_active == "true" ]]; then
+            local interval=$(get_var "WALL_SLIDESHOW_INTERVAL" "300")
+            local target_ticks=$interval
+
+            if [[ $interval == "random" ]]; then
+                if ((current_rand_target == 0)); then
+                    current_rand_target=$((RANDOM % 900 + 300))
+                fi
+                target_ticks=$current_rand_target
+            fi
+
+            if ((slideshow_tick >= target_ticks)); then
+                broadcast_event "on_slideshow_tick"
+                slideshow_tick=0
+                current_rand_target=0
+            fi
+
+            ((slideshow_tick++))
+        else
+            slideshow_tick=0
         fi
 
         if ((tick_counter % 15 == 0)) && [[ $current_on_battery == "true" ]]; then

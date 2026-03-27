@@ -38,6 +38,7 @@ rx_vars_defaults() {
         # Wallpaper
         "WALL_STATIC_FORCED|false"
         "WALL_STATIC_ON_BAT|true"
+        "WALL_SLIDESHOW_INTERVAL|300"
 
         # Power
         "PWR_CURRENT|balanced"
@@ -54,7 +55,6 @@ rx_vars_defaults() {
         "KITTY_FONT|JetBrainsMono Nerd Font"
         "KITTY_FONT_SIZE|9.5"
         "KITTY_PADDING|5"
-
         "KITTY_SHRINK_PADDING_FULLSCREEN|true"
 
         # Rofi

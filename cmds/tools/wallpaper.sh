@@ -18,6 +18,40 @@ cmd_wallpaper() {
                 rx_log "error" "I couldn't set that wallpaper: $value"
             fi
             ;;
+
+        "add")
+            [[ -z $value ]] && rx_log "error" "Please provide the path to the image/video." && return 1
+
+            rx_log "info" "Importing wallpaper into the current theme cache..."
+            if bash "$wall_script" --add "$value"; then
+                rx_log "success" "Wallpaper added and applied!"
+            else
+                rx_log "error" "Failed to add wallpaper. Does the file exist?"
+            fi
+            ;;
+
+        "slideshow")
+            local current_state=$(bash "$var_script" --get "WALL_SLIDESHOW_ACTIVE")
+            local new_state="true"
+
+            case "$value" in
+                "on" | "true") new_state="true" ;;
+                "off" | "false") new_state="false" ;;
+                "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
+            esac
+
+            bash "$var_script" --set "WALL_SLIDESHOW_ACTIVE" "$new_state"
+
+            if [[ -n $options ]]; then
+                bash "$var_script" --set "WALL_SLIDESHOW_INTERVAL" "$options"
+                rx_log "info" "Slideshow interval set to: $options"
+            fi
+
+            local status_text="${PINK}ENABLED${RESET}"
+            [[ $new_state == "false" ]] && status_text="${MUTE}DISABLED${RESET}"
+            rx_log "success" "Slideshow mode is now $status_text"
+            ;;
+
         "static")
             local current_state=$(bash "$var_script" --get "WALL_STATIC_FORCED")
             local new_state=""
@@ -190,7 +224,7 @@ cmd_wallpaper() {
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
             ;;
 
-        *) rx_log "info" "Usage: retro --wallpaper [set|static|list|picker|cache|restore|res|optimize|status]" ;;
+        *) rx_log "info" "Usage: retro --wallpaper [set|add|slideshow|static|list|picker|cache|restore|res|optimize|status]" ;;
     esac
 }
 
