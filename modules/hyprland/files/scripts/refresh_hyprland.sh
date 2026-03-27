@@ -16,6 +16,7 @@ get_val() {
     echo "${val:-$2}"
 }
 
+BORDER=$(get_val "RETRO_BORDER_SIZE" "2")
 ROUNDING=$(get_val "RETRO_ROUNDING" "10")
 SHADOW=$(get_val "RETRO_SHADOW" "true")
 BLUR=$(get_val "RETRO_BLUR" "true")
@@ -33,6 +34,7 @@ cat <<EOF >"$TEMP_FILE"
 
 \$retro_opacity = $TRANS
 \$retro_inactive_opacity = $INACTIVE_TRANS
+\$retro_border_size = $BORDER
 \$retro_rounding = $ROUNDING
 \$retro_gap_in = $GAP_IN
 \$retro_gap_out = $GAP_OUT
