@@ -14,6 +14,7 @@ rx_vars_defaults() {
 
         "RETRO_OPACITY|0.9"
         "RETRO_INACTIVE_OPACITY|0.8"
+        "RETRO_BORDER_SIZE|2"
         "RETRO_ROUNDING|10"
         "RETRO_GAP_IN|5"
         "RETRO_GAP_OUT|20"
@@ -62,6 +63,7 @@ rx_vars_defaults() {
         # Rofi
         "ROFI_FONT|JetBrainsMono Nerd Font"
         "ROFI_FONT_SIZE|9.5"
+        "ROFI_BORDER_SIZE|2"
         "ROFI_ROUDING|10"
         "ROFI_PADDING|5"
     )
