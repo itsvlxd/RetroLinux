@@ -32,7 +32,7 @@ rx_vars_defaults() {
         "BAT_SAVER_THRESHOLD|50"
         "BAT_SAVER_ACTIVE|false"
         "BAT_SAVER_FORCED|false"
-        "BAT_SAVER_ON_PWR_DIS|false"
+        "BAT_SAVER_ON_PWR_DIS|true"
 
         "BAT_NOTIFY_THRESHOLD|30"
         "BAT_NOTIFY_CRITICAL_THRESHOLD|15"
