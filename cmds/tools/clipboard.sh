@@ -2,29 +2,72 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 
-# FIX: Fix the screenshot clipboard generating the screenshots and saving them twice
-# in .cache and ~/Pictures/Screenshots
-# FIX: Fix rofi high loading time on battery saver or balanced
-
 cmd_clipboard() {
     local action="$1"
     local selection="$2"
+    local var_script="$RETRO_DIR/scripts/variable_core.sh"
+
+    if [[ $action == "history" ]]; then
+        if [[ -z $selection ]]; then
+            cliphist list | grep -vE "\[\[.*binary.*data" | head -n 150 || echo "Clipboard history is empty..."
+            exit 0
+        else
+            if echo "$selection" | cliphist decode | wl-copy 2>/dev/null; then
+                rx_log "success" "Item copied to clipboard." >&2
+            else
+                echo -n "$selection" | wl-copy
+                rx_log "success" "Text copied." >&2
+            fi
+            exit 0
+        fi
+    elif [[ $action == "emoji" ]]; then
+        local emoji_dir="$RETRO_DIR/cmds/tools/clipboard"
+
+        if [[ -z $selection ]]; then
+            if [[ -d $emoji_dir ]]; then
+                cat "$emoji_dir/emojis_smileys_emotion.csv" \
+                    "$emoji_dir/emojis_people_body.csv" \
+                    "$emoji_dir/emojis_animals_nature.csv" \
+                    "$emoji_dir/emojis_food_drink.csv" \
+                    "$emoji_dir/emojis_travel_places.csv" \
+                    "$emoji_dir/emojis_activities.csv" \
+                    "$emoji_dir/emojis_objects.csv" \
+                    "$emoji_dir/emojis_symbols.csv" \
+                    "$emoji_dir/emojis_flags.csv" \
+                    2>/dev/null | sed 's/,/  /'
+            else
+                echo -e "😀 Grinning Face\n(Error: Emoji directory not found in $emoji_dir)"
+            fi
+            exit 0
+        else
+            echo -n "$selection" | awk '{print $1}' | wl-copy
+            rx_log "success" "Copied to clipboard!" >&2
+            exit 0
+        fi
+    fi
+
     local theme_file="$HOME/.config/rofi/themes/clipboard.rasi"
     local gallery_theme="$HOME/.config/rofi/themes/gallery.rasi"
 
-    local CLIP_BITWARDEN=$(retro -var get CLIP_BITWARDEN 2>/dev/null || echo "false")
-    local CLIP_WARDEN_DESTRUCT=$(retro -var get CLIP_WARDEN_DESTRUCT 2>/dev/null || echo "15")
+    local CLIP_BITWARDEN=$(bash "$var_script" --get "CLIP_BITWARDEN" 2>/dev/null || echo "false")
+    local CLIP_WARDEN_DESTRUCT=$(bash "$var_script" --get "CLIP_WARDEN_DESTRUCT" 2>/dev/null || echo "15")
 
     local alpha=$(get_opacity_hex "0.9")
     local alpha_alt=$(get_opacity_hex "0.6")
-    local base_bg=$(grep "background:" ~/.cache/retro/themes/rofi-colors.rasi | awk '{print $2}' | sed 's/[#;FF]//g')
-    local base_bg_alt=$(grep "background-alt:" ~/.cache/retro/themes/rofi-colors.rasi | awk '{print $2}' | sed 's/[#;FF]//g')
-    local highlight_color=$(grep "highlight:" ~/.cache/retro/themes/rofi-colors.rasi | awk '{print $2}' | sed 's/[;]//g')
+
+    local color_file="$HOME/.cache/retro/themes/rofi-colors.rasi"
+    local base_bg=$(grep "background:" "$color_file" 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
+    local base_bg_alt=$(grep "background-alt:" "$color_file" 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
+    local highlight_color=$(grep "highlight:" "$color_file" 2>/dev/null | awk '{print $2}' | sed 's/[;]//g')
+
+    : ${base_bg:="1A1B26"}
+    : ${base_bg_alt:="24283B"}
+    : ${highlight_color:="7aa2f7"}
 
     launch_gallery() {
         rofi -dmenu -i -p "󰄄 " -theme "$gallery_theme" -show-icons \
             -theme-str "
-                window { background-color: #${base_bg}${alpha}; } 
+                window { background-color: #${base_bg}; } 
                 inputbar { background-color: #${base_bg}${alpha}; }  
                 element selected.normal { background-color: #${base_bg_alt}${alpha_alt}; }
             "
@@ -33,6 +76,7 @@ cmd_clipboard() {
     launch_rofi() {
         local mode="${1:-Clipboard}"
 
+        # Pure Native Modes!
         local modes="Clipboard:retro -clip history,Emoji:retro -clip emoji"
         [[ $CLIP_BITWARDEN == "true" ]] && modes+=",Bitwarden:retro -clip bitwarden"
 
@@ -64,35 +108,6 @@ cmd_clipboard() {
                 cliphist wipe && rx_log "success" "Clipboard database wiped clean."
             else
                 rx_log "info" "Wipe cancelled."
-            fi
-            ;;
-        "history")
-            if [[ -z $selection ]]; then
-                local list=$(cliphist list | grep -vE "\[\[.*binary.*data")
-
-                if [[ -z $list ]]; then
-                    echo "Clipboard history is empty..."
-                else
-                    echo "$list"
-                fi
-            else
-                if echo "$selection" | cliphist decode | wl-copy 2>/dev/null; then
-                    rx_log "success" "Item copied to clipboard." >&2
-                else
-                    echo -n "$selection" | wl-copy
-                    rx_log "success" "Emoji/Text copied." >&2
-                fi
-
-                exit 0
-            fi
-            ;;
-
-        "emoji")
-            if [[ -z $selection ]]; then
-                rofimoji --action copy
-            else
-                echo "$selection" | awk '{print $1}' | wl-copy
-                exit 0
             fi
             ;;
 
@@ -176,36 +191,41 @@ cmd_clipboard() {
             ;;
 
         "screenshots")
-            local thumb_dir="$HOME/.cache/retro/clip_thumbs"
-            mkdir -p "$thumb_dir"
+            local screenshot_dir=$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")
+            screenshot_dir="$screenshot_dir/Screenshots"
 
-            local result=$(cliphist list | grep -E "\[\[.*binary.*data" | while read -r line; do
-                local id=$(echo "$line" | cut -f1 | awk '{print $1}')
-                local thumb="$thumb_dir/${id}.png"
-
-                if [[ ! -f $thumb ]]; then
-                    if ! echo "$line" | cliphist decode >"$thumb" 2>/dev/null; then
-                        rm -f "$thumb"
-                        continue
-                    fi
-
-                    if ! file "$thumb" | grep -qE "image|graphics"; then
-                        rm -f "$thumb"
-                        continue
-                    fi
-                fi
-                echo -en "${id} │ Preview\0icon\x1f${thumb}\n"
-            done | launch_gallery)
-
-            if [[ -n $result ]]; then
-                local id=$(echo "$result" | awk '{print $1}')
-                local restored_img="$thumb_dir/${id}.png"
-
-                if cliphist list | grep -w "^$id" | cliphist decode | wl-copy; then
-                    notify-send "Screenshot $id" "Image has been copied to the clipboard." -i "$restored_img"
-                fi
+            if [[ ! -d $screenshot_dir ]]; then
+                rx_log "error" "Screenshot folder not found: $screenshot_dir"
+                return 1
             fi
 
+            local list=""
+            while IFS= read -r f; do
+                [[ -z $f ]] && continue
+
+                local filename=$(basename "$f")
+                local display=$(echo "${filename%.*}" | sed -E 's/hyprshot-//gi')
+
+                list+="${display}\0icon\x1f${f}\n"
+            done < <(find "$screenshot_dir" -maxdepth 1 -type f -iname "*hyprshot*" -printf "%T@ %p\n" | sort -nr | cut -d' ' -f2-)
+
+            if [[ -z $list ]]; then
+                rx_log "info" "No Hyprshot screenshots found in $screenshot_dir"
+                return 0
+            fi
+
+            local choice=$(echo -en "$list" | launch_gallery)
+
+            if [[ -n $choice ]]; then
+                local target_file=$(find "$screenshot_dir" -maxdepth 1 -type f -name "*${choice}*" -print -quit)
+
+                if [[ -f $target_file ]]; then
+                    wl-copy <"$target_file"
+                    notify-send "Screenshot Copied" "The image is ready to paste." -i "$target_file"
+                else
+                    rx_log "error" "Could not find the selected image file."
+                fi
+            fi
             exit 0
             ;;
 
