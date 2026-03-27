@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# TODO: Add a option to cache reset so it deleted the wallpapers saved in cache and
-# the cache of the wallpaper frames to generate new ones
-#
-# TODO: also add a command to add a wallpaper inside the wallpaper menu
-# TODO: add slideshow mode
-
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/scripts/lib/battery.sh"
