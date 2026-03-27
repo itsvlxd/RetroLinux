@@ -45,6 +45,64 @@ cmd_var() {
             rx_log "success" "Toggled ${PINK}$key${RESET}: ${GRAY}$old_val${RESET} -> ${PINK}$new_val${RESET}"
             ;;
 
+        "add")
+            [[ -z $key || -z $value ]] && rx_log "error" "I need both a key and a value to append." && return 1
+
+            local current=$(bash "$var_script" --get "$key")
+
+            if [[ -z $current || $current == "null" ]]; then
+                bash "$var_script" --set "$key" "$value"
+                rx_log "success" "Created ${PINK}$key${RESET} with: $value"
+            else
+                if [[ "|${current}|" == *"|${value}|"* ]]; then
+                    rx_log "info" "The value '${value}' is already in ${PINK}$key${RESET}."
+                    return 0
+                fi
+
+                local new_val="${current}|${value}"
+                bash "$var_script" --set "$key" "$new_val"
+                rx_log "success" "Appended to ${PINK}$key${RESET}. New value: ${INFO}$new_val${RESET}"
+            fi
+            ;;
+
+        "remove")
+            [[ -z $key || -z $value ]] && rx_log "error" "I need a key and the specific element to remove." && return 1
+
+            local current=$(bash "$var_script" --get "$key")
+
+            if [[ -z $current || $current == "null" ]]; then
+                rx_log "error" "Key ${PINK}$key${RESET} is empty or doesn't exist." && return 1
+            fi
+
+            if [[ "|${current}|" != *"|${value}|"* ]]; then
+                rx_log "error" "Could not find '${value}' inside ${PINK}$key${RESET}." && return 1
+            fi
+
+            local temp="|${current}|"
+            temp="${temp//|${value}|/|}"
+
+            temp="${temp#|}"
+            temp="${temp%|}"
+
+            [[ -z $temp ]] && temp="null"
+
+            if bash "$var_script" --set "$key" "$temp"; then
+                rx_log "success" "Removed '${value}' from ${PINK}$key${RESET}. New value: ${INFO}$temp${RESET}"
+            fi
+            ;;
+
+        "edit")
+            local var_file="$HOME/.cache/retro/variables.sh"
+
+            if [[ ! -f $var_file ]]; then
+                rx_log "error" "Variables cache not found at $var_file" && return 1
+            fi
+
+            ${EDITOR:-nano} "$var_file"
+
+            rx_log "success" "Finished editing variables."
+            ;;
+
         "reset")
             rm -rf "$HOME/.cache/retro/variables.sh"
             rx_vars_defaults "-f"
@@ -100,7 +158,7 @@ cmd_var() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro --variable [get|set|del|toggle|list|reset]"
+            rx_log "info" "Usage: retro --variable [get|set|del|add|remove|toggle|edit|list|reset]"
             ;;
     esac
 }

@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# TODO: Add the edit command which open the variables file
-# using the default text editor
-
 rx_vars_defaults() {
     local force_flag="$1"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
