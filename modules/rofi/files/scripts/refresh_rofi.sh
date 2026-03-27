@@ -14,6 +14,7 @@ FONT=$(get_val "ROFI_FONT" "JetBrains Mono Nerd Font")
 FONT_SIZE=$(get_val "ROFI_FONT_SIZE" "9.5")
 ROUNDING=$(get_val "ROFI_ROUNDING" "10")
 PADDING=$(get_val "ROFI_PADDING" "5")
+BORDER=$(get_val "ROFI_BORDER_SIZE" "2")
 
 cat <<EOF >"$TEMP_FILE"
 /**
@@ -22,6 +23,7 @@ cat <<EOF >"$TEMP_FILE"
 
 * {
     rofi-font:          "$FONT $FONT_SIZE";
+    rofi-border:        ${BORDER}px solid;
     rofi-radius:        ${ROUNDING}px;
     rofi-padding:       ${PADDING}px;
 }
