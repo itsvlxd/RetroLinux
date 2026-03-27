@@ -13,9 +13,16 @@ source "$RETRO_DIR/cmds/system/setup/system.sh"
 source "$RETRO_DIR/cmds/system/setup/emojis.sh"
 source "$RETRO_DIR/cmds/system/setup/power.sh"
 
+# TODO: Improve installing logs
+# TODO: If a module path already exists warn the user first
+# that we detected a different config then the retro one
+# and bypass SKIP_PROMPT and ask the user if he would like
+# to install the specific module but still ensure him that
+# before installing we backup their local config
+
 cmd_setup() {
     rx_logo
-    rx_log "info" "Setting up RetroArch..."
+    rx_log "info" "Setting up Retro Linux..."
 
     setup_system
     setup_editors
