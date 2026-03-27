@@ -2,42 +2,122 @@
     // TODO: add alias in zsh neofetch to point to fastfetch
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
     "logo": {
-        "source": "~/.config/fastfetch/logo/retroarch-logo.png",
-        "width": 40,
+        "source": "~/.config/fastfetch/logo/retro.txt",
+        "type": "file",
+        "color": {
+            "1": "35",
+            "2": "32",
+            "3": "33",
+            "4": "31"
+        },
         "padding": {
             "top": 2,
-            "right": 2
+            "left": 4
+        }
+    },
+    "display": {
+        "separator": "  ",
+        "color": {
+            "keys": "magenta"
+        },
+        "key": {
+            "width": 10
         }
     },
     "modules": [
-        "title",
-        "separator",
-        "os",
-        "host",
-        "kernel",
-        "uptime",
-        "packages",
-        "shell",
-        "display",
-        "de",
-        "wm",
-        "wmtheme",
-        "theme",
-        "icons",
-        "font",
-        "cursor",
-        "terminal",
-        "terminalfont",
-        "cpu",
-        "gpu",
-        "memory",
-        "swap",
-        "disk",
-        "localip",
-        "battery",
-        "poweradapter",
-        "locale",
         "break",
-        "colors"
+        "break",
+        {
+            "type": "title",
+            "format": "            {#magenta} USR  {#97}{1}@{2}"
+        },
+        {
+            "type": "custom",
+            "format": "{#38;2;69;71;90}╭──────────────────────────────────────────╮"
+        },
+        {
+            "type": "command",
+            "key": "   OS",
+            "shell": "bash",
+            "text": "retro -v",
+            "format": "Retro Linux {1}"
+        },
+        {
+            "type": "host",
+            "key": "  󰒋 HST"
+        },
+        {
+            "type": "kernel",
+            "key": "   KRN"
+        },
+        {
+            "type": "uptime",
+            "key": "  󱎫 UPT"
+        },
+        {
+            "type": "packages",
+            "key": "  󰏖 PKG ",
+            "format": "{#97}{1} {#38;2;69;71;90}({#33}pacman{#38;2;69;71;90}){#}"
+        },
+        {
+            "type": "wm",
+            "key": "   WM ",
+            "format": "{#97}{1} {5} {#38;2;69;71;90}({#35}{3}{#38;2;69;71;90}){#}"
+        },
+        {
+            "type": "terminal",
+            "key": "   TRM"
+        },
+        {
+            "type": "shell",
+            "key": "   SHL"
+        },
+        {
+            "type": "command",
+            "key": "  󰏘 THM",
+            "text": "retro -var get RETRO_THEME",
+            "format": "{#97}{1}{#}"
+        },
+        "break",
+        {
+            "type": "display",
+            "key": "  󰍹 MON",
+            "format": "{#97}{1}x{2} {#38;2;69;71;90}@ {#97}{3}Hz {#38;2;69;71;90}({#35}{6}\"{#38;2;69;71;90}){#}"
+        },
+        {
+            "type": "cpu",
+            "key": "   CPU",
+            "format": "{name} {#38;2;69;71;90}({#35}{freq-max}{#38;2;69;71;90}){#}"
+        },
+        {
+            "type": "gpu",
+            "key": "  󰢮 GPU",
+            "format": "{name}"
+        },
+        {
+            "type": "memory",
+            "key": "   MEM",
+            "format": "{1} {#38;2;69;71;90}/ {#97}{2} {#38;2;69;71;90}({#33}{3}{#38;2;69;71;90}){#}"
+        },
+        {
+            "type": "disk",
+            "key": "  󰋊 DSK",
+            "format": "{#97}{1} {#38;2;69;71;90}/ {#97}{2} {#38;2;69;71;90}({#33}{3}{#38;2;69;71;90}) {#38;2;69;71;90}- {#97}{9}{#}"
+        },
+        {
+            "type": "localip",
+            "key": "   NET",
+            "format": "{#97}{1} {#38;2;69;71;90}({#33}{4}{#38;2;69;71;90}){#}"
+        },
+        {
+            "type": "custom",
+            "format": "{#38;2;69;71;90}╰──────────────────────────────────────────╯"
+        },
+        "break",
+        {
+            "type": "colors",
+            "symbol": "circle",
+            "paddingLeft": 15
+        }
     ]
 }
