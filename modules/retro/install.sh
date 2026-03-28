@@ -22,6 +22,13 @@ z /sys/class/powercap/intel-rapl:*/constraint_*_power_limit_uw                06
 z /sys/class/powercap/intel-rapl:*/constraint_*_time_window_us                0666 - - - -
 z /sys/class/powercap/intel-rapl:*:*/constraint_*_power_limit_uw              0666 - - - -
 z /sys/class/powercap/intel-rapl:*:*/constraint_*_time_window_us              0666 - - - -
+z /sys/class/bluetooth/hci*/device/power/control                              0666 - - - -
+z /sys/module/pcie_aspm/parameters/policy                                     0666 - - - -
+z /sys/class/scsi_host/host*/link_power_management_policy                     0666 - - - -
+z /sys/module/snd_hda_intel/parameters/power_save                             0666 - - - -
+z /sys/devices/system/cpu/cpufreq/boost                                       0666 - - - -
+z /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor                       0666 - - - -
+z /sys/bus/usb/devices/*/power/control                                        0666 - - - -
 EOF
 
     if [[ -f $tmp_file ]]; then
