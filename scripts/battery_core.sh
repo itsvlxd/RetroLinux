@@ -81,6 +81,46 @@ set_limit() {
     [[ -f $path ]] && echo "$limit" | sudo tee "$path" >/dev/null || return 1
 }
 
+get_internal_monitor() {
+    hyprctl monitors -j | jq -r '.[] | select(.name | startswith("eDP")) | .name' | head -n 1
+}
+
+sync_hyprland_power() {
+    local state="$1"
+
+    local mon_name=$(get_internal_monitor)
+    if [[ -z $mon_name ]]; then
+        return 0
+    fi
+
+    local mon_info=$(hyprctl monitors -j | jq -r --arg n "$mon_name" '.[] | select(.name==$n)')
+    local w=$(echo "$mon_info" | jq -r '.width')
+    local h=$(echo "$mon_info" | jq -r '.height')
+    local x=$(echo "$mon_info" | jq -r '.x')
+    local y=$(echo "$mon_info" | jq -r '.y')
+    local scale=$(echo "$mon_info" | jq -r '.scale')
+
+    if [[ $state == "true" ]]; then
+        hyprctl keyword monitor "$mon_name, ${w}x${h}@60, ${x}x${y}, $scale" >/dev/null
+
+        #hyprctl keyword decoration:blur:enabled 0 >/dev/null
+        #hyprctl keyword decoration:drop_shadow 0 >/dev/null
+
+        if command -v brightnessctl >/dev/null 2>&1; then
+            brightnessctl set 30% >/dev/null 2>&1
+        fi
+    else
+        hyprctl keyword monitor "$mon_name, highres, ${x}x${y}, $scale" >/dev/null
+
+        local blur_state=$(get_var "RETRO_BLUR" "true")
+        local shadow_state=$(get_var "RETRO_SHADOW" "true")
+
+        #[[ $blur_state == "true" ]] && hyprctl keyword decoration:blur:enabled 1 >/dev/null
+        #[[ $shadow_state == "true" ]] && hyprctl keyword decoration:drop_shadow 1 >/dev/null
+        #hyprctl keyword animations:enabled 1 >/dev/null
+    fi
+}
+
 set_saver() {
     local val="$1"
     local force="$2"
@@ -88,6 +128,7 @@ set_saver() {
     if [[ $val == "true" ]]; then
         set_var "BAT_SAVER_FORCED" "true"
         set_var "BAT_SAVER_ACTIVE" "true"
+        sync_hyprland_power "true"
         return 0
 
     elif [[ $val == "false" ]]; then
@@ -97,6 +138,7 @@ set_saver() {
         else
             set_var "BAT_SAVER_FORCED" "false"
         fi
+        sync_hyprland_power "false"
         return 0
 
     elif [[ $val =~ ^[0-9]+$ ]]; then
