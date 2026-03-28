@@ -53,14 +53,84 @@ get_pwr_var() {
     echo "$val"
 }
 
+sync_hardware_power() {
+    local state="$1"
+
+    if command -v powerprofilesctl >/dev/null 2>&1; then
+        local ppd_state="balanced"
+        [[ $state == "performance" ]] && ppd_state="performance"
+        [[ $state == "saver" ]] && ppd_state="power-saver"
+        powerprofilesctl set "$ppd_state" 2>/dev/null
+    fi
+
+    local wifi_pm="off"
+    local bt_pm="on"
+    local usb_pm="on"
+    local pcie_policy="performance"
+    local sata_policy="max_performance"
+    local audio_sleep="0"
+    local cpu_gov="performance"
+    local nmi_watchdog="1"
+    local vm_writeback="500"
+
+    if [[ $state == "saver" ]]; then
+        wifi_pm="on"
+        bt_pm="auto"
+        usb_pm="auto"
+        pcie_policy="powersave"
+        sata_policy="min_power"
+        audio_sleep="1"
+        cpu_gov="powersave"
+        nmi_watchdog="0"
+        vm_writeback="6000"
+    elif [[ $state == "balanced" ]]; then
+        wifi_pm="on"
+        sata_policy="med_power_with_dipm"
+        cpu_gov="powersave"
+        vm_writeback="1500"
+    fi
+
+    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+        [[ -f $gov ]] && echo "$cpu_gov" >"$gov" 2>/dev/null
+    done
+
+    if [[ -w /proc/sys/kernel/nmi_watchdog ]]; then
+        echo "$nmi_watchdog" >/proc/sys/kernel/nmi_watchdog 2>/dev/null
+    fi
+
+    if [[ -w /proc/sys/vm/dirty_writeback_centisecs ]]; then
+        echo "$vm_writeback" >/proc/sys/vm/dirty_writeback_centisecs 2>/dev/null
+    fi
+
+    local wl_iface=$(iw dev 2>/dev/null | awk '$1=="Interface"{print $2}')
+    if [[ -n $wl_iface ]]; then
+        iw dev "$wl_iface" set power_save "$wifi_pm" 2>/dev/null
+    fi
+
+    for bt in /sys/class/bluetooth/hci*/device/power/control; do
+        [[ -f $bt ]] && echo "$bt_pm" >"$bt" 2>/dev/null
+    done
+
+    for usb in /sys/bus/usb/devices/*/power/control; do
+        [[ -f $usb ]] && echo "$usb_pm" >"$usb" 2>/dev/null
+    done
+
+    if [[ -f /sys/module/pcie_aspm/parameters/policy ]]; then
+        echo "$pcie_policy" >/sys/module/pcie_aspm/parameters/policy 2>/dev/null
+    fi
+
+    for sata in /sys/class/scsi_host/host*/link_power_management_policy; do
+        [[ -f $sata ]] && echo "$sata_policy" >"$sata" 2>/dev/null
+    done
+
+    if [[ -f /sys/module/snd_hda_intel/parameters/power_save ]]; then
+        echo "$audio_sleep" >/sys/module/snd_hda_intel/parameters/power_save 2>/dev/null
+    fi
+}
+
 set_profile() {
     local profile="${1#--}"
     profile="${profile,,}"
-
-    #local current=$(get_var "PWR_CURRENT")
-    #if [[ $profile == "$current" ]]; then
-    #    return 0
-    #fi
 
     local prev=$(get_var "PWR_CURRENT")
     set_var "PWR_PREVIOUS" "$prev"
@@ -69,9 +139,12 @@ set_profile() {
     local watts=$(get_pwr_var "$profile")
     local microwatts=$((watts * 1000000))
 
-    # TODO: Add support for adding the bluetooth and wifi in power saving mode
-    # TODO: Make sure to have the intel-rapl:1 error fixed and proper sync with power-profiles-daemon
-    # TODO: Do more research on how to extend the battery life of the laptop
+    sync_hardware_power "$profile"
+
+    if [[ ! -d /sys/class/powercap/intel-rapl:0 ]]; then
+        sudo modprobe intel_rapl_msr 2>/dev/null
+        sudo modprobe intel_rapl_common 2>/dev/null
+    fi
 
     if [[ $CPU_VENDOR == "GenuineIntel" ]]; then
         if [[ ! -d /sys/class/powercap/intel-rapl:0 ]]; then
@@ -114,26 +187,38 @@ set_profile() {
                     echo "976" >/sys/class/powercap/intel-rapl:0/constraint_0_time_window_us 2>/dev/null
                 fi
 
-                [[ -d /sys/class/powercap/intel-rapl:1 ]] &&
-                    #echo "3000000" >/sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw 2>/dev/null
+                if [[ -f /sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw ]]; then
                     echo "$microwatts" >/sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw 2>/dev/null
+                fi
 
-                if [[ -d /sys/class/powercap/intel-rapl:0:1 ]]; then
+                if [[ -f /sys/class/powercap/intel-rapl:0:1/constraint_0_power_limit_uw ]]; then
                     echo "3000000" >/sys/class/powercap/intel-rapl:0:1/constraint_0_power_limit_uw 2>/dev/null
                 fi
 
                 bash "$BAT_CORE" --saver "true"
                 ;;
         esac
-        # TODO: Finish the implementation for AMD cpus
     elif [[ $CPU_VENDOR == "AuthenticAMD" ]]; then
         local amd_epp="balance_power"
+        local amd_boost="1"
+
         [[ $profile == "performance" ]] && amd_epp="performance"
-        [[ $profile == "saver" ]] && amd_epp="power"
+        if [[ $profile == "saver" ]]; then
+            amd_epp="power"
+            amd_boost="0"
+        fi
 
         for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
             echo "$amd_epp" >"$epp" 2>/dev/null
         done
+
+        if [[ -f /sys/devices/system/cpu/cpufreq/boost ]]; then
+            echo "$amd_boost" >/sys/devices/system/cpu/cpufreq/boost 2>/dev/null
+        fi
+
+        if [[ -f /sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw ]]; then
+            echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw 2>/dev/null
+        fi
     fi
 
     return 0
