@@ -107,7 +107,7 @@ sync_hyprland_power() {
         #hyprctl keyword decoration:drop_shadow 0 >/dev/null
 
         if command -v brightnessctl >/dev/null 2>&1; then
-            brightnessctl set 30% >/dev/null 2>&1
+            brightnessctl set 30% >/dev/null 2>&1 #TODO: Add the brightness to a variable
         fi
     else
         hyprctl keyword monitor "$mon_name, highres, ${x}x${y}, $scale" >/dev/null

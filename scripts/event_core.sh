@@ -194,7 +194,7 @@ run_event_loop() {
             fi
         fi
 
-        if ((tick_counter % 2 == 0)) && [[ $notify_on_high_bat_usage == "true" ]]; then
+        if ((tick_counter % 2 == 0)); then
             local current_usb_list=$(lsblk -nlo NAME,RM,TYPE | awk '$2=="1" && $3=="part" {print $1}' | xargs)
             local ignore_list=$(get_var "USB_IGNORE_DRIVES")
 
@@ -202,10 +202,17 @@ run_event_loop() {
                 if [[ ! " $last_usb_list " =~ " $dev_name " ]]; then
                     local dev_path="/dev/$dev_name"
                     local label=$(lsblk -nlo LABEL "$dev_path" | xargs)
-                    [[ -z $label ]] && label="USB_Drive"
+                    [[ -z $label ]] && label="USB_$dev_name"
 
-                    if mount "$dev_path" 2>/dev/null || udisksctl mount -b "$dev_path" >/dev/null 2>&1; then
-                        local actual_mount=$(findmnt -nlo TARGET "$dev_path")
+                    local actual_mount=$(findmnt -nlo TARGET "$dev_path")
+
+                    if [[ -z $actual_mount ]]; then
+                        udisksctl mount -b "$dev_path" --no-user-interaction >/dev/null 2>&1
+                        sleep 0.5
+                        actual_mount=$(findmnt -nlo TARGET "$dev_path")
+                    fi
+
+                    if [[ -n $actual_mount ]]; then
                         local symlink_path="$mount_root/$label"
                         ln -sfn "$actual_mount" "$symlink_path"
 

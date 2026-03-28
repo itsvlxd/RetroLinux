@@ -76,7 +76,7 @@ sync_hardware_power() {
     if [[ $state == "saver" ]]; then
         wifi_pm="on"
         bt_pm="auto"
-        usb_pm="auto"
+        usb_pm="on"
         pcie_policy="powersave"
         sata_policy="min_power"
         audio_sleep="1"
@@ -112,15 +112,7 @@ sync_hardware_power() {
     done
 
     for usb in /sys/bus/usb/devices/*/power/control; do
-        [[ -f $usb ]] && echo "$usb_pm" >"$usb" 2>/dev/null
-    done
-
-    if [[ -f /sys/module/pcie_aspm/parameters/policy ]]; then
-        echo "$pcie_policy" >/sys/module/pcie_aspm/parameters/policy 2>/dev/null
-    fi
-
-    for sata in /sys/class/scsi_host/host*/link_power_management_policy; do
-        [[ -f $sata ]] && echo "$sata_policy" >"$sata" 2>/dev/null
+        [[ -w $usb ]] && echo "$usb_pm" >"$usb" 2>/dev/null
     done
 
     if [[ -f /sys/module/snd_hda_intel/parameters/power_save ]]; then
