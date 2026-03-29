@@ -8,9 +8,9 @@ cmd_load() {
     local action="$1"
 
     local startup_tasks=(
-        "retro --wallpaper restore|Applying last used wallpaper"
         "retro --power restore|Restoring hardware power profiles"
         "retro --event restart|Initializing event loop and custom hooks"
+        "retro --wallpaper restore|Applying last used wallpaper"
 
         "wl-paste --type text --watch cliphist store -ignore-secrets|Starting cliphist text store watcher"
         "wl-paste --type image --watch cliphist store -ignore-secrets|Starting cliphist image store watcher"
