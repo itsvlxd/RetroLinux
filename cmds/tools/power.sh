@@ -147,7 +147,18 @@ cmd_power() {
             bash "$pwr_script" --restore
             ;;
 
-        *) rx_log "info" "Usage: retro --power [set|tune|toggle|restore|list|status|optimize]" ;;
+        "permissions")
+            rx_log "info" "Configuring kernel modules for early boot..."
+            rx_log "info" "Requesting root access to write deep-kernel permissions..."
+
+            if bash "$pwr_script" --permissions; then
+                rx_log "success" "Udev rules and Tmpfiles generated successfully."
+            else
+                rx_log "error" "Failed to generate power permissions."
+            fi
+            ;;
+
+        *) rx_log "info" "Usage: retro --power [set|tune|toggle|restore|list|status|optimize|permissions]" ;;
     esac
 }
 

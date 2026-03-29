@@ -300,6 +300,37 @@ optimize_cpu() {
     echo "$match"
 }
 
+apply_permissions() {
+    echo -e "intel_rapl_msr\nintel_rapl_common" | sudo tee /etc/modules-load.d/retro-power.conf >/dev/null
+
+    local udev_rule='SUBSYSTEM=="powercap", ACTION=="add", RUN+="/bin/sh -c \"chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null\""'
+    echo "$udev_rule" | sudo tee /etc/udev/rules.d/99-retro-power.rules >/dev/null
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger --subsystem-match=powercap
+
+    read -r -d '' expected_content <<EOF
+# Retro Power Management Permissions
+z /sys/devices/system/cpu/intel_pstate/no_turbo                               0666 - - - -
+z /sys/devices/system/cpu/intel_pstate/max_perf_pct                           0666 - - - -
+z /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference          0666 - - - -
+z /sys/class/bluetooth/hci*/device/power/control                              0666 - - - -
+z /sys/module/snd_hda_intel/parameters/power_save                             0666 - - - -
+z /sys/devices/system/cpu/cpufreq/boost                                       0666 - - - -
+z /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor                       0666 - - - -
+z /sys/bus/usb/devices/*/power/control                                        0666 - - - -
+EOF
+
+    local tmp_file="/etc/tmpfiles.d/retro-power.conf"
+    sudo bash -c "echo \"$expected_content\" > $tmp_file"
+    sudo systemd-tmpfiles --create "$tmp_file" 2>/dev/null
+
+    sudo modprobe intel_rapl_msr 2>/dev/null
+    sudo modprobe intel_rapl_common 2>/dev/null
+    sudo chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null
+
+    return 0
+}
+
 case "$1" in
     "--set") set_profile "$2" ;;
     "--get") get_var "PWR_CURRENT" ;;
@@ -311,5 +342,6 @@ case "$1" in
     "--source") is_on_battery ;;
     "--get-val") get_pwr_var "$2" ;;
     "--optimize") optimize_cpu ;;
+    "--permissions") apply_permissions ;;
     "--model") grep -m 1 'model name' /proc/cpuinfo | sed 's/model name\s*:\s*//' ;;
 esac

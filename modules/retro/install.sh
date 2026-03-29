@@ -1,56 +1,14 @@
 #!/bin/bash
 
+source "$RETRO_DIR/cmds/tools/power.sh"
+
 RETRO_CACHE="$HOME/.cache/retro"
 source_bin="$RETRO_DIR/retro.sh"
 bin_dir="/usr/local/bin"
 cmd_name="retro"
 target="$bin_dir/$cmd_name"
-tmp_file="/etc/tmpfiles.d/retro-power.conf"
 
-setup_power_permissions() {
-    sudo modprobe intel_rapl_msr 2>/dev/null
-    sudo modprobe intel_rapl_common 2>/dev/null
-
-    sleep 0.5
-
-    read -r -d '' expected_content <<EOF
-# Retro Power Management Permissions
-z /sys/devices/system/cpu/intel_pstate/no_turbo                               0666 - - - -
-z /sys/devices/system/cpu/intel_pstate/max_perf_pct                           0666 - - - -
-z /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference          0666 - - - -
-z /sys/class/powercap/intel-rapl:*/constraint_*_power_limit_uw                0666 - - - -
-z /sys/class/powercap/intel-rapl:*/constraint_*_time_window_us                0666 - - - -
-z /sys/class/powercap/intel-rapl:*:*/constraint_*_power_limit_uw              0666 - - - -
-z /sys/class/powercap/intel-rapl:*:*/constraint_*_time_window_us              0666 - - - -
-z /sys/class/bluetooth/hci*/device/power/control                              0666 - - - -
-z /sys/module/pcie_aspm/parameters/policy                                     0666 - - - -
-z /sys/class/scsi_host/host*/link_power_management_policy                     0666 - - - -
-z /sys/module/snd_hda_intel/parameters/power_save                             0666 - - - -
-z /sys/devices/system/cpu/cpufreq/boost                                       0666 - - - -
-z /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor                       0666 - - - -
-z /sys/bus/usb/devices/*/power/control                                        0666 - - - -
-EOF
-
-    if [[ -f $tmp_file ]]; then
-        echo "$expected_content" >/tmp/retro_pwr_check
-        if diff -q /tmp/retro_pwr_check "$tmp_file" >/dev/null 2>&1; then
-            rm /tmp/retro_pwr_check
-            return 0
-        fi
-        rm /tmp/retro_pwr_check
-    fi
-
-    rx_log "info" "Syncing CPU power permissions..."
-
-    sudo bash -c "echo \"$expected_content\" > $tmp_file"
-    sudo systemd-tmpfiles --create "$tmp_file" 2>/dev/null
-
-    sudo chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null
-
-    rx_log "success" "Power permissions synchronized."
-}
-
-setup_power_permissions
+cmd_power "permissions"
 
 if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
     rx_log "info" "Installing ${PINK}${cmd_name}${RESET} to ${bin_dir}..."
