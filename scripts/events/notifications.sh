@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/icons.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/cmds/tools/app.sh"
 
@@ -132,4 +133,119 @@ on_usb_disconnected() {
             fi
         fi
     done
+}
+
+on_bluetooth_connected() {
+    local name="$1"
+    local mac="$2"
+
+    local icon_path=$(rx_get_icon "$name")
+
+    (
+        local ACTION=$(notify-send -u normal -i "$icon_path" -t 10000 \
+            "Connection Established" \
+            "<b>$name</b> ($mac) has been connected successfully." \
+            -A "disconnect=󰂲 Disconnect" \
+            -A "forget=󱘖 Forget Device")
+
+        case "$ACTION" in
+            "disconnect")
+                rx_log "info" "User requested disconnect for $name ($mac)."
+                bluetoothctl disconnect "$mac" >/dev/null 2>&1
+                ;;
+            "forget")
+                rx_log "info" "User requested to forget device: $name."
+                bluetoothctl remove "$mac" >/dev/null 2>&1
+                notify-send -u low -i "edit-delete" "Device Forgotten" "$name has been removed from trusted devices."
+                ;;
+        esac
+    ) &
+}
+
+on_bluetooth_disconnected() {
+    local name="$1"
+    local mac="$2"
+    local icon_path=$(rx_get_icon "$name")
+
+    notify-send -u normal -i "$icon_path" -t 5000 \
+        "Connection Severed" \
+        "<b>$name</b> ($mac) is no longer active."
+}
+
+on_bluetooth_pairing_request() {
+    local name="$1"
+    local mac="$2"
+
+    local icon_path=$(rx_get_icon "$name")
+
+    local ACTION=$(notify-send -u critical -i "$icon_path" -w \
+        "Bluetooth Pairing Request" \
+        "Device <b>$name</b> sent a bluetooth pairing request.\nAddress: $mac" \
+        -A "pair=Pair" \
+        -A "ignore=Ignore")
+
+    case "$ACTION" in
+        "pair")
+            local current_locks=$(get_var "BT_PAIRING_IN_PROGRESS")
+            set_var "BT_PAIRING_IN_PROGRESS" "$current_locks|$mac"
+
+            rx_log "info" "Engaging Expect-based handshake for $name..."
+
+            (
+                expect <<DONE
+                    set timeout 20
+                    spawn bluetoothctl
+                    expect "agent on"
+                    send "agent on\r"
+                    expect "default-agent"
+                    send "default-agent\r"
+                    expect "trust"
+                    send "trust $mac\r"
+                    expect "connect"
+                    send "connect $mac\r"
+                    
+                    # This is the magic part: it WAITS for the prompt
+                    expect "Accept pairing (yes/no):"
+                    send "yes\r"
+                    
+                    expect "Paired: yes"
+                    send "exit\r"
+                    expect eof
+DONE
+                local new_locks=$(get_var "BT_PAIRING_IN_PROGRESS" | sed "s/|$mac//g")
+                set_var "BT_PAIRING_IN_PROGRESS" "$new_locks"
+
+                rx_log "success" "Handshake complete for $name."
+            ) &
+            ;;
+
+        "ignore")
+            local current_ignored=$(get_var "BT_MAC_IGNORE")
+            if [[ -z $current_ignored || $current_ignored == "null" ]]; then
+                set_var "BT_MAC_IGNORE" "$mac"
+            else
+                [[ "|$current_ignored|" != *"|$mac|"* ]] && set_var "BT_MAC_IGNORE" "$current_ignored|$mac"
+            fi
+            rx_log "info" "Added $mac to ignore list."
+            ;;
+    esac
+}
+
+on_pkg_updates_available() {
+    local count="$1"
+    local sample="$2"
+    local helper=$(get_var "PKG_HELPER" "yay")
+
+    local ACTION=$(notify-send -u normal -i software-update-available-symbolic -t 20000 \
+        "System Updates Available" \
+        "<b>$count</b> updates pending.\nIncluding: <i>$sample</i>" \
+        -A "update=󰚰 Update Now" \
+        -A "later=󰔚 Remind Later")
+
+    if [[ $ACTION == "update" ]]; then
+        local update_cmd="sudo pacman -Syu && \
+                           $helper -Sua"
+
+        hyprctl dispatch exec "[float; size 1000 700; center] retro -app terminal open '$update_cmd'"
+    fi
 }

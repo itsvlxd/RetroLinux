@@ -9,14 +9,14 @@ EVENT_DIR="$RETRO_DIR/scripts/events"
 
 broadcast_event() {
     local event_name="$1"
-    local args="${@:2}"
+    shift
 
     for hook_file in "$EVENT_DIR"/*.sh; do
         if [[ -f $hook_file ]]; then
             (
                 source "$hook_file"
                 if declare -f "$event_name" >/dev/null; then
-                    "$event_name" $args
+                    "$event_name" "$@"
                 fi
             )
         fi
@@ -231,6 +231,71 @@ run_event_loop() {
 
             last_usb_list="$current_usb_list"
         fi
+
+        local pkg_min=$(get_var "RETRO_PKG_UPDATE_MIN" "20")
+        local pkg_interval=$((pkg_min * 60))
+        local now=$(date +%s)
+
+        if ((tick_counter % 60 == 0)) && ((now - last_pkg_check > pkg_interval)); then
+            local helper=$(get_var "PKG_HELPER" "yay")
+
+            local pac_count=$(checkupdates 2>/dev/null | wc -l)
+            local aur_count=$($helper -Qu 2>/dev/null | wc -l)
+            local total=$((pac_count + aur_count))
+
+            local raw_thresh=$(get_var "RETRO_PKG_UPDATE_THRESH" "20")
+            local thresh=$(echo "$raw_thresh" | tr -dc '0-9')
+            [[ -z $thresh ]] && thresh=20
+
+            if [ "$total" -gt 0 ] && [ "$total" -ge "$thresh" ]; then
+                local sample=$( (
+                    checkupdates 2>/dev/null
+                    $helper -Qu 2>/dev/null
+                ) | head -n 3 | awk '{print $1}' | xargs | sed 's/ /, /g')
+                broadcast_event "on_pkg_updates_available" "$total" "$sample"
+            fi
+
+            last_pkg_check=$now
+        fi
+
+        local ignored_macs=$(get_var "BT_MAC_IGNORE")
+        local currently_pairing=$(get_var "BT_PAIRING_IN_PROGRESS")
+
+        local pairing_dev=$(bluetoothctl devices Connected | awk '{print $2}' | while read -r mac; do
+            if [[ "|$ignored_macs|" != *"|$mac|"* ]] && [[ "|$currently_pairing|" != *"|$mac|"* ]]; then
+                if [[ $(bluetoothctl info "$mac" | grep "Paired: no") ]]; then
+                    echo "$mac"
+                    break
+                fi
+            fi
+        done)
+
+        if [[ -n $pairing_dev ]]; then
+            local dev_name=$(bluetoothctl info "$pairing_dev" | grep "Name:" | sed 's/.*Name: //' | xargs)
+            [[ -z $dev_name ]] && dev_name=$(bluetoothctl info "$pairing_dev" | grep "Alias:" | sed 's/.*Alias: //' | xargs)
+
+            broadcast_event "on_bluetooth_pairing_request" "$dev_name" "$pairing_dev"
+        fi
+
+        local current_connected_list=$(bluetoothctl devices Connected | awk '{print $2}' | xargs)
+
+        for mac in $current_connected_list; do
+            if [[ ! " $last_bt_connected_list " =~ " $mac " ]]; then
+                if [[ $(bluetoothctl info "$mac" | grep "Paired: yes") ]]; then
+                    local dev_name=$(bluetoothctl info "$mac" | grep "Name:" | sed 's/.*Name: //' | xargs)
+                    broadcast_event "on_bluetooth_connected" "$dev_name" "$mac"
+                fi
+            fi
+        done
+
+        for mac in $last_bt_connected_list; do
+            if [[ ! " $current_connected_list " =~ " $mac " ]]; then
+                local dev_name=$(bluetoothctl info "$mac" | grep "Name:" | sed 's/.*Name: //' | xargs)
+                broadcast_event "on_bluetooth_disconnected" "$dev_name" "$mac"
+            fi
+        done
+
+        last_bt_connected_list="$current_connected_list"
 
         ((tick_counter++))
         sleep 1
