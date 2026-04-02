@@ -1,0 +1,4 @@
+{
+    "config": "./files",
+    "install": "~/.config/MangoHud"
+}

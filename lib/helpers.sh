@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/log.sh"
+
 VAR_CORE="$RETRO_DIR/scripts/variable_core.sh"
 
 get_var() { bash "$VAR_CORE" --get "$1"; }
@@ -93,4 +95,30 @@ get_battery_icon() {
     else
         echo "󰂃"
     fi
+}
+
+check_dep() {
+    local cmd="$1"
+    local pkgs="$2"
+
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        local helper=$(bash "$VAR_SCRIPT" --get "PKG_HELPER")
+        : ${helper:="yay"}
+        rx_log "error" "Missing required dependency: ${PINK}$cmd${RESET}"
+        rx_log "info" "Would you like to install [${GRAY}$pkgs${RESET}] using $helper? ${PINK}[y/N]${RESET}: "
+        read -r allow
+        if [[ $allow =~ ^[Yy]$ ]]; then
+            rx_log "info" "Installing..."
+            $helper -S $pkgs
+            if ! command -v "$cmd" >/dev/null 2>&1; then
+                rx_log "error" "Installation failed or aborted."
+                return 1
+            fi
+        else
+            rx_log "info" "Dependency required. Aborting."
+            return 1
+        fi
+        echo ""
+    fi
+    return 0
 }
