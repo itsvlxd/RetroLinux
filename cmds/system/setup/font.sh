@@ -2,6 +2,6 @@
 
 source "$RETRO_DIR/cmds/tools/font.sh"
 
-rx_setup_emojis() {
+rx_setup_fonts() {
     cmd_font "setup"
 }
