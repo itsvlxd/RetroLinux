@@ -321,12 +321,21 @@ z /sys/bus/usb/devices/*/power/control                                        06
 EOF
 
     local tmp_file="/etc/tmpfiles.d/retro-power.conf"
-    sudo bash -c "echo \"$expected_content\" > $tmp_file"
+    echo "$expected_content" | sudo tee "$tmp_file" >/dev/null
     sudo systemd-tmpfiles --create "$tmp_file" 2>/dev/null
 
     sudo modprobe intel_rapl_msr 2>/dev/null
     sudo modprobe intel_rapl_common 2>/dev/null
+
+    if [[ -f /sys/module/snd_hda_intel/parameters/power_save ]]; then
+        sudo chmod 666 /sys/module/snd_hda_intel/parameters/power_save 2>/dev/null
+    fi
+
     sudo chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null
+    sudo chmod 666 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null
+
+    sudo chmod 666 /sys/bus/usb/devices/*/power/control 2>/dev/null
+    sudo chmod 666 /sys/class/bluetooth/hci*/device/power/control 2>/dev/null
 
     return 0
 }
