@@ -12,3 +12,9 @@ base-devel
 
 awww-bin
 mpvpaper
+
+sysbench
+glmark2
+vkmark
+speedtest-cli
+pciutils
