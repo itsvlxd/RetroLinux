@@ -10,7 +10,7 @@ source "$RETRO_DIR/cmds/system/setup/bitwarden.sh"
 source "$RETRO_DIR/cmds/system/setup/editor.sh"
 source "$RETRO_DIR/cmds/system/setup/pacman.sh"
 source "$RETRO_DIR/cmds/system/setup/system.sh"
-source "$RETRO_DIR/cmds/system/setup/emojis.sh"
+source "$RETRO_DIR/cmds/system/setup/font.sh"
 source "$RETRO_DIR/cmds/system/setup/power.sh"
 
 # TODO: Improve installing logs
@@ -45,7 +45,7 @@ cmd_setup() {
     rx_setup_session_service
     rx_setup_wallpapers
 
-    rx_setup_emojis "$2"
+    rx_setup_fonts "$2"
     rx_setup_bitwarden
     rx_setup_fingerprint
 
