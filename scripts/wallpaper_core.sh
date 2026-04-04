@@ -199,7 +199,7 @@ set_wallpaper() {
         local rand_x=$((RANDOM % 1920))
         local rand_y=$((RANDOM % 1080))
         awww img "$static_source" \
-            --transition-type grow \
+            --transition-type random \
             --transition-duration 2.5 \
             --transition-fps 120 \
             --transition-pos "$rand_x,$rand_y"
@@ -212,7 +212,7 @@ set_wallpaper() {
         if [ "$(echo "$COLOR < 1.0" | bc)" -eq 1 ]; then
             matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
         else
-            matugen image -b wal "$static_source" --source-color-index 0 >/dev/null 2>&1
+            matugen image -b wal "$static_source" -t scheme-rainbow --source-color-index 0 >/dev/null 2>&1
         fi
 
         if [[ $is_video == "true" && $should_be_static == "false" ]]; then
