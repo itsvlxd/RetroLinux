@@ -23,7 +23,9 @@ cmd_power() {
     case "$action" in
         "set")
             [[ -z $val1 ]] && rx_log "error" "Please provide a profile: [SAVER|BALANCED|PERFORMANCE]" && return 1
-            bash "$pwr_script" --set "$val1" && rx_log "success" "Profile set to: ${PINK}${val1^^}${RESET}" || rx_log "error" "Couldn't set profile."
+            local profile="${val1,,}"
+            [[ ! $profile =~ ^(saver|balanced|performance)$ ]] && rx_log "error" "Invalid profile '${val1}'. Use: saver, balanced, or performance" && return 1
+            bash "$pwr_script" --set "$profile" && rx_log "success" "Profile set to: ${PINK}${profile^^}${RESET}" || rx_log "error" "Couldn't set profile."
             ;;
 
         "tune")
