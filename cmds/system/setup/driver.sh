@@ -10,7 +10,7 @@ rx_setup_drivers() {
     [[ -z $scan_data ]] && return 0
     [[ $scan_data == *"ALL_DRIVERS_INSTALLED"* ]] && return 0
 
-    rx_log "info" "Missing drivers detected on your system, would you like to install them? [y/N] "
+    rx_log "info" "Missing drivers detected on your system, would you like to install them? ${PINK}[y/N]${RESET}: "
     read -r confirm
     [[ ! $confirm =~ ^[Yy]$ ]] && return 0
 

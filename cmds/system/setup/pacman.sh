@@ -25,7 +25,7 @@ rx_optimize_pacman() {
     fi
 
     echo -e " I noticed some Pacman optimizations (Color, ILoveCandy, Extra, Multilib) aren't active."
-    echo -ne " ${PINK}󰄾 ${RESET}Would you like me to enable them in /etc/pacman.conf? [y/N]: "
+    echo -ne " ${PINK}󰄾 ${RESET}Would you like me to enable them in /etc/pacman.conf? ${PINK}[y/N]${RESET}: "
     read -r allow
 
     if [[ ! $allow =~ ^[Yy]$ ]]; then
