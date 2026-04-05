@@ -169,16 +169,32 @@ cmd_font() {
             ;;
 
         "setup")
+            local helper=$(get_var "PKG_HELPER")
+            [[ -z $helper ]] && helper="sudo pacman"
+
             if [[ -z $(get_var "RETRO_FONT_MAIN") ]]; then
                 rx_log "info" "Which font family do you want to use? ${PINK}[Default: Inter]${RESET}: "
                 read -r input_main
-                set_var "RETRO_FONT_MAIN" "${input_main:-Inter}"
+                local main_font="${input_main:-Inter}"
+                set_var "RETRO_FONT_MAIN" "$main_font"
+
+                if ! bash "$font_core" --list-installed | grep -Fxq "$main_font"; then
+                    rx_log "info" "Installing ${PINK}$main_font${RESET}..."
+                    $helper -S --noconfirm "${main_font,,}-font" 2>/dev/null || $helper -S --noconfirm "ttf-${main_font,,}" 2>/dev/null || $helper -S --noconfirm "otf-${main_font,,}" 2>/dev/null
+                fi
             fi
 
             if [[ -z $(get_var "RETRO_FONT_NERD") ]]; then
                 rx_log "info" "Which nerd font family do you want to use? ${PINK}[Default: JetBrainsMono Nerd Font]${RESET}: "
                 read -r input_nerd
-                set_var "RETRO_FONT_NERD" "${input_nerd:-JetBrainsMono Nerd Font}"
+                local nerd_font="${input_nerd:-JetBrainsMono Nerd Font}"
+                set_var "RETRO_FONT_NERD" "$nerd_font"
+
+                if ! bash "$font_core" --list-installed | grep -Fxq "$nerd_font"; then
+                    rx_log "info" "Installing ${PINK}$nerd_font${RESET}..."
+                    local nerd_pkg=$(echo "$nerd_font" | sed 's/ /-/g' | tr '[:upper:]' '[:lower:]')
+                    $helper -S --noconfirm "${nerd_pkg}-nerd-font" 2>/dev/null || $helper -S --noconfirm "ttf-${nerd_pkg}-nerd" 2>/dev/null
+                fi
             fi
 
             if [[ -z $(get_var "RETRO_FONT_EMOJI") ]]; then
@@ -207,9 +223,6 @@ cmd_font() {
 
                 IFS='|' read -r e_key e_pkg e_name e_vibe <<<"${styles[$idx]}"
 
-                local helper=$(get_var "PKG_HELPER")
-                [[ -z $helper ]] && helper="sudo pacman"
-
                 rx_log "info" "Installing $e_name..."
                 $helper -S --noconfirm "$e_pkg"
 
@@ -217,6 +230,7 @@ cmd_font() {
             fi
 
             bash "$font_core" --sync
+            rx_log "success" "All fonts installed and configured"
             ;;
 
         *) rx_log "info" "Usage: retro --font [install|set|edit|list|remote|status]" ;;
