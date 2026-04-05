@@ -184,7 +184,7 @@ cmd_font() {
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
 
                 if [[ -n $match ]]; then
-                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? [Y/n] "
+                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? ${PINK}[Y/n]${RESET}: "
                     read -r confirm
                     if [[ ! $confirm =~ ^[Nn]$ ]]; then
                         set_var "RETRO_FONT_MAIN" "$match"
@@ -208,7 +208,7 @@ cmd_font() {
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
 
                 if [[ -n $match ]]; then
-                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? [Y/n] "
+                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? ${PINK}[Y/n]${RESET}: "
                     read -r confirm
                     if [[ ! $confirm =~ ^[Nn]$ ]]; then
                         set_var "RETRO_FONT_NERD" "$match"
