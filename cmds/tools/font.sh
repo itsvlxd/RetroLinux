@@ -173,27 +173,50 @@ cmd_font() {
             [[ -z $helper ]] && helper="sudo pacman"
 
             if [[ -z $(get_var "RETRO_FONT_MAIN") ]]; then
-                rx_log "info" "Which font family do you want to use? ${PINK}[Default: Inter]${RESET}: "
-                read -r input_main
-                local main_font="${input_main:-Inter}"
-                set_var "RETRO_FONT_MAIN" "$main_font"
+                rx_log "info" "Enter the main font package name ${PINK}[Default: inter-font]${RESET}: "
+                read -r input_pkg
+                local main_pkg="${input_pkg:-inter-font}"
 
-                if ! bash "$font_core" --list-installed | grep -Fxq "$main_font"; then
-                    rx_log "info" "Installing ${PINK}$main_font${RESET}..."
-                    $helper -S --noconfirm "${main_font,,}-font" 2>/dev/null || $helper -S --noconfirm "ttf-${main_font,,}" 2>/dev/null || $helper -S --noconfirm "otf-${main_font,,}" 2>/dev/null
+                cmd_font "install" "$main_pkg"
+
+                local installed_fonts=$(bash "$font_core" --list-installed)
+                local match=$(echo "$installed_fonts" | grep -i "inter" | head -1)
+                [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
+
+                if [[ -n $match ]]; then
+                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? [Y/n] "
+                    read -r confirm
+                    if [[ ! $confirm =~ ^[Nn]$ ]]; then
+                        set_var "RETRO_FONT_MAIN" "$match"
+                    else
+                        rx_log "info" "Enter the exact font family name: "
+                        read -r font_name
+                        set_var "RETRO_FONT_MAIN" "${font_name:-$match}"
+                    fi
                 fi
             fi
 
             if [[ -z $(get_var "RETRO_FONT_NERD") ]]; then
-                rx_log "info" "Which nerd font family do you want to use? ${PINK}[Default: JetBrainsMono Nerd Font]${RESET}: "
-                read -r input_nerd
-                local nerd_font="${input_nerd:-JetBrainsMono Nerd Font}"
-                set_var "RETRO_FONT_NERD" "$nerd_font"
+                rx_log "info" "Enter the nerd font package name ${PINK}[Default: ttf-jetbrains-mono-nerd]${RESET}: "
+                read -r input_pkg
+                local nerd_pkg="${input_pkg:-ttf-jetbrains-mono-nerd}"
 
-                if ! bash "$font_core" --list-installed | grep -Fxq "$nerd_font"; then
-                    rx_log "info" "Installing ${PINK}$nerd_font${RESET}..."
-                    local nerd_pkg=$(echo "$nerd_font" | sed 's/ /-/g' | tr '[:upper:]' '[:lower:]')
-                    $helper -S --noconfirm "${nerd_pkg}-nerd-font" 2>/dev/null || $helper -S --noconfirm "ttf-${nerd_pkg}-nerd" 2>/dev/null
+                cmd_font "install" "$nerd_pkg"
+
+                local installed_fonts=$(bash "$font_core" --list-installed)
+                local match=$(echo "$installed_fonts" | grep -i "jetbrains" | head -1)
+                [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
+
+                if [[ -n $match ]]; then
+                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? [Y/n] "
+                    read -r confirm
+                    if [[ ! $confirm =~ ^[Nn]$ ]]; then
+                        set_var "RETRO_FONT_NERD" "$match"
+                    else
+                        rx_log "info" "Enter the exact font family name: "
+                        read -r font_name
+                        set_var "RETRO_FONT_NERD" "${font_name:-$match}"
+                    fi
                 fi
             fi
 
