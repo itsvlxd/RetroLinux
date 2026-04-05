@@ -12,6 +12,7 @@ source "$RETRO_DIR/cmds/system/setup/pacman.sh"
 source "$RETRO_DIR/cmds/system/setup/system.sh"
 source "$RETRO_DIR/cmds/system/setup/font.sh"
 source "$RETRO_DIR/cmds/system/setup/power.sh"
+source "$RETRO_DIR/cmds/system/setup/driver.sh"
 
 # TODO: Improve installing logs
 # TODO: If a module path already exists warn the user first
@@ -35,6 +36,7 @@ cmd_setup() {
     rx_default_directories
 
     rx_vars_defaults "$2"
+    rx_setup_drivers
 
     setup_file_manager
 
