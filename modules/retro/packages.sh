@@ -15,6 +15,7 @@ pacman-contrib
 
 awww-bin
 mpvpaper
+imagemagick
 
 sysbench
 glmark2
