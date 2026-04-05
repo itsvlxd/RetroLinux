@@ -145,9 +145,9 @@ cmd_bluetooth() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro --bluetooth [status|scan on/off|discoverable|list|nearby|connect|disconnect|forget]"
+            rx_log "info" "Usage: retro bluetooth [status|scan on/off|discoverable|list|nearby|connect|disconnect|forget]"
             ;;
     esac
 }
 
-register_command "TOOLS" "-bt|--bluetooth" "Manage bluetooth settings and connections" "cmd_bluetooth"
+register_command "TOOLS" "bluetooth" "Manage bluetooth settings and connections" "cmd_bluetooth"

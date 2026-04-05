@@ -2,7 +2,7 @@
 
 get_var() {
     local val
-    val=$(retro -var get "$1" 2>/dev/null)
+    val=$(retro variable get "$1" 2>/dev/null)
     echo "${val:-$2}"
 }
 

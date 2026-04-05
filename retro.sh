@@ -38,6 +38,7 @@ for arg in "$@"; do
 done
 
 CMD="${CLEAN_ARGS[0]}"
+CMD="${CMD#--}"
 TARGET="${CLEAN_ARGS[1]}"
 
 register_command() {

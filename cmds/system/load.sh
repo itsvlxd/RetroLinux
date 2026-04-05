@@ -8,11 +8,11 @@ cmd_load() {
     local action="$1"
 
     local startup_tasks=(
-        "retro --power restore|Restoring hardware power profiles"
-        "retro --event restart|Initializing event loop and custom hooks"
-        "retro --wallpaper restore|Applying last used wallpaper"
+        "retro power restore|Restoring hardware power profiles"
+        "retro event restart|Initializing event loop and custom hooks"
+        "retro wallpaper restore|Applying last used wallpaper"
 
-        "retro -bm hud load|Loads mangohud and benchmark variables"
+        "retro benchmark hud load|Loads mangohud and benchmark variables"
 
         "wl-paste --type text --watch cliphist store -ignore-secrets|Starting cliphist text store watcher"
         "wl-paste --type image --watch cliphist store -ignore-secrets|Starting cliphist image store watcher"
@@ -23,7 +23,7 @@ cmd_load() {
 
     local auto_load=$(get_var "RETRO_SESSION_AUTOLOAD")
     if [[ $auto_load == "true" ]]; then
-        startup_tasks+=("retro --window restore|Restoring the last Hyprland window snapshot")
+        startup_tasks+=("retro window restore|Restoring the last Hyprland window snapshot")
     fi
 
     local custom_tasks=()
@@ -98,7 +98,7 @@ cmd_load() {
             rx_log "success" "Startup sequence synchronized."
             ;;
         *)
-            rx_log "info" "Usage: retro --load [all|list]"
+            rx_log "info" "Usage: retro load [all|list]"
             ;;
     esac
 }

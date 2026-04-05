@@ -73,9 +73,9 @@ cmd_event() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro --event [trigger|list|start|stop|restart|status]"
+            rx_log "info" "Usage: retro event [trigger|list|start|stop|restart|status]"
             ;;
     esac
 }
 
-register_command "TOOLS" "-ev|--event" "Manage system events and hooks" "cmd_event"
+register_command "TOOLS" "event" "Manage system events and hooks" "cmd_event"

@@ -80,7 +80,7 @@ cmd_apps() {
 
     if [[ -z $action || $action == "list" ]]; then
         [[ ${#actions[@]} -eq 0 ]] && rx_log "error" "No actions available for '${app_name}'." && return 1
-        rx_log "info" "Usage: retro -app $app_name [$(
+        rx_log "info" "Usage: retro app $app_name [$(
             IFS="|"
             echo "${actions[*]}"
         )]"
@@ -144,4 +144,4 @@ cmd_apps() {
     return 1
 }
 
-register_command "TOOLS" "-app|--application" "Centralized app manager" "cmd_apps"
+register_command "TOOLS" "app" "Centralized app manager" "cmd_apps"

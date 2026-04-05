@@ -162,7 +162,7 @@ cmd_var() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro --variable [get|set|del|add|remove|toggle|edit|list|reset]"
+            rx_log "info" "Usage: retro variable [get|set|del|add|remove|toggle|edit|list|reset]"
             ;;
     esac
 }

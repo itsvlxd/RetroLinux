@@ -246,6 +246,6 @@ on_pkg_updates_available() {
         local update_cmd="sudo pacman -Syu && \
                            $helper -Sua"
 
-        hyprctl dispatch exec "[float; size 1000 700; center] retro -app terminal open '$update_cmd'"
+        hyprctl dispatch exec "[float; size 1000 700; center] retro app terminal open '$update_cmd'"
     fi
 }

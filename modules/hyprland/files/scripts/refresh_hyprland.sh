@@ -12,7 +12,7 @@ TEMP_FILE=$(mktemp)
 mkdir -p "$(dirname "$OUTPUT")"
 
 get_val() {
-    local val=$(retro -var get "$1" 2>/dev/null)
+    local val=$(retro variable get "$1" 2>/dev/null)
     echo "${val:-$2}"
 }
 
