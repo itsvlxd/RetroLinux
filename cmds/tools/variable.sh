@@ -28,10 +28,14 @@ cmd_var() {
             if [[ $key == *"*"* ]]; then
                 if bash "$var_script" --del "$key"; then
                     rx_log "success" "Bulk deleted all variables matching: ${PINK}$key${RESET}"
+                else
+                    rx_log "error" "No variables found matching: ${PINK}$key${RESET}"
                 fi
             else
                 if bash "$var_script" --del "$key"; then
                     rx_log "success" "Removed ${PINK}$key${RESET} from the cache."
+                else
+                    rx_log "error" "Key ${PINK}$key${RESET} doesn't exist in the cache."
                 fi
             fi
             ;;
@@ -163,4 +167,4 @@ cmd_var() {
     esac
 }
 
-register_command "TOOLS" "-var|--variable" "Manage global state and persistent variables" "cmd_var"
+register_command "TOOLS" "variable" "Manage global state and persistent variables" "cmd_var"
