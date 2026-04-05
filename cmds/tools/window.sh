@@ -306,8 +306,8 @@ cmd_wm() {
             echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────${RESET}\n"
             ;;
 
-        *) rx_log "info" "Usage: retro --window [fullscreen|save|restore|clear|status]" ;;
+        *) rx_log "info" "Usage: retro window [fullscreen|save|restore|clear|status]" ;;
     esac
 }
 
-register_command "TOOLS" "-wm|--window" "Window manager utilities and rules" "cmd_wm"
+register_command "TOOLS" "window" "Window manager utilities and rules" "cmd_wm"

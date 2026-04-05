@@ -165,7 +165,7 @@ cmd_bw() {
             ;;
 
         "add")
-            [[ -z $val1 ]] && rx_log "error" "Usage: retro -bw add <NAME> [USER]" && return 1
+            [[ -z $val1 ]] && rx_log "error" "Usage: retro bitwarden add <NAME> [USER]" && return 1
             rbw unlocked || rbw unlock || return 1
 
             rx_log "info" "Interactive entry creation: ${PINK}$val1${RESET}..."
@@ -279,10 +279,10 @@ cmd_bw() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro --bitwarden [sync|lock|unlock|status|list|get|code|add|edit|del|reset|setup]" ;;
+        *) rx_log "info" "Usage: retro bitwarden [sync|lock|unlock|status|list|get|code|add|edit|del|reset|setup]" ;;
     esac
 }
 
 if [[ $(bash "$RETRO_DIR/scripts/variable_core.sh" --get "CLIP_BITWARDEN") == "true" ]]; then
-    register_command "TOOLS" "-bw|--bitwarden" "Secure Bitwarden vault management utility" "cmd_bw"
+    register_command "TOOLS" "bitwarden" "Secure Bitwarden vault management utility" "cmd_bw"
 fi

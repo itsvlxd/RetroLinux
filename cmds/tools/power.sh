@@ -160,8 +160,8 @@ cmd_power() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro --power [set|tune|toggle|restore|list|status|optimize|permissions]" ;;
+        *) rx_log "info" "Usage: retro power [set|tune|toggle|restore|list|status|optimize|permissions]" ;;
     esac
 }
 
-register_command "TOOLS" "-pwr|--power" "Hardware power management and optimization" "cmd_power"
+register_command "TOOLS" "power" "Hardware power management and optimization" "cmd_power"

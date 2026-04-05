@@ -130,7 +130,7 @@ cmd_battery() {
             ;;
 
         "saver")
-            [[ -z $value ]] && rx_log "info" "Usage: retro --battery saver [true|false|0-100]" && return 1
+            [[ -z $value ]] && rx_log "info" "Usage: retro battery saver [true|false|0-100]" && return 1
 
             local force_tag=""
             if [[ $options == "-f" || $options == "--force" ]]; then
@@ -152,8 +152,8 @@ cmd_battery() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro --battery [status|stats|usage|limit|saver|raw]" ;;
+        *) rx_log "info" "Usage: retro battery [status|stats|usage|limit|saver|raw]" ;;
     esac
 }
 
-register_command "TOOLS" "-bat|--battery" "Smart battery management utility" "cmd_battery"
+register_command "TOOLS" "battery" "Smart battery management utility" "cmd_battery"

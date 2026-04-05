@@ -7,7 +7,7 @@ cmd_benchmark() {
     local action="${1,,}"
     local silent_tables="${2,,}"
 
-    [[ -z $action ]] && rx_log "info" "Usage: retro --benchmark [stats|cpu|gpu|ram|disk|net|all|hud]" && return 1
+    [[ -z $action ]] && rx_log "info" "Usage: retro benchmark [stats|cpu|gpu|ram|disk|net|all|hud]" && return 1
 
     sync_mangohud() {
         local profile=$(bash "$VAR_SCRIPT" --get "MANGOHUD_PROFILE")
@@ -67,7 +67,7 @@ cmd_benchmark() {
                             [[ $name != "MangoHud" ]] && echo -e " ${PINK}󰓅${RESET} $name"
                         done
                         echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────${RESET}\n"
-                        rx_log "info" "Apply one using: retro -bm hud set <name>"
+                        rx_log "info" "Apply one using: retro benchmark hud set <name>"
                         return 0
                     fi
 
@@ -77,7 +77,7 @@ cmd_benchmark() {
                         rx_log "success" "MangoHud profile symlinked to: ${PINK}${hud_val}.conf${RESET}"
                     else
                         rx_log "error" "Config '${hud_val}.conf' not found in ~/.config/MangoHud/"
-                        rx_log "info" "Run 'retro -bm hud set' to see available profiles."
+                        rx_log "info" "Run 'retro benchmark hud set' to see available profiles."
                     fi
                     ;;
 
@@ -98,7 +98,7 @@ cmd_benchmark() {
 
                 "run")
                     local run_cmd="${@:3}"
-                    [[ -z $run_cmd ]] && rx_log "error" "Provide an app to run (e.g., retro -bm hud run vkmark)" && return 1
+                    [[ -z $run_cmd ]] && rx_log "error" "Provide an app to run (e.g., retro benchmark hud run vkmark)" && return 1
 
                     if [[ ${run_cmd,,} == *".exe"* || ${run_cmd,,} == *".exe "* ]]; then
                         rx_log "info" "Windows Executable detected."
@@ -202,7 +202,7 @@ cmd_benchmark() {
                     ;;
 
                 *)
-                    rx_log "info" "Usage: retro -bm hud [status|set|on|off|auto|run|test]"
+                    rx_log "info" "Usage: retro benchmark hud [status|set|on|off|auto|run|test]"
                     ;;
             esac
             ;;
@@ -372,7 +372,7 @@ EOF
             rx_log "success" "RetroBench Full Suite Completed and Saved."
             ;;
 
-        *) rx_log "info" "Usage: retro --benchmark [status|cpu|gpu|ram|disk|net|all|hud]" ;;
+        *) rx_log "info" "Usage: retro benchmark [status|cpu|gpu|ram|disk|net|all|hud]" ;;
     esac
 }
-register_command "TOOLS" "-bm|--benchmark" "Benchmark utiltiy for hardware diagnostics and scoring" "cmd_benchmark"
+register_command "TOOLS" "benchmark" "Benchmark utiltiy for hardware diagnostics and scoring" "cmd_benchmark"

@@ -59,7 +59,7 @@ remove_retro_command() {
     rx_log "info" "Note: Environment changes require a logout/login to fully clear from Hyprland."
 }
 
-retro -fp uninstall
+retro fingerprint uninstall
 
 remove_power_permissions
 remove_retro_command

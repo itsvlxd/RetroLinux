@@ -77,8 +77,8 @@ cmd_clipboard() {
         local mode="${1:-Clipboard}"
 
         # Pure Native Modes!
-        local modes="Clipboard:retro -clip history,Emoji:retro -clip emoji"
-        [[ $CLIP_BITWARDEN == "true" ]] && modes+=",Bitwarden:retro -clip bitwarden"
+        local modes="Clipboard:retro clipboard history,Emoji:retro clipboard emoji"
+        [[ $CLIP_BITWARDEN == "true" ]] && modes+=",Bitwarden:retro clipboard bitwarden"
 
         rofi -modi "$modes" \
             -show "$mode" \
@@ -235,4 +235,4 @@ cmd_clipboard() {
     esac
 }
 
-register_command "TOOLS" "-clip|--clipboard" "Search clipboard history with image previews (Use 'wipe' to clear)" "cmd_clipboard"
+register_command "TOOLS" "clipboard" "Search clipboard history with image previews (Use 'wipe' to clear)" "cmd_clipboard"

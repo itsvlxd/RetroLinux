@@ -60,10 +60,10 @@ cmd_font() {
             ;;
 
         "set")
-            [[ -z $value ]] && rx_log "error" "Usage: retro --font set [main|nerd|emoji] [Font Name]" && return 1
+            [[ -z $value ]] && rx_log "error" "Usage: retro font set [main|nerd|emoji] [Font Name]" && return 1
 
             if ! bash "$font_core" --list-installed | grep -Fxq "$value"; then
-                rx_log "error" "Font '${value}' is not valid. Use 'retro -ft list' for exact names."
+                rx_log "error" "Font '${value}' is not valid. Use 'retro font list' for exact names."
                 return 1
             fi
 
@@ -151,7 +151,7 @@ cmd_font() {
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
             if ((total > skip + limit)); then
-                echo -e " ${PINK}󰄾${RESET} Page $page | Next: ${PINK}retro -ft remote $query $((page + 1))${RESET}\n"
+                echo -e " ${PINK}󰄾${RESET} Page $page | Next: ${PINK}retro font remote $query $((page + 1))${RESET}\n"
             else
                 echo -e ""
             fi
@@ -256,8 +256,8 @@ cmd_font() {
             rx_log "success" "All fonts installed and configured"
             ;;
 
-        *) rx_log "info" "Usage: retro --font [install|set|edit|list|remote|status]" ;;
+        *) rx_log "info" "Usage: retro font [install|set|edit|list|remote|status]" ;;
     esac
 }
 
-register_command "TOOLS" "-ft|--font" "System-wide typography and emoji management" "cmd_font"
+register_command "TOOLS" "font" "System-wide typography and emoji management" "cmd_font"

@@ -188,7 +188,7 @@ cmd_wallpaper() {
             local res_map=$(bash "$var_script" --get "WALL_RES_MAP")
 
             if [[ -z $res_map || $res_map == "null" ]]; then
-                rx_log "error" "No custom monitor resolutions are set. Run '${PINK}retro -wal res${RESET}' first."
+                rx_log "error" "No custom monitor resolutions are set. Run '${PINK}retro wallpaper res${RESET}' first."
                 return 1
             fi
 
@@ -224,8 +224,8 @@ cmd_wallpaper() {
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
             ;;
 
-        *) rx_log "info" "Usage: retro --wallpaper [set|add|slideshow|static|list|picker|cache|restore|res|optimize|status]" ;;
+        *) rx_log "info" "Usage: retro wallpaper [set|add|slideshow|static|list|picker|cache|restore|res|optimize|status]" ;;
     esac
 }
 
-register_command "TOOLS" "-wal|--wallpaper" "Manage your wallpaper and theme" "cmd_wallpaper"
+register_command "TOOLS" "wallpaper" "Manage your wallpaper and theme" "cmd_wallpaper"

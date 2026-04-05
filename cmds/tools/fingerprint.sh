@@ -130,8 +130,8 @@ cmd_fingerprint() {
             sudo fprintd-delete "$target_user" && rx_log "success" "Fingerprints have been cleared."
             ;;
 
-        *) rx_log "info" "Usage: retro --fingerprint [enroll|list|status|clear|uninstall]" ;;
+        *) rx_log "info" "Usage: retro fingerprint [enroll|list|status|clear|uninstall]" ;;
     esac
 }
 
-register_command "TOOLS" "-fp|--fingerprint" "Biometric security management" "cmd_fingerprint"
+register_command "TOOLS" "fingerprint" "Biometric security management" "cmd_fingerprint"

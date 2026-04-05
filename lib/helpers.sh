@@ -51,7 +51,7 @@ rx_format_string() {
 }
 
 get_opacity_hex() {
-    local base_opacity=$(retro -var get RETRO_OPACITY 2>/dev/null || echo "1.0")
+    local base_opacity=$(retro variable get RETRO_OPACITY 2>/dev/null || echo "1.0")
 
     [[ $base_opacity == "1.0" ]] && {
         echo "FF"

@@ -75,7 +75,7 @@
         {
             "type": "command",
             "key": "  󰏘 THM",
-            "text": "retro -var get RETRO_THEME",
+            "text": "retro variable get RETRO_THEME",
             "format": "{#97}{1}{#}"
         },
         "break",

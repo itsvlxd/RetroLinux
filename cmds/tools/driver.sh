@@ -239,7 +239,7 @@ cmd_driver() {
             if [[ $missing_count -gt 0 ]]; then
                 rx_log "warn" "$missing_count component(s) have missing drivers"
                 rx_log "warn" "Missing: ${PINK}$tagged_missing${RESET}"
-                rx_log "info" "Run ${PINK}retro --driver install${RESET} to fix"
+                rx_log "info" "Run ${PINK}retro driver install${RESET} to fix"
             fi
             echo ""
             ;;
@@ -321,7 +321,7 @@ cmd_driver() {
 
         "info")
             check_dep "lspci" "pciutils" || return 1
-            [[ -z $flag ]] && rx_log "info" "Usage: retro --driver info <keyword>" && return 1
+            [[ -z $flag ]] && rx_log "info" "Usage: retro driver info <keyword>" && return 1
 
             local info_data=$(bash "$driver_script" --info "$flag")
             if [[ $info_data == "NOT_FOUND" ]]; then
@@ -354,7 +354,7 @@ cmd_driver() {
 
         "switch")
             local target="${2,,}"
-            [[ -z $target ]] && rx_log "info" "Usage: retro --driver switch [xe|i915]" && return 1
+            [[ -z $target ]] && rx_log "info" "Usage: retro driver switch [xe|i915]" && return 1
 
             local device_id=$(bash "$driver_script" --device-id)
             local current=$(bash "$driver_script" --current-driver)
@@ -440,7 +440,7 @@ cmd_driver() {
             local module="$2"
             local param="$3"
             local value="$4"
-            [[ -z $module || -z $param || -z $value ]] && rx_log "info" "Usage: retro --driver modules-set <module> <param> <value>" && return 1
+            [[ -z $module || -z $param || -z $value ]] && rx_log "info" "Usage: retro driver modules-set <module> <param> <value>" && return 1
 
             local result=$(bash "$driver_script" --modules-set "$module" "$param" "$value")
             IFS='|' read -r status mod_name param_val <<<"$result"
@@ -612,7 +612,7 @@ cmd_driver() {
 
         "profile")
             local profile="${2,,}"
-            [[ -z $profile ]] && rx_log "info" "Usage: retro --driver profile [gaming|ai|minimal|workstation]" && return 1
+            [[ -z $profile ]] && rx_log "info" "Usage: retro driver profile [gaming|ai|minimal|workstation]" && return 1
 
             local pkgs=$(bash "$driver_script" --profile "$profile")
             [[ -z $pkgs ]] && rx_log "error" "Unknown profile: ${profile}" && return 1
@@ -652,7 +652,7 @@ cmd_driver() {
 
         "firmware")
             local subcmd="${2,,}"
-            [[ -z $subcmd ]] && rx_log "info" "Usage: retro --driver firmware [scan|install|status]" && return 1
+            [[ -z $subcmd ]] && rx_log "info" "Usage: retro driver firmware [scan|install|status]" && return 1
 
             case "$subcmd" in
                 scan)
@@ -690,7 +690,7 @@ cmd_driver() {
                     echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
 
                     if [[ $upd_count -gt 0 ]]; then
-                        rx_log "warn" "Firmware updates available. Run ${PINK}retro --driver firmware install${RESET}"
+                        rx_log "warn" "Firmware updates available. Run ${PINK}retro driver firmware install${RESET}"
                     else
                         rx_log "success" "No firmware updates available"
                     fi
@@ -772,8 +772,8 @@ cmd_driver() {
             esac
             ;;
 
-        *) rx_log "info" "Usage: retro --driver [status|install|env|info|switch|modules|modules-set|conflicts|fix-conflicts|optimus|hybrid-amd|gpu-status|profile|firmware] [--yes]" ;;
+        *) rx_log "info" "Usage: retro driver [status|install|env|info|switch|modules|modules-set|conflicts|fix-conflicts|optimus|hybrid-amd|gpu-status|profile|firmware] [--yes]" ;;
     esac
 }
 
-register_command "TOOLS" "-drv|--driver" "Hardware driver manager for Arch Linux (Gaming + AI)" "cmd_driver"
+register_command "TOOLS" "driver" "Hardware driver manager for Arch Linux (Gaming + AI)" "cmd_driver"
