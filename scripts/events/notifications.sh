@@ -239,8 +239,8 @@ on_pkg_updates_available() {
     local ACTION=$(notify-send -u normal -i software-update-available-symbolic -t 20000 \
         "System Updates Available" \
         "<b>$count</b> updates pending.\nIncluding: <i>$sample</i>" \
-        -A "update=󰚰 Update Now" \
-        -A "later=󰔚 Remind Later")
+        -A "update=Update Now" \
+        -A "later=Remind Later")
 
     if [[ $ACTION == "update" ]]; then
         local update_cmd="sudo pacman -Syu && \
