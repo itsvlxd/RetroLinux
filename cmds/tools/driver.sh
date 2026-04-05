@@ -272,7 +272,7 @@ cmd_driver() {
             rx_log "info" "The following packages will be installed: ${PINK}$tagged${RESET}"
 
             if [[ $SKIP_PROMPT != true ]]; then
-                rx_log "info" "Continue? [y/N] "
+                rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                 read -r confirm
                 if [[ ! $confirm =~ ^[Yy]$ ]]; then
                     rx_log "info" "Installation cancelled."
@@ -386,7 +386,7 @@ cmd_driver() {
             fi
 
             if [[ $SKIP_PROMPT != true ]]; then
-                rx_log "info" "Continue? [y/N] "
+                rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                 read -r confirm
                 [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
             fi
@@ -535,7 +535,7 @@ cmd_driver() {
                     local missing="${status#MISSING:}"
                     rx_log "info" "Will install: ${PINK}$missing${RESET}"
                     if [[ $SKIP_PROMPT != true ]]; then
-                        rx_log "info" "Continue? [y/N] "
+                        rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
                     fi
@@ -578,7 +578,7 @@ cmd_driver() {
                     local missing="${status#MISSING:}"
                     rx_log "info" "Will install: ${PINK}$missing${RESET}"
                     if [[ $SKIP_PROMPT != true ]]; then
-                        rx_log "info" "Continue? [y/N] "
+                        rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
                     fi
@@ -630,7 +630,7 @@ cmd_driver() {
             printf " ${PINK}󰄪${RESET} Missing %s\n" "$tagged"
             echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
 
-            rx_log "info" "Continue? [y/N] "
+            rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
             read -r confirm
             [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
 
@@ -658,7 +658,7 @@ cmd_driver() {
                 scan)
                     local fw_data=$(bash "$driver_script" --firmware-scan)
                     if [[ $fw_data == *"ERROR"* ]]; then
-                        rx_log "info" "fwupdmgr is not installed. Would you like to install it? [y/N] "
+                        rx_log "info" "fwupdmgr is not installed. Would you like to install it? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         if [[ $confirm =~ ^[Yy]$ ]]; then
                             local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
@@ -700,7 +700,7 @@ cmd_driver() {
                 install)
                     local fw_data=$(bash "$driver_script" --firmware-install)
                     if [[ $fw_data == *"ERROR"* ]]; then
-                        rx_log "info" "fwupdmgr is not installed. Would you like to install it? [y/N] "
+                        rx_log "info" "fwupdmgr is not installed. Would you like to install it? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         if [[ $confirm =~ ^[Yy]$ ]]; then
                             local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
@@ -738,7 +738,7 @@ cmd_driver() {
                 status)
                     local fw_data=$(bash "$driver_script" --firmware-status)
                     if [[ $fw_data == *"ERROR"* ]]; then
-                        rx_log "info" "fwupdmgr is not installed. Would you like to install it? [y/N] "
+                        rx_log "info" "fwupdmgr is not installed. Would you like to install it? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         if [[ $confirm =~ ^[Yy]$ ]]; then
                             local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
