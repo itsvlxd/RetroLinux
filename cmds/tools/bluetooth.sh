@@ -145,7 +145,7 @@ cmd_bluetooth() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro -bluetooth [status|scan on/off|discoverable|list|nearby|connect|disconnect|forget]"
+            rx_log "info" "Usage: retro --bluetooth [status|scan on/off|discoverable|list|nearby|connect|disconnect|forget]"
             ;;
     esac
 }
