@@ -227,7 +227,11 @@ toggle_profile() {
     local prev=$(get_var "PWR_PREVIOUS")
 
     if [[ -z $prev || $prev == "$curr" ]]; then
-        [[ $curr == "saver" ]] && prev="balanced" || prev="saver"
+        case "$curr" in
+            "saver") prev="balanced" ;;
+            "balanced") prev="performance" ;;
+            *) prev="saver" ;;
+        esac
     fi
 
     set_profile "$prev"

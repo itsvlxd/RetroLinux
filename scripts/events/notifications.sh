@@ -145,8 +145,8 @@ on_bluetooth_connected() {
         local ACTION=$(notify-send -u normal -i "$icon_path" -t 10000 \
             "Connection Established" \
             "<b>$name</b> ($mac) has been connected successfully." \
-            -A "disconnect=󰂲 Disconnect" \
-            -A "forget=󱘖 Forget Device")
+            -A "disconnect=Disconnect" \
+            -A "forget=Forget Device")
 
         case "$ACTION" in
             "disconnect")
