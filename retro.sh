@@ -27,7 +27,7 @@ source "$RETRO_DIR/lib/module.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/pkg_manager.sh"
 
-SKIP_PROMPT=false
+export SKIP_PROMPT=false
 CLEAN_ARGS=()
 
 for arg in "$@"; do
