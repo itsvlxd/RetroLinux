@@ -279,7 +279,24 @@ cmd_bw() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro bitwarden [sync|lock|unlock|status|list|get|code|add|edit|del|reset|setup]" ;;
+        *)
+            rx_log "info" "Usage: retro bitwarden <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "sync" "Sync vault with server"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "lock" "Lock the vault"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "unlock" "Unlock the vault"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show vault status and settings"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all vault entries"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "get <entry>" "Copy password for an entry"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "code <entry>" "Copy TOTP code for an entry"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "add [name] [user]" "Create a new vault entry"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit <entry>" "Edit an existing entry"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "del <entry>" "Remove a vault entry"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "reset" "Purge local data and disable"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Interactive setup wizard"
+            echo ""
+            ;;
     esac
 }
 

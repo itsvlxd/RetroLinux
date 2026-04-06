@@ -772,7 +772,29 @@ cmd_driver() {
             esac
             ;;
 
-        *) rx_log "info" "Usage: retro driver [status|install|env|info|switch|modules|modules-set|conflicts|fix-conflicts|optimus|hybrid-amd|gpu-status|profile|firmware] [--yes]" ;;
+        *)
+            rx_log "info" "Usage: retro driver <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Scan hardware and report driver status"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "install" "Install missing drivers"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "env" "Show AI environment variables"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "info <keyword>" "Show detailed device info"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "switch [xe|i915]" "Switch Intel GPU kernel driver"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "modules [names...]" "List kernel module parameters"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "modules-set" "Set a kernel module parameter"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "conflicts" "Check for driver conflicts"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "fix-conflicts" "Auto-resolve driver conflicts"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "optimus" "Setup NVIDIA Optimus dual GPU"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "hybrid-amd" "Setup AMD hybrid graphics"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "gpu-status" "List all detected GPUs"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "profile [name]" "Install driver profile packages"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "firmware" "Manage firmware updates"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Flags${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "--yes" "Skip confirmation prompts"
+            echo ""
+            ;;
     esac
 }
 

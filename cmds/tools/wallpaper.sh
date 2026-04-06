@@ -224,7 +224,23 @@ cmd_wallpaper() {
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
             ;;
 
-        *) rx_log "info" "Usage: retro wallpaper [set|add|slideshow|static|list|picker|cache|restore|res|optimize|status]" ;;
+        *)
+            rx_log "info" "Usage: retro wallpaper <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <name|path>" "Set the wallpaper"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "add <path>" "Import image to wallpaper cache"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "slideshow [mode]" "Toggle slideshow mode"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "static [mode]" "Toggle static wallpaper mode"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all wallpapers in theme"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "picker" "Launch interactive wallpaper picker"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "cache [value]" "Build animated wallpaper cache"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore" "Restore previous wallpaper"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "res" "Set wallpaper render resolution"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "optimize" "Optimize video feeds for resolution"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show active wallpaper info"
+            echo ""
+            ;;
     esac
 }
 

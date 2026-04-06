@@ -152,7 +152,18 @@ cmd_battery() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro battery [status|stats|usage|limit|saver|raw]" ;;
+        *)
+            rx_log "info" "Usage: retro battery <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show battery info and charge bar"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "stats" "Show 7-day battery usage history"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "usage [count]" "List top power-consuming processes"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "limit <percent>" "Set battery charge threshold"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "saver [mode] [-f]" "Configure battery saver mode"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "raw" "Output raw battery status string"
+            echo ""
+            ;;
     esac
 }
 
