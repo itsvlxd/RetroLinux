@@ -98,7 +98,7 @@ cmd_load() {
             rx_log "success" "Startup sequence synchronized."
             ;;
         *)
-            rx_log "info" "Usage: retro load [all|list]"
+            rx_log "info" "Usage: retro --load [all|list]"
             ;;
     esac
 }
