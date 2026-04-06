@@ -30,7 +30,7 @@ rx_log() {
             ;;
     esac
 
-    if [[ $message =~ \[[^\]:]+\][[:space:]]*$ ]]; then
+    if [[ $message =~ \[(y/N|Y/n|Default:[^\]]*)\][[:space:]:]*$ ]]; then
         echo_opts="-ne"
     fi
 
