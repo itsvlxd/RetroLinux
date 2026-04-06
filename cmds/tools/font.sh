@@ -256,7 +256,19 @@ cmd_font() {
             rx_log "success" "All fonts installed and configured"
             ;;
 
-        *) rx_log "info" "Usage: retro font [install|set|edit|list|remote|status]" ;;
+        *)
+            rx_log "info" "Usage: retro font <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "install <pkg>" "Install a font package"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set [cat] <font>" "Set active font for category"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit" "Edit fontconfig override file"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all installed fonts"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "remote [query]" "Search remote font packages"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show active fonts and count"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Interactive font setup wizard"
+            echo ""
+            ;;
     esac
 }
 

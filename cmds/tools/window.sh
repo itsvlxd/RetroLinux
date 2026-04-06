@@ -306,7 +306,18 @@ cmd_wm() {
             echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────${RESET}\n"
             ;;
 
-        *) rx_log "info" "Usage: retro window [fullscreen|save|restore|clear|status]" ;;
+        *)
+            rx_log "info" "Usage: retro window <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "fullscreen" "Toggle fullscreen on active window"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "save" "Capture current workspace layout"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore" "Rebuild workspace from saved layout"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "clear" "Delete saved session state"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle-autosave" "Toggle session autosave"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show saved session snapshot"
+            echo ""
+            ;;
     esac
 }
 

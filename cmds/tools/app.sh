@@ -22,6 +22,19 @@ cmd_apps() {
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
     if [[ $app_name == "list" || -z $app_name ]]; then
+        if [[ -z $app_name ]]; then
+            rx_log "info" "Usage: retro app <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all available applications"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> open" "Launch an application"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> close" "Close an application"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> refresh" "Refresh an application"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> list" "Show actions for an app"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "all <action>" "Run action for all apps"
+            echo ""
+        fi
+
         rx_log "info" "Available Applications:"
 
         local raw_vars=$(bash "$var_script" --list 2>/dev/null)

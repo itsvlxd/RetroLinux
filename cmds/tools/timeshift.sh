@@ -278,7 +278,21 @@ cmd_timeshift() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro timeshift [status|list|create|restore|delete|config|schedule|setup|gui]" ;;
+        *)
+            rx_log "info" "Usage: retro timeshift <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show backup config and snapshot count"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all snapshots"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "create [comment]" "Create a new snapshot"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore <snapshot>" "Restore a specific snapshot"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "delete <snapshot>" "Delete a specific snapshot"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "config" "Show current Timeshift configuration"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "schedule" "Set snapshot retention counts"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Interactive setup wizard"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "gui" "Open Timeshift GUI"
+            echo ""
+            ;;
     esac
 }
 

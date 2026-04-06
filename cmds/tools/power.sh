@@ -160,7 +160,20 @@ cmd_power() {
             fi
             ;;
 
-        *) rx_log "info" "Usage: retro power [set|tune|toggle|restore|list|status|optimize|permissions]" ;;
+        *)
+            rx_log "info" "Usage: retro power <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <profile>" "Set power profile (saver/balanced/perf)"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "tune" "Fine-tune wattage limits per profile"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle" "Cycle through power profiles"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore" "Sync current profile to hardware"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all profile wattage values"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show CPU, clock, and power cap info"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "optimize" "Auto-detect CPU and suggest settings"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "permissions" "Configure kernel power permissions"
+            echo ""
+            ;;
     esac
 }
 

@@ -46,7 +46,7 @@ show_usage() {
 
             local display_aliases=$(echo "$aliases" | sed 's/|/, /g')
 
-            printf "    ${PINK}%-22s ${GRAY}-${RESET} %s\n" "$display_aliases" "$desc"
+            printf "    ${PINK}%-16s ${GRAY}-${RESET} %s\n" "$display_aliases" "$desc"
         done <<<"$sorted_entries"
 
         echo ""

@@ -212,7 +212,7 @@ set_wallpaper() {
         if [ "$(echo "$COLOR < 1.0" | bc)" -eq 1 ]; then
             matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
         else
-            matugen image -b wal "$static_source" -t scheme-rainbow --source-color-index 0 >/dev/null 2>&1
+            matugen image -b wal "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
         fi
 
         if [[ $is_video == "true" && $should_be_static == "false" ]]; then

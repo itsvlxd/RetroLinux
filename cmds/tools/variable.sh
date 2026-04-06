@@ -162,7 +162,19 @@ cmd_var() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro variable [get|set|del|add|remove|toggle|edit|list|reset]"
+            rx_log "info" "Usage: retro variable <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "get <key>" "Get a variable value"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <k> <v>" "Set a variable value"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "del <key>" "Delete a variable (supports *)"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle <key>" "Toggle boolean variable"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "add <k> <v>" "Append to pipe-delimited value"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "remove <k> <v>" "Remove element from value"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit" "Open variables file in editor"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all variables"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "reset" "Reset all variables to defaults"
+            echo ""
             ;;
     esac
 }

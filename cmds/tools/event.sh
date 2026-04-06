@@ -73,7 +73,16 @@ cmd_event() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro event [trigger|list|start|stop|restart|status]"
+            rx_log "info" "Usage: retro event <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "trigger <event>" "Fire a system event"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all event hooks"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "start" "Start the event worker daemon"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "stop" "Stop the event worker daemon"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restart" "Restart the event worker daemon"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show event worker status"
+            echo ""
             ;;
     esac
 }

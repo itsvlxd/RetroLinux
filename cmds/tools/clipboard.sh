@@ -229,8 +229,21 @@ cmd_clipboard() {
             exit 0
             ;;
 
-        *)
+        "open")
             launch_rofi "Clipboard"
+            ;;
+
+        *)
+            rx_log "info" "Usage: retro clipboard <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "history [item]" "View or restore clipboard history"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "emoji [emoji]" "Browse and copy emojis"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "wipe" "Clear clipboard history"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "bitwarden [entry]" "Access Bitwarden vault entries"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "screenshots" "Browse and copy screenshots"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "open" "Launch clipboard picker UI"
+            echo ""
             ;;
     esac
 }

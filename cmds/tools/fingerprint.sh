@@ -130,7 +130,17 @@ cmd_fingerprint() {
             sudo fprintd-delete "$target_user" && rx_log "success" "Fingerprints have been cleared."
             ;;
 
-        *) rx_log "info" "Usage: retro fingerprint [enroll|list|status|clear|uninstall]" ;;
+        *)
+            rx_log "info" "Usage: retro fingerprint <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Enroll a new fingerprint"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List enrolled fingerprints"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show hardware and auth status"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "clear" "Wipe all biometric data"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "uninstall" "Remove PAM auth and fingerprints"
+            echo ""
+            ;;
     esac
 }
 

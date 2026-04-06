@@ -145,7 +145,18 @@ cmd_bluetooth() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro bluetooth [status|scan on/off|discoverable|list|nearby|connect|disconnect|forget]"
+            rx_log "info" "Usage: retro bluetooth <command>"
+            echo -e ""
+            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show adapter and connection info"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "scan [on|off]" "Toggle device discovery"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List paired devices"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "nearby" "Show discoverable devices"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "connect <mac>" "Connect to a device"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "disconnect <mac>" "Disconnect a device"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "forget <mac>" "Remove a paired device"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "discoverable" "Toggle visibility mode"
+            echo ""
             ;;
     esac
 }
