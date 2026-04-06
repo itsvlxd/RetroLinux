@@ -101,36 +101,34 @@ cmd_apps() {
     fi
 
     if [[ $action == "open" ]]; then
-        local -a launch_args=()
-        if [[ $app_name == "terminal" && -n $extra_args ]]; then
-            launch_args=(bash -c "$extra_args; exec bash")
-        elif is_tui "$target_cmd"; then
-            launch_args=(bash -c "$target_cmd $extra_args; exec bash")
-        elif [[ -z $target_cmd ]] && command -v "$app_name" &>/dev/null; then
-            launch_args=(bash -c "$app_name $extra_args; exec bash")
-        else
-            [[ -n $extra_args ]] && launch_args=("$extra_args")
-        fi
-
         local custom_open="$s_dir/open_${mod_name}.sh"
         if [[ -f $custom_open ]]; then
             rx_log "info" "Executing custom open script for ${mod_name^}..."
-            (cd "$mod_path" && setsid bash "$custom_open" "${launch_args[@]}" >/dev/null 2>&1 &)
-            return 0
-        fi
-
-        if [[ ${#launch_args[@]} -gt 0 ]]; then
-            (setsid $term "${launch_args[@]}" >/dev/null 2>&1 &)
+            (cd "$mod_path" && setsid bash "$custom_open" $extra_args >/dev/null 2>&1 &)
             return 0
         fi
 
         if [[ $app_name == "terminal" ]]; then
-            (setsid $term >/dev/null 2>&1 &)
+            if [[ -n $extra_args ]]; then
+                (setsid $term bash -c "$extra_args; exec bash" >/dev/null 2>&1 &)
+            else
+                (setsid $term >/dev/null 2>&1 &)
+            fi
+            return 0
+        fi
+
+        if is_tui "$target_cmd"; then
+            (setsid $term bash -c "$target_cmd $extra_args; exec bash" >/dev/null 2>&1 &)
             return 0
         fi
 
         if [[ -n $target_cmd && $target_cmd != "null" ]]; then
             (setsid $target_cmd $extra_args >/dev/null 2>&1 &)
+            return 0
+        fi
+
+        if command -v "$app_name" &>/dev/null; then
+            (setsid $app_name $extra_args >/dev/null 2>&1 &)
             return 0
         fi
     fi
