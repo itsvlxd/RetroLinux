@@ -29,13 +29,13 @@ cmd_update() {
                     local prefix="${msg%%:*}"
 
                     case "$prefix" in
-                        feat*)       feat+="  ${PINK}󰬈${RESET} ${clean_msg}\n" ;;
-                        fix*)        fix+="  ${PINK}󰁨${RESET} ${clean_msg}\n" ;;
-                        refactor*)   refactor+="  ${PINK}󰑓${RESET} ${clean_msg}\n" ;;
-                        style*)      style+="  ${PINK}󰏘${RESET} ${clean_msg}\n" ;;
-                        docs*)       docs+="  ${PINK}󰈙${RESET} ${clean_msg}\n" ;;
-                        chore*)      chore+="  ${PINK}󰗑${RESET} ${clean_msg}\n" ;;
-                        *)           other+="  ${PINK}󰋗${RESET} ${msg}\n" ;;
+                        feat*) feat+="  ${PINK}󰬈${RESET} ${clean_msg}\n" ;;
+                        fix*) fix+="  ${PINK}󰁨${RESET} ${clean_msg}\n" ;;
+                        refactor*) refactor+="  ${PINK}󰑓${RESET} ${clean_msg}\n" ;;
+                        style*) style+="  ${PINK}󰏘${RESET} ${clean_msg}\n" ;;
+                        docs*) docs+="  ${PINK}󰈙${RESET} ${clean_msg}\n" ;;
+                        chore*) chore+="  ${PINK}󰗑${RESET} ${clean_msg}\n" ;;
+                        *) other+="  ${PINK}󰋗${RESET} ${msg}\n" ;;
                     esac
                 done <<<"$commits"
 
@@ -57,6 +57,8 @@ cmd_update() {
             rx_log "info" "Would you like to update all modules? ${PINK}[y/N]${RESET}"
             read -r confirm
             if [[ $confirm =~ ^[Yy]$ ]]; then
+                SKIP_PROMPT=true
+
                 cmd_install "$target"
             else
                 rx_log "info" "Skipping module updates."
