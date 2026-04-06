@@ -776,4 +776,4 @@ cmd_driver() {
     esac
 }
 
-register_command "TOOLS" "driver" "Hardware driver manager for Arch Linux (Gaming + AI)" "cmd_driver"
+register_command "TOOLS" "driver" "Scan hardware, install drivers, and manage kernel modules" "cmd_driver"
