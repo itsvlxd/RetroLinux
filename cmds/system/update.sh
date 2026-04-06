@@ -27,14 +27,56 @@ cmd_update() {
                 while IFS= read -r msg; do
                     local clean_msg="${msg#*: }"
                     local prefix="${msg%%:*}"
+                    local module=""
+                    local mod_regex='^[a-z]+\(([^)]+)\)'
+
+                    if [[ $prefix =~ $mod_regex ]]; then
+                        module="${BASH_REMATCH[1]}"
+                    fi
 
                     case "$prefix" in
-                        feat*) feat+="  ${PINK}󰬈${RESET} ${clean_msg}\n" ;;
-                        fix*) fix+="  ${PINK}󰁨${RESET} ${clean_msg}\n" ;;
-                        refactor*) refactor+="  ${PINK}󰑓${RESET} ${clean_msg}\n" ;;
-                        style*) style+="  ${PINK}󰏘${RESET} ${clean_msg}\n" ;;
-                        docs*) docs+="  ${PINK}󰈙${RESET} ${clean_msg}\n" ;;
-                        chore*) chore+="  ${PINK}󰗑${RESET} ${clean_msg}\n" ;;
+                        feat*)
+                            if [[ -n $module ]]; then
+                                feat+="  ${PINK}󰬈${RESET} ${PINK}${module}${GRAY}: ${RESET}${clean_msg}\n"
+                            else
+                                feat+="  ${PINK}󰬈${RESET} ${clean_msg}\n"
+                            fi
+                            ;;
+                        fix*)
+                            if [[ -n $module ]]; then
+                                fix+="  ${PINK}󰁨${RESET} ${PINK}${module}${GRAY}: ${RESET}${clean_msg}\n"
+                            else
+                                fix+="  ${PINK}󰁨${RESET} ${clean_msg}\n"
+                            fi
+                            ;;
+                        refactor*)
+                            if [[ -n $module ]]; then
+                                refactor+="  ${PINK}󰑓${RESET} ${PINK}${module}${GRAY}: ${RESET}${clean_msg}\n"
+                            else
+                                refactor+="  ${PINK}󰑓${RESET} ${clean_msg}\n"
+                            fi
+                            ;;
+                        style*)
+                            if [[ -n $module ]]; then
+                                style+="  ${PINK}󰏘${RESET} ${PINK}${module}${GRAY}: ${RESET}${clean_msg}\n"
+                            else
+                                style+="  ${PINK}󰏘${RESET} ${clean_msg}\n"
+                            fi
+                            ;;
+                        docs*)
+                            if [[ -n $module ]]; then
+                                docs+="  ${PINK}󰈙${RESET} ${PINK}${module}${GRAY}: ${RESET}${clean_msg}\n"
+                            else
+                                docs+="  ${PINK}󰈙${RESET} ${clean_msg}\n"
+                            fi
+                            ;;
+                        chore*)
+                            if [[ -n $module ]]; then
+                                chore+="  ${PINK}󰗑${RESET} ${PINK}${module}${GRAY}: ${RESET}${clean_msg}\n"
+                            else
+                                chore+="  ${PINK}󰗑${RESET} ${clean_msg}\n"
+                            fi
+                            ;;
                         *) other+="  ${PINK}󰋗${RESET} ${msg}\n" ;;
                     esac
                 done <<<"$commits"
@@ -58,7 +100,6 @@ cmd_update() {
             read -r confirm
             if [[ $confirm =~ ^[Yy]$ ]]; then
                 SKIP_PROMPT=true
-
                 cmd_install "$target"
             else
                 rx_log "info" "Skipping module updates."
