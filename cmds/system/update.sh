@@ -32,6 +32,7 @@ cmd_update() {
 
                     if [[ $prefix =~ $mod_regex ]]; then
                         module="${BASH_REMATCH[1]}"
+                        module="$(echo "${module:0:1}" | tr '[:lower:]' '[:upper:]')${module:1}"
                     fi
 
                     case "$prefix" in
