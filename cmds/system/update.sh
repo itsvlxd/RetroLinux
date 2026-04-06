@@ -8,9 +8,49 @@ cmd_update() {
         return 1
     fi
 
+    local old_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
+
     rx_log "info" "Syncing repository with $(rx_git_branch)"
 
-    if git -C "$RETRO_DIR" pull; then
+    if git -C "$RETRO_DIR" pull 2>&1; then
+        local new_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
+
+        if [[ $old_head != $new_head ]]; then
+            local commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
+
+            if [[ -n $commits ]]; then
+                echo -e "\n ${PINK}󰜘 Changelog${RESET}"
+                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+
+                local feat="" fix="" refactor="" style="" docs="" chore="" other=""
+
+                while IFS= read -r msg; do
+                    local clean_msg="${msg#*: }"
+                    local prefix="${msg%%:*}"
+
+                    case "$prefix" in
+                        feat*)       feat+="  ${PINK}󰬈${RESET} ${clean_msg}\n" ;;
+                        fix*)        fix+="  ${PINK}󰁨${RESET} ${clean_msg}\n" ;;
+                        refactor*)   refactor+="  ${PINK}󰑓${RESET} ${clean_msg}\n" ;;
+                        style*)      style+="  ${PINK}󰏘${RESET} ${clean_msg}\n" ;;
+                        docs*)       docs+="  ${PINK}󰈙${RESET} ${clean_msg}\n" ;;
+                        chore*)      chore+="  ${PINK}󰗑${RESET} ${clean_msg}\n" ;;
+                        *)           other+="  ${PINK}󰋗${RESET} ${msg}\n" ;;
+                    esac
+                done <<<"$commits"
+
+                [[ -n $feat ]] && echo -e " ${PINK}󰬈${RESET} Features${GRAY}:${RESET}" && echo -e "$feat"
+                [[ -n $fix ]] && echo -e " ${PINK}󰁨${RESET} Fixes${GRAY}:${RESET}" && echo -e "$fix"
+                [[ -n $refactor ]] && echo -e " ${PINK}󰑓${RESET} Refactors${GRAY}:${RESET}" && echo -e "$refactor"
+                [[ -n $style ]] && echo -e " ${PINK}󰏘${RESET} Style${GRAY}:${RESET}" && echo -e "$style"
+                [[ -n $docs ]] && echo -e " ${PINK}󰈙${RESET} Docs${GRAY}:${RESET}" && echo -e "$docs"
+                [[ -n $chore ]] && echo -e " ${PINK}󰗑${RESET} Chore${GRAY}:${RESET}" && echo -e "$chore"
+                [[ -n $other ]] && echo -e " ${PINK}󰋗${RESET} Other${GRAY}:${RESET}" && echo -e "$other"
+
+                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            fi
+        fi
+
         rx_log "success" "Git pull successful"
 
         if [[ $SKIP_PROMPT != true ]]; then
