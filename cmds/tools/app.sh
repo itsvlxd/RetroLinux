@@ -109,10 +109,11 @@ cmd_apps() {
         fi
 
         if [[ $app_name == "terminal" ]]; then
+            local open_term_script="$RETRO_DIR/modules/kitty/files/scripts/open_kitty.sh"
             if [[ -n $extra_args ]]; then
-                (setsid $term bash -c "$extra_args; exec bash" >/dev/null 2>&1 &)
+                (setsid bash "$open_term_script" -- bash -c "$extra_args; exec bash" >/dev/null 2>&1 &)
             else
-                (setsid $term >/dev/null 2>&1 &)
+                (setsid bash "$open_term_script" >/dev/null 2>&1 &)
             fi
             return 0
         fi
