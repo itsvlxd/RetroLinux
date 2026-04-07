@@ -56,11 +56,12 @@ cmd_event() {
             ;;
 
         "status")
-            local pid=$(pgrep -f "event_core.sh --loop")
+            local pids=$(pgrep -f "event_core.sh --loop" | grep -v "$$" | xargs)
             echo -e "\n ${PINK}󱐋 Event Worker Status${RESET}"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            if [[ -n $pid ]]; then
-                local uptime=$(ps -o etime= -p "$pid" | xargs)
+            if [[ -n $pids ]]; then
+                local pid=$(echo "$pids" | awk '{print $1}')
+                local uptime=$(ps -o etime= -p "$pid" 2>/dev/null | xargs)
 
                 printf " ${PINK}󱐋${RESET} %-14s ${SUCCESS}ACTIVE${RESET} ${GRAY}(PID: %s)${RESET}\n" "State:" "$pid"
                 printf " ${PINK}󱎫${RESET} %-14s ${PINK}%s${RESET}\n" "Uptime:" "$uptime"

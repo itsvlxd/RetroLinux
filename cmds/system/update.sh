@@ -1,7 +1,11 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/logo.sh"
+
 cmd_update() {
     local target="$1"
+
+    rx_logo
 
     if [[ ! -d "$RETRO_DIR/.git" ]]; then
         rx_log "error" "Not a git repository: $RETRO_DIR"

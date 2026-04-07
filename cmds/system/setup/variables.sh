@@ -6,9 +6,10 @@ rx_vars_defaults() {
 
     local defaults=(
         # Retro
-        "RETRO_CUSTOM_LOAD|hyprland-welcome"
         "RETRO_TERMINAL_CMD|kitty"
         "RETRO_PKG_UPDATE_MIN|30"
+        "RETRO_UPDATE_CHECK_MIN|30"
+        "RETRO_PKG_UPDATE_THRESH|30"
 
         "RETRO_OPACITY|0.9"
         "RETRO_INACTIVE_OPACITY|0.8"
