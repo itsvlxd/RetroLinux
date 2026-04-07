@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/scripts/lib/battery.sh"
 source "$RETRO_DIR/scripts/lib/variable.sh"
+source "$RETRO_DIR/lib/git.sh"
 
 EVENT_DIR="$RETRO_DIR/scripts/events"
 
@@ -43,6 +44,7 @@ run_event_loop() {
     local current_rand_target=0
 
     local tick_counter=0
+    local last_retro_check=0
 
     # TODO: Need to implement the on_event_loop_start logic
     broadcast_event "on_event_loop_start"
@@ -256,6 +258,22 @@ run_event_loop() {
             fi
 
             last_pkg_check=$now
+        fi
+
+        local retro_check_min=$(get_var "RETRO_UPDATE_CHECK_MIN" "5")
+        local retro_interval=$((retro_check_min * 60))
+        local now=$(date +%s)
+
+        if ((tick_counter % 300 == 0)) && [[ -d "$RETRO_DIR/.git" ]]; then
+            if ((now - last_retro_check > retro_interval)); then
+                git -C "$RETRO_DIR" fetch origin 2>/dev/null
+                local current_branch=$(git -C "$RETRO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null)
+                local behind=$(git -C "$RETRO_DIR" rev-list --count HEAD..origin/$current_branch 2>/dev/null)
+                if [[ -n $behind && $behind -gt 0 ]]; then
+                    broadcast_event "on_retro_update_available" "$behind"
+                fi
+                last_retro_check=$now
+            fi
         fi
 
         local ignored_macs=$(get_var "BT_MAC_IGNORE")
