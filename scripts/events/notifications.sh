@@ -234,7 +234,6 @@ DONE
 on_pkg_updates_available() {
     local count="$1"
     local sample="$2"
-    local helper=$(get_var "PKG_HELPER" "yay")
 
     local ACTION=$(notify-send -u normal -i software-update-available-symbolic -t 20000 \
         "System Updates Available" \
@@ -243,9 +242,6 @@ on_pkg_updates_available() {
         -A "later=Remind Later")
 
     if [[ $ACTION == "update" ]]; then
-        local update_cmd="sudo pacman -Syu && \
-                           $helper -Sua"
-
-        hyprctl dispatch exec "[float; size 1000 700; center] retro app terminal open '$update_cmd'"
+        retro app terminal open "bash $RETRO_DIR/scripts/events/system_update.sh $count $sample"
     fi
 }

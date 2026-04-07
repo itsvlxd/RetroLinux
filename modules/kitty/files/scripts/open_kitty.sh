@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RETRO_DIR="$(dirname "$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")")"
+
 ALL_VARS=$(bash "$RETRO_DIR/scripts/variable_core.sh" --list 2>/dev/null)
 
 get_var() {
