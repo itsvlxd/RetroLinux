@@ -237,11 +237,25 @@ on_pkg_updates_available() {
 
     local ACTION=$(notify-send -u normal -i software-update-available-symbolic -t 20000 \
         "System Updates Available" \
-        "<b>$count</b> updates pending.\nIncluding: <i>$sample</i>" \
+        "<b>$count</b> packages have pending updates.\nIncluding: <i>$sample</i>" \
         -A "update=Update Now" \
         -A "later=Remind Later")
 
     if [[ $ACTION == "update" ]]; then
-        retro app terminal open "bash $RETRO_DIR/scripts/events/system_update.sh $count $sample"
+        hyprctl dispatch exec "[float; size 1000 700; center] kitty -- bash $RETRO_DIR/scripts/lib/system_update.sh $count $sample" &
+    fi
+}
+
+on_retro_update_available() {
+    local commits="$1"
+
+    local ACTION=$(notify-send -u normal -i software-update-available-symbolic -t 20000 \
+        "Retro Update Available" \
+        "RetroLinux has some new updates. \n<b>$commits</b> new commits have been added." \
+        -A "update=Update" \
+        -A "later=Remind me later")
+
+    if [[ $ACTION == "update" ]]; then
+        hyprctl dispatch exec "[float; size 1000 700; center] kitty -- bash -c 'cd $RETRO_DIR && bash retro.sh --update; echo; echo Press Enter to close.; read'" &
     fi
 }
