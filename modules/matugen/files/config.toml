@@ -22,3 +22,7 @@ output_path = '~/.cache/retro/themes/nvim-colors.json'
 input_path = '~/.config/matugen/templates/rofi.rasm'
 output_path = '~/.cache/retro/themes/rofi-colors.rasi'
 post_hook = 'bash ~/.config/rofi/scripts/refresh_rofi.sh'
+
+[templates.colors-css]
+input_path = '~/.config/matugen/templates/colors.css'
+output_path = '~/.cache/retro/themes/colors.css'
