@@ -299,7 +299,7 @@ cmd_driver() {
         "env")
             local ai_env
             ai_env=$(bash "$driver_script" --sys-ai-env)
-            [[ -z $ai_env ]] && rx_log "error" "Failed to read AI environment variables" && return 1
+            [[ -z $ai_env ]] && rx_log "error" "Failed to read GPU compute environment" && return 1
             IFS='|' read -r intel_env nvidia_env amd_env <<<"$ai_env"
 
             local intel_val="${intel_env#intel:}"
@@ -310,7 +310,7 @@ cmd_driver() {
             zes=$(grep "^ZES_ENABLE_SYSMAN=" /etc/environment 2>/dev/null | cut -d= -f2)
             : ${zes:="not_set"}
 
-            echo -e "\n ${PINK}󰓅 AI Environment Variables${RESET}"
+            echo -e "\n ${PINK}󰓅 GPU Compute Environment${RESET}"
             echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────"
             printf " ${PINK}󰏗${RESET} %-22s ${PINK}%s${RESET}\n" "ONEAPI_DEVICE_SELECTOR" "${intel_val}"
             printf " ${PINK}󰏗${RESET} %-22s ${PINK}%s${RESET}\n" "ZES_ENABLE_SYSMAN" "${zes}"
@@ -772,13 +772,23 @@ cmd_driver() {
             esac
             ;;
 
+        hypr|hyprenv)
+            local force_vendor="$2"
+            bash "$driver_script" --hypr "$force_vendor"
+            bash "$driver_script" --hypr-show
+            ;;
+
+        mkinit)
+            bash "$driver_script" --mkinit
+            ;;
+
         *)
             rx_log "info" "Usage: retro driver <command>"
             echo -e ""
             echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Scan hardware and report driver status"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "install" "Install missing drivers"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "env" "Show AI environment variables"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "env" "Show GPU compute env (CUDA/ONEAPI/RADV)"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "info <keyword>" "Show detailed device info"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "switch [xe|i915]" "Switch Intel GPU kernel driver"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "modules [names...]" "List kernel module parameters"
@@ -790,9 +800,18 @@ cmd_driver() {
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "gpu-status" "List all detected GPUs"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "profile [name]" "Install driver profile packages"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "firmware" "Manage firmware updates"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "hypr [nvidia|amd|intel]" "Generate Hyprland GPU env"
+            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "mkinit" "Configure mkinitcpio for NVIDIA"
             echo -e ""
-            echo -e " ${PINK}  ${RESET}Flags${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "--yes" "Skip confirmation prompts"
+            echo -e " ${PINK}  ${RESET}Examples${GRAY}:${RESET}"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr" "Auto-detect GPU and generate env"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr nvidia" "Force NVIDIA env generation"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr amd" "Force AMD env generation"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr intel" "Force Intel env generation"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver env" "Show compute environment vars"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver gpu-status" "List all detected GPUs"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver info nvidia" "Show NVIDIA device details"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver mkinit" "Configure NVIDIA in initramfs"
             echo ""
             ;;
     esac
