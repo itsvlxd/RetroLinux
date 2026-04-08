@@ -11,7 +11,8 @@ get_var() {
 }
 
 count="$1"
-sample="$2"
+shift
+sample="$*"
 helper="$(get_var "PKG_HELPER" "yay")"
 
 echo -e "${PINK}
