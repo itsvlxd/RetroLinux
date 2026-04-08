@@ -174,14 +174,14 @@ cmd_var() {
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit" "Open variables file in editor"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all variables"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "reset" "Reset all variables to defaults"
-            echo -e ""
-            echo -e " ${PINK}󰋽 ${RESET}Examples${GRAY}:${RESET}"
-            printf "   ${GRAY}%s${RESET}\n" "retro variable get RETRO_WALLPAPER"
-            printf "   ${GRAY}%s${RESET}\n" 'retro variable set RETRO_THEME "retro"'
-            printf "   ${GRAY}%s${RESET}\n" "retro variable toggle RETRO_BORDER"
-            printf "   ${GRAY}%s${RESET}\n" 'retro variable add RETRO_FONT_NERD "JetBrainsMono Nerd Font"'
-            printf "   ${GRAY}%s${RESET}\n" 'retro variable remove RETRO_FONT_MAIN "Inter"'
-            printf "   ${GRAY}%s${RESET}\n" "retro variable del RETRO_*"
+            echo ""
+            echo -e " ${PINK}  ${RESET}Examples${GRAY}:${RESET}"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro variable get RETRO_WALLPAPER" "Get a variable value"
+            printf " ${GRAY}%-35s${RESET} %s\n" 'retro variable set RETRO_THEME "retro"' "Set a variable value"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro variable toggle RETRO_BORDER" "Toggle boolean"
+            printf " ${GRAY}%-35s${RESET} %s\n" 'retro variable add RETRO_FONT_NERD "JetBrainsMono Nerd Font"' "Append to value"
+            printf " ${GRAY}%-35s${RESET} %s\n" 'retro variable remove RETRO_FONT_MAIN "Inter"' "Remove from value"
+            printf " ${GRAY}%-35s${RESET} %s\n" "retro variable del RETRO_*" "Delete with wildcard"
             echo ""
             ;;
     esac
