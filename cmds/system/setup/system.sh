@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# TODO: Add maybe a notification on system startup to let the user know
-# they got some updates todo and their system is outdated
-
 setup_system() {
     if grep -q '^ID=retrolinux' /etc/os-release 2>/dev/null; then
         return 0
