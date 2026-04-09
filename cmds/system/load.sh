@@ -8,8 +8,9 @@ cmd_load() {
     local action="$1"
 
     local startup_tasks=(
-        "retro power restore|Restoring hardware power profiles"
+        "retro audio easyeffects start|Initializing audio drivers"
         "retro event start|Initializing event loop and custom hooks"
+        "retro power restore|Restoring hardware power profiles"
         "retro wallpaper restore|Applying last used wallpaper"
 
         "retro benchmark hud load|Loads mangohud and benchmark variables"

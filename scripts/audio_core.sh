@@ -120,10 +120,31 @@ list_eq_profiles() {
 apply_eq_profile() {
     local profile="$1"
     local eq_dir="$HOME/.local/share/easyeffects/output"
-    local profile_path="$eq_dir/$profile"
-    [[ ! -f "$profile_path" ]] && profile_path="$eq_dir/${profile}.json"
-    [[ ! -f "$profile_path" ]] && echo "Profile not found: $profile" && return 1
-    echo "$profile_path"
+    local profile_path=""
+    
+    if [[ -f "$eq_dir/$profile" ]]; then
+        profile_path="$eq_dir/$profile"
+    elif [[ -f "$eq_dir/${profile}.json" ]]; then
+        profile_path="$eq_dir/${profile}.json"
+    else
+        local matches=$(find "$eq_dir" -maxdepth 1 -name "*.json" 2>/dev/null | while read -r f; do
+            local name=$(basename "$f" .json)
+            if [[ "$name" == *"$profile"* || "$profile" == *"$name"* ]]; then
+                echo "$f"
+            fi
+        done | head -1)
+        
+        if [[ -n "$matches" ]]; then
+            profile_path="$matches"
+        fi
+    fi
+    
+    if [[ -f "$profile_path" ]]; then
+        echo "$profile_path"
+    else
+        echo "Profile not found: $profile"
+        return 1
+    fi
 }
 
 get_remote_eq_repos() {
@@ -132,6 +153,29 @@ get_remote_eq_repos() {
     echo "Bundy01|EasyEffects-presets|Various audio profiles"
     echo "Digitalone1/EasyEffects-presets|DTS/Atmos alternatives"
     echo "ShadowOne333|EasyEffects-Configs|Gaming presets"
+}
+
+eq_list_remote_profiles() {
+    local cache_dir="$RETRO_CACHE/audio/eq"
+    local dest_dir="$HOME/.local/share/easyeffects/output"
+    
+    if [[ -d "$dest_dir" ]]; then
+        local profiles=$(find "$dest_dir" -name "*.json" -o -name "*.presets" 2>/dev/null | while read -r f; do
+            local name=$(basename "$f")
+            local size=$(ls -lh "$f" 2>/dev/null | awk '{print $5}')
+            echo "$name|$size"
+        done)
+        
+        if [[ -n "$profiles" ]]; then
+            while IFS='|' read -r name size; do
+                printf " ${PINK}󰾰${RESET} %-40s ${GRAY}%s${RESET}\n" "$name" "$size"
+            done <<<"$profiles"
+        else
+            echo "No profiles found"
+        fi
+    else
+        echo "No profiles found"
+    fi
 }
 
 download_eq_preset() {
@@ -204,11 +248,92 @@ stop_easyeffects() {
     pgrep -x easyeffects >/dev/null 2>&1 && echo "Failed to stop" || echo "Stopped"
 }
 
+get_pcore_threads() {
+    local cpu_vendor=$(grep -m1 "vendor" /proc/cpuinfo | awk '{print $3}')
+    local cpu_model=$(grep -m1 "model name" /proc/cpuinfo | awk '{$1=""; $2=""; print $0}' | xargs)
+    
+    if [[ "$cpu_vendor" == *"Intel"* ]]; then
+        local is_big_little=false
+        
+        if [[ "$cpu_model" == *"Ultra"* ]]; then
+            is_big_little=true
+        elif [[ "$cpu_model" =~ [0-9]{2}[0-9]H ]]; then
+            local gen=$(echo "$cpu_model" | grep -oE "^[0-9]{2}" | head -1)
+            if [[ $gen -ge 12 ]]; then
+                is_big_little=true
+            fi
+        elif [[ "$cpu_model" =~ [0-9]+[0-9]00 ]]; then
+            local gen_num=$(echo "$cpu_model" | grep -oE '[0-9]+[0-9]00' | head -1 | grep -oE '^[0-9]+')
+            if [[ $gen_num -ge 12 ]]; then
+                is_big_little=true
+            fi
+        fi
+        
+        if [[ "$is_big_little" == "true" ]]; then
+            local p_cores=()
+            for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+                local id=$(basename "$cpu" | sed 's/cpu//')
+                
+                if [[ -f "$cpu/online" ]] && [[ $(cat "$cpu/online") == "1" ]]; then
+                    local freq=$(cat "$cpu/cpufreq/scaling_max_freq" 2>/dev/null)
+                    if [[ -n "$freq" && $freq -gt 4000000 ]]; then
+                        p_cores+=("$id")
+                    fi
+                fi
+            done
+            
+            if [[ ${#p_cores[@]} -gt 0 ]]; then
+                echo "$(IFS=,; echo "${p_cores[*]}")"
+                return 0
+            fi
+        fi
+        
+        local cores=$(nproc 2>/dev/null || echo 4)
+        local threads_per_core=$(lscpu 2>/dev/null | grep "Thread(s) per core" | awk '{print $4}')
+        local pcore_cores=$((cores / threads_per_core))
+        
+        local pcore_threads=""
+        for ((i=0; i<pcore_cores * threads_per_core; i++)); do
+            [[ -n "$pcore_threads" ]] && pcore_threads+="," || pcore_threads+=""
+            pcore_threads+="$i"
+        done
+        echo "$pcore_threads"
+    elif [[ "$cpu_vendor" == *"AMD"* ]]; then
+        local cores=$(nproc 2>/dev/null || echo 4)
+        local threads_per_core=$(lscpu 2>/dev/null | grep "Thread(s) per core" | awk '{print $4}')
+        local total_threads=$((cores / threads_per_core))
+        
+        local threads=""
+        for ((i=0; i<total_threads; i++)); do
+            [[ -n "$threads" ]] && threads+=","
+            threads+="$i"
+        done
+        echo "$threads"
+    else
+        local cores=$(nproc 2>/dev/null || echo 4)
+        local threads=""
+        for ((i=0; i<cores; i++)); do
+            [[ -n "$threads" ]] && threads+=","
+            threads+="$i"
+        done
+        echo "$threads"
+    fi
+}
+
 fix_stutter() {
     local services=("pipewire" "wireplumber" "easyeffects")
-    local pcore_count=$(nproc 2>/dev/null || echo 4)
-    local affinity=""
-    [[ $pcore_count -gt 8 ]] && affinity="0-7" || [[ $pcore_count -gt 4 ]] && affinity="0-3" || affinity="0-$((pcore_count - 1))"
+    local cpu_vendor=$(grep -m1 "vendor" /proc/cpuinfo | awk '{print $3}')
+    
+    local affinity=$(get_pcore_threads)
+    
+    if [[ -z "$affinity" ]]; then
+        local cores=$(nproc 2>/dev/null || echo 4)
+        affinity="0-$((cores - 1))"
+    fi
+    
+    local method="P-cores"
+    [[ "$cpu_vendor" == *"AMD"* ]] && method="all cores"
+    [[ "$cpu_vendor" != *"Intel"* && "$cpu_vendor" != *"AMD"* ]] && method="all cores"
     
     for svc in "${services[@]}"; do
         local unit="${svc}.service"
@@ -250,6 +375,7 @@ case "$1" in
     "--eq-apply") apply_eq_profile "$2" ;;
     "--eq-download") download_eq_preset "$2" ;;
     "--eq-list-remote") get_remote_eq_repos ;;
+    "--eq-list-remote-profiles") eq_list_remote_profiles ;;
     "--ee-start") start_easyeffects ;;
     "--ee-stop") stop_easyeffects ;;
     "--fix-stutter") fix_stutter ;;

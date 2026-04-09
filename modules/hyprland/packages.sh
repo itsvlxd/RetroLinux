@@ -1,5 +1,5 @@
 hyprland
+hyprshot
 
 cliphist
-hyprshot
 wl-clipboard
