@@ -1,3 +1,4 @@
+# Base
 bc
 jq
 git
@@ -13,10 +14,18 @@ inetutils
 base-devel
 pacman-contrib
 
+# Audio
+wireplumber
+easyeffects
+libwireplumber
+lsp-plugins-lv2
+
+# Wallpaper
 awww-bin
 mpvpaper
 imagemagick
 
+# Benchmark
 sysbench
 glmark2
 vkmark

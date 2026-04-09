@@ -57,14 +57,14 @@ cmd_audio() {
             local source_name=$(bash "$audio_core" --get-source-name "$source" 2>/dev/null || echo "$source")
 
             echo -e "\n ${PINK}󰑊 Audio Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
             printf " ${PINK}󰿅${RESET} %-14s ${GRAY}%s${RESET}\n" "PipeWire:" "$pw_ver"
             printf " ${PINK}󰛫${RESET} %-14s ${GRAY}%s${RESET}\n" "WirePlumber:" "$wp_ver"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
             printf " ${PINK}󰝥${RESET} %-14s ${PINK}%s%%${RESET} (${mute_state})\n" "Volume:" "$sink_vol"
             printf " ${PINK}${mute_icon}${RESET} %-14s ${GRAY}%s${RESET}\n" "Output:" "${sink_name:0:35}"
             printf " ${PINK}${mic_mute_icon}${RESET} %-14s ${GRAY}%s${RESET}\n" "Input:" "${source_name:0:35}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
             printf " ${PINK}${ee_icon}${RESET} %-14s ${ee_color}%s${RESET}\n" "EasyEffects:" "$ee_status"
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
             ;;
@@ -128,7 +128,7 @@ cmd_audio() {
             fi
 
             echo -e "\n ${PINK}󰑊 Select Output Device${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
             local idx=0
             for s in "${sinks[@]}"; do
@@ -141,7 +141,7 @@ cmd_audio() {
                 ((idx++))
             done
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
             echo -ne "\n ${PINK}󰄾 ${RESET}Selection [1-${#sinks[@]}]: "
             read -r choice
@@ -175,7 +175,7 @@ cmd_audio() {
             local current_source=$(bash "$audio_core" --status | grep "^source:" | cut -d: -f2)
 
             echo -e "\n ${PINK}󰑊 Audio Devices${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
             echo -e " ${PINK}󰝥  Outputs (Sinks):${RESET}"
 
             while IFS= read -r s; do
@@ -202,13 +202,44 @@ cmd_audio() {
 
         "eq")
             local eq_action="$val1"
-            local eq_val="$val2"
+            shift 2
+            local eq_val="$*"
+
+            case "$eq_action" in
+                "list"|"download"|"delete"|"delete-all"|"list-remote"|"remote"|"open")
+                    ;;
+                "")
+                    rx_log "info" "Usage: retro audio eq <command>"
+                    echo -e ""
+                    echo -e " ${PINK}  ${RESET}EQ commands${GRAY}:${RESET}"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List installed EQ profiles"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list-remote" "List available remote profiles"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "download <repo>" "Download presets from GitHub"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<name>" "Apply EQ profile by name"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "delete <name>" "Delete an EQ profile"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "delete-all" "Delete all EQ profiles"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "open" "Open EasyEffects GUI"
+                    echo ""
+                    echo -e " ${PINK}Examples${GRAY}:${RESET}"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq list" "List all profiles"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq Boosted" "Apply Boosted profile"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq Boosted.json" "Apply with .json"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq download JackHack96" "Download presets"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq delete Boosted" "Delete profile"
+                    echo ""
+                    return 0
+                    ;;
+                *)
+                    eq_val="$eq_action $eq_val"
+                    eq_action="apply"
+                    ;;
+            esac
 
             case "$eq_action" in
                 "list")
                     local profiles=$(bash "$audio_core" --eq-list)
                     echo -e "\n ${PINK}󰑊 EQ Profiles${RESET}"
-                    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+                    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
                     if [[ -z "$profiles" ]]; then
                         echo -e " ${GRAY}No EQ profiles found${RESET}"
@@ -219,7 +250,6 @@ cmd_audio() {
                     fi
 
                     echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
-                    echo -e " ${GRAY}Use 'retro audio eq download <repo>' to get more presets${RESET}\n"
                     ;;
 
                 "download")
@@ -242,19 +272,19 @@ cmd_audio() {
                     rx_log "success" "Download complete"
                     ;;
 
-                "list-remote")
+                "list-remote"|"remote")
                     local repos=$(bash "$audio_core" --eq-list-remote)
+                    
                     echo -e "\n ${PINK}󰑊 Available Preset Repositories${RESET}"
-                    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+                    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
                     while IFS='|' read -r name url desc; do
                         printf " ${PINK}󰾰${RESET} ${PINK}%s${RESET}\n" "$name"
-                        printf "   ${GRAY}%s${RESET}\n" "$desc"
+                        [[ -n "$desc" ]] && printf "   ${GRAY}%s${RESET}\n" "$desc"
                         echo ""
                     done <<<"$repos"
 
-                    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-                    echo -e " ${GRAY}Usage: retro audio eq download <repo>${RESET}\n"
+                    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
                     ;;
 
                 "apply")
@@ -262,11 +292,62 @@ cmd_audio() {
 
                     local profile_path=$(bash "$audio_core" --eq-apply "$eq_val")
                     if [[ -f "$profile_path" ]]; then
-                        rx_log "success" "EQ profile ${PINK}${eq_val}${RESET} applied (path: ${profile_path})"
-                        rx_log "info" "Open EasyEffects to load the preset"
+                        local profile_name=$(basename "$profile_path" .json)
+                        
+                        if command -v easyeffects >/dev/null 2>&1; then
+                            easyeffects -l "$profile_name" 2>/dev/null
+                            rx_log "success" "Profile ${PINK}${profile_name}${RESET} applied"
+                        else
+                            rx_log "success" "Profile ${PINK}${profile_name}${RESET} ready"
+                            rx_log "info" "EasyEffects not running. Start it to use the preset."
+                        fi
                     else
                         rx_log "error" "Profile not found: ${PINK}${eq_val}${RESET}"
                         rx_log "info" "Use 'retro audio eq list' to see available profiles"
+                    fi
+                    ;;
+
+                "delete")
+                    [[ -z $eq_val ]] && rx_log "error" "Usage: retro audio eq delete <profile-name>" && return 1
+                    
+                    local profile_path=$(bash "$audio_core" --eq-apply "$eq_val")
+                    if [[ -f "$profile_path" ]]; then
+                        rx_log "info" "Deleting ${PINK}${eq_val}${RESET}..."
+                        rm -f "$profile_path"
+                        rx_log "success" "Profile deleted"
+                    else
+                        rx_log "error" "Profile not found: ${PINK}${eq_val}${RESET}"
+                    fi
+                    ;;
+
+                "delete-all")
+                    local eq_dir="$HOME/.local/share/easyeffects/output"
+                    if [[ -d "$eq_dir" ]]; then
+                        local count=$(ls -1 "$eq_dir" 2>/dev/null | wc -l)
+                        if ((count > 0)); then
+                            rx_log "warn" "This will delete all ${count} EQ profiles from $eq_dir"
+                            echo -ne " ${PINK}󰄾 ${RESET}Confirm? ${PINK}[y/N]${RESET}: "
+                            read -r confirm
+                            if [[ $confirm =~ ^[Yy]$ ]]; then
+                                rm -f "$eq_dir"/*
+                                rx_log "success" "All EQ profiles deleted"
+                            else
+                                rx_log "info" "Cancelled"
+                            fi
+                        else
+                            rx_log "info" "No profiles to delete"
+                        fi
+                    else
+                        rx_log "info" "No EQ profiles directory found"
+                    fi
+                    ;;
+
+                "open")
+                    if command -v easyeffects >/dev/null 2>&1; then
+                        nohup easyeffects >/dev/null 2>&1 &
+                        rx_log "success" "EasyEffects GUI opened"
+                    else
+                        rx_log "error" "EasyEffects not installed"
                     fi
                     ;;
 
@@ -275,9 +356,12 @@ cmd_audio() {
                     echo -e ""
                     echo -e " ${PINK}  ${RESET}EQ commands${GRAY}:${RESET}"
                     printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List installed EQ profiles"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list-remote" "List available preset repos"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list-remote" "List available remote profiles"
                     printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "download <repo>" "Download presets from GitHub"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<profile>" "Apply an EQ profile"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<name>" "Apply EQ profile by name"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "delete <name>" "Delete an EQ profile"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "delete-all" "Delete all EQ profiles"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "open" "Open EasyEffects GUI"
                     echo ""
                     ;;
             esac
@@ -315,13 +399,38 @@ cmd_audio() {
                         rx_log "info" "EasyEffects is stopped"
                     fi
                     ;;
+                "restart")
+                    bash "$audio_core" --ee-stop >/dev/null 2>&1
+                    sleep 1
+                    local status=$(bash "$audio_core" --ee-start)
+                    if [[ "$status" == "Started" ]]; then
+                        rx_log "success" "EasyEffects daemon restarted"
+                    else
+                        rx_log "error" "Failed to restart EasyEffects"
+                    fi
+                    ;;
+                "open")
+                    if command -v easyeffects >/dev/null 2>&1; then
+                        nohup easyeffects >/dev/null 2>&1 &
+                        rx_log "success" "EasyEffects GUI opened"
+                    else
+                        rx_log "error" "EasyEffects not installed"
+                    fi
+                    ;;
                 *)
                     rx_log "info" "Usage: retro audio easyeffects <command>"
                     echo -e ""
                     echo -e " ${PINK}  ${RESET}EasyEffects commands${GRAY}:${RESET}"
                     printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "start" "Start EasyEffects daemon"
                     printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "stop" "Stop EasyEffects daemon"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restart" "Restart EasyEffects daemon"
                     printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Check EasyEffects status"
+                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "open" "Open EasyEffects GUI"
+                    echo ""
+                    echo -e " ${PINK}Examples${GRAY}:${RESET}"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio easyeffects start" "Start daemon"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio easyeffects restart" "Restart daemon"
+                    printf " ${GRAY}%-30s${RESET} %s\n" "retro audio easyeffects open" "Open GUI"
                     echo ""
                     ;;
             esac
@@ -333,6 +442,9 @@ cmd_audio() {
             local result=$(bash "$audio_core" --fix-stutter)
             rx_log "success" "Applied CPU affinity: ${PINK}${result}${RESET}"
             rx_log "info" "Audio services have been restarted with P-core affinity"
+            
+            bash "$audio_core" --ee-start >/dev/null 2>&1
+            rx_log "success" "EasyEffects daemon started"
             ;;
 
         "sources"|"inputs")
@@ -340,7 +452,7 @@ cmd_audio() {
             local current_source=$(bash "$audio_core" --status | grep "^source:" | cut -d: -f2)
 
             echo -e "\n ${PINK}󰑊 Input Devices${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
             while IFS= read -r s; do
                 [[ -n $s ]] || continue
@@ -370,6 +482,13 @@ cmd_audio() {
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "eq [args]" "EQ profile management"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "easyeffects [cmd]" "Control EasyEffects"
             printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "fix-stutter" "Fix audio crackling"
+            echo ""
+            echo -e " ${PINK}Examples${GRAY}:${RESET}"
+            printf " ${GRAY}%-30s${RESET} %s\n" "retro audio set 50" "Set volume to 50%"
+            printf " ${GRAY}%-30s${RESET} %s\n" "retro audio up 10" "Increase volume by 10%"
+            printf " ${GRAY}%-30s${RESET} %s\n" "retro audio mute" "Toggle mute"
+            printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq list" "List EQ profiles"
+            printf " ${GRAY}%-30s${RESET} %s\n" "retro audio eq Boosted" "Apply Boosted profile"
             echo ""
             ;;
     esac
