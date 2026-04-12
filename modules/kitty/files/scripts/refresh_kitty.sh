@@ -1,10 +1,6 @@
 #!/bin/bash
 
-get_var() {
-    local val
-    val=$(retro variable get "$1" 2>/dev/null)
-    echo "${val:-$2}"
-}
+source "$RETRO_DIR/lib/helpers.sh"
 
 OPACITY=$(get_var "RETRO_OPACITY" "1.0")
 FONT=$(get_var "KITTY_FONT" "JetBrainsMono Nerd Font")
@@ -39,3 +35,4 @@ for sock in /tmp/kitty-*; do
 done
 
 apply_settings "" 2>/dev/null
+

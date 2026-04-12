@@ -1,9 +1,10 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 
 cmd_clipboard() {
-    local action="$1"
+    local action="${1,,}"
     local selection="$2"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
@@ -36,7 +37,7 @@ cmd_clipboard() {
                     "$emoji_dir/emojis_flags.csv" \
                     2>/dev/null | sed 's/,/  /'
             else
-                echo -e "😀 Grinning Face\n(Error: Emoji directory not found in $emoji_dir)"
+                rx_log "error" "Emoji directory not found in $emoji_dir"
             fi
             exit 0
         else
@@ -102,13 +103,8 @@ cmd_clipboard() {
 
     case "$action" in
         "wipe" | "clear")
-            rx_log "info" "Clear all clipboard history (including images)? ${PINK}[y/N]${RESET}: "
-            read -r confirm
-            if [[ $confirm =~ ^[Yy]$ ]]; then
-                cliphist wipe && rx_log "success" "Clipboard database wiped clean."
-            else
-                rx_log "info" "Wipe cancelled."
-            fi
+            rx_confirm "Clear all clipboard history (including images)?" "N" || { rx_log "info" "Wipe cancelled."; return 0; }
+            cliphist wipe && rx_log "success" "Clipboard database wiped clean."
             ;;
 
         "bitwarden")
@@ -234,16 +230,15 @@ cmd_clipboard() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro clipboard <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "history [item]" "View or restore clipboard history"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "emoji [emoji]" "Browse and copy emojis"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "wipe" "Clear clipboard history"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "bitwarden [entry]" "Access Bitwarden vault entries"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "screenshots" "Browse and copy screenshots"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "open" "Launch clipboard picker UI"
-            echo ""
+            rx_help_usage "retro clipboard <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "history [item]" "View or restore clipboard history"
+            rx_help_cmd "emoji [emoji]" "Browse and copy emojis"
+            rx_help_cmd "wipe" "Clear clipboard history"
+            rx_help_cmd "bitwarden [entry]" "Access Bitwarden vault entries"
+            rx_help_cmd "screenshots" "Browse and copy screenshots"
+            rx_help_cmd "open" "Launch clipboard picker UI"
+            rx_help_spacer
             ;;
     esac
 }

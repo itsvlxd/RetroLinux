@@ -1,7 +1,7 @@
 #!/bin/bash
 
-source "$RETRO_DIR/scripts/lib/battery.sh"
-source "$RETRO_DIR/scripts/lib/variable.sh"
+source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 CPU_VENDOR=$(grep -m 1 'vendor_id' /proc/cpuinfo | awk '{print $3}')
 BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
@@ -243,7 +243,7 @@ tune_settings() {
     local watts="$3"
 
     if [[ ! $source =~ ^(BAT|AC)$ ]] || [[ ! $profile =~ ^(SAVER|BALANCED|PERFORMANCE)$ ]] || [[ -z $watts ]]; then
-        echo "Error: Usage --settings [BAT|AC] [SAVER|BALANCED|PERFORMANCE] [WATTS]" >&2
+        echo "ERROR:invalid_args|source=$source|profile=$profile|watts=$watts"
         return 1
     fi
 

@@ -1,9 +1,11 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_event() {
     local event_script="$RETRO_DIR/scripts/event_core.sh"
     local hook_dir="$RETRO_DIR/scripts/events"
-    local action="$1"
+    local action="${1,,}"
     local value="$2"
     local args="${@:3}"
 
@@ -17,20 +19,20 @@ cmd_event() {
             ;;
 
         "list")
-            echo -e "\n ${PINK}󱐋 Active Event Modules: ${RESET}${hook_dir}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󱐋" "Active Event Modules: ${hook_dir}"
 
             local hooks=$(ls "$hook_dir"/*.sh 2>/dev/null)
             if [[ -z $hooks ]]; then
-                echo -e " ${MUTE}  (No scripts found)${RESET}"
+                rx_table_simple "󰓅" "(No scripts found)" "$MUTE"
             else
                 for h in $hooks; do
                     local name=$(basename "$h")
                     local func_count=$(grep -c "^[a-zA-Z0-9_]*()" "$h")
-                    printf " ${PINK} ${RESET} %-24s ${GRAY}[%s hooks]${RESET}\n" "$name:" "$func_count"
+                    rx_table_simple "󱐋" "$name: [$func_count hooks]" "$GRAY"
                 done
             fi
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "start")
@@ -57,33 +59,36 @@ cmd_event() {
 
         "status")
             local pids=$(pgrep -f "event_core.sh --loop" | grep -v "$$" | xargs)
-            echo -e "\n ${PINK}󱐋 Event Worker Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󱐋" "Event Worker Status"
             if [[ -n $pids ]]; then
                 local pid=$(echo "$pids" | awk '{print $1}')
                 local uptime=$(ps -o etime= -p "$pid" 2>/dev/null | xargs)
 
-                printf " ${PINK}󱐋${RESET} %-14s ${SUCCESS}ACTIVE${RESET} ${GRAY}(PID: %s)${RESET}\n" "State:" "$pid"
-                printf " ${PINK}󱎫${RESET} %-14s ${PINK}%s${RESET}\n" "Uptime:" "$uptime"
+                rx_table_row "󱐋" "State:" "ACTIVE (PID: $pid)" "$SUCCESS" "14"
+                rx_table_row "󱎫" "Uptime:" "$uptime" "$PINK" "14"
             else
-                printf " ${PINK}󱐋${RESET} %-14s ${ERROR}INACTIVE${RESET}\n" "State:"
-                printf " ${PINK}󱎫${RESET} %-14s ${MUTE}N/A${RESET}\n" "Uptime:"
+                rx_table_row "󱐋" "State:" "INACTIVE" "$ERROR" "14"
+                rx_table_row "󱎫" "Uptime:" "N/A" "$MUTE" "14"
             fi
-            printf " ${PINK}󰓅${RESET} %-14s %s\n" "Path:" "$event_script"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_row "󰓅" "Path:" "$event_script" "$GRAY" "14"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         *)
-            rx_log "info" "Usage: retro event <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "trigger <event>" "Fire a system event"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all event hooks"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "start" "Start the event worker daemon"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "stop" "Stop the event worker daemon"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restart" "Restart the event worker daemon"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show event worker status"
-            echo ""
+            rx_help_usage "retro event <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "trigger <event>" "Fire a system event"
+            rx_help_cmd "list" "List all event hooks"
+            rx_help_cmd "start" "Start the event worker daemon"
+            rx_help_cmd "stop" "Stop the event worker daemon"
+            rx_help_cmd "restart" "Restart the event worker daemon"
+            rx_help_cmd "status" "Show event worker status"
+            rx_help_examples
+            rx_help_example "retro event status" "Check if daemon is running"
+            rx_help_example "retro event list" "Show all loaded hooks"
+            rx_help_example "retro event trigger battery_low" "Fire specific event"
+            rx_help_spacer
             ;;
     esac
 }

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 rx_optimize_pacman() {
     local config="/etc/pacman.conf"
 
@@ -24,8 +26,10 @@ rx_optimize_pacman() {
         return 0
     fi
 
-    echo -e " I noticed some Pacman optimizations (Color, ILoveCandy, Extra, Multilib) aren't active."
-    echo -ne " ${PINK}󰄾 ${RESET}Would you like me to enable them in /etc/pacman.conf? ${PINK}[y/N]${RESET}: "
+    rx_help_section "Pacman Optimizations"
+    rx_log "info" "I noticed some Pacman optimizations (Color, ILoveCandy, Extra, Multilib) aren't active."
+
+    rx_log "info" "Would you like me to enable them in /etc/pacman.conf? ${PINK}[y/N]${RESET}"
     read -r allow
 
     if [[ ! $allow =~ ^[Yy]$ ]]; then

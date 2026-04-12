@@ -5,7 +5,7 @@ get_default_sink() {
 }
 
 get_default_source() {
-    wpctl status 2>/dev/null | grep -A5 "Sources:" | grep "\*" | grep -oE "[0-9]+\." | head -1 | tr -d '.'
+    wpctl status 2>/dev/null | sed -n '/Audio/,/Video/p' | sed -n '/Sources:/,/Filters:/p' | grep -E "│  \*" | grep -oE "[0-9]+\." | head -1 | tr -d '.'
 }
 
 get_sink_volume() {
@@ -23,7 +23,7 @@ get_sink_mute() {
 get_source_mute() {
     local source=$(get_default_source)
     [[ -z $source ]] && echo "false" && return
-    wpctl get-mute "$source" 2>/dev/null | grep -qi "Mute: yes" && echo "true" || echo "false"
+    pactl get-source-mute "$source" 2/ | grep -qi "yes" && echo "true" || echo "false"
 }
 
 get_sinks() {
@@ -47,11 +47,13 @@ get_source_name() {
 }
 
 get_pipewire_version() {
-    pipewire --version 2>/dev/null | awk '{print $NF}' | tr -d ')'
+    local ver=$(pipewire --version 2>/dev/null | awk '{print $NF}' | tr -d ')')
+    [[ -z $ver ]] && echo "N/A" || echo "$ver"
 }
 
 get_wireplumber_version() {
-    wireplumber --version 2>/dev/null | awk '{print $NF}' | tr -d ')'
+    local ver=$(wireplumber --version 2>/dev/null | awk '{print $NF}' | tr -d ')')
+    [[ -z $ver ]] && echo "N/A" || echo "$ver"
 }
 
 get_easyeffects_status() {
@@ -93,7 +95,7 @@ toggle_mute() {
 toggle_mic_mute() {
     local source=$(get_default_source)
     [[ -z $source ]] && return 1
-    wpctl set-mute "$source" toggle 2>/dev/null
+    pactl set-source-mute "$source" toggle 2>/dev/null
     get_source_mute
 }
 
@@ -115,6 +117,24 @@ list_eq_profiles() {
     find "$eq_dir" -name "*.json" -o -name "*.presets" 2>/dev/null | while read -r f; do
         basename "$f"
     done
+}
+
+get_current_eq_profile() {
+    local eq_config="$HOME/.config/easyeffects/db/equalizerrc"
+    if [[ -f "$eq_config" ]]; then
+        local preset=$(grep "^preset=" "$eq_config" 2>/dev/null | cut -d'=' -f2-)
+        if [[ -n "$preset" ]]; then
+            echo "$preset"
+            return
+        fi
+        
+        local has_eq=$(grep "band.*Gain=" "$eq_config" 2>/dev/null | grep -v "=0$\|=-0$\|=[+-]0\." | head -1)
+        if [[ -n "$has_eq" ]]; then
+            echo "Custom"
+            return
+        fi
+    fi
+    echo "None"
 }
 
 apply_eq_profile() {
@@ -156,25 +176,14 @@ get_remote_eq_repos() {
 }
 
 eq_list_remote_profiles() {
-    local cache_dir="$RETRO_CACHE/audio/eq"
     local dest_dir="$HOME/.local/share/easyeffects/output"
     
     if [[ -d "$dest_dir" ]]; then
-        local profiles=$(find "$dest_dir" -name "*.json" -o -name "*.presets" 2>/dev/null | while read -r f; do
+        find "$dest_dir" -name "*.json" -o -name "*.presets" 2>/dev/null | while read -r f; do
             local name=$(basename "$f")
             local size=$(ls -lh "$f" 2>/dev/null | awk '{print $5}')
             echo "$name|$size"
-        done)
-        
-        if [[ -n "$profiles" ]]; then
-            while IFS='|' read -r name size; do
-                printf " ${PINK}󰾰${RESET} %-40s ${GRAY}%s${RESET}\n" "$name" "$size"
-            done <<<"$profiles"
-        else
-            echo "No profiles found"
-        fi
-    else
-        echo "No profiles found"
+        done
     fi
 }
 
@@ -189,7 +198,6 @@ download_eq_preset() {
         "JackHack96")
             local url="https://github.com/JackHack96/EasyEffects-Presets/archive/refs/heads/master.zip"
             local tmp="/tmp/easyeffects-presets.zip"
-            echo "Downloading JackHack96 presets..."
             curl -Ls "$url" -o "$tmp"
             unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
             local preset_dir="$cache_dir/EasyEffects-Presets-master"
@@ -199,7 +207,6 @@ download_eq_preset() {
         "wwmm"|"wwmm/easyeffects")
             local url="https://github.com/wwmm/easyeffects/archive/refs/heads/main.zip"
             local tmp="/tmp/easyeffects.zip"
-            echo "Downloading official EasyEffects presets..."
             curl -Ls "$url" -o "$tmp"
             unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
             local preset_dir="$cache_dir/easyeffects-main"
@@ -209,7 +216,6 @@ download_eq_preset() {
         "Bundy01")
             local url="https://github.com/Bundy01/EasyEffects-presets/archive/refs/heads/main.zip"
             local tmp="/tmp/bundy-presets.zip"
-            echo "Downloading Bundy01 presets..."
             curl -Ls "$url" -o "$tmp"
             unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
             local preset_dir="$cache_dir/EasyEffects-presets-main"
@@ -219,7 +225,6 @@ download_eq_preset() {
         "Digitalone1")
             local url="https://github.com/Digitalone1/EasyEffects-presets/archive/refs/heads/main.zip"
             local tmp="/tmp/digitalone-presets.zip"
-            echo "Downloading Digitalone1 presets..."
             curl -Ls "$url" -o "$tmp"
             unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
             local preset_dir="$cache_dir/EasyEffects-presets-main"
@@ -227,11 +232,9 @@ download_eq_preset() {
             rm -f "$tmp"
             ;;
         *)
-            echo "Unknown repo: $repo"
             return 1
             ;;
     esac
-    echo "Presets installed to $dest_dir"
 }
 
 start_easyeffects() {
@@ -372,6 +375,7 @@ case "$1" in
     "--set-sink") set_sink "$2" ;;
     "--set-source") set_source "$2" ;;
     "--eq-list") list_eq_profiles ;;
+    "--eq-current") get_current_eq_profile ;;
     "--eq-apply") apply_eq_profile "$2" ;;
     "--eq-download") download_eq_preset "$2" ;;
     "--eq-list-remote") get_remote_eq_repos ;;

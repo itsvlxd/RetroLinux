@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 source "$RETRO_DIR/cmds/tools/bitwarden.sh"
 
 rx_setup_bitwarden() {

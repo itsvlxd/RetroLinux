@@ -1,8 +1,11 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
+
 cmd_bw() {
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
-    local action="$1"
+    local action="${1,,}"
     local val1="$2"
     local val2="$3"
 
@@ -54,27 +57,26 @@ cmd_bw() {
                 last_sync=$(date -d "@$(stat -c %Y "$db_path")" "+%d %b %Y - %H:%M")
             fi
 
-            echo -e "\n ${PINK} Bitwarden Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "" "Bitwarden Status"
+            rx_table_row "󰇮" "Active Account:" "$email" "$PINK" "18"
+            rx_table_row "󰆟" "Vault Server:" "${vault_url:-None}" "$PINK" "18"
+            rx_table_row "󰒋" "Identity Server:" "${identity_url:-None}" "$PINK" "18"
 
-            printf " ${PINK}󰇮${RESET} %-18s %s\n" "Active Account:" "$email"
-            printf " ${PINK}󰆟${RESET} %-18s %s\n" "Vault Server:" "${vault_url:-None}"
-            printf " ${PINK}󰒋${RESET} %-18s %s\n" "Identity Server:" "${identity_url:-None}"
+            rx_table_separator
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_row "󰌾" "Vault State:" "$is_unlocked" "$status_color" "18"
+            rx_table_row "󰔛" "Auto-Lock:" "$(rx_format_time "$lock_timer")" "$PINK" "18"
+            rx_table_row "󰃢" "Clipboard Wipe:" "$(rx_format_time "$wipe_timer")" "$PINK" "18"
+            rx_table_row "󱍸" "Sync Interval:" "Every $(rx_format_time "$sync_rate")" "$PINK" "18"
 
-            printf " ${PINK}󰌾${RESET} %-18s ${status_color}%s${RESET}\n" "Vault State:" "$is_unlocked"
-            printf " ${PINK}󰔛${RESET} %-18s %s\n" "Auto-Lock:" "$(rx_format_time "$lock_timer")"
-            printf " ${PINK}󰃢${RESET} %-18s %s\n" "Clipboard Wipe:" "$(rx_format_time "$wipe_timer")"
-            printf " ${PINK}󱍸${RESET} %-18s Every %s\n" "Sync Interval:" "$(rx_format_time "$sync_rate")"
+            rx_table_separator
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_row_gray "󰄨" "Vault Entries:" "$total_items" "18"
+            rx_table_row_gray "󰋊" "Cache Size:" "$(rx_format_size "$db_size_raw")" "18"
+            rx_table_row_gray "󰄭" "Last Synchronized:" "$last_sync" "18"
 
-            printf " ${PINK}󰄨${RESET} %-18s %b\n" "Vault Entries:" "$total_items"
-            printf " ${PINK}󰋊${RESET} %-18s %s\n" "Cache Size:" "$(rx_format_size "$db_size_raw")"
-            printf " ${PINK}󰄭${RESET} %-18s %s\n" "Last Synchronized:" "$last_sync"
-
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "list")
@@ -82,8 +84,7 @@ cmd_bw() {
                 rbw unlock || return 1
             fi
 
-            echo -e "\n ${PINK} Bitwarden Vault Index${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────────────────────────────────"
+            rx_table_header "" "Bitwarden Vault Index"
 
             rbw list --fields type,name,user | sort -k2,2 | while IFS=$'\t' read -r type name user; do
                 [[ -z $user || $user == "null" ]] && user=""
@@ -128,7 +129,8 @@ cmd_bw() {
                 fi
             done
 
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "get")
@@ -189,38 +191,38 @@ cmd_bw() {
 
         "reset")
             rx_log "warn" "Purging local data and disabling integration."
-            echo -ne " ${PINK}󰄾 ${RESET}Confirm reset? ${PINK}[y/N]${RESET}: "
-            read -r confirm
-            if [[ $confirm =~ ^[Yy]$ ]]; then
-                rbw purge
-                bash "$var_script" --del "CLIP_BITWARDEN"
-                bash "$var_script" --del "CLIP_WARDEN_SERVER"
+            rx_confirm "Confirm reset?" "N" || { rx_log "info" "Aborted."; return 0; }
 
-                rbw stop-agent
-                rm -rf ~/.cache/rbw
+            rbw purge
+            bash "$var_script" --del "CLIP_BITWARDEN"
+            bash "$var_script" --del "CLIP_WARDEN_SERVER"
 
-                rx_log "success" "Bitwarden integration reset."
-            fi
+            rbw stop-agent
+            rm -rf ~/.cache/rbw
+
+            rx_log "success" "Bitwarden integration reset."
             ;;
         "setup")
             mkdir -p ~/.cache/rbw
 
-            echo -e "\n ${PINK} Bitwarden Setup Instructions${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────${RESET}"
+            rx_help_header "" "Bitwarden Setup Instructions"
             echo -e " ${PINK}1.${RESET} Open the API Settings directly: "
             echo -e "     ${PINK}https://vault.bitwarden.com/#/settings/security/security-keys${RESET}"
             echo -e " ${PINK}2.${RESET} Scroll down to the ${PINK}API KEY${RESET} section."
             echo -e " ${PINK}3.${RESET} View and copy your ${PINK}Client ID${RESET} and ${PINK}Client Secret${RESET}."
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────"
+            rx_help_separator
+            rx_help_spacer
 
-            rx_log "info" "Do you have your keys and wish to continue? ${PINK}[y/N]${RESET}: "
-            read -r ready
-            [[ ! $ready =~ ^[Yy]$ ]] && return 0
+            if [[ "$SKIP_PROMPT" != "true" ]]; then
+                rx_log "info" "Do you have your keys and wish to continue? ${PINK}[y/N]${RESET}: "
+                read -r ready
+                [[ ! $ready =~ ^[Yy]$ ]] && return 0
+            fi
 
             rx_log "info" "Which Bitwarden instance are you using?"
-            echo -e "    ${PINK}1)${RESET} Global (.com)"
-            echo -e "    ${PINK}2)${RESET} Europe (.eu)"
-            echo -e "    ${PINK}8)${RESET} Custom / Self-Hosted"
+            rx_help_option "1)" "Global (.com)"
+            rx_help_option "2)" "Europe (.eu)"
+            rx_help_option "8)" "Custom / Self-Hosted"
             echo -ne "\n ${PINK}󰄾 ${RESET}Choice [1-3]: "
             read -r srv_choice
 
@@ -255,21 +257,26 @@ cmd_bw() {
             if rbw register; then
                 bash "$var_script" --set "CLIP_BITWARDEN" "true"
 
-                rx_log "info" "How often should I pull fresh data from the server? (seconds) ${PINK}[Default: 1800]${RESET}: "
-                read -r input_sync
-                local val_sync=${input_sync:-1800}
+                if [[ "$SKIP_PROMPT" == "true" ]]; then
+                    local val_sync=1800
+                    local val_timeout=900
+                    local val_destruct=30
+                    rx_log "info" "Using defaults: sync=${val_sync}s, lock=${val_timeout}s, wipe=${val_destruct}s"
+                else
+                    rx_log "info" "How often should I pull fresh data from the server? (seconds) ${PINK}[Default: 1800]${RESET}: "
+                    read -r input_sync
+                    local val_sync=${input_sync:-1800}
+                    rx_log "info" "How long should the vault stay unlocked before requiring a PIN? (seconds) ${PINK}[Default: 900]${RESET}: "
+                    read -r input_timeout
+                    local val_timeout=${input_timeout:-900}
+                    rx_log "info" "How many seconds before a copied password is wiped from the clipboard? ${PINK}[Default: 30]${RESET}: "
+                    read -r input_destruct
+                    local val_destruct=${input_destruct:-30}
+                fi
                 rbw config set sync_interval "$val_sync"
                 bash "$var_script" --set "CLIP_WARDEN_SYNC" "$val_sync"
-
-                rx_log "info" "How long should the vault stay unlocked before requiring a PIN? (seconds) ${PINK}[Default: 900]${RESET}: "
-                read -r input_timeout
-                local val_timeout=${input_timeout:-900}
                 rbw config set lock_timeout "$val_timeout"
                 bash "$var_script" --set "CLIP_WARDEN_TIMEOUT" "$val_timeout"
-
-                rx_log "info" "How many seconds before a copied password is wiped from the clipboard? ${PINK}[Default: 30]${RESET}: "
-                read -r input_destruct
-                local val_destruct=${input_destruct:-30}
                 bash "$var_script" --set "CLIP_WARDEN_DESTRUCT" "$val_destruct"
 
                 rx_log "success" "Bitwarden integration and security policies enabled!"
@@ -280,22 +287,21 @@ cmd_bw() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro bitwarden <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "sync" "Sync vault with server"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "lock" "Lock the vault"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "unlock" "Unlock the vault"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show vault status and settings"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all vault entries"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "get <entry>" "Copy password for an entry"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "code <entry>" "Copy TOTP code for an entry"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "add [name] [user]" "Create a new vault entry"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit <entry>" "Edit an existing entry"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "del <entry>" "Remove a vault entry"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "reset" "Purge local data and disable"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Interactive setup wizard"
-            echo ""
+            rx_help_usage "retro bitwarden <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "sync" "Sync vault with server"
+            rx_help_cmd "lock" "Lock the vault"
+            rx_help_cmd "unlock" "Unlock the vault"
+            rx_help_cmd "status" "Show vault status and settings"
+            rx_help_cmd "list" "List all vault entries"
+            rx_help_cmd "get <entry>" "Copy password for an entry"
+            rx_help_cmd "code <entry>" "Copy TOTP code for an entry"
+            rx_help_cmd "add [name] [user]" "Create a new vault entry"
+            rx_help_cmd "edit <entry>" "Edit an existing entry"
+            rx_help_cmd "del <entry>" "Remove a vault entry"
+            rx_help_cmd "reset" "Purge local data and disable"
+            rx_help_cmd "setup" "Interactive setup wizard"
+            rx_help_spacer
             ;;
     esac
 }

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 rx_module_status() {
     local mod_name="$1"
     local mod_dir="$RETRO_DIR/modules/$mod_name"
@@ -33,8 +35,7 @@ rx_module_status() {
 cmd_list_modules() {
     local modules_dir="$RETRO_DIR/modules"
 
-    echo -e "\n ${PINK}󰯉 Retro Repository Modules${RESET}"
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+    rx_table_header "󰯉" "Retro Repository Modules"
 
     for mod_path in "$modules_dir"/*; do
         [[ ! -d $mod_path ]] && continue
@@ -68,6 +69,7 @@ cmd_list_modules() {
         printf " ${PINK}%b ${RESET}%-12s %b ${GRAY}%+12s${RESET}\n" "$icon" "$mod_name:" "$status_text" "$mod_size"
     done
 
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+    rx_table_separator
+    rx_table_spacer
 }
 register_command "MODULES" "-ls|--list" "List all available and installed modules" "cmd_list_modules"

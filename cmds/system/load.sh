@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/help.sh"
 
 # TODO: Add also boot time metric and change from list to status
 
@@ -43,23 +44,24 @@ cmd_load() {
 
     case "$action" in
         "list")
-            echo -e "\n ${PINK}󱗼 Startup Sequence${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󱗼" "Startup Sequence"
 
             for task in "${startup_tasks[@]}"; do
                 IFS='|' read -r cmd desc <<<"$task"
-                printf " ${PINK}󰄾${RESET} %-35s ${MUTE}\n   ${GRAY}%s\n" "$cmd" "$desc"
+                rx_table_simple "󰄾" "$cmd" "$MUTE"
+                rx_help_wrap "$desc" 50
             done
 
             if [[ ${#custom_tasks[@]} -gt 0 ]]; then
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+                rx_table_separator
                 for task in "${custom_tasks[@]}"; do
                     IFS='|' read -r cmd desc <<<"$task"
-                    [[ -n $cmd ]] && printf " ${PINK}󰄾${RESET} %-35s\n" "$cmd"
+                    [[ -n $cmd ]] && rx_table_simple "󰄾" "$cmd" "$GRAY"
                 done
             fi
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "all" | "")

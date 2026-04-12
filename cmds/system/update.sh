@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/logo.sh"
 
 cmd_update() {
@@ -23,8 +24,7 @@ cmd_update() {
             local commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
 
             if [[ -n $commits ]]; then
-                echo -e "\n ${PINK}󰜘 Changelog${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󰜘" "Changelog"
 
                 local feat="" fix="" refactor="" style="" docs="" chore="" other=""
 
@@ -86,15 +86,15 @@ cmd_update() {
                     esac
                 done <<<"$commits"
 
-                [[ -n $feat ]] && echo -e " ${PINK}󰬈${RESET} Features${GRAY}:${RESET}" && echo -e "$feat"
-                [[ -n $fix ]] && echo -e " ${PINK}󰁨${RESET} Fixes${GRAY}:${RESET}" && echo -e "$fix"
-                [[ -n $refactor ]] && echo -e " ${PINK}󰑓${RESET} Refactors${GRAY}:${RESET}" && echo -e "$refactor"
-                [[ -n $style ]] && echo -e " ${PINK}󰏘${RESET} Style${GRAY}:${RESET}" && echo -e "$style"
-                [[ -n $docs ]] && echo -e " ${PINK}󰈙${RESET} Docs${GRAY}:${RESET}" && echo -e "$docs"
-                [[ -n $chore ]] && echo -e " ${PINK}󰗑${RESET} Chore${GRAY}:${RESET}" && echo -e "$chore"
-                [[ -n $other ]] && echo -e " ${PINK}󰋗${RESET} Other${GRAY}:${RESET}" && echo -e "$other"
+                [[ -n $feat ]] && rx_help_section "󰬈" "Features" && echo -e "$feat"
+                [[ -n $fix ]] && rx_help_section "󰁨" "Fixes" && echo -e "$fix"
+                [[ -n $refactor ]] && rx_help_section "󰑓" "Refactors" && echo -e "$refactor"
+                [[ -n $style ]] && rx_help_section "󰏘" "Style" && echo -e "$style"
+                [[ -n $docs ]] && rx_help_section "󰈙" "Docs" && echo -e "$docs"
+                [[ -n $chore ]] && rx_help_section "󰗑" "Chore" && echo -e "$chore"
+                [[ -n $other ]] && rx_help_section "󰋗" "Other" && echo -e "$other"
 
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+                rx_help_footer
             fi
         fi
 

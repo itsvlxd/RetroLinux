@@ -1,8 +1,5 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/log.sh"
-source "$RETRO_DIR/lib/colors.sh"
-
 get_disk_usage() {
     local path="${1:-/}"
     df -h "$path" 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}'
@@ -51,155 +48,137 @@ get_pacman_cache_size() {
     fi
 }
 
-system_status() {
-    echo -e "\n ${PINK}󰟓  System Health${RESET}"
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
-
-    printf " ${PINK}󰉌${RESET} %-20s ${GRAY}%s${RESET}\n" "Disk (/):" "$(get_disk_usage /)"
-    printf " ${PINK}󰉌${RESET} %-20s ${GRAY}%s${RESET}\n" "Disk (/home):" "$(get_disk_usage /home)"
-    printf " ${PINK}󰠮${RESET} %-20s ${GRAY}%s${RESET}\n" "Memory:" "$(get_mem_usage)"
-    printf " ${PINK}󰕾${RESET} %-20s ${GRAY}%s${RESET}\n" "Boot partition:" "$(get_boot_size)"
-    printf " ${PINK}󰶐${RESET} %-20s ${GRAY}%s${RESET}\n" "Journal logs:" "$(get_log_size)"
-    printf " ${PINK}󰶐${RESET} %-20s ${GRAY}%s${RESET}\n" "User cache:" "$(get_cache_size)"
-    printf " ${PINK}󰶐${RESET} %-20s ${GRAY}%s${RESET}\n" "Pacman pkg cache:" "$(get_pacman_cache_size)"
-
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+get_status_data() {
+    echo "disk_root=$(get_disk_usage /)"
+    echo "disk_home=$(get_disk_usage /home)"
+    echo "mem=$(get_mem_usage)"
+    echo "boot=$(get_boot_size)"
+    echo "logs=$(get_log_size)"
+    echo "cache=$(get_cache_size)"
+    echo "pacman_cache=$(get_pacman_cache_size)"
 }
 
 clean_caches() {
-    rx_log "info" "Cleaning user cache..."
-
     local cache_dir="$HOME/.cache"
+    local before=""
+    local result="failed"
+
     if [[ -d "$cache_dir" ]]; then
-        local before=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
-        
+        before=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
         find "$cache_dir" -mindepth 1 -maxdepth 1 -not -name "retro" -not -name ".retroweb" -exec rm -rf {} + 2>/dev/null
-        
-        rx_log "success" "Cleaned user cache: ${GRAY}$before${RESET}"
-    else
-        rx_log "warn" "No user cache found"
+        result="success"
     fi
+
+    echo "action=clean_caches|result=$result|before=$before"
 }
 
 clean_thumbnails() {
-    rx_log "info" "Cleaning thumbnails..."
-
     local thumb_dir="$HOME/.cache/thumbnails"
     local thumb_dir_alt="$HOME/.thumbnails"
+    local before=""
+    local result="none"
 
     if [[ -d "$thumb_dir" ]]; then
-        local before=$(du -sh "$thumb_dir" 2>/dev/null | cut -f1)
+        before=$(du -sh "$thumb_dir" 2>/dev/null | cut -f1)
         rm -rf "$thumb_dir"/* 2>/dev/null
-        rx_log "success" "Cleaned thumbnails: ${GRAY}$before${RESET}"
+        result="success"
     elif [[ -d "$thumb_dir_alt" ]]; then
-        local before=$(du -sh "$thumb_dir_alt" 2>/dev/null | cut -f1)
+        before=$(du -sh "$thumb_dir_alt" 2>/dev/null | cut -f1)
         rm -rf "$thumb_dir_alt"/* 2>/dev/null
-        rx_log "success" "Cleaned thumbnails: ${GRAY}$before${RESET}"
-    else
-        rx_log "warn" "No thumbnails cache found"
+        result="success"
     fi
+
+    echo "action=clean_thumbnails|result=$result|before=$before"
 }
 
 clean_logs() {
-    rx_log "info" "Cleaning journal logs..."
-
-    local before=$(journalctl --disk-usage 2>/dev/null | grep -oP '\d+\.\d+\w+' | head -1)
     local keep="${1:-7}"
+    local before=""
+    local result="failed"
+    local after="N/A"
 
     if command -v journalctl >/dev/null 2>&1; then
+        before=$(journalctl --disk-usage 2>/dev/null | grep -oP '\d+\.\d+\w+' | head -1)
         journalctl --vacuum-time="${keep}days" 2>/dev/null
-        local after=$(journalctl --disk-usage 2>/dev/null | grep -oP '\d+\.\d+\w+' | head -1)
-        rx_log "success" "Cleaned journal logs: ${GRAY}${before:-N/A}${RESET} -> ${PINK}${after:-N/A}${RESET}"
-    else
-        rx_log "warn" "journalctl not available"
+        after=$(journalctl --disk-usage 2>/dev/null | grep -oP '\d+\.\d+\w+' | head -1)
+        result="success"
     fi
+
+    echo "action=clean_logs|result=$result|before=${before:-N/A}|after=$after|keep_days=$keep"
 }
 
 clean_pacman_cache() {
-    rx_log "info" "Cleaning pacman package cache..."
+    local before=""
+    local result="failed"
+    local after="0B"
 
     if [[ -d "/var/cache/pacman/pkg" ]]; then
-        local before=$(du -sh /var/cache/pacman/pkg 2>/dev/null | cut -f1)
-        
+        before=$(du -sh /var/cache/pacman/pkg 2>/dev/null | cut -f1)
+
         if command -v yay >/dev/null 2>&1; then
             yay -Scc --noconfirm 2>/dev/null
         elif command -v pacman >/dev/null 2>&1; then
             sudo pacman -Scc --noconfirm 2>/dev/null
         fi
-        
-        local after=$(du -sh /var/cache/pacman/pkg 2>/dev/null | cut -f1)
-        rx_log "success" "Cleaned pacman cache: ${GRAY}$before${RESET} -> ${PINK}${after:-0B}${RESET}"
-    else
-        rx_log "warn" "No pacman cache found"
+
+        after=$(du -sh /var/cache/pacman/pkg 2>/dev/null | cut -f1)
+        result="success"
     fi
+
+    echo "action=clean_pacman_cache|result=$result|before=$before|after=${after:-0B}"
 }
 
 clean_orphans() {
-    rx_log "info" "Cleaning orphaned packages..."
+    local orphans=0
+    local result="none"
 
     if command -v yay >/dev/null 2>&1; then
         yay -Y --devel --save 2>/dev/null
-        local orphans=$(yay -Qdtq 2>/dev/null | wc -l)
+        orphans=$(yay -Qdtq 2>/dev/null | wc -l)
         if [[ "$orphans" -gt 0 ]]; then
             yay -Rs $(yay -Qdtq) --noconfirm 2>/dev/null
-            rx_log "success" "Removed ${PINK}$orphans${RESET} orphaned packages"
-        else
-            rx_log "info" "No orphaned packages found"
+            result="removed"
         fi
     elif command -v pacman >/dev/null 2>&1; then
-        local orphans=$(pacman -Qdtq 2>/dev/null | wc -l)
+        orphans=$(pacman -Qdtq 2>/dev/null | wc -l)
         if [[ "$orphans" -gt 0 ]]; then
             sudo pacman -Rs $(pacman -Qdtq) --noconfirm 2>/dev/null
-            rx_log "success" "Removed ${PINK}$orphans${RESET} orphaned packages"
-        else
-            rx_log "info" "No orphaned packages found"
+            result="removed"
         fi
     fi
+
+    echo "action=clean_orphans|result=$result|count=$orphans"
 }
 
 clean_temp() {
-    rx_log "info" "Cleaning temp files..."
-
     local temp_dirs=("/tmp" "$HOME/.local/share/Trash")
     local total_cleaned=0
 
     for dir in "${temp_dirs[@]}"; do
         if [[ -d "$dir" ]]; then
-            local before=$(du -sh "$dir" 2>/dev/null | cut -f1)
+            local before_num=$(du -sh "$dir" 2>/dev/null | grep -oP '\d+' | head -1)
             find "$dir" -type f -atime +7 -delete 2>/dev/null
-            local after=$(du -sh "$dir" 2>/dev/null | cut -f1)
-            
-            local before_num=$(echo "$before" | grep -oP '\d+' | head -1)
-            local after_num=$(echo "$after" | grep -oP '\d+' | head -1)
-            
+            local after_num=$(du -sh "$dir" 2>/dev/null | grep -oP '\d+' | head -1)
             total_cleaned=$((total_cleaned + before_num - after_num))
         fi
     done
 
-    rx_log "success" "Cleaned temp files older than 7 days"
+    echo "action=clean_temp|result=success|cleaned=$total_cleaned"
 }
 
 clean_all() {
-    rx_log "info" "Running full system cleanup..."
+    local total_cleaned=0
 
-    clean_caches
-    clean_thumbnails
-    clean_logs
-    clean_temp
-    
-    if [[ "$EUID" -eq 0 ]]; then
-        clean_pacman_cache
-        clean_orphans
-    else
-        rx_log "warn" "Run as root to clean pacman cache and orphans"
-    fi
+    clean_caches >/dev/null
+    clean_thumbnails >/dev/null
+    clean_logs "7" >/dev/null
+    clean_temp >/dev/null
 
-    rx_log "success" "Cleanup complete!"
-    system_status
+    echo "action=clean_all|result=success"
 }
 
 case "$1" in
-    "--status") system_status ;;
+    "--status") get_status_data ;;
     "--clean-caches") clean_caches ;;
     "--clean-thumbnails") clean_thumbnails ;;
     "--clean-logs") clean_logs "$2" ;;

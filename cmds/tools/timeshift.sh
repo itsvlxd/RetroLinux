@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_timeshift() {
     local ts_script="$RETRO_DIR/scripts/timeshift_core.sh"
     local action="${1,,}"
@@ -24,21 +26,20 @@ cmd_timeshift() {
                 snap_count=$(echo "$snapshots" | grep -c "^SNAPSHOT|")
             fi
 
-            echo -e "\n ${PINK}󰕰 Timeshift Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰏗${RESET} Device: ${PINK}%s${RESET}\n" "${device}"
-            printf " ${PINK}󰏗${RESET} Type: ${PINK}%s${RESET}\n" "$([ "$btrfs" == "true" ] && echo "BTRFS" || echo "RSYNC")"
-            printf " ${PINK}󰏗${RESET} Snapshots: ${PINK}%s${RESET}\n" "${snap_count}"
-
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰓅${RESET} Daily: ${PINK}%s${RESET}\n" "${daily}"
-            printf " ${PINK}󰓅${RESET} Weekly: ${PINK}%s${RESET}\n" "${weekly}"
-            printf " ${PINK}󰓅${RESET} Monthly: ${PINK}%s${RESET}\n" "${monthly}"
+            rx_table_header "󰕰" "Timeshift Status"
+            rx_table_row "󰏗" "Device:" "$device" "$PINK" "20"
+            rx_table_row "󰏗" "Type:" "$([ "$btrfs" == "true" ] && echo "BTRFS" || echo "RSYNC")" "$PINK" "20"
+            rx_table_row "󰏗" "Snapshots:" "$snap_count" "$PINK" "20"
+            rx_table_separator
+            rx_table_row "󰓅" "Daily:" "$daily" "$PINK" "20"
+            rx_table_row "󰓅" "Weekly:" "$weekly" "$PINK" "20"
+            rx_table_row "󰓅" "Monthly:" "$monthly" "$PINK" "20"
             if [[ $dev_name != "none" && -n $total ]]; then
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰓅${RESET} Disk: ${PINK}%s${RESET} / %s (%s used)\n" "$used" "$total" "$pct"
+                rx_table_separator
+                rx_table_row "󰓅" "Disk:" "$used / $total ($pct used)" "$PINK" "20"
             fi
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "list")
@@ -50,37 +51,37 @@ cmd_timeshift() {
             fi
 
             if [[ $snapshots == "NONE" ]]; then
-                echo -e "\n ${PINK}󰕰 Timeshift Snapshots${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰄪${RESET} ${PINK}No snapshots found${RESET}\n"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰕰" "Timeshift Snapshots"
+                rx_table_simple "󰄪" "No snapshots found" "$PINK"
+                rx_table_separator
+                rx_table_spacer
                 return 0
             fi
 
             if [[ $snapshots == *"AUTH_REQUIRED"* ]]; then
                 local snap_count=$(echo "$snapshots" | grep "^COUNT|" | cut -d'|' -f2)
-                echo -e "\n ${PINK}󰕰 Timeshift Snapshots${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰏗${RESET} ${PINK}Total snapshots:${RESET} %s\n" "$snap_count"
-                printf " ${PINK}󰓅${RESET} ${PINK}Run with sudo to list:${RESET} sudo retro timeshift list\n"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰕰" "Timeshift Snapshots"
+                rx_table_row "󰏗" "Total snapshots:" "$snap_count" "$PINK" "25"
+                rx_table_row "󰓅" "Run with sudo to list:" "sudo retro timeshift list" "$GRAY" "25"
+                rx_table_separator
+                rx_table_spacer
                 return 0
             fi
 
-            echo -e "\n ${PINK}󰕰 Timeshift Snapshots${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰕰" "Timeshift Snapshots"
 
             while IFS= read -r line; do
                 IFS='|' read -r key date tag comment <<<"$line"
                 if [[ $key == "SNAPSHOT" ]]; then
                     local tag_icon="󰕰"
                     [[ $tag == "B" ]] && tag_icon="󰀧"
-                    printf " ${PINK}${tag_icon}${RESET} ${RESET}%s${RESET}  ${GRAY}%s${RESET}" "$date" "$tag"
-                    [[ -n $comment ]] && printf "  ${GRAY}%s${RESET}" "$comment"
-                    printf "\n"
+                    local comment_text=""
+                    [[ -n $comment ]] && comment_text=" - $comment"
+                    rx_table_simple "$tag_icon" "$date - $tag$comment_text" "$GRAY"
                 fi
             done <<<"$snapshots"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "create")
@@ -104,9 +105,7 @@ cmd_timeshift() {
 
             rx_log "warn" "This will restore snapshot: ${PINK}$snapshot${RESET}"
             rx_log "warn" "The system will reboot after restore"
-            rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
-            read -r confirm
-            [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
+            rx_yesno "Continue?" || { rx_log "info" "Aborted."; return 0; }
 
             bash "$ts_script" --restore "$snapshot"
             ;;
@@ -116,9 +115,7 @@ cmd_timeshift() {
             [[ -z $snapshot ]] && rx_log "info" "Usage: retro timeshift delete <snapshot-name>" && return 1
 
             rx_log "warn" "This will delete snapshot: ${PINK}$snapshot${RESET}"
-            rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
-            read -r confirm
-            [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
+            rx_yesno "Continue?" || { rx_log "info" "Aborted."; return 0; }
 
             local result=$(bash "$ts_script" --delete "$snapshot")
 
@@ -139,18 +136,18 @@ cmd_timeshift() {
 
             IFS='|' read -r key device uuid dir daily weekly monthly hourly boot hidden level <<<"$config"
 
-            echo -e "\n ${PINK}󰕰 Timeshift Configuration${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰏗${RESET} Device: ${PINK}%s${RESET}\n" "${device}"
-            printf " ${PINK}󰏗${RESET} UUID: ${PINK}%s${RESET}\n" "${uuid}"
-            printf " ${PINK}󰏗${RESET} Directory: ${PINK}%s${RESET}\n" "${dir}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰓅${RESET} Daily: ${PINK}%s${RESET}\n" "${daily}"
-            printf " ${PINK}󰓅${RESET} Weekly: ${PINK}%s${RESET}\n" "${weekly}"
-            printf " ${PINK}󰓅${RESET} Monthly: ${PINK}%s${RESET}\n" "${monthly}"
-            printf " ${PINK}󰓅${RESET} Hourly: ${PINK}%s${RESET}\n" "${hourly}"
-            printf " ${PINK}󰓅${RESET} Boot: ${PINK}%s${RESET}\n" "${boot}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_header "󰕰" "Timeshift Configuration"
+            rx_table_row "󰏗" "Device:" "$device" "$PINK" "20"
+            rx_table_row "󰏗" "UUID:" "$uuid" "$PINK" "20"
+            rx_table_row "󰏗" "Directory:" "$dir" "$PINK" "20"
+            rx_table_separator
+            rx_table_row "󰓅" "Daily:" "$daily" "$PINK" "20"
+            rx_table_row "󰓅" "Weekly:" "$weekly" "$PINK" "20"
+            rx_table_row "󰓅" "Monthly:" "$monthly" "$PINK" "20"
+            rx_table_row "󰓅" "Hourly:" "$hourly" "$PINK" "20"
+            rx_table_row "󰓅" "Boot:" "$boot" "$PINK" "20"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "schedule")
@@ -166,14 +163,13 @@ cmd_timeshift() {
 
                 IFS='|' read -r key device uuid dir btrfs daily weekly monthly hourly boot count size <<<"$config"
 
-                echo -e "\n ${PINK}󰕰 Backup Schedule${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰓅${RESET} Daily: ${PINK}%s${RESET}\n" "${daily}"
-                printf " ${PINK}󰓅${RESET} Weekly: ${PINK}%s${RESET}\n" "${weekly}"
-                printf " ${PINK}󰓅${RESET} Monthly: ${PINK}%s${RESET}\n" "${monthly}"
-                printf " ${PINK}󰓅${RESET} Hourly: ${PINK}%s${RESET}\n" "${hourly}"
-                printf " ${PINK}󰓅${RESET} Boot: ${PINK}%s${RESET}\n" "${boot}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+                rx_table_header "󰕰" "Backup Schedule"
+                rx_table_row "󰓅" "Daily:" "$daily" "$PINK" "20"
+                rx_table_row "󰓅" "Weekly:" "$weekly" "$PINK" "20"
+                rx_table_row "󰓅" "Monthly:" "$monthly" "$PINK" "20"
+                rx_table_row "󰓅" "Hourly:" "$hourly" "$PINK" "20"
+                rx_table_row "󰓅" "Boot:" "$boot" "$PINK" "20"
+                rx_table_separator
                 rx_log "info" "Usage: retro timeshift schedule [daily|weekly|monthly|hourly|boot] [number|disable]"
                 echo ""
                 return 0
@@ -198,36 +194,31 @@ cmd_timeshift() {
         "setup")
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
-                rx_log "info" "Timeshift is not installed. Would you like to install it? ${PINK}[y/N]${RESET}: "
-                read -r confirm
-                if [[ $confirm =~ ^[Yy]$ ]]; then
-                    local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
-                    : ${pkg_helper:="yay"}
-                    if command -v "$pkg_helper" >/dev/null 2>&1; then
-                        $pkg_helper -S --needed --noconfirm timeshift 2>&1
-                    else
-                        sudo pacman -S --needed --noconfirm timeshift 2>&1
-                    fi
-                    if [[ $? -eq 0 ]]; then
-                        rx_log "success" "Timeshift installed successfully"
-                    else
-                        rx_log "error" "Failed to install timeshift"
-                        return 1
-                    fi
+                rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || { rx_log "info" "Aborted."; return 0; }
+                
+                local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
+                : ${pkg_helper:="yay"}
+                if command -v "$pkg_helper" >/dev/null 2>&1; then
+                    $pkg_helper -S --needed --noconfirm timeshift 2>&1
                 else
-                    rx_log "info" "Aborted."
-                    return 0
+                    sudo pacman -S --needed --noconfirm timeshift 2>&1
+                fi
+                if [[ $? -eq 0 ]]; then
+                    rx_log "success" "Timeshift installed successfully"
+                else
+                    rx_log "error" "Failed to install timeshift"
+                    return 1
                 fi
             fi
 
             local config=$(bash "$ts_script" --config)
             if [[ $config != "ERROR"* ]]; then
                 rx_log "info" "Timeshift is already configured"
+                rx_table_spacer
                 return 0
             fi
 
-            echo -e "\n ${PINK}󰕰 Timeshift Setup${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_help_header "󰕰" "Timeshift Setup"
             rx_log "info" "This will configure Timeshift for system backups"
             echo ""
 
@@ -245,25 +236,20 @@ cmd_timeshift() {
         "gui")
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
-                rx_log "info" "Timeshift is not installed. Would you like to install it? ${PINK}[y/N]${RESET}: "
-                read -r confirm
-                if [[ $confirm =~ ^[Yy]$ ]]; then
-                    local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
-                    : ${pkg_helper:="yay"}
-                    if command -v "$pkg_helper" >/dev/null 2>&1; then
-                        $pkg_helper -S --needed --noconfirm timeshift 2>&1
-                    else
-                        sudo pacman -S --needed --noconfirm timeshift 2>&1
-                    fi
-                    if [[ $? -eq 0 ]]; then
-                        rx_log "success" "Timeshift installed successfully"
-                    else
-                        rx_log "error" "Failed to install timeshift"
-                        return 1
-                    fi
+                rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || { rx_log "info" "Aborted."; return 0; }
+                
+                local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
+                : ${pkg_helper:="yay"}
+                if command -v "$pkg_helper" >/dev/null 2>&1; then
+                    $pkg_helper -S --needed --noconfirm timeshift 2>&1
                 else
-                    rx_log "info" "Aborted."
-                    return 0
+                    sudo pacman -S --needed --noconfirm timeshift 2>&1
+                fi
+                if [[ $? -eq 0 ]]; then
+                    rx_log "success" "Timeshift installed successfully"
+                else
+                    rx_log "error" "Failed to install timeshift"
+                    return 1
                 fi
             fi
 
@@ -279,19 +265,18 @@ cmd_timeshift() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro timeshift <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show backup config and snapshot count"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all snapshots"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "create [comment]" "Create a new snapshot"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore <snapshot>" "Restore a specific snapshot"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "delete <snapshot>" "Delete a specific snapshot"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "config" "Show current Timeshift configuration"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "schedule" "Set snapshot retention counts"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Interactive setup wizard"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "gui" "Open Timeshift GUI"
-            echo ""
+            rx_help_usage "retro timeshift <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "status" "Show backup config and snapshot count"
+            rx_help_cmd "list" "List all snapshots"
+            rx_help_cmd "create [comment]" "Create a new snapshot"
+            rx_help_cmd "restore <snapshot>" "Restore a specific snapshot"
+            rx_help_cmd "delete <snapshot>" "Delete a specific snapshot"
+            rx_help_cmd "config" "Show current Timeshift configuration"
+            rx_help_cmd "schedule" "Set snapshot retention counts"
+            rx_help_cmd "setup" "Interactive setup wizard"
+            rx_help_cmd "gui" "Open Timeshift GUI"
+            rx_help_spacer
             ;;
     esac
 }

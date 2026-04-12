@@ -3,12 +3,12 @@
 
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
+source "$RETRO_DIR/lib/help.sh"
 
 BOLD="\033[1m"
 
 fetch_contributors() {
-    echo -e "\n ${PINK}  Thanks to our Contributors${RESET}"
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+    rx_table_header "" "Thanks to our Contributors"
 
     local repo="itsvlxd/RetroLinux"
 
@@ -20,13 +20,13 @@ fetch_contributors() {
         if [[ -n $contributors && $contributors != "null" ]]; then
             echo -e "$contributors"
         else
-            echo -e "  ${PINK}•${RESET} itsvlxd ${MUTE}[Creator]${RESET} ${GRAY}(https://github.com/itsvlxd)${RESET}"
+            rx_table_simple "•" "itsvlxd [Creator] (https://github.com/itsvlxd)" "$MUTE"
         fi
     else
-        echo -e "  ${PINK}•${RESET} itsvlxd ${MUTE}[Creator]${RESET} ${GRAY}(https://github.com/itsvlxd)${RESET}"
+        rx_table_simple "•" "itsvlxd [Creator] (https://github.com/itsvlxd)" "$MUTE"
     fi
 
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+    rx_table_separator
 }
 
 cmd_about() {
@@ -42,9 +42,11 @@ cmd_about() {
     echo -e " "
     echo -e " I wanted bleeding-edge features, but with unbreakable stability."
     echo -e " That's why I built ${PINK}RetroLinux${RESET}—a full, standalone Arch-based"
-    echo -e " distribution. And to control it, I built the ${PINK}retro CLI${RESET}—a"
+    echo -e " distribution. And to control it, I built the ${PINK}retro CLI${RESET} a"
     echo -e " unified, one-stop command center to manage the entire system."
     echo -e " Fast, fully customizable, and built so anyone can use it."
+    echo -e " I also got bored, that's why I wanted to build a more "
+    echo -e " 'professional' project and codebase."
     echo -e " "
     echo -e " ${PINK}󰒓 The Vibe${RESET}"
     echo -e " Straight out of an 80s/90s synthwave commercial. Neon pinks,"
@@ -55,14 +57,13 @@ cmd_about() {
     echo -e " ${PINK}\"Just another midnight override,\"${RESET} actually means."
     echo -e " "
     echo -e " ${PINK} Built For${RESET}"
-    echo -e "  ${PINK}•${RESET} ${BOLD}Developers${RESET} : A blazing fast, terminal-centric workflow."
-    echo -e "  ${PINK}•${RESET} ${BOLD}Gamers${RESET}     : Zero background bloat for maximum FPS."
-    echo -e "  ${PINK}•${RESET} ${BOLD}Ricers${RESET}     : An ingenious modular OS. It detects your"
+    echo -e "  ${PINK}•${RESET} ${BOLD}Developers${RESET} ${GRAY}:${RESET} A blazing fast, terminal-centric workflow."
+    echo -e "  ${PINK}•${RESET} ${BOLD}Gamers${RESET}     ${GRAY}:${RESET} Zero background bloat for maximum FPS."
+    echo -e "  ${PINK}•${RESET} ${BOLD}Ricers${RESET}     ${GRAY}:${RESET} An ingenious modular OS. It detects your"
     echo -e "                 manual tweaks and adapts. Customizing"
     echo -e "                 won't break your system."
     echo -e " "
     echo -e " ${PINK}󰘬 Repository :${RESET} ${GRAY}https://github.com/itsvlxd/RetroLinux${RESET}"
-    echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
     fetch_contributors
 }

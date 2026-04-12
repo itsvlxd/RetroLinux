@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_version() {
     local version=$(rx_git_run describe --tags --abbrev=0 2>/dev/null)
 

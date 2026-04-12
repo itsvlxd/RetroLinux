@@ -1,15 +1,18 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 setup_editors() {
     if [[ -n $EDITOR ]] || grep -q "EDITOR=" /etc/environment 2>/dev/null; then
         return 0
     fi
 
     rx_log "info" "Which text editor do you want to use:"
-    echo -e "  ${PINK}1)${RESET} Neovim"
-    echo -e "  ${PINK}2)${RESET} Vim"
-    echo -e "  ${PINK}3)${RESET} Vi"
-    echo -e "  ${PINK}4)${RESET} Nano"
+    rx_help_section "�편집" "Editor Selection"
+    rx_table_simple "1)" "Neovim"
+    rx_table_simple "2)" "Vim"
+    rx_table_simple "3)" "Vi"
+    rx_table_simple "4)" "Nano"
 
     rx_log "info" "Selection ${PINK}[1-4]${RESET}: "
     read -r ed_choice
