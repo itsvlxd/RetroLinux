@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 show_usage() {
     rx_logo
 
@@ -31,7 +33,7 @@ show_usage() {
 
     for group in "${final_groups[@]}"; do
         local group_icon=$(get_group_icon "$group")
-        echo -e " ${PINK}$group_icon ${RESET}${group}${GRAY}:"
+        rx_help_section "$group_icon" "$group"
 
         local sorted_entries=$(for entry in "${CMDS_HELP[@]}"; do
             [[ ${entry%%|*} == "$group" ]] && echo "$entry"

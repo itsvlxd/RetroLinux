@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 setup_file_manager() {
     local existing_fm=$(get_var "RETRO_FILEMANAGER_CMD")
     if [[ -n $existing_fm && $existing_fm != "null" ]]; then
@@ -13,11 +15,11 @@ setup_file_manager() {
         $helper -S --noconfirm xdg-utils
     fi
 
-    rx_log "info" "Select the primary file manager to be used as the system standard:"
-    echo -e "  ${PINK}1)${RESET} Thunar (Fast, XFCE style)"
-    echo -e "  ${PINK}2)${RESET} Nemo (Cinnamon style, feature-rich)"
-    echo -e "  ${PINK}3)${RESET} Nautilus (GNOME style, clean)"
-    echo -e "  ${PINK}4)${RESET} Yazi (Terminal-based, Blazing fast)"
+    rx_help_section "File Manager Selection"
+    rx_table_simple "1)" "Thunar (Fast, XFCE style)"
+    rx_table_simple "2)" "Nemo (Cinnamon style, feature-rich)"
+    rx_table_simple "3)" "Nautilus (GNOME style, clean)"
+    rx_table_simple "4)" "Yazi (Terminal-based, Blazing fast)"
 
     rx_log "info" "Enter selection ${PINK}[1-4]${RESET}: "
     read -r fm_choice

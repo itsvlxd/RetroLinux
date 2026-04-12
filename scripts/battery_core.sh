@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/scripts/lib/battery.sh"
+source "$RETRO_DIR/lib/battery.sh"
 
 get_info() {
     local stat=$(get_bat_status)

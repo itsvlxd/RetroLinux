@@ -121,7 +121,6 @@ _restore_snapshot() {
     [[ -z $snapshot ]] && echo "ERROR:no_snapshot" && return 1
 
     echo "RESTORE|${snapshot}"
-    echo "WARNING: This will reboot the system after restore"
 }
 
 _delete_snapshot() {

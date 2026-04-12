@@ -1,7 +1,6 @@
 #!/bin/bash
 
 RETRO_DIR="${RETRO_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
-source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 
 _is_pkg_installed() {
@@ -990,7 +989,7 @@ env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 env = GBM_BACKEND,nvidia-drm
 
 ENDOFENV
-        rx_log "success" "Generated hybrid Intel+NVIDIA env.conf"
+        echo "result=success|type=hybrid"
     elif $has_nvidia; then
         cat >> "$env_file" << 'ENDOFENV'
 # NVIDIA GPU
@@ -1000,7 +999,7 @@ env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 env = NVD_BACKEND,direct
 
 ENDOFENV
-        rx_log "success" "Generated NVIDIA env.conf"
+        echo "result=success|type=nvidia"
     elif $has_amd; then
         cat >> "$env_file" << 'ENDOFENV'
 # AMD GPU
@@ -1009,7 +1008,7 @@ env = VDPAU_DRIVER,radeonsi
 env = mesa_glthread,true
 
 ENDOFENV
-        rx_log "success" "Generated AMD env.conf"
+        echo "result=success|type=amd"
     elif $has_intel; then
         cat >> "$env_file" << 'ENDOFENV'
 # Intel GPU
@@ -1018,7 +1017,7 @@ env = VDPAU_DRIVER,va_gl
 env = mesa_glthread,true
 
 ENDOFENV
-        rx_log "success" "Generated Intel env.conf"
+        echo "result=success|type=intel"
     else
         cat >> "$env_file" << 'ENDOFENV'
 # No GPU detected - using default settings
@@ -1026,7 +1025,7 @@ env = LIBVA_DRIVER_NAME,iHD
 env = mesa_glthread,true
 
 ENDOFENV
-        rx_log "warn" "No GPU detected, generated generic env.conf"
+        echo "result=warn|no_gpu_detected"
     fi
     
     echo "$env_file"
@@ -1037,19 +1036,17 @@ configure_mkinitcpio_nvidia() {
     local backup="${mkinit_conf}.bak.$(date +%Y%m%d%H%M%S)"
     
     if [[ ! -f "$mkinit_conf" ]]; then
-        rx_log "error" "mkinitcpio.conf not found"
+        echo "result=error|reason=mkinit_conf_not_found"
         return 1
     fi
     
     if ! _is_pkg_installed "nvidia-open-dkms" && ! _is_pkg_installed "nvidia"; then
-        rx_log "info" "NVIDIA driver not installed, skipping mkinitcpio config"
+        echo "result=skipped|reason=nvidia_not_installed"
         return 0
     fi
     
-    rx_log "info" "Configuring mkinitcpio for NVIDIA..."
-    
     sudo cp "$mkinit_conf" "$backup"
-    rx_log "info" "Backup created: $backup"
+    echo "result=backup_created|backup=$backup"
     
     if grep -q "^MODULES=" "$mkinit_conf"; then
         if ! grep "^MODULES=" "$mkinit_conf" | grep -q "nvidia"; then
@@ -1060,26 +1057,21 @@ configure_mkinitcpio_nvidia() {
     fi
     
     if command -v mkinitcpio >/dev/null 2>&1; then
-        rx_log "info" "Regenerating initramfs..."
         sudo mkinitcpio -P 2>&1 | head -20
+        echo "result=initramfs_regenerated"
     fi
     
-    rx_log "success" "NVIDIA mkinitcpio configured. Reboot to apply."
-    echo "MKINIT_CONFIGURED"
+    echo "result=success|action=mkinit_configured"
 }
 
 show_hypr_env() {
     local env_file="$HOME/.cache/retro/env.conf"
     
     if [[ -f "$env_file" ]]; then
-        echo -e "\n ${PINK}󰢮 Hyprland GPU Environment${RESET}"
-        echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
-        cat "$env_file" | sed 's/^/ /'
-        echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
-        echo -e " ${GRAY}Location: $env_file${RESET}"
-        echo -e " ${GRAY}Source in Hyprland: source = ~/.cache/retro/env.conf${RESET}\n"
+        echo "result=success|path=$env_file"
     else
-        rx_log "error" "env.conf not found. Run: retro driver hypr-env"
+        echo "result=error|reason=env_file_not_found"
+        return 1
     fi
 }
 

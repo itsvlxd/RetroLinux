@@ -121,6 +121,40 @@ run_internet() {
     fi
 }
 
+hud_set_preset() {
+    local preset="$1"
+    [[ -z $preset ]] && return 1
+
+    local config_dir="$HOME/.config/MangoHud"
+    local valid_presets=("minimal" "full" "advanced" "gaming" "performance")
+
+    local valid=false
+    for p in "${valid_presets[@]}"; do
+        [[ "$preset" == "$p" ]] && valid=true && break
+    done
+
+    if [[ $valid == "false" ]]; then
+        return 1
+    fi
+
+    if [[ -f "$config_dir/${preset}.conf" ]]; then
+        bash "$RETRO_DIR/scripts/variable_core.sh" --set "MANGOHUD_PROFILE" "$preset"
+
+        if [[ "$config_dir/${preset}.conf" -ef "$config_dir/MangoHud.conf" ]]; then
+            sed -i '/^toggle_hud=/d' "$config_dir/MangoHud.conf"
+            echo "toggle_hud=F11" >> "$config_dir/MangoHud.conf"
+        else
+            cp "$config_dir/${preset}.conf" "$config_dir/MangoHud.conf"
+            sed -i '/^toggle_hud=/d' "$config_dir/MangoHud.conf"
+            echo "toggle_hud=F11" >> "$config_dir/MangoHud.conf"
+        fi
+
+        return 0
+    else
+        return 1
+    fi
+}
+
 case "$1" in
     "--hw-cpu") get_hw "cpu" ;;
     "--hw-gpu") get_hw "gpu" ;;
@@ -132,4 +166,5 @@ case "$1" in
     "--disk") run_disk ;;
     "--gpu") run_gpu ;;
     "--internet") run_internet ;;
+    "--hud-set") hud_set_preset "$2" ;;
 esac

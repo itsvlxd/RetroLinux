@@ -1,10 +1,11 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/cmds/system/setup/variables.sh"
 
 cmd_var() {
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
-    local action="$1"
+    local action="${1,,}"
     local key="$2"
     local value="$3"
 
@@ -114,13 +115,12 @@ cmd_var() {
             ;;
 
         "list")
-            echo -e "\n ${PINK} Cache Location: ${RESET}${RETRO_CACHE}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+            rx_table_header "" "Cache Location: ${RETRO_CACHE}"
 
             local raw_list=$(bash "$var_script" --list 2>/dev/null)
 
             if [[ -z $raw_list ]]; then
-                echo -e " ${GRAY}  (Everything is empty)${RESET}"
+                rx_table_simple "󰋙" "(Everything is empty)" "$GRAY"
             else
                 local first_order=("RETRO_" "BAT_" "PWR_")
                 local processed_keys=""
@@ -154,35 +154,34 @@ cmd_var() {
                         val_color="$ERROR"
                     fi
 
-                    printf " ${PINK}󰋙${RESET} %-30s ${val_color}%s${RESET}\n" "$k:" "$v"
+                    rx_table_row "󰋙" "$k:" "$v" "$val_color" "30"
                 done
             fi
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         *)
-            rx_log "info" "Usage: retro variable <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "get <key>" "Get a variable value"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <k> <v>" "Set a variable value"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "del <key>" "Delete a variable (supports *)"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle <key>" "Toggle boolean variable"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "add <k> <v>" "Append to pipe-delimited value"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "remove <k> <v>" "Remove element from value"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit" "Open variables file in editor"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all variables"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "reset" "Reset all variables to defaults"
-            echo ""
-            echo -e " ${PINK}  ${RESET}Examples${GRAY}:${RESET}"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro variable get RETRO_WALLPAPER" "Get a variable value"
-            printf " ${GRAY}%-35s${RESET} %s\n" 'retro variable set RETRO_THEME "retro"' "Set a variable value"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro variable toggle RETRO_BORDER" "Toggle boolean"
-            printf " ${GRAY}%-35s${RESET} %s\n" 'retro variable add RETRO_FONT_NERD "JetBrainsMono Nerd Font"' "Append to value"
-            printf " ${GRAY}%-35s${RESET} %s\n" 'retro variable remove RETRO_FONT_MAIN "Inter"' "Remove from value"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro variable del RETRO_*" "Delete with wildcard"
-            echo ""
+            rx_help_usage "retro variable <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "get <key>" "Get a variable value"
+            rx_help_cmd "set <k> <v>" "Set a variable value"
+            rx_help_cmd "del <key>" "Delete a variable (supports *)"
+            rx_help_cmd "toggle <key>" "Toggle boolean variable"
+            rx_help_cmd "add <k> <v>" "Append to pipe-delimited value"
+            rx_help_cmd "remove <k> <v>" "Remove element from value"
+            rx_help_cmd "edit" "Open variables file in editor"
+            rx_help_cmd "list" "List all variables"
+            rx_help_cmd "reset" "Reset all variables to defaults"
+            rx_help_examples
+            rx_help_example "retro variable get RETRO_WALLPAPER" "Get a variable value"
+            rx_help_example 'retro variable set RETRO_THEME "retro"' "Set a variable value"
+            rx_help_example "retro variable toggle RETRO_BORDER" "Toggle boolean"
+            rx_help_example 'retro variable add RETRO_FONT_NERD "JetBrainsMono Nerd Font"' "Append to value"
+            rx_help_example 'retro variable remove RETRO_FONT_MAIN "Inter"' "Remove from value"
+            rx_help_example "retro variable del RETRO_*" "Delete with wildcard"
+            rx_help_spacer
             ;;
     esac
 }

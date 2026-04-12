@@ -1,8 +1,11 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
+
 cmd_power() {
     local pwr_script="$RETRO_DIR/scripts/power_core.sh"
-    local action="$1"
+    local action="${1,,}"
     local val1="$2"
     local val2="$3"
     local val3="$4"
@@ -66,25 +69,24 @@ cmd_power() {
 
             : ${prev_pwr:="None"}
 
-            echo -e "\n ${PINK}󱐋 Power Profiles List${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-
-            printf " ${PINK}󱐋 ${RESET} %-24s ${PINK}%s${RESET}\n" "Current Profile:" "${current_pwr^^}"
-            printf " ${PINK} ${RESET} %-24s ${GRAY}%s${RESET}\n" "Last Profile:" "${prev_pwr^^}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󱐋" "Power Profiles List"
+            rx_table_row "󱐋" "Current Profile:" "${current_pwr^^}" "$PINK" "24"
+            rx_table_row_gray "" "Last Profile:" "${prev_pwr^^}" "24"
+            rx_table_separator
 
             bash "$pwr_script" --list | while read -r line; do
                 local var=$(echo "$line" | cut -d: -f1)
                 local val=$(echo "$line" | cut -d: -f2 | xargs)
 
                 if [[ $var == "PWR_${source_mode}_${current_pwr^^}" ]]; then
-                    printf " ${PINK}󰓅 ${RESET} %-24s ${PINK}%sW${RESET}\n" "$var:" "$val"
+                    rx_table_row "󰓅" "$var" "${val}W" "$PINK" "24"
                 else
-                    printf " ${PINK}󰓅 ${RESET} %-24s ${GRAY}%sW${RESET}\n" "$var:" "$val"
+                    rx_table_row "󰓅" "$var" "${val}W" "$GRAY" "24"
                 fi
             done
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "status")
@@ -93,14 +95,14 @@ cmd_power() {
             local mhz_raw=$(awk '/cpu MHz/ {sum+=$4; count++} END {print sum/count}' /proc/cpuinfo)
             local ghz=$(echo "scale=2; $mhz_raw/1000" | bc -l)
 
-            echo -e "\n ${PINK}󰯉 System Power Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}󰍛${RESET} %-14s ${brand_color}%s${RESET}\n" "CPU Model:" "$model"
-            printf " ${PINK}󱐌${RESET} %-14s %s GHz\n" "CPU Clock:" "$ghz"
-            printf " ${PINK}${src_icon}${RESET} %-14s %s\n" "Power Source:" "$([[ $source == "true" ]] && echo -e "Battery" || echo "Wall/AC")"
-            printf " ${PINK}󱐋${RESET} %-14s ${PINK}%s${RESET}\n" "Active Plan:" "${current^^}"
-            printf " ${PINK}󱖫${RESET} %-14s %sW\n" "Current Cap:" "$limit"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_header "󰯉" "System Power Status"
+            rx_table_row "󰍛" "CPU Model:" "$model" "$brand_color" "14"
+            rx_table_row "󱐌" "CPU Clock:" "$ghz GHz" "$PINK" "14"
+            rx_table_row "󱊦" "Power Source:" "$([[ $source == "true" ]] && echo "Battery" || echo "Wall/AC")" "$PINK" "14"
+            rx_table_row "󱐋" "Active Plan:" "${current^^}" "$PINK" "14"
+            rx_table_row "󱖫" "Current Cap:" "$limit W" "$PINK" "14"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "optimize")
@@ -127,16 +129,14 @@ cmd_power() {
                 rx_log "warn" "We don't have power profiles for this CPU yet. Drop us an issue on GitHub and we'll add it!"
             fi
 
-            echo -e ""
-            echo -e " ${PINK}󰓅 ${RESET}Suggested settings for ${PINK}$c_name${RESET}:"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}󰚥 Plugged In:${RESET}   Saver: ${ac_s}W | Balanced: ${ac_b}W | Perf: ${ac_p}W\n"
-            printf " ${PINK}󱊦 On Battery:${RESET}   Saver: ${bat_s}W | Balanced: ${bat_b}W | Perf: ${bat_p}W\n"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────\n"
+            rx_table_spacer
+            rx_table_header "󰓅" "Suggested settings for $c_name"
+            rx_table_row "󰚥" "Plugged In" "Saver: ${ac_s}W | Balanced: ${ac_b}W | Perf: ${ac_p}W" "$PINK" "24"
+            rx_table_row "󱊦" "On Battery" "Saver: ${bat_s}W | Balanced: ${bat_b}W | Perf: ${bat_p}W" "$PINK" "24"
+            rx_table_separator
+            rx_table_spacer
 
-            echo -ne " ${PINK}󰄾 ${RESET}Apply these power settings? ${PINK}[y/N]${RESET}: "
-            read -r allow
-            [[ ! $allow =~ ^[Yy]$ ]] && rx_log "info" "Optimization cancelled. Nothing changed." && return 0
+            rx_yesno "Apply these power settings?" || { rx_log "info" "Optimization cancelled. Nothing changed."; return 0; }
 
             bash "$VAR_SCRIPT" --set "PWR_AC_SAVER" "$ac_s"
             bash "$VAR_SCRIPT" --set "PWR_AC_BALANCED" "$ac_b"
@@ -161,18 +161,22 @@ cmd_power() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro power <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <profile>" "Set power profile (saver/balanced/perf)"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "tune" "Fine-tune wattage limits per profile"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle" "Cycle through power profiles"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore" "Sync current profile to hardware"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all profile wattage values"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show CPU, clock, and power cap info"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "optimize" "Auto-detect CPU and suggest settings"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "permissions" "Configure kernel power permissions"
-            echo ""
+            rx_help_usage "retro power <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "set <profile>" "Set power profile (saver/balanced/perf)"
+            rx_help_cmd "tune" "Fine-tune wattage limits per profile"
+            rx_help_cmd "toggle" "Cycle through power profiles"
+            rx_help_cmd "restore" "Sync current profile to hardware"
+            rx_help_cmd "list" "List all profile wattage values"
+            rx_help_cmd "status" "Show CPU, clock, and power cap info"
+            rx_help_cmd "optimize" "Auto-detect CPU and suggest settings"
+            rx_help_cmd "permissions" "Configure kernel power permissions"
+            rx_help_examples
+            rx_help_example "retro power status" "Show power status and info"
+            rx_help_example "retro power set balanced" "Set balanced power profile"
+            rx_help_example "retro power list" "List all profile limits"
+            rx_help_example "retro power optimize" "Auto-detect CPU and optimize"
+            rx_help_spacer
             ;;
     esac
 }

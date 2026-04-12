@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 # TODO: Find a way in the future if we can implement it inside SDDM
 
 setup_pam_auth() {
@@ -39,7 +41,7 @@ remove_pam_auth() {
 }
 
 cmd_fingerprint() {
-    local action="$1"
+    local action="${1,,}"
     local target_user="$USER"
 
     local has_fprintd=$(command -v fprintd-enroll)
@@ -51,7 +53,7 @@ cmd_fingerprint() {
 
             sudo pkill -f fprintd
 
-            echo -e "\n ${PINK}󰟀 Choose a finger to enroll:${RESET}"
+            rx_help_header "󰟀" "Choose a finger to enroll"
             local fingers=("left-thumb" "left-index-finger" "left-middle-finger" "left-ring-finger" "left-little-finger" "right-thumb" "right-index-finger" "right-middle-finger" "right-ring-finger" "right-little-finger")
 
             for i in "${!fingers[@]}"; do
@@ -71,9 +73,8 @@ cmd_fingerprint() {
                 rx_log "success" "Fingerprint registered!"
 
                 if ! grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
-                    rx_log "info" "Enable biometric auth for sudo/login? ${PINK}[y/N]${RESET}: "
-                    read -r auth_choice
-                    [[ $auth_choice =~ ^[Yy]$ ]] && setup_pam_auth
+                    rx_yesno "Enable biometric auth for sudo/login?" || return 0
+                    setup_pam_auth
                 fi
             else
                 rx_log "error" "Enrollment failed."
@@ -81,9 +82,7 @@ cmd_fingerprint() {
             ;;
 
         "uninstall")
-            rx_log "info" "Disable biometric auth and wipe all hardware prints? ${PINK}[y/N]${RESET}: "
-            read -r confirm
-            [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Uninstall cancelled." && return 0
+            rx_confirm "Disable biometric auth and wipe all hardware prints?" "N" || { rx_log "info" "Uninstall cancelled."; return 0; }
 
             remove_pam_auth
 
@@ -97,14 +96,12 @@ cmd_fingerprint() {
         "list")
             local raw_data=$(sudo fprintd-list "$target_user" 2>&1)
 
-            echo -e "\n ${PINK}󰟀 Hardware Registry ($target_user)${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󰟀" "Hardware Registry ($target_user)"
 
             if echo "$raw_data" | grep -qE "finger-|#"; then
                 echo "$raw_data" | grep -E "finger-|#" | while read -r line; do
                     local clean_name=$(echo "$line" | sed -E 's/.*: //; s/finger-//g; s/-/ /g' | xargs)
-
-                    printf " ${PINK}󰄾${RESET} %-20s ${SUCCESS}(VERIFIED)${RESET}\n" "${clean_name^}"
+                    rx_table_simple "󰄾" "${clean_name^} (VERIFIED)" "$SUCCESS"
                 done
             elif echo "$raw_data" | grep -q "no devices"; then
                 rx_log "error" "No fingerprint hardware detected."
@@ -112,16 +109,17 @@ cmd_fingerprint() {
                 rx_log "warn" "No fingerprints found in the chip."
             fi
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
         "status")
             local active_service=$(systemctl is-active fprintd)
-            echo -e "\n ${PINK}󰟀 Hardware Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}󰍛${RESET} %-14s %s\n" "Hardware:" "$([[ $dev_check == *"found"* ]] && echo "Detected" || echo "Not Found")"
-            printf " ${PINK}󰌪${RESET} %-14s %s\n" "Service:" "$active_service"
-            printf " ${PINK}󱔗${RESET} %-14s %s\n" "Auth Mode:" "$([[ -f /etc/pam.d/sudo && $(grep "pam_fprintd.so" /etc/pam.d/sudo) ]] && echo "Biometric + Pass" || echo "Pass Only")"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_header "󰟀" "Hardware Status"
+            rx_table_row "󰍛" "Hardware:" "$([[ $dev_check == *"found"* ]] && echo "Detected" || echo "Not Found")" "$PINK" "14"
+            rx_table_row "󰌪" "Service:" "$active_service" "$PINK" "14"
+            rx_table_row "󱔗" "Auth Mode:" "$([[ -f /etc/pam.d/sudo && $(grep "pam_fprintd.so" /etc/pam.d/sudo) ]] && echo "Biometric + Pass" || echo "Pass Only")" "$PINK" "14"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "clear")
@@ -131,15 +129,18 @@ cmd_fingerprint() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro fingerprint <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Enroll a new fingerprint"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List enrolled fingerprints"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show hardware and auth status"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "clear" "Wipe all biometric data"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "uninstall" "Remove PAM auth and fingerprints"
-            echo ""
+            rx_help_usage "retro fingerprint <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "setup" "Enroll a new fingerprint"
+            rx_help_cmd "list" "List enrolled fingerprints"
+            rx_help_cmd "status" "Show hardware and auth status"
+            rx_help_cmd "clear" "Wipe all biometric data"
+            rx_help_cmd "uninstall" "Remove PAM auth and fingerprints"
+            rx_help_examples
+            rx_help_example "retro fingerprint setup" "Enroll a new fingerprint"
+            rx_help_example "retro fingerprint status" "Check hardware and auth status"
+            rx_help_example "retro fingerprint list" "Show enrolled fingerprints"
+            rx_help_spacer
             ;;
     esac
 }

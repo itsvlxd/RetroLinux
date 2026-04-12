@@ -1,10 +1,12 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_wallpaper() {
     local wall_script="$RETRO_DIR/scripts/wallpaper_core.sh"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
     local wall_dir="$HOME/.cache/retro/wallpapers"
-    local action="$1"
+    local action="${1,,}"
     local value="$2"
     local options="$3"
 
@@ -23,11 +25,19 @@ cmd_wallpaper() {
             [[ -z $value ]] && rx_log "error" "Please provide the path to the image/video." && return 1
 
             rx_log "info" "Importing wallpaper into the current theme cache..."
-            if bash "$wall_script" --add "$value"; then
-                rx_log "success" "Wallpaper added and applied!"
-            else
-                rx_log "error" "Failed to add wallpaper. Does the file exist?"
+            local add_result=$(bash "$wall_script" --add "$value")
+
+            if echo "$add_result" | grep -q "result=error"; then
+                local reason=$(echo "$add_result" | grep -oP "reason=\K[^|]+")
+                case "$reason" in
+                    "file_not_found") rx_log "error" "File not found: $value" ;;
+                    "unsupported_format") rx_log "error" "Unsupported file format! Please use a standard image or video." ;;
+                    *) rx_log "error" "Failed to add wallpaper." ;;
+                esac
+                return 1
             fi
+
+            rx_log "success" "Wallpaper added and applied!"
             ;;
 
         "slideshow")
@@ -79,14 +89,14 @@ cmd_wallpaper() {
             local target_dir="$wall_dir/$theme"
             [[ ! -d $target_dir ]] && target_dir="$wall_dir"
 
-            echo -e "\n ${PINK}󰸉 Your Wallpapers: ${RESET}$target_dir"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󰸉" "Your Wallpapers: $target_dir"
             while read -r file; do
-                local icon="${PINK}󰋫${RESET}"
-                [[ $file =~ \.(mp4|mkv|webm)$ ]] && icon="${PINK}󰎁${RESET}"
-                echo -e " $icon $file"
+                local icon="󰋫"
+                [[ $file =~ \.(mp4|mkv|webm)$ ]] && icon="󰎁"
+                rx_table_simple "$icon" "$file" "$GRAY"
             done < <(ls -1 "$target_dir" 2>/dev/null)
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "picker")
@@ -119,17 +129,16 @@ cmd_wallpaper() {
             fi
 
             local active_res="${current_w}x${current_h}"
-            local active_tag="${MUTE}(Native)${RESET}"
 
             if [[ -n $custom_res ]]; then
                 active_res="$custom_res"
-                active_tag="${PINK}(Optimized)${RESET}"
             fi
 
             rx_log "info" "Configuring the display this terminal is running on:"
-            echo -e " ${PINK}󰍹${RESET} Hardware: $mon_desc"
-            echo -e " ${PINK}󰊘${RESET} Native Resolution: ${current_w}x${current_h}"
-            echo -e " ${PINK}${RESET} Current Resolution: ${PINK}${active_res}${RESET} ${active_tag}"
+            rx_table_header "󰍹" "Monitor: $mon_desc"
+            rx_table_row "󰊘" "Native Resolution:" "${current_w}x${current_h}" "$PINK" "20"
+            rx_table_row "󰈐" "Current Resolution:" "${active_res}" "$PINK" "20"
+            rx_table_separator
             rx_log "info" "Enter your desired render resolution (e.g., ${PINK}1920x1080${RESET}) or type '${PINK}reset${RESET}' to use native scaling ${PINK}[Default: $active_res]${RESET}:"
             read user_res
 
@@ -172,7 +181,7 @@ cmd_wallpaper() {
                 else
                     new_map="${new_map},${entry}"
                 fi
-                rx_log "success" "monitor capped at ${pink}${user_res}${reset}."
+                rx_log "success" "monitor capped at ${PINK}${user_res}${RESET}."
             fi
 
             bash "$var_script" --set "WALL_RES_MAP" "$new_map"
@@ -214,32 +223,35 @@ cmd_wallpaper() {
                 type_icon="󰈫"
             fi
 
-            echo -e "\n ${PINK}󰸉 Wallpaper Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}󰀻${RESET} %-14s %s\n" "Active:" "$wall_name"
-            printf " ${PINK}󰏘${RESET} %-14s %s\n" "Theme Pool:" "${theme^}"
-            printf " ${PINK}${type_icon}${RESET} %-14s %s\n" "Style:" "$type"
-            printf " ${PINK}󰉖${RESET} %-14s %s\n" "Path:" "${current_wall/$HOME/\~}"
-            printf " ${PINK}󰓅${RESET} %-14s %s\n" "Engine:" "${engine^^}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_header "󰸉" "Wallpaper Status"
+            rx_table_row "󰀻" "Active:" "$wall_name" "$PINK" "14"
+            rx_table_row "󰏘" "Theme Pool:" "${theme^}" "$PINK" "14"
+            rx_table_row "$type_icon" "Style:" "$type" "$PINK" "14"
+            rx_table_row "󰉖" "Path:" "${current_wall/$HOME/\~}" "$PINK" "14"
+            rx_table_row "󰓅" "Engine:" "${engine^^}" "$PINK" "14"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         *)
-            rx_log "info" "Usage: retro wallpaper <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <name|path>" "Set the wallpaper"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "add <path>" "Import image to wallpaper cache"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "slideshow [mode]" "Toggle slideshow mode"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "static [mode]" "Toggle static wallpaper mode"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all wallpapers in theme"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "picker" "Launch interactive wallpaper picker"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "cache [value]" "Build animated wallpaper cache"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore" "Restore previous wallpaper"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "res" "Set wallpaper render resolution"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "optimize" "Optimize video feeds for resolution"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show active wallpaper info"
-            echo ""
+            rx_help_usage "retro wallpaper <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "set <name|path>" "Set the wallpaper"
+            rx_help_cmd "add <path>" "Import image to wallpaper cache"
+            rx_help_cmd "slideshow [mode]" "Toggle slideshow mode"
+            rx_help_cmd "static [mode]" "Toggle static wallpaper mode"
+            rx_help_cmd "list" "List all wallpapers in theme"
+            rx_help_cmd "picker" "Launch interactive wallpaper picker"
+            rx_help_cmd "cache [value]" "Build animated wallpaper cache"
+            rx_help_cmd "restore" "Restore previous wallpaper"
+            rx_help_cmd "res" "Set wallpaper render resolution"
+            rx_help_cmd "optimize" "Optimize video feeds for resolution"
+            rx_help_cmd "status" "Show active wallpaper info"
+            rx_help_examples
+            rx_help_example "retro wallpaper set bmw-m760" "Set wallpaper by name"
+            rx_help_example "retro wallpaper slideshow on 300" "Enable slideshow 5min"
+            rx_help_example "retro wallpaper res" "Set render resolution"
+            rx_help_spacer
             ;;
     esac
 }

@@ -19,8 +19,9 @@ get_bt_status() {
     fi
 
     local ver="5.4"
-    if command -v btmgmt >/dev/null; then
-        local lmp=$(btmgmt info 2>/dev/null | grep "ver" | awk '{print $4}' | head -n 1)
+    if command -v btmgmt >/dev/null 2>&1; then
+        local lmp
+        lmp=$(timeout 3 btmgmt info 2>/dev/null | grep -i "ver" | awk '{print $4}' | head -n 1)
         case "$lmp" in 13) ver="5.4" ;; 12) ver="5.3" ;; 11) ver="5.2" ;; esac
     fi
 

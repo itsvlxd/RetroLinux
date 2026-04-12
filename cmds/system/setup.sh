@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 source "$RETRO_DIR/cmds/system/setup/directories.sh"
 source "$RETRO_DIR/cmds/system/setup/fingerprint.sh"
 source "$RETRO_DIR/cmds/system/setup/filemanager.sh"
@@ -20,6 +22,8 @@ source "$RETRO_DIR/cmds/system/setup/driver.sh"
 # and bypass SKIP_PROMPT and ask the user if he would like
 # to install the specific module but still ensure him that
 # before installing we backup their local config
+#
+# TODO: add to automatically create cache/themes/windowrules.conf
 
 cmd_setup() {
     rx_logo

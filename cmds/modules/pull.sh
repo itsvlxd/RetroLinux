@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_pull() {
     local target="$1"
 

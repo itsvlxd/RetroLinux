@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"

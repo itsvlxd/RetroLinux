@@ -1,7 +1,7 @@
 #!/bin/bash
 
-source "$RETRO_DIR/scripts/lib/battery.sh"
-source "$RETRO_DIR/scripts/lib/variable.sh"
+source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/git.sh"
 
 EVENT_DIR="$RETRO_DIR/scripts/events"
@@ -141,6 +141,9 @@ run_event_loop() {
         fi
 
         if ((tick_counter % 15 == 0)) && [[ $current_on_battery == "true" ]]; then
+            bash "$RETRO_DIR/scripts/battery_core.sh" --log cycle 1
+            bash "$RETRO_DIR/scripts/battery_core.sh" --log seconds 15
+
             local p_raw=$(cat "$BAT_PATH/power_now" 2>/dev/null || echo "0")
             if [[ $p_raw -eq 0 ]]; then
                 local v_raw=$(cat "$BAT_PATH/voltage_now" 2>/dev/null || echo "0")

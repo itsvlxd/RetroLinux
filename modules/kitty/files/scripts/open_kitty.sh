@@ -1,14 +1,6 @@
 #!/bin/bash
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RETRO_DIR="$(dirname "$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")")"
-
-ALL_VARS=$(bash "$RETRO_DIR/scripts/variable_core.sh" --list 2>/dev/null)
-
-get_var() {
-    local val=$(echo "$ALL_VARS" | grep -m 1 "^$1=" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
-    echo "${val:-$2}"
-}
+source "$RETRO_DIR/lib/helpers.sh"
 
 OPACITY=$(get_var "RETRO_OPACITY" "1.0")
 FONT=$(get_var "KITTY_FONT" "JetBrainsMono Nerd Font")
@@ -29,3 +21,4 @@ exec kitty \
     -o "allow_remote_control=yes" \
     -o "listen_on=unix:/tmp/kitty-{kitty_pid}" \
     "$@"
+

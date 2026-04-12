@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/scripts/lib/battery.sh"
+source "$RETRO_DIR/lib/battery.sh"
 
 PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"

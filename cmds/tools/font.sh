@@ -1,10 +1,11 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 
 cmd_font() {
     local font_core="$RETRO_DIR/scripts/font_core.sh"
-    local action="$1"
+    local action="${1,,}"
     local type="$2"
     shift 2
     local value="$*"
@@ -13,6 +14,9 @@ cmd_font() {
         "install")
             [[ -z $type ]] && rx_log "error" "What font should I search for?" && return 1
             local helper=$(get_var "PKG_HELPER")
+            [[ -z $helper ]] && helper="yay"
+
+            local val=""
 
             if [[ ! $type =~ (font|ttf|otf|woff|emoji) ]]; then
                 rx_log "warn" "'$type' doesn't look like a font. Searching for alternatives..."
@@ -35,17 +39,16 @@ cmd_font() {
                     return 1
                 fi
 
-                echo -e "\n ${PINK} Remote Fonts: ${RESET}$type"
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+                rx_table_header "" "Remote Fonts: $type"
 
                 for i in "${!results[@]}"; do
                     local p_name=$(echo "${results[$i]}" | awk '{print $1}')
                     local p_desc=$(echo "${results[$i]}" | cut -d' ' -f2-)
-
-                    printf " ${PINK}%d)${RESET} %-30s ${GRAY}%s${RESET}\n" "$((i + 1))" "$p_name" "${p_desc:0:45}..."
+                    rx_table_simple "󰾰" "$p_name - ${p_desc:0:45}..." "$GRAY"
                 done
 
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+                rx_table_separator
+                rx_table_spacer
 
                 echo -ne "\n ${PINK}󰄾 ${RESET}Selection [1-${#results[@]}]: "
                 read -r choice
@@ -92,8 +95,7 @@ cmd_font() {
             local installed_list=$(bash "$font_core" --list-installed)
             local font_count=$(echo "$installed_list" | wc -l)
 
-            echo -e "\n ${PINK} Fonts Installed: ${RESET}${font_count} families"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "" "Fonts Installed: ${font_count} families"
 
             local m=$(get_var "RETRO_FONT_MAIN")
             local n=$(get_var "RETRO_FONT_NERD")
@@ -121,10 +123,11 @@ cmd_font() {
                     icon=""
                 fi
 
-                printf " ${PINK}%b${RESET} %-35s ${PINK}%-15s${RESET}\n" "$icon" "$font" "$tag"
+                rx_table_row "$icon" "$font" "$tag" "$PINK"
             done <<<"$installed_list"
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "remote")
@@ -139,33 +142,33 @@ cmd_font() {
             local total=${#all_results[@]}
             local paginated=("${all_results[@]:skip:limit}")
 
-            echo -e "\n ${PINK} Remote Fonts: ${RESET}$query ($total found)"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "" "Remote Fonts: $query ($total found)"
 
             for line in "${paginated[@]}"; do
                 local p_name=$(echo "$line" | awk '{print $1}')
                 local p_desc=$(echo "$line" | cut -d' ' -f2-)
-                printf " ${PINK}${RESET} %-30s ${GRAY}%s${RESET}\n" "$p_name" "${p_desc:0:45}..."
+                rx_table_simple "" "$p_name - ${p_desc:0:45}..." "$GRAY"
             done
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+            rx_table_separator
 
             if ((total > skip + limit)); then
-                echo -e " ${PINK}󰄾${RESET} Page $page | Next: ${PINK}retro font remote $query $((page + 1))${RESET}\n"
+                rx_table_simple "󰄾" "Page $page | Next: retro font remote $query $((page + 1))" "$GRAY"
+                rx_table_spacer
             else
-                echo -e ""
+                rx_table_spacer
             fi
             ;;
 
         "status")
             local count=$(bash "$font_core" --list-installed | wc -l)
-            echo -e "\n ${PINK} Font Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}${RESET} %-14s %s\n" "Main Font:" "$(get_var RETRO_FONT_MAIN)"
-            printf " ${PINK}󰊪${RESET} %-14s %s\n" "Nerd Font:" "$(get_var RETRO_FONT_NERD)"
-            printf " ${PINK}󰞅${RESET} %-14s %s\n" "Emoji Set:" "$(get_var RETRO_FONT_EMOJI)"
-            printf " ${PINK}󰉖${RESET} %-14s %s\n" "Unique Fonts:" "$count"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_header "" "Font Status"
+            rx_table_row "󰊪" "Main Font:" "$(get_var RETRO_FONT_MAIN)" "$PINK" "14"
+            rx_table_row "󰊪" "Nerd Font:" "$(get_var RETRO_FONT_NERD)" "$PINK" "14"
+            rx_table_row "󰞅" "Emoji Set:" "$(get_var RETRO_FONT_EMOJI)" "$PINK" "14"
+            rx_table_row "󰉖" "Unique Fonts:" "$count" "$PINK" "14"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "setup")
@@ -184,15 +187,8 @@ cmd_font() {
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
 
                 if [[ -n $match ]]; then
-                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? ${PINK}[Y/n]${RESET}: "
-                    read -r confirm
-                    if [[ ! $confirm =~ ^[Nn]$ ]]; then
-                        set_var "RETRO_FONT_MAIN" "$match"
-                    else
-                        rx_log "info" "Enter the exact font family name: "
-                        read -r font_name
-                        set_var "RETRO_FONT_MAIN" "${font_name:-$match}"
-                    fi
+                    rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || { rx_log "info" "Enter the exact font family name: "; read -r font_name; set_var "RETRO_FONT_MAIN" "${font_name:-$match}"; return 0; }
+                    set_var "RETRO_FONT_MAIN" "$match"
                 fi
             fi
 
@@ -208,15 +204,8 @@ cmd_font() {
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
 
                 if [[ -n $match ]]; then
-                    rx_log "info" "Detected font family: ${PINK}$match${RESET}. Use this? ${PINK}[Y/n]${RESET}: "
-                    read -r confirm
-                    if [[ ! $confirm =~ ^[Nn]$ ]]; then
-                        set_var "RETRO_FONT_NERD" "$match"
-                    else
-                        rx_log "info" "Enter the exact font family name: "
-                        read -r font_name
-                        set_var "RETRO_FONT_NERD" "${font_name:-$match}"
-                    fi
+                    rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || { rx_log "info" "Enter the exact font family name: "; read -r font_name; set_var "RETRO_FONT_NERD" "${font_name:-$match}"; return 0; }
+                    set_var "RETRO_FONT_NERD" "$match"
                 fi
             fi
 
@@ -257,17 +246,20 @@ cmd_font() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro font <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "install <pkg>" "Install a font package"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set [cat] <font>" "Set active font for category"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "edit" "Edit fontconfig override file"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all installed fonts"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "remote [query]" "Search remote font packages"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show active fonts and count"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "setup" "Interactive font setup wizard"
-            echo ""
+            rx_help_usage "retro font <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "install <pkg>" "Install a font package"
+            rx_help_cmd "set [cat] <font>" "Set active font for category"
+            rx_help_cmd "edit" "Edit fontconfig override file"
+            rx_help_cmd "list" "List all installed fonts"
+            rx_help_cmd "remote [query]" "Search remote font packages"
+            rx_help_cmd "status" "Show active fonts and count"
+            rx_help_cmd "setup" "Interactive font setup wizard"
+            rx_help_examples
+            rx_help_example "retro font status" "Show active fonts and count"
+            rx_help_example "retro font list" "List all installed fonts"
+            rx_help_example "retro font remote inter" "Search for Inter font"
+            rx_help_spacer
             ;;
     esac
 }

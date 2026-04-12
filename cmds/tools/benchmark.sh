@@ -1,24 +1,50 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_benchmark() {
     local VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
     local bench_script="$RETRO_DIR/scripts/benchmark_core.sh"
-    local power_script="$RETRO_DIR/scripts/power_core.sh"
     local action="${1,,}"
     local silent_tables="${2,,}"
 
     mark_run() { bash "$VAR_SCRIPT" --set "BENCH_LAST_RUN" "$(date +'%b %d, %H:%M')"; }
 
+    sync_mangohud() {
+        local s_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_STATE")
+        : ${s_hud:="on"}
+        local config_file="$HOME/.config/MangoHud/MangoHud.conf"
+
+        if [[ -f "$config_file" ]]; then
+            if [[ $s_hud == "off" ]]; then
+                if ! grep -q "^no_display=1" "$config_file" 2>/dev/null; then
+                    echo "no_display=1" >> "$config_file"
+                fi
+            else
+                sed -i '/^no_display=/d' "$config_file" 2>/dev/null
+            fi
+        fi
+
+        if [[ $s_hud == "on" ]]; then
+            hyprctl keyword env MANGOHUD,1 >/dev/null 2>&1
+        else
+            hyprctl keyword env MANGOHUD,0 >/dev/null 2>&1
+        fi
+    }
+
     case "$action" in
         "hud")
-            local hud_cmd="${3,,}"
-            local hud_val="${4,,}"
+            local hud_cmd="${2,,}"
+            local hud_val="${3,,}"
 
             case "$hud_cmd" in
                 "set")
                     [[ -z $hud_val ]] && rx_log "error" "Provide a preset name (e.g. minimal, full)" && return 1
-                    bash "$bench_script" --hud-set "$hud_val"
-                    [[ $? -eq 0 ]] && rx_log "success" "MangoHud set to preset: ${PINK}${hud_val}${RESET}" || rx_log "error" "Preset not found"
+                    if bash "$bench_script" --hud-set "$hud_val"; then
+                        rx_log "success" "MangoHud preset set to: ${PINK}${hud_val}${RESET}"
+                    else
+                        rx_log "error" "Failed to set preset: ${PINK}${hud_val}${RESET}"
+                    fi
                     ;;
                 "auto")
                     local current_auto=$(bash "$VAR_SCRIPT" --get "MANGOHUD_AUTO")
@@ -35,15 +61,20 @@ cmd_benchmark() {
                     fi
                     ;;
                 "run")
-                    local run_cmd="${@:4}"
+                    local run_cmd="${*:3}"
                     [[ -z $run_cmd ]] && rx_log "error" "Provide an app to run (e.g., retro benchmark hud run vkmark)" && return 1
                     if [[ ${run_cmd,,} == *".exe"* || ${run_cmd,,} == *".exe "* ]]; then
                         rx_log "info" "Windows Executable detected. Injecting MangoHud via Wine..."
-                        env MANGOHUD=1 mangohud wine $run_cmd
+                        nohup env MANGOHUD=1 mangohud wine $run_cmd >/dev/null 2>&1 &
                     else
                         rx_log "info" "Launching native Linux app with MangoHud: ${GRAY}$run_cmd${RESET}"
-                        env MANGOHUD=1 mangohud $run_cmd
+                        nohup env MANGOHUD=1 mangohud $run_cmd >/dev/null 2>&1 &
                     fi
+                    ;;
+                "test")
+                    check_dep "vkcube" "vulkan-tools" || return 1
+                    rx_log "info" "Spawning floating vkcube to test overlay..."
+                    nohup env MANGOHUD=1 vkcube >/dev/null 2>&1 &
                     ;;
                 "on" | "off")
                     bash "$VAR_SCRIPT" --set "MANGOHUD_STATE" "$hud_cmd"
@@ -51,10 +82,12 @@ cmd_benchmark() {
                     local p_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_PROFILE")
                     : ${p_hud:="advanced"}
                     local target_conf="$HOME/.config/MangoHud/${p_hud}.conf"
-                    local current_key="F11"
-                    if [[ -f $target_conf ]]; then
-                        local parsed_key=$(grep "^toggle_hud" "$target_conf" | tail -n 1 | cut -d'=' -f2 | tr -d '\r' | xargs)
-                        [[ -n $parsed_key ]] && current_key="$parsed_key"
+                    local current_key="Not set"
+                    if [[ -f "$target_conf" ]]; then
+                        local parsed_key=$(grep "^toggle_hud=" "$target_conf" 2>/dev/null | cut -d'=' -f2 | tr -d '\r' | xargs)
+                        if [[ -n "$parsed_key" && "$parsed_key" != "none" ]]; then
+                            current_key="$parsed_key"
+                        fi
                     fi
                     if [[ $hud_cmd == "on" ]]; then
                         rx_log "success" "MangoHud default state: ${PINK}VISIBLE${RESET} (Press ${current_key} to hide)"
@@ -81,31 +114,45 @@ cmd_benchmark() {
                     local a_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_AUTO")
                     : ${a_hud:="off"}
                     local target_conf="$HOME/.config/MangoHud/${p_hud}.conf"
-                    local current_key="F11 (Default)"
-                    if [[ -f $target_conf ]]; then
-                        local parsed_key=$(grep "^toggle_hud=" "$target_conf" | cut -d'=' -f2)
-                        [[ -n $parsed_key ]] && current_key="$parsed_key"
+                    local current_key="Not set"
+                    if [[ -f "$target_conf" ]]; then
+                        local parsed_key=$(grep "^toggle_hud=" "$target_conf" 2>/dev/null | cut -d'=' -f2 | tr -d '\r' | xargs)
+                        if [[ -n "$parsed_key" && "$parsed_key" != "none" ]]; then
+                            current_key="$parsed_key"
+                        fi
                     fi
-                    echo -e "\n ${PINK}󰢮 RetroHUD Configuration Status${RESET}"
-                    echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                    printf " ${PINK}󰈐${RESET} %-22s ${PINK}%s${RESET}\n" "Overlay Style:" "${p_hud^^}"
-                    printf " ${PINK}󰈐${RESET} %-22s ${PINK}%s${RESET} ${GRAY}(Toggle: %s)${RESET}\n" "Default Visibility:" "${s_hud^^}" "$current_key"
+                    rx_table_header "󰢮" "RetroHUD Configuration Status"
+                    rx_table_row "󰈐" "Overlay Style:" "${p_hud^^}" "$PINK" "22"
+                    rx_table_row "󰈐" "Default Visibility:" "${s_hud^^} (Toggle: ${current_key})" "$PINK" "22"
                     local auto_color="${GRAY}"
                     [[ $a_hud == "on" ]] && auto_color="${PINK}"
-                    printf " ${PINK}󰈐${RESET} %-22s ${auto_color}%s${RESET}\n" "Global Auto-Inject:" "${a_hud^^}"
-                    echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                    rx_table_row "󰈐" "Global Auto-Inject:" "${a_hud^^}" "$auto_color" "22"
+                    rx_table_separator
+                    rx_table_spacer
                     ;;
                 "toggle")
                     if [[ -z $hud_val ]]; then
-                        rx_log "error" "Please specify a key (e.g., F11 or Shift_R+F12)"
+                        rx_log "error" "Please specify a key (e.g., F11 or Shift_L+F12)"
                         return 1
                     fi
+
+                    local valid_key=false
+                    if [[ "$hud_val" =~ ^[A-Za-z_]+[+-][A-Za-z0-9]+$ ]] || [[ "$hud_val" =~ ^[A-Za-z0-9]+$ ]]; then
+                        valid_key=true
+                    fi
+
+                    if [[ $valid_key == "false" ]]; then
+                        rx_log "error" "Invalid key format. Use format like 'F11' or 'Shift_L+F12'"
+                        return 1
+                    fi
+
                     local current_prof=$(bash "$VAR_SCRIPT" --get "MANGOHUD_PROFILE")
                     : ${current_prof:="advanced"}
                     local target_conf="$HOME/.config/MangoHud/${current_prof}.conf"
-                    if [[ -f $target_conf ]]; then
-                        sed -i '/^toggle_hud/d' "$target_conf"
+                    if [[ -f "$target_conf" ]]; then
+                        sed -i '/^toggle_hud=/d' "$target_conf"
                         echo "toggle_hud=$hud_val" >>"$target_conf"
+                        cp "$target_conf" "$HOME/.config/MangoHud/MangoHud.conf"
                         rx_log "success" "HUD toggle key set to ${PINK}$hud_val${RESET} in ${current_prof}.conf"
                     else
                         rx_log "error" "Active config '$target_conf' not found."
@@ -117,19 +164,18 @@ cmd_benchmark() {
                     hyprctl dispatch exec "[float; size 800 600; center] env MANGOHUD=1 vkcube" >/dev/null 2>&1 || env MANGOHUD=1 vkcube &
                     ;;
                 *)
-                    rx_log "info" "Usage: retro benchmark hud <command>"
-                    echo -e ""
-                    echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "set <preset>" "Apply a HUD layout preset (minimal, full, etc)"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "auto" "Toggle global auto-inject for new apps"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "run <cmd>" "Launch a specific app with MangoHud overlay"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "on" "Set MangoHud default state to visible"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "off" "Set MangoHud default state to hidden"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "load" "Reload MangoHud env vars into Hyprland"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show RetroHUD configuration status"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle <key>" "Set keyboard shortcut to toggle overlay"
-                    printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "test" "Launch vkcube to preview HUD"
-                    echo ""
+                    rx_help_usage "retro benchmark hud <command>"
+                    rx_help_commands "Available commands"
+                    rx_help_cmd "set <preset>" "Apply a HUD layout preset (minimal, full, etc)"
+                    rx_help_cmd "auto" "Toggle global auto-inject for new apps"
+                    rx_help_cmd "run <cmd>" "Launch a specific app with MangoHud overlay"
+                    rx_help_cmd "on" "Set MangoHud default state to visible"
+                    rx_help_cmd "off" "Set MangoHud default state to hidden"
+                    rx_help_cmd "load" "Reload MangoHud env vars into Hyprland"
+                    rx_help_cmd "status" "Show RetroHUD configuration status"
+                    rx_help_cmd "toggle <key>" "Set keyboard shortcut to toggle overlay"
+                    rx_help_cmd "test" "Launch vkcube to preview HUD"
+                    rx_help_spacer
                     ;;
             esac
             ;;
@@ -164,14 +210,15 @@ cmd_benchmark() {
  / , _/ _/  / / / , _/ /_/ / _  / _//    / /__/ _  / 
 /_/|_/___/ /_/ /_/|_|\____/____/___/_/|_/\___/_//_/  
 EOF
-            echo -e " ${GRAY}               Last Benchmark: $last_run${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────────────────────────────"
+            rx_table_simple "" "Last Benchmark: $last_run" "$GRAY"
+            rx_help_separator
             printf " ${PINK}󰻠 ${RESET} %-36s ${PINK}%-28s ${GRAY}%s %s${RESET}\n" "${c_name:0:35}" "$s_cpu" "$c_arch" "$c_ucode"
             printf " ${PINK}󰢮 ${RESET} %-36s ${PINK}%-28s ${GRAY}%s (Vulkan API)${RESET}\n" "${g_name:0:35}" "$s_gpu" "$g_drv"
             printf " ${PINK}󰘚 ${RESET} %-36s ${PINK}%-28s\n" "$r_tot" "$s_ram"
             printf " ${PINK}󰋊 ${RESET} %-36s ${PINK}%-28s ${GRAY}%s${RESET}\n" "${d_model:0:35}" "$s_dsk" "$d_type"
             printf " ${PINK}󰀂 ${RESET} %-36s ${PINK}%s${RESET}\n" "${n_hw:0:35}" "$s_net"
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────────────────────────────${RESET}\n"
+            rx_help_separator
+            rx_help_spacer
             ;;
 
         "cpu")
@@ -189,13 +236,13 @@ EOF
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
-                echo -e "\n ${PINK}󰻠 CPU Benchmark Results${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Final Score:" "${score%.*} Events/sec"
-                printf " ${GRAY}󰔚${RESET} %-20s ${GRAY}%s ms${RESET}\n" "Min Latency:" "$min"
-                printf " ${GRAY}󰔚${RESET} %-20s ${GRAY}%s ms${RESET}\n" "Avg Latency:" "$avg"
-                printf " ${GRAY}󰔚${RESET} %-20s ${GRAY}%s ms${RESET}\n" "Max Latency:" "$max"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰻠" "CPU Benchmark Results"
+                rx_table_row "󰈐" "Final Score:" "${score%.*} Events/sec" "$PINK" "20"
+                rx_table_row_gray "󰔚" "Min Latency:" "$min ms" "20"
+                rx_table_row_gray "󰔚" "Avg Latency:" "$avg ms" "20"
+                rx_table_row_gray "󰔚" "Max Latency:" "$max ms" "20"
+                rx_table_separator
+                rx_table_spacer
             fi
             ;;
 
@@ -214,10 +261,10 @@ EOF
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
-                echo -e "\n ${PINK}󰢮 GPU Benchmark Results${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Final Score:" "$score (VKMark)"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰢮" "GPU Benchmark Results"
+                rx_table_row "󰈐" "Final Score:" "$score (VKMark)" "$PINK" "20"
+                rx_table_separator
+                rx_table_spacer
             fi
             ;;
 
@@ -235,13 +282,13 @@ EOF
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
-                echo -e "\n ${PINK}󰘚 RAM Benchmark Results${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s MiB/sec${RESET}\n" "Throughput:" "$score"
-                printf " ${GRAY}󰔚${RESET} %-20s ${GRAY}%s ms${RESET}\n" "Min Latency:" "$min"
-                printf " ${GRAY}󰔚${RESET} %-20s ${GRAY}%s ms${RESET}\n" "Avg Latency:" "$avg"
-                printf " ${GRAY}󰔚${RESET} %-20s ${GRAY}%s ms${RESET}\n" "Max Latency:" "$max"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰘚" "RAM Benchmark Results"
+                rx_table_row "󰈐" "Throughput:" "$score MiB/sec" "$PINK" "20"
+                rx_table_row_gray "󰔚" "Min Latency:" "$min ms" "20"
+                rx_table_row_gray "󰔚" "Avg Latency:" "$avg ms" "20"
+                rx_table_row_gray "󰔚" "Max Latency:" "$max ms" "20"
+                rx_table_separator
+                rx_table_spacer
             fi
             ;;
 
@@ -259,11 +306,11 @@ EOF
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
-                echo -e "\n ${PINK}󰋊 Disk Benchmark Results${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Read Speed:" "$r_spd"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Write Speed:" "$w_spd"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰋊" "Disk Benchmark Results"
+                rx_table_row "󰈐" "Read Speed:" "$r_spd" "$PINK" "20"
+                rx_table_row "󰈐" "Write Speed:" "$w_spd" "$PINK" "20"
+                rx_table_separator
+                rx_table_spacer
             fi
             ;;
 
@@ -279,12 +326,12 @@ EOF
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
-                echo -e "\n ${PINK}󰀂 Network Benchmark Results${RESET}"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Ping:" "$ping"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Download:" "$down"
-                printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Upload:" "$up"
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                rx_table_header "󰀂" "Network Benchmark Results"
+                rx_table_row "󰈐" "Ping:" "$ping" "$PINK" "20"
+                rx_table_row "󰈐" "Download:" "$down" "$PINK" "20"
+                rx_table_row "󰈐" "Upload:" "$up" "$PINK" "20"
+                rx_table_separator
+                rx_table_spacer
             fi
             ;;
 
@@ -300,18 +347,17 @@ EOF
             ;;
 
         *)
-            rx_log "info" "Usage: retro benchmark <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show benchmark scores and hardware"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "cpu" "Run CPU prime benchmark"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "gpu" "Run Vulkan 3D render benchmark"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "ram" "Run memory throughput test"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "disk" "Run sequential I/O test"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "net" "Run network speed test"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "all" "Run all benchmarks silently"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "hud" "MangoHud overlay management"
-            echo ""
+            rx_help_usage "retro benchmark <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "status" "Show benchmark scores and hardware"
+            rx_help_cmd "cpu" "Run CPU prime benchmark"
+            rx_help_cmd "gpu" "Run Vulkan 3D render benchmark"
+            rx_help_cmd "ram" "Run memory throughput test"
+            rx_help_cmd "disk" "Run sequential I/O test"
+            rx_help_cmd "net" "Run network speed test"
+            rx_help_cmd "all" "Run all benchmarks silently"
+            rx_help_cmd "hud" "MangoHud overlay management"
+            rx_help_spacer
             ;;
     esac
 }

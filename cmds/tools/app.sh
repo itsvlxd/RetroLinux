@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 is_tui() {
     local cmd="$1"
     [[ $cmd == "yazi" || $cmd == "nvim" || $cmd == "vim" || $cmd == "ranger" || $cmd == "btop" || $cmd == "cava" ]]
@@ -23,16 +25,15 @@ cmd_apps() {
 
     if [[ $app_name == "list" || -z $app_name ]]; then
         if [[ -z $app_name ]]; then
-            rx_log "info" "Usage: retro app <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List all available applications"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> open" "Launch an application"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> close" "Close an application"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> refresh" "Refresh an application"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "<app> list" "Show actions for an app"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "all <action>" "Run action for all apps"
-            echo ""
+            rx_help_usage "retro app <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "list" "List all available applications"
+            rx_help_cmd "<app> open" "Launch an application"
+            rx_help_cmd "<app> close" "Close an application"
+            rx_help_cmd "<app> refresh" "Refresh an application"
+            rx_help_cmd "<app> list" "Show actions for an app"
+            rx_help_cmd "all <action>" "Run action for all apps"
+            rx_help_spacer
         fi
 
         rx_log "info" "Available Applications:"

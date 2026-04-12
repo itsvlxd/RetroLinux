@@ -1,8 +1,10 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_battery() {
     local battery_script="$RETRO_DIR/scripts/battery_core.sh"
-    local action="$1"
+    local action="${1,,}"
     local value="$2"
     local options="$3"
 
@@ -23,27 +25,25 @@ cmd_battery() {
 
             local bat_icon=$(get_battery_icon "$cap" "$stat")
 
-            echo -e "\n ${PINK}󰂀 Battery: ${RESET}${model^^}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-
-            printf " ${PINK}%s${RESET} %-14s %s%% (%s)\n" "$bat_icon" "Charge:" "$cap" "$stat"
-            printf " ${PINK}󰚥${RESET} %-14s %s\n" "Health:" "$health"
-            printf " ${PINK}󱐋${RESET} %-14s %s W\n" "Usage Draw:" "$watts"
-            printf " ${PINK}󱈑${RESET} %-14s %s V\n" "Voltage:" "$volts"
+            rx_table_header "󰂀" "Battery: ${model^^}"
+            rx_table_row "󰓅" "Charge:" "${cap}%" "$PINK" "14"
+            rx_table_row "󰚥" "Health:" "$health" "$PINK" "14"
+            rx_table_row "󱐋" "Usage Draw:" "$watts W" "$PINK" "14"
+            rx_table_row "󱈑" "Voltage:" "$volts V" "$PINK" "14"
 
             if [[ $sot != "N/A" ]]; then
-                printf " ${PINK}󰔚${RESET} %-14s %b\n" "On Battery:" "${sot}"
+                rx_table_row "󰔚" "On Battery:" "$sot" "$PINK" "14"
             fi
 
             if [[ $est != "N/A" ]]; then
                 local est_icon="󱎫"
                 [[ $stat == *"charging"* ]] && est_icon="󱐋"
-                printf " ${PINK}%s${RESET} %-14s %s\n" "$est_icon" "Remaining:" "$est"
+                rx_table_row "$est_icon" "Remaining:" "$est" "$PINK" "14"
             fi
 
-            printf " ${PINK}󰌪${RESET} %-14s %s\n" "Saver Mode:" "$saver"
+            rx_table_row "󰌪" "Saver Mode:" "$saver" "$PINK" "14"
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_separator
 
             local filled=$((cap / 5))
             printf " ${PINK}󰏰${RESET} "
@@ -56,20 +56,22 @@ cmd_battery() {
                 fi
             done
 
-            echo -e "\n"
+            echo ""
+            rx_table_spacer
             ;;
 
         "stats")
-            echo -e "\n ${PINK}󰂀 Battery Usage Stats: ${RESET}Last 7 Days"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+            rx_table_header "󰂀" "Battery Usage Stats: Last 7 Days"
 
+            local has_data=false
             for i in {0..6}; do
                 local entry=$(get_var "BAT_STATS_$i")
                 [[ -z $entry || $entry == "null" ]] && continue
+                has_data=true
 
                 IFS='|' read -r d_date d_cycles d_seconds <<<"$entry"
 
-                local day_name=$(date -d "$d_date" +%a)
+                local day_name=$(date -d "$d_date" +%a 2>/dev/null || echo "$d_date")
 
                 local divisor=$d_cycles
                 ((divisor == 0)) && divisor=1
@@ -86,7 +88,13 @@ cmd_battery() {
                     "$day_name" "$bar" "$d_cycles" "$avg_min"
             done
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            if [[ $has_data != "true" ]]; then
+                rx_table_simple "󰂀" "No usage data recorded yet" "$MUTE"
+                rx_table_simple "󰇚" "Stats are recorded when on battery power" "$MUTE"
+            fi
+
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "usage")
@@ -104,8 +112,7 @@ cmd_battery() {
             local total_watts=$(echo "$raw_data" | head -n 1)
             local procs=$(echo "$raw_data" | tail -n +2)
 
-            echo -e "\n ${PINK}󱈑 Power Consumption: ${RESET}${total_watts}W Total"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+            rx_table_header "󱈑" "Power Consumption: ${total_watts}W Total"
 
             local count=0
             while IFS='|' read -r cpu cmd; do
@@ -122,7 +129,8 @@ cmd_battery() {
                 printf " ${MUTE}%-22s %-12s %-8s${RESET}\n" "---" "0.0%" "0.00W"
             done
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "limit")
@@ -153,16 +161,15 @@ cmd_battery() {
             ;;
 
         *)
-            rx_log "info" "Usage: retro battery <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show battery info and charge bar"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "stats" "Show 7-day battery usage history"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "usage [count]" "List top power-consuming processes"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "limit <percent>" "Set battery charge threshold"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "saver [mode] [-f]" "Configure battery saver mode"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "raw" "Output raw battery status string"
-            echo ""
+            rx_help_usage "retro battery <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "status" "Show battery info and charge bar"
+            rx_help_cmd "stats" "Show 7-day battery usage history"
+            rx_help_cmd "usage [count]" "List top power-consuming processes"
+            rx_help_cmd "limit <percent>" "Set battery charge threshold"
+            rx_help_cmd "saver [mode] [-f]" "Configure battery saver mode"
+            rx_help_cmd "raw" "Output raw battery status string"
+            rx_help_spacer
             ;;
     esac
 }

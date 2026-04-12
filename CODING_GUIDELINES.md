@@ -38,8 +38,9 @@ The project provides the `retro` CLI - a unified command center to manage the en
 
 | Pattern | Location | Example |
 |---------|----------|---------|
-| Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `driver.sh` |
+| Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `helpers.sh`, `battery.sh` |
 | Backend core scripts | `scripts/` | `audio_core.sh`, `network_core.sh`, `driver_core.sh` |
+| Standalone scripts | `scripts/` | `system_update.sh` (UI, invoked from events) |
 | Frontend commands | `cmds/tools/` | `audio.sh`, `network.sh`, `driver.sh` |
 | System commands | `cmds/system/` | `load.sh`, `update.sh`, `setup.sh` |
 | Module definitions | `modules/<name>/` | `modules/hyprland/`, `modules/ags/` |
@@ -88,6 +89,22 @@ Every tool in this project follows a strict two-layer architecture:
 3. Test with: retro newtool status
 ```
 
+### The lib/ Directory
+
+The `lib/` directory is the **single source of truth** for all shared utilities:
+- **DO** put helper functions, color definitions, logging, battery helpers, etc. in `lib/`
+- **DO NOT** create subdirectories like `scripts/lib/` - all libs go flat in `lib/`
+- **DO** source from `lib/` in both scripts and commands
+- **NEVER** duplicate functions - check `lib/` before creating new helpers
+
+Example:
+```bash
+# In any script or command:
+source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/colors.sh"
+```
+
 ---
 
 ## 5. Code Style Rules
@@ -102,6 +119,16 @@ Every tool in this project follows a strict two-layer architecture:
   - `_` prefix for private helper functions (e.g., `_kernel_version_ge`)
 - **Variable naming**: lowercase with underscores (e.g., `wifi_iface`, `action`)
 - **Constants**: uppercase (e.g., `RETRO_DIR`, `RETRO_CACHE`)
+
+### Shellcheck Compliance
+
+All scripts must pass shellcheck before being merged. Run `shellcheck scripts/*.sh cmds/**/*.sh lib/*.sh` locally to check.
+
+Exceptions can be added inline for intentional cases:
+```bash
+# shellcheck disable=SC2086
+local result=$myvar1$myvar2  # intentional concatenation
+```
 
 ### Critical Rule: Never Duplicate Functions
 
@@ -171,58 +198,135 @@ printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "command" "description"
 
 ## 7. Design Rules and Examples
 
-### Status Table Pattern
+### Status Table Pattern (Use Centralized Functions)
 
-The standard pattern for displaying status information:
+The standard pattern for displaying status information - use centralized functions from `lib/help.sh`:
 
 ```bash
-echo -e "\n ${PINK}󰑊 Status Title${RESET}"
-echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-printf " ${PINK}󰄾${RESET} %-36s ${PINK}%s${RESET}\n" "Label" "Value"
-printf " ${PINK}󰄾${RESET} %-36s ${GRAY}%s${RESET}\n" "Description" "gray value"
-echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────\n"
+rx_table_header "󰑊" "Status Title"
+rx_table_row "󰄾" "Label:" "Value" "$PINK" "36"
+rx_table_row_gray "󰄾" "Description:" "gray value"
+rx_table_separator
+rx_table_spacer
 ```
 
 **Real example** (from `cmds/tools/audio.sh`):
 
 ```bash
+rx_table_header "󰑊" "Audio Status"
+rx_table_row "󰿅" "PipeWire:" "$pw_ver" "$GRAY" "14"
+rx_table_row "󰛫" "WirePlumber:" "$wp_ver" "$GRAY" "14"
+rx_table_separator
+rx_table_row "󰝥" "Volume:" "${sink_vol}%" "$PINK" "14"
+rx_table_row_gray "󰈐" "Output:" "${sink_name:0:35}" "14"
+rx_table_separator
+rx_table_spacer
+```
+
+**Legacy pattern (AVOID - use centralized functions instead):**
+
+```bash
 echo -e "\n ${PINK}󰑊 Audio Status${RESET}"
 echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 printf " ${PINK}󰿅${RESET} %-14s ${GRAY}%s${RESET}\n" "PipeWire:" "$pw_ver"
-printf " ${PINK}󰛫${RESET} %-14s ${GRAY}%s${RESET}\n" "WirePlumber:" "$wp_ver"
-echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
-printf " ${PINK}󰝥${RESET} %-14s ${PINK}%s%%${RESET} (${mute_state})\n" "Volume:" "$sink_vol"
-printf " ${PINK}${mute_icon}${RESET} %-14s ${GRAY}%s${RESET}\n" "Output:" "${sink_name:0:35}"
-echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+# ... etc
 ```
 
 ### Help Message Pattern
 
-For displaying command usage and sub-commands:
+For displaying command usage and sub-commands, use the centralized help functions from `lib/help.sh`:
 
 ```bash
-rx_log "info" "Usage: retro tool <command>"
-echo -e ""
-echo -e " ${PINK}  ${RESET}Subcommands${GRAY}:${RESET}"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "status" "Show current status"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "set <value>" "Set a value"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "action" "Perform action"
-echo ""
+rx_help_usage "retro tool <command>"
+rx_help_commands "Subcommands"
+rx_help_cmd 20 "status" "Show current status"
+rx_help_cmd 20 "set <value>" "Set a value"
+rx_help_cmd 20 "action" "Perform action"
+rx_help_examples
+rx_help_example 30 "retro tool status" "Show current status"
 ```
 
-**Real example** (from `cmds/tools/network.sh`):
+**Available Help Functions** (in `lib/help.sh`):
+
+| Function | Purpose |
+|----------|---------|
+| `rx_help_usage "usage text"` | Shows usage line |
+| `rx_help_commands "title"` | Shows "Commands:" header |
+| `rx_help_cmd width "cmd" "desc"` | Prints a command line |
+| `rx_help_examples` | Shows "Examples:" header |
+| `rx_help_example width "cmd" "desc"` | Prints an example line |
+| `rx_help_header "icon" "title"` | Shows section header with icon |
+| `rx_help_separator` | Prints separator line |
+| `rx_help_footer` | Prints footer with separator |
+
+**Real example** (from `cmds/tools/driver.sh`):
 
 ```bash
-rx_log "info" "Usage: retro network wifi <command>"
-echo -e ""
-echo -e " ${PINK}  ${RESET}WiFi commands${GRAY}:${RESET}"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "on" "Turn WiFi on"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "off" "Turn WiFi off"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "list" "List available networks"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "connect <ssid> [pass]" "Connect to a network"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "disconnect" "Disconnect current network"
-printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "status" "Show WiFi status"
-echo ""
+rx_help_usage "retro driver <command>"
+rx_help_commands "Available commands"
+rx_help_cmd "status" "Scan hardware and report driver status"
+rx_help_cmd "install" "Install missing drivers"
+rx_help_examples
+rx_help_example "retro driver status" "Scan hardware..."
+rx_help_spacer
+```
+
+### Table and Status Display Functions
+
+For displaying status information and tables, use the centralized table functions from `lib/help.sh`:
+
+```bash
+rx_table_header "󰑊" "Status Title"
+rx_table_row "󰄾" "Label:" "Value" "$PINK" "36"
+rx_table_row_gray "󰄾" "Gray:" "Value" "36"
+rx_table_separator
+rx_table_spacer
+```
+
+**Available Table Functions** (in `lib/help.sh`):
+
+| Function | Purpose |
+|----------|---------|
+| `rx_table_separator` | Prints ───────────────────────────── |
+| `rx_table_header "icon" "title"` | 󰑊 Title + separator |
+| `rx_table_row "icon" "label" "value" [color] [width]` | Icon + key-value row |
+| `rx_table_row_gray "icon" "label" "value" [width]` | Gray colored row |
+| `rx_table_key_value "label" "value" [color]` | 󰄾 label + value |
+| `rx_table_simple "icon" "value" [color]` | Just icon + text |
+| `rx_table_spacer` | Empty row for spacing |
+| `rx_table_list_header "icon" "c1" "c2" "c3"` | Table header row |
+| `rx_table_list_row "icon" "c1" "c2" "c3" [colors]` | Multi-color table row |
+| `rx_table_list_single "icon" "text" [color]` | Single column row |
+
+**Confirmation Functions**:
+
+| Function | Purpose |
+|----------|---------|
+| `rx_confirm "message"` | Yes/no prompt, returns 0 for yes |
+| `rx_yesno "message"` | Yes/no with SKIP_PROMPT support |
+
+**Real example** (from `cmds/tools/audio.sh`):
+
+```bash
+rx_table_header "󰑊" "Audio Status"
+rx_table_row "󰿅" "PipeWire:" "$pw_ver" "$GRAY" "14"
+rx_table_row "󰛫" "WirePlumber:" "$wp_ver" "$GRAY" "14"
+rx_table_separator
+rx_table_row "󰝥" "Volume:" "${sink_vol}%" "$PINK" "14"
+rx_table_row_gray "󰈐" "Output:" "${sink_name:0:35}" "14"
+rx_table_separator
+rx_table_spacer
+```
+
+**Real example for lists** (from `cmds/tools/service.sh`):
+
+```bash
+rx_table_header "󰒑" "System Services"
+while IFS='|' read -r _ name load active sub; do
+    rx_table_list_row "$name" "$active" "$sub" "$PINK" "$active_color" "$sub_color"
+done <<<"$result"
+rx_table_separator
+rx_table_spacer
 ```
 
 ### Section Separator Pattern
@@ -236,6 +340,26 @@ echo -e " ${PINK}󰇝${MUTE} ─────────────────
 The line width should be:
 - 34 chars for simpler tables (36 - 2 for padding)
 - 50+ chars for complex tables
+
+### Separator Spacer Rule
+
+After the final `rx_table_separator` or `rx_help_separator` in any display block, you MUST add a spacer:
+
+✅ CORRECT:
+```bash
+rx_table_separator
+rx_table_spacer
+```
+
+❌ INCORRECT:
+```bash
+rx_table_separator
+# Missing spacer - looks cramped!
+```
+
+This applies to:
+- `rx_table_separator` → follow with `rx_table_spacer`
+- `rx_help_separator` → follow with `rx_help_spacer`
 
 ### Icon System
 
@@ -641,9 +765,113 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 
 5. **Icon padding**: Always use `${PINK}icon${RESET}` pattern, never plain icon alone.
 
+### Ctrl+C Trap (Graceful Exits)
+
+If your script does destructive actions (moving files, installing packages, creating symlinks), use trap to handle user interruptions:
+
+```bash
+cleanup() {
+    rm -f "$temp_file"
+    # restore any backups
+}
+trap cleanup INT TERM
+
+# ... your destructive code ...
+
+trap - INT TERM  # clear trap on success
+```
+
+Failing to handle interrupts can leave the system in a broken state (half-installed packages, incomplete symlinks, broken database entries).
+
 ---
 
-## 16. Quick Reference
+## 17. Event System (Background Daemon)
+
+### Overview
+
+The **Event System** is a background daemon that continuously monitors system state and fires events when conditions change. Unlike the two-layer tool pattern, this is a **long-running loop** that runs continuously in the background.
+
+### File Structure
+
+| File | Purpose |
+|------|---------|
+| `scripts/event_core.sh` | Main event loop daemon (runs with `--loop`) |
+| `scripts/events/*.sh` | Event hook modules (define event handlers) |
+| `cmds/tools/event.sh` | Frontend command to manage the daemon |
+
+### How It Works
+
+1. **Event Loop** (`event_core.sh --loop`):
+   - Runs as a background daemon (started via `retro event start`)
+   - Polls system state every 1-15 seconds depending on check type
+   - Fires events by calling `broadcast_event "event_name" args`
+
+2. **Event Hooks** (`scripts/events/*.sh`):
+   - Each `.sh` file in `scripts/events/` is sourced automatically
+   - Functions named `on_event_name()` become event handlers
+   - Multiple hooks can respond to the same event
+
+3. **Event Commands**:
+   - `retro event start` - Start the daemon in background
+   - `retro event stop` - Stop the running daemon
+   - `retro event status` - Show if daemon is running
+   - `retro event trigger <name>` - Manually fire an event
+   - `retro event list` - Show all available hooks
+
+### Available Events
+
+| Event | Trigger |
+|-------|---------|
+| `on_event_loop_start` | Daemon starts |
+| `on_power_disconnect` | Battery power connected |
+| `on_power_connect` | AC power connected |
+| `on_battery_low` | Battery below threshold |
+| `on_battery_critical` | Battery critically low |
+| `on_battery_saver_enabled` | Saver mode activated |
+| `on_battery_saver_disabled` | Saver mode deactivated |
+| `on_power_profile_changed` | Power profile switched |
+| `on_battery_usage_high` | High-usage app detected |
+| `on_usb_connected` | USB device inserted |
+| `on_usb_disconnected` | USB device removed |
+| `on_pkg_updates_available` | System updates available |
+| `on_retro_update_available` | RetroLinux update available |
+| `on_bluetooth_pairing_request` | New BT device pairing |
+| `on_bluetooth_connected` | BT device connected |
+| `on_bluetooth_disconnected` | BT device disconnected |
+| `on_slideshow_tick` | Wallpaper slideshow tick |
+
+### Adding a New Event Handler
+
+1. Create or edit a file in `scripts/events/`:
+```bash
+# scripts/events/my_hooks.sh
+source "$RETRO_DIR/lib/helpers.sh"
+
+on_power_disconnect() {
+    local capacity="$1"
+    rx_log "info" "Power disconnected at ${capacity}%"
+}
+
+on_battery_low() {
+    local cap="$1"
+    notify-send "Battery Low" "Only ${cap}% remaining"
+}
+```
+
+2. The function name determines which event it handles:
+   - `on_power_disconnect` → fires when AC power removed
+   - `on_battery_low` → fires when battery below threshold
+
+### Important Notes
+
+- Event hooks run in a **subshell** - they don't share variables with the main loop
+- Use `get_var`/`set_var` from `lib/helpers.sh` for persistent state
+- Long-running operations in hooks can delay the main loop
+- The daemon auto-starts on login (via `retro load`)
+
+---
+
+## 18. Quick Reference
 
 ### File Locations
 
@@ -662,6 +890,10 @@ RetroLinux/
 │   ├── audio_core.sh
 │   ├── network_core.sh
 │   ├── driver_core.sh
+│   └── ...
+├── scripts/events/             # Event hook modules
+│   ├── battery_events.sh
+│   ├── power_events.sh
 │   └── ...
 ├── cmds/tools/                 # Frontend commands
 │   ├── audio.sh
@@ -684,5 +916,4 @@ RetroLinux/
 | Log success | `rx_log "success" "Message"` |
 | Log error | `rx_log "error" "Message" && return 1` |
 | Register cmd | `register_command "TOOLS" "cmd|alias" "desc" "cmd_cmd"` |
-
-
+| Event hook | `on_event_name() { ... }` in `scripts/events/*.sh` |

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 rx_setup_session_service() {
     local existing_auto=$(get_var "RETRO_SESSION_AUTOSAVE")
     local existing_load=$(get_var "RETRO_SESSION_AUTOLOAD")

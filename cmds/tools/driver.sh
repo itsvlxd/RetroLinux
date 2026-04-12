@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
+
 _kernel_version_ge() {
     local major="$1"
     local minor="$2"
@@ -160,31 +163,30 @@ cmd_driver() {
             local unique_all_missing=$(echo "$all_missing" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs)
             local tagged_missing=$(_tag_missing "$unique_all_missing")
 
-            echo -e "\n ${PINK}󰢮 Driver Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            [[ -n $cpu_name ]] && printf " ${PINK}󰻠${RESET} %-36s ${PINK}%s${RESET}\n" "${cpu_name:0:35}" "$cpu_info"
+            rx_table_header "󰢮" "Driver Status"
+            [[ -n $cpu_name ]] && rx_table_row "󰻠" "${cpu_name:0:35}" "$cpu_info" "$PINK" "36"
             if [[ -n $gpu_name ]]; then
                 if [[ -n $gpu_miss ]]; then
                     printf " ${PINK}󰢮${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${gpu_name:0:35}" "$gpu_drv" "$gpu_miss"
                 else
-                    printf " ${PINK}󰢮${RESET} %-36s ${PINK}%s${RESET}\n" "${gpu_name:0:35}" "$gpu_drv"
+                    rx_table_row "󰢮" "${gpu_name:0:35}" "$gpu_drv" "$PINK" "36"
                 fi
             fi
             if [[ -n $npu_name ]]; then
                 if [[ -n $npu_miss ]]; then
                     printf " ${PINK}󰓅${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${npu_name:0:35}" "$npu_drv" "$npu_miss"
                 else
-                    printf " ${PINK}󰓅${RESET} %-36s ${PINK}%s${RESET}\n" "${npu_name:0:35}" "$npu_drv"
+                    rx_table_row "󰓅" "${npu_name:0:35}" "$npu_drv" "$PINK" "36"
                 fi
             fi
             if [[ -n $net_name ]]; then
                 if [[ -n $net_miss ]]; then
                     printf " ${PINK}󰤨${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${net_name:0:35}" "$net_drv" "$net_miss"
                 else
-                    printf " ${PINK}󰤨${RESET} %-36s ${PINK}%s${RESET}\n" "${net_name:0:35}" "$net_drv"
+                    rx_table_row "󰤨" "${net_name:0:35}" "$net_drv" "$PINK" "36"
                 fi
             fi
-            [[ -n $audio_name ]] && printf " ${PINK}󰥲${RESET} %-36s ${PINK}%s${RESET}\n" "${audio_name:0:35}" "$audio_drv"
+            [[ -n $audio_name ]] && rx_table_row "󰥲" "${audio_name:0:35}" "$audio_drv" "$PINK" "36"
             if [[ -n $bt_info ]]; then
                 if [[ -n $bt_miss ]]; then
                     printf " ${PINK}󰂯${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "Bluetooth" "$bt_info" "$bt_miss"
@@ -200,29 +202,29 @@ cmd_driver() {
             for entry in "${other_entries[@]}"; do
                 IFS='|' read -r o_type o_model o_miss <<<"$entry"
                 if [[ -n $o_miss ]]; then
-                    printf " ${PINK}󰓅${RESET} %-36s ${PINK}%s${RESET}\n" "$o_type" "$o_miss"
+                    rx_table_row "󰓅" "$o_type" "$o_miss" "$PINK" "36"
                 else
-                    printf " ${PINK}󰓅${RESET} %-36s ${PINK}%s${RESET}\n" "$o_type" "$o_model"
+                    rx_table_row "󰓅" "$o_type" "$o_model" "$PINK" "36"
                 fi
             done
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            [[ -n $ml_status ]] && printf " ${PINK}󰓅${RESET} %-36s ${GRAY}%s${RESET}\n" "Multilib" "$ml_status"
-            [[ -n $rb_status ]] && printf " ${PINK}󰓅${RESET} %-36s ${GRAY}%s${RESET}\n" "Resizable BAR" "$rb_status"
+            rx_table_separator
+            [[ -n $ml_status ]] && rx_table_row_gray "󰓅" "Multilib" "$ml_status" "36"
+            [[ -n $rb_status ]] && rx_table_row_gray "󰓅" "Resizable BAR" "$rb_status" "36"
             if [[ -n $kernel_warn ]]; then
-                printf " ${PINK}󰅸${RESET} ${PINK}%s${RESET}\n" "$kernel_warn"
+                rx_table_simple "󰅸" "$kernel_warn" "$PINK"
             fi
 
             local conflicts=$(bash "$driver_script" --conflicts)
             if [[ -n $conflicts ]]; then
-                echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+                rx_table_separator
                 while IFS= read -r conflict; do
-                    printf " ${PINK}󰅸${RESET} ${PINK}%s${RESET}\n" "$conflict"
+                    rx_table_simple "󰅸" "$conflict" "$PINK"
                 done <<<"$conflicts"
             fi
             local services=$(bash "$driver_script" --services)
             if [[ -n $services ]]; then
                 while IFS= read -r svc; do
-                    printf " ${PINK}󰓅${RESET} ${PINK}%s${RESET}\n" "$svc"
+                    rx_table_simple "󰓅" "$svc" "$PINK"
                 done <<<"$services"
             fi
 
@@ -231,17 +233,18 @@ cmd_driver() {
                 IFS='|' read -r ie ne ae <<<"$intel_env"
                 local iv="${ie#intel:}"
                 if [[ $iv != "not_set" ]]; then
-                    printf " ${PINK}󰓅${RESET} %-36s ${SUCCESS}%s${RESET}\n" "NPU" "$iv"
+                    rx_table_row "󰓅" "NPU" "$iv" "$SUCCESS" "36"
                 fi
             fi
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
 
             if [[ $missing_count -gt 0 ]]; then
                 rx_log "warn" "$missing_count component(s) have missing drivers"
                 rx_log "warn" "Missing: ${PINK}$tagged_missing${RESET}"
                 rx_log "info" "Run ${PINK}retro driver install${RESET} to fix"
             fi
-            echo ""
+            rx_table_spacer
             ;;
 
         "install")
@@ -271,7 +274,7 @@ cmd_driver() {
             local tagged=$(_tag_missing "$missing_pkgs")
             rx_log "info" "The following packages will be installed: ${PINK}$tagged${RESET}"
 
-            if [[ $SKIP_PROMPT != true ]]; then
+            if [[ "$SKIP_PROMPT" != "true" ]]; then
                 rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                 read -r confirm
                 if [[ ! $confirm =~ ^[Yy]$ ]]; then
@@ -310,13 +313,13 @@ cmd_driver() {
             zes=$(grep "^ZES_ENABLE_SYSMAN=" /etc/environment 2>/dev/null | cut -d= -f2)
             : ${zes:="not_set"}
 
-            echo -e "\n ${PINK}󰓅 GPU Compute Environment${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────"
-            printf " ${PINK}󰏗${RESET} %-22s ${PINK}%s${RESET}\n" "ONEAPI_DEVICE_SELECTOR" "${intel_val}"
-            printf " ${PINK}󰏗${RESET} %-22s ${PINK}%s${RESET}\n" "ZES_ENABLE_SYSMAN" "${zes}"
-            printf " ${PINK}󰏗${RESET} %-22s ${PINK}%s${RESET}\n" "CUDA_VISIBLE_DEVICES" "${nvidia_val}"
-            printf " ${PINK}󰏗${RESET} %-22s ${PINK}%s${RESET}\n" "HSA_OVERRIDE_GFX_VERSION" "${amd_val}"
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────${RESET}\n"
+            rx_table_header "󰓅" "GPU Compute Environment"
+            rx_table_row "󰏗" "ONEAPI_DEVICE_SELECTOR" "${intel_val}" "$PINK" "22"
+            rx_table_row "󰏗" "ZES_ENABLE_SYSMAN" "${zes}" "$PINK" "22"
+            rx_table_row "󰏗" "CUDA_VISIBLE_DEVICES" "${nvidia_val}" "$PINK" "22"
+            rx_table_row "󰏗" "HSA_OVERRIDE_GFX_VERSION" "${amd_val}" "$PINK" "22"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "info")
@@ -342,14 +345,14 @@ cmd_driver() {
                 esac
             done <<<"$info_data"
 
-            echo -e "\n ${PINK}󰢮 Device Info: ${dev_name}${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            [[ -n $driver ]] && printf " ${PINK}󰓡${RESET} ${PINK}Driver:${RESET} %s\n" "$driver"
-            [[ -n $modules ]] && printf " ${PINK}󰓅${RESET} ${PINK}Modules:${RESET} %s\n" "$modules"
+            rx_table_header "󰢮" "Device Info: ${dev_name}"
+            [[ -n $driver ]] && rx_table_simple "󰓡" "Driver: $driver" "$PINK"
+            [[ -n $modules ]] && rx_table_simple "󰓅" "Modules: $modules" "$PINK"
             for detail in "${details[@]}"; do
-                echo -e "   ${GRAY}${detail}${RESET}"
+            rx_table_simple "$detail" ""
             done
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "switch")
@@ -361,13 +364,12 @@ cmd_driver() {
             local bl_info=$(bash "$driver_script" --bootloader)
             IFS='|' read -r bl_type bl_file bl_key bl_cmd <<<"$bl_info"
 
-            echo -e "\n ${PINK}󰢮 Kernel Driver Switch${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰏗${RESET} ${PINK}Bootloader:${RESET} %s\n" "${bl_type^^}"
-            printf " ${PINK}󰏗${RESET} ${PINK}Device ID:${RESET} %s\n" "$device_id"
+            rx_table_header "󰢮" "Kernel Driver Switch"
+            rx_table_simple "󰏗" "Bootloader: ${bl_type^^}" "$PINK"
+            rx_table_simple "󰏗" "Device ID: $device_id"
             printf " ${PINK}󰏗${RESET} ${PINK}Current driver:${RESET} %s\n" "$current"
             printf " ${PINK}󰏗${RESET} ${PINK}Target driver:${RESET} %s\n" "${target^^}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_separator
 
             if [[ $target != "xe" && $target != "i915" ]]; then
                 rx_log "error" "Unknown driver: ${target}. Use xe or i915"
@@ -385,7 +387,7 @@ cmd_driver() {
                 fi
             fi
 
-            if [[ $SKIP_PROMPT != true ]]; then
+            if [[ "$SKIP_PROMPT" != "true" ]]; then
                 rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                 read -r confirm
                 [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
@@ -410,15 +412,14 @@ cmd_driver() {
                     return 1
                     ;;
             esac
-            echo ""
+            rx_table_spacer
             ;;
 
         "modules")
             local mod_list=("${@:2}")
             local mod_data=$(bash "$driver_script" --modules "${mod_list[@]}")
 
-            echo -e "\n ${PINK}󰓅 Kernel Module Parameters${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰓅" "Kernel Module Parameters"
 
             local current_mod=""
             while IFS= read -r line; do
@@ -426,14 +427,14 @@ cmd_driver() {
                 case "$key" in
                     MODULE)
                         current_mod="$p_name"
-                        printf " ${PINK}󰓅${RESET} ${PINK}%s${RESET}\n" "$current_mod"
+                        rx_table_simple "󰓅" "$current_mod" "$PINK"
                         ;;
                     PARAM)
-                        printf "   ${GRAY}%-24s${RESET} %s\n" "$p_name" "${p_val:-<empty>}"
+                        rx_table_row_gray "󰓅" "$p_name" "${p_val:-<empty>}" "24"
                         ;;
                 esac
             done <<<"$mod_data"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
             ;;
 
         "modules-set")
@@ -456,17 +457,16 @@ cmd_driver() {
         "conflicts")
             local conflicts=$(bash "$driver_script" --conflicts)
 
-            echo -e "\n ${PINK}󰅸 Driver Conflict Check${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰅸" "Driver Conflict Check"
 
             if [[ -z $conflicts ]]; then
-                printf " ${SUCCESS}󰄪${RESET} ${SUCCESS}No conflicts detected${RESET}\n"
+                rx_table_simple "󰄪" "No conflicts detected" "$SUCCESS"
             else
                 while IFS= read -r conflict; do
-                    printf " ${PINK}󰅸${RESET} ${PINK}%s${RESET}\n" "$conflict"
+                    rx_table_simple "󰅸" "$conflict" "$PINK"
                 done <<<"$conflicts"
             fi
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
             ;;
 
         "fix-conflicts")
@@ -477,8 +477,7 @@ cmd_driver() {
                 return 0
             fi
 
-            echo -e "\n ${PINK}󰅸 Fixing Driver Conflicts${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰅸" "Fixing Driver Conflicts"
 
             while IFS= read -r conflict; do
                 if echo "$conflict" | grep -q "xf86-video-intel"; then
@@ -497,9 +496,9 @@ cmd_driver() {
                 fi
             done <<<"$conflicts"
 
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_separator
             rx_log "success" "Conflicts resolved. Reboot recommended."
-            echo ""
+            rx_table_spacer
             ;;
 
         "optimus")
@@ -511,11 +510,10 @@ cmd_driver() {
 
             IFS='|' read -r setup intel_model nvidia_model intel_drv nvidia_drv <<<"$dual_info"
 
-            echo -e "\n ${PINK}󰢮 NVIDIA Optimus Setup${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰢮${RESET} ${PINK}Intel GPU:${RESET} %s\n" "${intel_model}"
-            printf " ${PINK}󰢮${RESET} ${PINK}NVIDIA GPU:${RESET} %s\n" "${nvidia_model}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰢮" "NVIDIA Optimus Setup"
+            rx_table_simple "󰢮" "Intel GPU: ${intel_model}" "$PINK"
+            rx_table_simple "󰢮" "NVIDIA GPU: ${nvidia_model}" "$PINK"
+            rx_table_separator
 
             local result=$(bash "$driver_script" --optimus)
             IFS='|' read -r status <<<"$result"
@@ -534,7 +532,7 @@ cmd_driver() {
                 MISSING:*)
                     local missing="${status#MISSING:}"
                     rx_log "info" "Will install: ${PINK}$missing${RESET}"
-                    if [[ $SKIP_PROMPT != true ]]; then
+                    if [[ "$SKIP_PROMPT" != "true" ]]; then
                         rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
@@ -542,7 +540,7 @@ cmd_driver() {
                     bash "$driver_script" --optimus
                     ;;
             esac
-            echo ""
+            rx_table_spacer
             ;;
 
         "hybrid-amd")
@@ -554,11 +552,10 @@ cmd_driver() {
 
             IFS='|' read -r setup intel_model amd_model intel_drv amd_drv <<<"$dual_info"
 
-            echo -e "\n ${PINK}󰢮 AMD Hybrid Graphics Setup${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰢮${RESET} ${PINK}Intel GPU:${RESET} %s\n" "${intel_model}"
-            printf " ${PINK}󰢮${RESET} ${PINK}AMD GPU:${RESET} %s\n" "${amd_model}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰢮" "AMD Hybrid Graphics Setup"
+            rx_table_simple "󰢮" "Intel GPU: ${intel_model}" "$PINK"
+            rx_table_simple "󰢮" "AMD GPU: ${amd_model}" "$PINK"
+            rx_table_separator
 
             local result=$(bash "$driver_script" --hybrid-amd)
             IFS='|' read -r status <<<"$result"
@@ -577,7 +574,7 @@ cmd_driver() {
                 MISSING:*)
                     local missing="${status#MISSING:}"
                     rx_log "info" "Will install: ${PINK}$missing${RESET}"
-                    if [[ $SKIP_PROMPT != true ]]; then
+                    if [[ "$SKIP_PROMPT" != "true" ]]; then
                         rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
@@ -585,7 +582,7 @@ cmd_driver() {
                     bash "$driver_script" --hybrid-amd
                     ;;
             esac
-            echo ""
+            rx_table_spacer
             ;;
 
         "gpu-status")
@@ -596,18 +593,17 @@ cmd_driver() {
                 return 1
             fi
 
-            echo -e "\n ${PINK}󰢮 GPU Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰢮" "GPU Status"
 
             while IFS= read -r line; do
                 IFS='|' read -r state vendor model driver <<<"$line"
                 if [[ $state == "ACTIVE" ]]; then
-                    printf " ${PINK}󰢮${RESET} %s  %s\n" "${model}" "${driver}"
+                    rx_table_simple "󰢮" "$model ($driver)" "$PINK"
                 elif [[ $state == "INACTIVE" ]]; then
-                    printf " ${GRAY}󰢮${RESET} %s  %s\n" "${model}" "${driver}"
+                    rx_table_simple "󰢮" "$model ($driver)" "$GRAY"
                 fi
             done <<<"$gpu_data"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+            rx_table_separator
             ;;
 
         "profile")
@@ -624,11 +620,10 @@ cmd_driver() {
             fi
 
             local tagged=$(_tag_missing "$missing")
-            echo -e "\n ${PINK}󰓅 ${profile^} Profile${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-            printf " ${PINK}󰏦${RESET} Packages %s\n" "${pkgs}"
-            printf " ${PINK}󰄪${RESET} Missing %s\n" "$tagged"
-            echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
+            rx_table_header "󰓅" "${profile^} Profile"
+            rx_table_simple "󰏦" "Packages: ${pkgs}" "$PINK"
+            rx_table_simple "󰄪" "Missing: $tagged" "$PINK"
+            rx_table_separator
 
             rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
             read -r confirm
@@ -647,7 +642,7 @@ cmd_driver() {
             else
                 rx_log "error" "Failed to install some packages"
             fi
-            echo ""
+            rx_table_spacer
             ;;
 
         "firmware")
@@ -683,18 +678,17 @@ cmd_driver() {
 
                     IFS='|' read -r key dev_count upd_count <<<"$fw_data"
 
-                    echo -e "\n ${PINK}󰓅 Firmware Updates${RESET}"
-                    echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                    printf " ${PINK}󰏗${RESET} Devices: ${PINK}%s${RESET}\n" "$dev_count"
-                    printf " ${PINK}󰏗${RESET} Updates: ${PINK}%s${RESET}\n" "$upd_count"
-                    echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                    rx_table_header "󰓅" "Firmware Updates"
+                    rx_table_row "󰏗" "Devices:" "$dev_count" "$PINK" "20"
+                    rx_table_row "󰏗" "Updates:" "$upd_count" "$PINK" "20"
+                    rx_table_separator
 
                     if [[ $upd_count -gt 0 ]]; then
                         rx_log "warn" "Firmware updates available. Run ${PINK}retro driver firmware install${RESET}"
                     else
                         rx_log "success" "No firmware updates available"
                     fi
-                    echo ""
+                    rx_table_spacer
                     ;;
 
                 install)
@@ -763,56 +757,98 @@ cmd_driver() {
 
                     IFS='|' read -r key daemon_ver dev_count <<<"$fw_data"
 
-                    echo -e "\n ${PINK}󰓅 Firmware Status${RESET}"
-                    echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────"
-                    printf " ${PINK}󰏗${RESET} Daemon: ${PINK}%s${RESET}\n" "$daemon_ver"
-                    printf " ${PINK}󰏗${RESET} Devices: ${PINK}%s${RESET}\n" "$dev_count"
-                    echo -e " ${PINK}󰇝${MUTE} ──────────────────────────────────────────────────${RESET}\n"
+                    rx_table_header "󰓅" "Firmware Status"
+                    rx_table_row "󰏗" "Daemon:" "$daemon_ver" "$PINK" "20"
+                    rx_table_row "󰏗" "Devices:" "$dev_count" "$PINK" "20"
+                    rx_table_separator
                     ;;
             esac
             ;;
 
         hypr|hyprenv)
             local force_vendor="$2"
-            bash "$driver_script" --hypr "$force_vendor"
-            bash "$driver_script" --hypr-show
+            local hypr_result=$(bash "$driver_script" --hypr "$force_vendor")
+
+            local result_type=$(echo "$hypr_result" | grep -oP "result=\K[^|]+")
+            local gpu_type=$(echo "$hypr_result" | grep -oP "type=\K[^|]+")
+
+            if [[ "$result_type" == "success" ]]; then
+                rx_log "success" "Generated ${gpu_type^^} env.conf"
+            elif [[ "$result_type" == "warn" ]]; then
+                rx_log "warn" "No GPU detected, generated generic env.conf"
+            fi
+
+            local show_result=$(bash "$driver_script" --hypr-show)
+            if echo "$show_result" | grep -q "result=success"; then
+                local env_path=$(echo "$show_result" | grep -oP "path=\K[^|]+")
+                rx_table_header "󰢮" "Hyprland GPU Environment"
+                cat "$env_path" | sed 's/^/ /'
+                rx_table_separator
+                rx_table_simple "󰈐" "Location: $env_path" "$GRAY"
+                rx_table_simple "󰈐" "Source in Hyprland: source = ~/.cache/retro/env.conf" "$GRAY"
+                rx_table_spacer
+            else
+                rx_log "error" "env.conf not found. Run: retro driver hypr"
+            fi
             ;;
 
         mkinit)
-            bash "$driver_script" --mkinit
+            local mkinit_result=$(bash "$driver_script" --mkinit)
+
+            if echo "$mkinit_result" | grep -q "result=error"; then
+                local reason=$(echo "$mkinit_result" | grep -oP "reason=\K[^|]+")
+                if [[ "$reason" == "mkinit_conf_not_found" ]]; then
+                    rx_log "error" "mkinitcpio.conf not found"
+                fi
+                return 1
+            fi
+
+            if echo "$mkinit_result" | grep -q "result=skipped"; then
+                rx_log "info" "NVIDIA driver not installed, skipping mkinitcpio config"
+                return 0
+            fi
+
+            local backup=$(echo "$mkinit_result" | grep -oP "backup=\K[^|]+")
+            if [[ -n "$backup" ]]; then
+                rx_log "info" "Backup created: $backup"
+            fi
+
+            if echo "$mkinit_result" | grep -q "initramfs_regenerated"; then
+                rx_log "info" "Regenerating initramfs..."
+            fi
+
+            rx_log "success" "NVIDIA mkinitcpio configured. Reboot to apply."
             ;;
 
         *)
-            rx_log "info" "Usage: retro driver <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Scan hardware and report driver status"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "install" "Install missing drivers"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "env" "Show GPU compute env (CUDA/ONEAPI/RADV)"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "info <keyword>" "Show detailed device info"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "switch [xe|i915]" "Switch Intel GPU kernel driver"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "modules [names...]" "List kernel module parameters"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "modules-set" "Set a kernel module parameter"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "conflicts" "Check for driver conflicts"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "fix-conflicts" "Auto-resolve driver conflicts"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "optimus" "Setup NVIDIA Optimus dual GPU"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "hybrid-amd" "Setup AMD hybrid graphics"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "gpu-status" "List all detected GPUs"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "profile [name]" "Install driver profile packages"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "firmware" "Manage firmware updates"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "hypr [nvidia|amd|intel]" "Generate Hyprland GPU env"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "mkinit" "Configure mkinitcpio for NVIDIA"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Examples${GRAY}:${RESET}"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr" "Auto-detect GPU and generate env"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr nvidia" "Force NVIDIA env generation"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr amd" "Force AMD env generation"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver hypr intel" "Force Intel env generation"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver env" "Show compute environment vars"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver gpu-status" "List all detected GPUs"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver info nvidia" "Show NVIDIA device details"
-            printf " ${GRAY}%-35s${RESET} %s\n" "retro driver mkinit" "Configure NVIDIA in initramfs"
-            echo ""
+            rx_help_usage "retro driver <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "status" "Scan hardware and report driver status"
+            rx_help_cmd "install" "Install missing drivers"
+            rx_help_cmd "env" "Show GPU compute env (CUDA/ONEAPI/RADV)"
+            rx_help_cmd "info <keyword>" "Show detailed device info"
+            rx_help_cmd "switch [xe|i915]" "Switch Intel GPU kernel driver"
+            rx_help_cmd "modules [names...]" "List kernel module parameters"
+            rx_help_cmd "modules-set" "Set a kernel module parameter"
+            rx_help_cmd "conflicts" "Check for driver conflicts"
+            rx_help_cmd "fix-conflicts" "Auto-resolve driver conflicts"
+            rx_help_cmd "optimus" "Setup NVIDIA Optimus dual GPU"
+            rx_help_cmd "hybrid-amd" "Setup AMD hybrid graphics"
+            rx_help_cmd "gpu-status" "List all detected GPUs"
+            rx_help_cmd "profile [name]" "Install driver profile packages"
+            rx_help_cmd "firmware" "Manage firmware updates"
+            rx_help_cmd "hypr [nvidia|amd|intel]" "Generate Hyprland GPU env"
+            rx_help_cmd "mkinit" "Configure mkinitcpio for NVIDIA"
+            rx_help_examples
+            rx_help_example "retro driver hypr" "Auto-detect GPU and generate env"
+            rx_help_example "retro driver hypr nvidia" "Force NVIDIA env generation"
+            rx_help_example "retro driver hypr amd" "Force AMD env generation"
+            rx_help_example "retro driver hypr intel" "Force Intel env generation"
+            rx_help_example "retro driver env" "Show compute environment vars"
+            rx_help_example "retro driver gpu-status" "List all detected GPUs"
+            rx_help_example "retro driver info nvidia" "Show NVIDIA device details"
+            rx_help_example "retro driver mkinit" "Configure NVIDIA in initramfs"
+            rx_help_spacer
             ;;
     esac
 }

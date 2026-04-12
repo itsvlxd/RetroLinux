@@ -1,7 +1,7 @@
 #!/bin/bash
 
-source "$RETRO_DIR/scripts/lib/battery.sh"
-source "$RETRO_DIR/scripts/lib/variable.sh"
+source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"

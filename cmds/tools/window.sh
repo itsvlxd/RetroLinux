@@ -1,38 +1,6 @@
 #!/bin/bash
 
-get_terminal_child() {
-    local title="$1"
-    local t_cmd="${title%% *}"
-
-    if [[ $t_cmd =~ ^(/|~|\.) ]] || [[ $t_cmd =~ ^(bash|zsh|fish|sh|tmux|kitty|kitten)$ ]]; then
-        return
-    fi
-
-    if [[ $t_cmd =~ ^(hyprctl|ps|grep|awk|sudo|su|clear|cat|ls|cd|rm|cp|mv|retro)$ ]]; then
-        return
-    fi
-
-    if command -v "$t_cmd" &>/dev/null; then
-        echo "$t_cmd"
-    fi
-}
-
-get_client_cwd() {
-    local pid="$1"
-    local class="$2"
-    local term_cmd="$3"
-    local cwd=""
-
-    if [[ ${class,,} == "${term_cmd,,}" ]]; then
-        cwd=$(kitty @ --to="unix:/tmp/kitty-$pid" ls 2>/dev/null | grep -m 1 '"cwd":' | cut -d'"' -f4)
-    fi
-
-    if [[ -z $cwd ]]; then
-        cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null)
-    fi
-
-    echo "${cwd:-$HOME}"
-}
+source "$RETRO_DIR/lib/help.sh"
 
 handle_kitty_padding() {
     local pid="$1"
@@ -52,179 +20,11 @@ handle_kitty_padding() {
     fi
 }
 
-save_session() {
-    rx_log "info" "Capturing system-wide session state..."
-    local session_data=""
-    local terminal_cmd=$(get_var "RETRO_TERMINAL_CMD" "kitty")
-    local fm_cmd=$(get_var "RETRO_FILEMANAGER_CMD")
-
-    local raw_vars=$(bash "$RETRO_DIR/scripts/variable_core.sh" --list 2>/dev/null)
-    local mapped_vars=$(echo "$raw_vars" | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); gsub(/"/, "", $2); print tolower($1) "=" tolower($2)}')
-
-    while read -r class ws_id pid is_floating is_fs title; do
-        if [[ $is_floating == "true" && $is_fs != "1" && $is_fs != "2" && $is_fs != "true" ]]; then
-            continue
-        fi
-
-        [[ -z $class || $class == "null" ]] && continue
-
-        local final_app_name=""
-        local display_sub=""
-
-        local cwd=$(get_client_cwd "$pid" "$class" "$terminal_cmd")
-
-        if [[ ${class,,} == "${terminal_cmd,,}" ]]; then
-            final_app_name="terminal"
-            display_sub=$(get_terminal_child "$title")
-        else
-            local binary_name="${class,,}"
-            if [[ -n $fm_cmd && $binary_name == "${fm_cmd,,}" ]]; then
-                final_app_name="filemanager"
-            else
-                local var_match=$(echo "$mapped_vars" | grep -i "$binary_name" | cut -d'=' -f1 | head -n 1)
-
-                if [[ -n $var_match ]]; then
-                    final_app_name="$var_match"
-                else
-                    case "$binary_name" in
-                        "terminal" | "bash" | "zsh" | "sh") final_app_name="terminal" ;;
-                        "ps" | "grep" | "awk" | "retro" | "kitten" | "rofi") continue ;;
-                        *) final_app_name="$binary_name" ;;
-                    esac
-                fi
-            fi
-        fi
-
-        if [[ -n $final_app_name ]]; then
-            local entry="${final_app_name}|${display_sub}|${cwd}|${is_fs}:${ws_id}"
-
-            if [[ -z $session_data ]]; then
-                session_data="$entry"
-            else
-                session_data="${session_data},${entry}"
-            fi
-        fi
-    done < <(hyprctl clients -j | jq -r 'sort_by(.workspace.id, .at[1], .at[0]) | .[] | "\(.initialClass // .class) \(.workspace.id) \(.pid) \(.floating) \(.fullscreen) \(.title)"')
-
-    if [[ -n $session_data ]]; then
-        set_var "RETRO_SESSION_STATE" "$session_data"
-        set_var "RETRO_SESSION_TIMESTAMP" "$(date +%s)"
-        rx_log "success" "Session state cached: ${MUTE}${session_data}${RESET}"
-    else
-        rx_log "error" "No tiled applications found to save."
-    fi
-}
-
-restore_session() {
-    local data=$(get_var "RETRO_SESSION_STATE")
-    local terminal_cmd=$(get_var "RETRO_TERMINAL_CMD" "kitty")
-
-    if [[ -z $data || $data == "null" ]]; then
-        rx_log "error" "No session payload found in Retro variables."
-        return 1
-    fi
-
-    rx_log "info" "Rebuilding workspace layout..."
-
-    local current_clients=","
-    local mapped_vars=$(bash "$RETRO_DIR/scripts/variable_core.sh" --list | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); gsub(/"/, "", $2); print tolower($1) "=" tolower($2)}')
-
-    while read -r class ws_id pid is_floating is_fs title; do
-        if [[ $is_floating == "true" && $is_fs != "1" && $is_fs != "2" && $is_fs != "true" ]]; then
-            continue
-        fi
-
-        local app_name=""
-        local display_sub=""
-
-        if [[ ${class,,} == "${terminal_cmd,,}" ]]; then
-            app_name="terminal"
-            display_sub=$(get_terminal_child "$title")
-        else
-            local bin="${class,,}"
-            local var_match=$(echo "$mapped_vars" | grep -i "$bin" | cut -d'=' -f1 | head -n 1)
-
-            if [[ -n $var_match ]]; then
-                app_name="$var_match"
-            else
-                app_name="$bin"
-            fi
-        fi
-
-        current_clients="${current_clients}${app_name}|${display_sub}:${ws_id},"
-    done < <(hyprctl clients -j | jq -r 'sort_by(.workspace.id, .at[1], .at[0]) | .[] | "\(.initialClass // .class) \(.workspace.id) \(.pid) \(.floating) \(.fullscreen) \(.title)"')
-
-    IFS=',' read -ra ENTRIES <<<"$data"
-    for entry in "${ENTRIES[@]}"; do
-        local full_payload="${entry%%:*}"
-        local ws="${entry#*:}"
-
-        local app=$(echo "$full_payload" | cut -d'|' -f1)
-        local sub=$(echo "$full_payload" | cut -d'|' -f2)
-        local cwd=$(echo "$full_payload" | cut -d'|' -f3)
-        local is_fs=$(echo "$full_payload" | cut -d'|' -f4)
-
-        local check_str="${app}|${sub}:${ws}"
-
-        if [[ $current_clients == *",$check_str,"* ]]; then
-            current_clients="${current_clients/,$check_str,/,}"
-
-            local skip_name="${app^}"
-            [[ $app != "$sub" && -n $sub ]] && skip_name="$skip_name ($sub)"
-            rx_log "info" "Skipping $skip_name: Already present on Workspace $ws."
-            continue
-        fi
-
-        local rest_name="${app^}"
-        [[ $app != "$sub" && -n $sub ]] && rest_name="$rest_name ($sub)"
-        rx_log "info" "Restoring $rest_name to Workspace $ws..."
-
-        hyprctl dispatch workspace "$ws" >/dev/null
-
-        export RETRO_CWD="$cwd"
-
-        # 󱗼 FIXED: Isolate App Manager from Native Apps
-        local is_core="false"
-        case "$app" in
-            terminal | filemanager | browser | editor) is_core="true" ;;
-        esac
-
-        if [[ $is_core == "true" ]]; then
-            if [[ $app != "$sub" && -n $sub ]]; then
-                cmd_apps "$app" "open" "$sub"
-            else
-                cmd_apps "$app" "open"
-            fi
-        else
-            local exe_cmd="$app"
-            # Hardcoded quirks for apps with weird classes
-            case "${app,,}" in
-                zen) exe_cmd="zen-browser" ;;
-                code-url-handler) exe_cmd="code" ;;
-            esac
-            (setsid "$exe_cmd" >/dev/null 2>&1 &)
-        fi
-
-        unset RETRO_CWD
-
-        if [[ $is_fs == "1" || $is_fs == "2" || $is_fs == "true" ]]; then
-            (sleep 0.8 && hyprctl dispatch fullscreen 0 >/dev/null 2>&1) &
-        fi
-
-        sleep 0.4
-    done
-
-    sleep 0.5
-
-    hyprctl dispatch workspace 1 >/dev/null
-
-    rx_log "success" "System state fully restored."
-}
-
 cmd_wm() {
-    local action="$1"
-    shift
-    local args="$@"
+    local window_core="$RETRO_DIR/scripts/window_core.sh"
+    local action="${1,,}"
+    local arg1="$2"
+    local arg2="$3"
 
     case "$action" in
         "fullscreen")
@@ -239,86 +39,200 @@ cmd_wm() {
             hyprctl dispatch fullscreen 0
             ;;
 
-        "save") save_session ;;
-        "restore") restore_session ;;
+        "list")
+            local raw_rules=$(bash "$window_core" --list)
 
-        "clear")
-            set_var "RETRO_SESSION_STATE" "null"
-            set_var "RETRO_SESSION_TIMESTAMP" "null"
-            rx_log "success" "Saved session state has been deleted."
+            if [[ $raw_rules == "NONE" ]]; then
+                rx_table_header "󰨇" "Window Rules"
+                rx_table_simple "󰄪" "No custom rules defined" "$PINK"
+                rx_table_separator
+                rx_table_spacer
+                return 0
+            fi
+
+            rx_table_header "󰨇" "Custom Window Rules"
+
+            while IFS='|' read -r rtype rname; do
+                [[ -z $rtype && -z $rname ]] && continue
+
+                if [[ $rtype == "window" ]]; then
+                    rx_table_simple "󰍱" "$rname" "$PINK"
+                elif [[ $rtype == "layer" ]]; then
+                    rx_table_simple "󰨎" "$rname" "$PINK"
+                fi
+            done <<<"$raw_rules"
+
+            rx_table_separator
+            rx_table_spacer
             ;;
 
-        "toggle-autosave")
-            local current_state=$(get_var "RETRO_SESSION_AUTOSAVE")
-            if [[ $current_state == "true" ]]; then
-                set_var "RETRO_SESSION_AUTOSAVE" "false"
-                rx_log "success" "Retro Session auto-save disabled."
+        "add")
+            local name="$arg1"
+            local rule="$arg2"
+
+            [[ -z $name ]] && rx_log "error" "Usage: retro window add <name> <rule>" && return 1
+            [[ -z $rule ]] && rx_log "error" "Usage: retro window add <name> <rule>" && return 1
+
+            local result=$(bash "$window_core" --add "$name" "$rule")
+
+            if [[ $result == "ERROR:blacklisted" ]]; then
+                rx_log "error" "This application is blacklisted. Check RETRO_WINDOW_BLACKLIST variable."
+                return 1
+            elif [[ $result == "ERROR:exists" ]]; then
+                rx_log "error" "Rule '${PINK}$name${RESET}' already exists."
+                return 1
+            elif [[ $result == "APPLIED" ]]; then
+                rx_log "success" "Window rule '${PINK}$name${RESET}' added and applied."
             else
-                set_var "RETRO_SESSION_AUTOSAVE" "true"
-                rx_log "success" "Retro Session auto-save enabled."
+                rx_log "error" "Failed to add window rule."
+                return 1
             fi
             ;;
 
-        "status")
-            local data=$(get_var "RETRO_SESSION_STATE")
-            local ts=$(get_var "RETRO_SESSION_TIMESTAMP")
+        "add-anon")
+            local rule="$arg1"
 
-            if [[ -z $data || $data == "null" ]]; then
-                rx_log "error" "No session snapshot found in system variables."
+            [[ -z $rule ]] && rx_log "error" "Usage: retro window add-anon <rule>" && return 1
+
+            local result=$(bash "$window_core" --add-anon "window" "$rule")
+
+            if [[ $result == "APPLIED" ]]; then
+                rx_log "success" "Anonymous window rule added and applied."
+            else
+                rx_log "error" "Failed to add anonymous window rule."
+                return 1
+            fi
+            ;;
+
+        "add-layer")
+            local name="$arg1"
+            local rule="$arg2"
+
+            [[ -z $name ]] && rx_log "error" "Usage: retro window add-layer <name> <rule>" && return 1
+            [[ -z $rule ]] && rx_log "error" "Usage: retro window add-layer <name> <rule>" && return 1
+
+            local result=$(bash "$window_core" --add-layer "$name" "$rule")
+
+            if [[ $result == "ERROR:exists" ]]; then
+                rx_log "error" "Layer rule '${PINK}$name${RESET}' already exists."
+                return 1
+            elif [[ $result == "APPLIED" ]]; then
+                rx_log "success" "Layer rule '${PINK}$name${RESET}' added and applied."
+            else
+                rx_log "error" "Failed to add layer rule."
+                return 1
+            fi
+            ;;
+
+        "add-layer-anon")
+            local rule="$arg1"
+
+            [[ -z $rule ]] && rx_log "error" "Usage: retro window add-layer-anon <rule>" && return 1
+
+            local result=$(bash "$window_core" --add-anon "layer" "$rule")
+
+            if [[ $result == "APPLIED" ]]; then
+                rx_log "success" "Anonymous layer rule added and applied."
+            else
+                rx_log "error" "Failed to add anonymous layer rule."
+                return 1
+            fi
+            ;;
+
+        "remove")
+            local name="$arg1"
+
+            [[ -z $name ]] && rx_log "error" "Usage: retro window remove <name>" && return 1
+
+            local result=$(bash "$window_core" --remove "$name")
+
+            if [[ $result == "ERROR:not_found" ]]; then
+                rx_log "error" "Rule '${PINK}$name${RESET}' not found."
+                return 1
+            elif [[ $result == "APPLIED" ]]; then
+                rx_log "success" "Rule '${PINK}$name${RESET}' removed and applied."
+            else
+                rx_log "error" "Failed to remove rule."
+                return 1
+            fi
+            ;;
+
+        "apply")
+            bash "$window_core" --apply
+            rx_log "success" "Window rules reloaded."
+            ;;
+
+        "show")
+            local name="$arg1"
+
+            [[ -z $name ]] && rx_log "error" "Usage: retro window show <name>" && return 1
+
+            local content=$(bash "$window_core" --get "$name")
+
+            if [[ -z $content ]]; then
+                rx_log "error" "Rule '${PINK}$name${RESET}' not found."
                 return 1
             fi
 
-            local diff=$(($(date +%s) - ts))
-            local ago_str="$((diff / 60))m $((diff % 60))s ago"
-            local human_time=$(date -d "@$ts" "+%H:%M:%S")
+            rx_table_header "󰨇" "Rule: $name"
+            echo -e "${GRAY}$content${RESET}"
+            rx_table_separator
+            rx_table_spacer
+            ;;
 
-            echo -e "\n ${PINK}󰨇 Session Snapshot: ${RESET}$ago_str at $human_time ${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────"
+        "blacklist")
+            local blacklist=$(get_var "RETRO_WINDOW_BLACKLIST")
 
-            declare -A ws_groups
-            IFS=',' read -ra ENTRIES <<<"$data"
+            : ${blacklist:="(none)"}
 
-            for entry in "${ENTRIES[@]}"; do
-                local full_payload="${entry%%:*}"
-                local ws="${entry#*:}"
+            rx_table_header "󰞵" "Blacklisted Classes"
+            rx_table_row "󰍱" "Apps:" "$blacklist" "$PINK" "30"
+            rx_table_separator
+            rx_table_spacer
 
-                local app=$(echo "$full_payload" | cut -d'|' -f1)
-                local sub=$(echo "$full_payload" | cut -d'|' -f2)
-                local is_fs=$(echo "$full_payload" | cut -d'|' -f4)
+            rx_log "info" 'Manage with: retro variable set RETRO_WINDOW_BLACKLIST "app1|app2"'
+            ;;
 
-                local display="${app^}"
-                [[ $app != "$sub" && -n $sub ]] && display="$display ${MUTE}($sub)${RESET}"
-                [[ $is_fs == "1" || $is_fs == "2" || $is_fs == "true" ]] && display="$display ${PINK}[FS]${RESET}"
+        "edit")
+            local rules_file="$RETRO_CACHE/themes/windowrules.conf"
+            local editor="${EDITOR:-${RETRO_EDITOR:-nano}}"
 
-                if [[ -z ${ws_groups[$ws]} ]]; then
-                    ws_groups[$ws]="$display"
-                else
-                    ws_groups[$ws]="${ws_groups[$ws]}, $display"
-                fi
-            done
+            if [[ ! -f $rules_file ]]; then
+                rx_log "error" "Rules file not found at $rules_file"
+                return 1
+            fi
 
-            local sorted_workspaces=$(for k in "${!ws_groups[@]}"; do echo "$k"; done | sort -n)
+            $editor "$rules_file"
 
-            for ws in $sorted_workspaces; do
-                printf " ${PINK}󰄾${RESET} %-18s %b\n" "Workspace $ws:" "${ws_groups[$ws]}"
-            done
-
-            echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────${RESET}\n"
+            rx_log "info" "Reloading window rules..."
+            bash "$window_core" --apply
+            rx_log "success" "Window rules updated and applied."
             ;;
 
         *)
-            rx_log "info" "Usage: retro window <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "fullscreen" "Toggle fullscreen on active window"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "save" "Capture current workspace layout"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "restore" "Rebuild workspace from saved layout"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "clear" "Delete saved session state"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "toggle-autosave" "Toggle session autosave"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show saved session snapshot"
-            echo ""
+            rx_help_usage "retro window <command>"
+            rx_help_commands "Window Commands"
+            rx_help_cmd "fullscreen" "Toggle fullscreen on active window"
+            rx_help_cmd "list" "Show all custom window/layer rules"
+            rx_help_cmd "add <name> <rule>" "Add named windowrule"
+            rx_help_cmd "add-anon <rule>" "Add anonymous windowrule"
+            rx_help_cmd "add-layer <name> <rule>" "Add named layerrule"
+            rx_help_cmd "add-layer-anon <rule>" "Add anonymous layerrule"
+            rx_help_cmd "remove <name>" "Remove rule by name"
+            rx_help_cmd "show <name>" "Show rule details"
+            rx_help_cmd "apply" "Reload rules without adding"
+            rx_help_cmd "edit" "Edit rules file in editor"
+            rx_help_cmd "blacklist" "Show blacklisted app classes"
+            rx_help_examples
+            rx_help_example "retro window add zen-opacity 'match:class = zen, opacity = 1.0 0.8'" "Named windowrule"
+            rx_help_example "retro window add-anon 'no_blur on, match:class firefox'" "Anonymous windowrule"
+            rx_help_example "retro window add-layer mylayer 'match:namespace = mylayer, blur = on'" "Named layerrule"
+            rx_help_example "retro window add-layer-anon 'blur on, match:namespace waybar'" "Anonymous layerrule"
+            rx_help_example "retro window edit" 'Edit rules in $EDITOR'
+            rx_help_example "retro window fullscreen" "Toggle fullscreen"
+            rx_help_spacer
             ;;
     esac
 }
 
-register_command "TOOLS" "window" "Window manager utilities and rules" "cmd_wm"
+register_command "TOOLS" "window" "Manage window rules and layer rules" "cmd_wm"

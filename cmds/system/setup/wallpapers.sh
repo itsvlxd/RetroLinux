@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 source "$RETRO_DIR/cmds/tools/wallpaper.sh"
 
 VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
@@ -55,12 +57,12 @@ rx_setup_wallpapers() {
             local pretty_name=$(echo "$raw_name" | tr '_' ' ' | awk '{for(j=1;j<=NF;j++) $j=toupper(substr($j,1,1)) tolower(substr($j,2)); print}')
             display_names[$i]="$pretty_name"
 
-            echo -e " ${PINK}$i)${RESET} $pretty_name"
+            rx_table_simple "$i)" "$pretty_name"
             ((i++))
         done
 
         if ((i > 1)); then
-            printf " ${PINK}󰄾${RESET} Select a theme [1-$((i - 1))]: "
+            rx_log "info" "Select a theme [1-$((i - 1))]: "
             read theme_choice
 
             local selected_theme="${theme_dirs[$theme_choice]}"
@@ -95,7 +97,7 @@ rx_setup_wallpapers() {
 
         local res_map=$(bash "$VAR_SCRIPT" --get "WALL_RES_MAP")
         if [[ -z $res_map || $res_map == "null" ]]; then
-            echo -e ""
+            rx_help_spacer
             rx_log "info" "Let's optimize your video wallpapers to save CPU overhead."
             cmd_wallpaper "res"
         else

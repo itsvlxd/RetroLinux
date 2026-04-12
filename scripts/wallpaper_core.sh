@@ -1,8 +1,7 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/scripts/lib/battery.sh"
+source "$RETRO_DIR/lib/battery.sh"
 
 WALL_DIR="$HOME/.cache/retro/wallpapers"
 FRAME_CACHE="$HOME/.cache/retro/wallpaper_frames"
@@ -43,13 +42,13 @@ get_theme_dir() {
 add_wallpaper() {
     local source_file="$1"
     if [[ ! -f $source_file ]]; then
-        rx_log "error" "File not found: $source_file"
+        echo "result=error|reason=file_not_found|path=$source_file"
         return 1
     fi
 
     local ext="${source_file##*.}"
     if [[ ! ${ext,,} =~ ^(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$ ]]; then
-        rx_log "error" "Unsupported file format! Please use a standard image or video."
+        echo "result=error|reason=unsupported_format|ext=$ext"
         return 1
     fi
 
@@ -126,8 +125,6 @@ optimize_wallpapers() {
             fi
 
             if [[ $cached_res != "${target_w}x${target_h}" ]]; then
-                rx_log "info" "Downscaling $filename (${src_w}x${src_h} -> ${target_w}x${target_h})"
-
                 rm -f "$opt_file"
 
                 if [[ $is_video == "true" ]]; then
@@ -297,7 +294,7 @@ launch_picker() {
     done
 
     if [[ -z $list ]]; then
-        rx_log "error" "No wallpaper files found inside $target_dir"
+        echo "result=error|reason=no_files_found|path=$target_dir"
         return 1
     fi
 

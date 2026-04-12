@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/help.sh"
+
 cmd_bluetooth() {
     local bt_script="$RETRO_DIR/scripts/bluetooth_core.sh"
     local action="${1,,}"
@@ -18,14 +20,14 @@ cmd_bluetooth() {
             ;;
 
         "list")
-            echo -e "\n ${PINK}󰂳 Paired Bluetooth Devices${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󰂳" "Paired Bluetooth Devices"
             bash "$bt_script" --list | while read -r line; do
                 local mac=$(echo "$line" | awk '{print $2}')
                 local name=$(echo "$line" | cut -d' ' -f3-)
-                echo -e " ${PINK}󰂲${RESET} $name ${GRAY}$mac${RESET}"
+                rx_table_simple "󰂲" "$name ($mac)" "$GRAY"
             done
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "forget")
@@ -42,19 +44,19 @@ cmd_bluetooth() {
                 return 1
             fi
 
-            echo -e "\n ${PINK}󰂰 Nearby Bluetooth Devices${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
+            rx_table_header "󰘐" "Nearby Bluetooth Devices"
 
             if [[ -z $nearby_raw ]]; then
-                echo -e " ${GRAY}  No new devices found yet...${RESET}"
+                rx_table_simple "󰍉" "No new devices found yet..." "$GRAY"
             else
                 echo "$nearby_raw" | while read -r line; do
                     local mac=$(echo "$line" | awk '{print $2}')
                     local name=$(echo "$line" | cut -d' ' -f3-)
-                    echo -e " ${PINK}󰍉${RESET} $name ${GRAY}$mac${RESET}"
+                    rx_table_simple "󰍉" "$name ($mac)" "$GRAY"
                 done
             fi
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "connect")
@@ -133,30 +135,29 @@ cmd_bluetooth() {
             local mode_color="$PINK"
             [[ $pwr_mode == "SAVER" ]] && mode_color="$MUTE"
 
-            echo -e "\n ${PINK}󰂯 Bluetooth Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────"
-            printf " ${PINK}󰈐${RESET} %-20s ${mode_color}%s${RESET} ${GRAY}(Radio: %s)${RESET}\n" "Power Mode:" "$pwr_mode" "${pwr_stat^^}"
-            printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Discoverable:" "${disc^^}"
-            printf " ${PINK}󰈐${RESET} %-20s ${PINK}%s${RESET}\n" "Pairable:" "${pair^^}"
-            printf " ${PINK}󰂱${RESET} %-20s ${GRAY}%s${RESET}\n" "Adapter:" "$chip"
-            printf " ${PINK}󰄀${RESET} %-20s ${GRAY}Bluetooth %s${RESET}\n" "Stack Version:" "$ver"
-            printf " ${PINK}󰂲${RESET} %-20s ${PINK}%s Device(s)${RESET}\n" "Active Conns:" "$conns"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}\n"
+            rx_table_header "󰂯" "Bluetooth Status"
+            rx_table_row "󰈐" "Power Mode:" "${pwr_mode} (Radio: ${pwr_stat^^})" "$mode_color" "20"
+            rx_table_row "󰈐" "Discoverable:" "${disc^^}" "$PINK" "20"
+            rx_table_row "󰈐" "Pairable:" "${pair^^}" "$PINK" "20"
+            rx_table_row_gray "󰂱" "Adapter:" "$chip" "20"
+            rx_table_row_gray "󰄀" "Stack Version:" "Bluetooth $ver" "20"
+            rx_table_row "󰂲" "Active Conns:" "$conns Device(s)" "$PINK" "20"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         *)
-            rx_log "info" "Usage: retro bluetooth <command>"
-            echo -e ""
-            echo -e " ${PINK}  ${RESET}Available commands${GRAY}:${RESET}"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "status" "Show adapter and connection info"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "scan [on|off]" "Toggle device discovery"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "list" "List paired devices"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "nearby" "Show discoverable devices"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "connect <mac>" "Connect to a device"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "disconnect <mac>" "Disconnect a device"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "forget <mac>" "Remove a paired device"
-            printf " ${PINK}%-18s${GRAY}- ${RESET}%s\n" "discoverable" "Toggle visibility mode"
-            echo ""
+            rx_help_usage "retro bluetooth <command>"
+            rx_help_commands "Available commands"
+            rx_help_cmd "status" "Show adapter and connection info"
+            rx_help_cmd "scan [on|off]" "Toggle device discovery"
+            rx_help_cmd "list" "List paired devices"
+            rx_help_cmd "nearby" "Show discoverable devices"
+            rx_help_cmd "connect <mac>" "Connect to a device"
+            rx_help_cmd "disconnect <mac>" "Disconnect a device"
+            rx_help_cmd "forget <mac>" "Remove a paired device"
+            rx_help_cmd "discoverable" "Toggle visibility mode"
+            rx_help_spacer
             ;;
     esac
 }
