@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop, "**"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install -y shellcheck jq bash
+
+      - name: Set up environment
+        run: |
+          echo "RETRO_DIR=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+          echo "RETRO_CACHE=$HOME/.cache/retro" >> $GITHUB_ENV
+          mkdir -p $HOME/.cache/retro
+
+      - name: Run all tests via retro
+        run: |
+          chmod +x $RETRO_DIR/retro.sh
+          cd $RETRO_DIR
+          RETRO_TEST_BYPASS=true ./retro.sh --tests all
+
+      - name: Upload test cache
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-cache
+          path: ~/.cache/retro/test_cache.json
+          retention-days: 30
+
+      - name: Show test summary
+        if: always()
+        run: |
+          if [[ -f ~/.cache/retro/test_cache.json ]]; then
+            cat ~/.cache/retro/test_cache.json | jq -r '
+              "Test Summary:
+              Total: \(.total)
+              Passed: \(.passed)
+              Failed: \(.failed)
+              Warnings: \(.warnings)"
+            '
+          else
+            echo "No test cache found"
+          fi
+
+      - name: Fail if tests failed
+        run: |
+          if [[ -f ~/.cache/retro/test_cache.json ]]; then
+            failed=$(cat ~/.cache/retro/test_cache.json | jq -r '.failed')
+            if [[ "$failed" -gt 0 ]]; then
+              echo "Tests failed!"
+              exit 1
+            fi
+          fi

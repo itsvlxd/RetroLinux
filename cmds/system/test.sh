@@ -4,13 +4,15 @@ cmd_test() {
     local action="${1:-}"
     local subarg="$2"
 
-    local current_branch
-    current_branch=$(cd "$RETRO_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [[ -z $RETRO_TEST_BYPASS ]]; then
+        local current_branch
+        current_branch=$(cd "$RETRO_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
-    if [[ $current_branch != *"dev"* ]]; then
-        rx_log "error" "Test command is only available on dev branches"
-        rx_log "info" "Current branch: ${GRAY}${current_branch}${RESET}"
-        return 1
+        if [[ $current_branch != *"dev"* ]]; then
+            rx_log "error" "Test command is only available on dev branches"
+            rx_log "info" "Current branch: ${GRAY}${current_branch}${RESET}"
+            return 1
+        fi
     fi
 
     local core="$RETRO_DIR/scripts/test_core.sh"
@@ -201,8 +203,6 @@ cmd_test() {
     esac
 }
 
-current_branch=$(cd "$RETRO_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-
-if [[ $current_branch == *"dev"* ]]; then
-    register_command "SYSTEM" "-t|--tests" "Run test suite (dev branches only)" "cmd_test"
+if [[ -n $RETRO_TEST_BYPASS || "$(cd "$RETRO_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null)" == *"dev"* ]]; then
+    register_command "SYSTEM" "-t|--tests" "Run test suite" "cmd_test"
 fi
