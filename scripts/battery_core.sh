@@ -4,6 +4,8 @@ source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/battery.sh"
 
 get_info() {
+    [[ $(has_battery) != "true" ]] && echo "no-battery" && return 1
+
     local stat=$(get_bat_status)
     local cap=$(cat "$BAT_PATH/capacity" 2>/dev/null || echo "0")
     local health=$(cat "$BAT_PATH/capacity_level" 2>/dev/null || echo "N/A")

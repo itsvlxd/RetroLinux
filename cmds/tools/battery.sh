@@ -1,8 +1,10 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/battery.sh"
 
 cmd_battery() {
+    [[ $(has_battery) != "true" ]] && rx_log "error" "No battery detected" && return 1
     local battery_script="$RETRO_DIR/scripts/battery_core.sh"
     local action="${1,,}"
     local value="$2"
@@ -174,4 +176,6 @@ cmd_battery() {
     esac
 }
 
-register_command "TOOLS" "battery" "Smart battery management utility" "cmd_battery"
+if [[ $(has_battery) == "true" ]]; then
+    register_command "TOOLS" "battery" "Smart battery management utility" "cmd_battery"
+fi
