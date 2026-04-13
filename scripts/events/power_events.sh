@@ -8,18 +8,13 @@ BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
 VAR_CORE="$RETRO_DIR/scripts/variable_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 
-# TODO: Make a on idle event
-#
-
 on_power_disconnect() {
     local cap="$1"
 
     if [[ $(get_var "BAT_SAVER_ON_PWR_DIS") == "true" && $(get_var "BAT_SAVER_ACTIVE") != "true" ]]; then
-        bash "$BAT_CORE" --saver "true"
+        #bash "$BAT_CORE" --saver "true"
         bash "$PWR_CORE" --set "saver"
     fi
-
-    bash "$PWR_CORE" --restore
 
     if [[ $(get_var "WALL_STATIC_ON_BAT") == "true" ]]; then
         bash "$WALL_CORE" --restore
@@ -29,14 +24,10 @@ on_power_disconnect() {
 }
 
 on_power_connect() {
-    bash "$PWR_CORE" --restore
+    bash "$PWR_CORE" --restore-prev
 
     if [[ $(get_var "BAT_SAVER_ON_PWR_DIS") == "true" && $(get_var "BAT_SAVER_ACTIVE") == "true" ]]; then
         bash "$BAT_CORE" --saver "false"
-
-        if [[ $(get_var "PWR_CURRENT") == "saver" ]]; then
-            bash "$PWR_CORE" --toggle
-        fi
     fi
 
     if [[ $(get_var "WALL_STATIC_ON_BAT") == "true" ]]; then
@@ -65,3 +56,4 @@ on_power_profile_changed() {
         bash "$BAT_CORE" --saver "true"
     fi
 }
+
