@@ -126,7 +126,9 @@ set_profile() {
     profile="${profile,,}"
 
     local prev=$(get_var "PWR_CURRENT")
-    set_var "PWR_PREVIOUS" "$prev"
+    if [[ "$prev" != "$profile" ]]; then
+        set_var "PWR_PREVIOUS" "$prev"
+    fi
     set_var "PWR_CURRENT" "$profile"
 
     local watts=$(get_pwr_var "$profile")
@@ -218,8 +220,17 @@ set_profile() {
 }
 
 restore_profile() {
-    curr=$(get_var "PWR_CURRENT")
+    local curr=$(get_var "PWR_CURRENT")
     set_profile "$curr"
+}
+
+restore_previous() {
+    local prev=$(get_var "PWR_PREVIOUS")
+    if [[ -n $prev && $prev != "null" ]]; then
+        set_profile "$prev"
+    else
+        restore_profile
+    fi
 }
 
 toggle_profile() {
@@ -295,7 +306,7 @@ optimize_cpu() {
     done
 
     if [[ -z $match ]]; then
-        if ls /sys/class/power_supply/BAT* >/dev/null 2>&1; then
+        if [[ $(has_battery) == "true" ]]; then
             match="Generic Laptop|15,25,45|10,15,25"
         else
             match="Generic PC|65,95,125|45,65,95"
@@ -349,6 +360,7 @@ case "$1" in
     "--set") set_profile "$2" ;;
     "--get") get_var "PWR_CURRENT" ;;
     "--restore") restore_profile ;;
+    "--restore-prev") restore_previous ;;
     "--toggle") toggle_profile ;;
     "--tune") tune_settings "$2" "$3" "$4" ;;
     "--list") list_settings ;;
