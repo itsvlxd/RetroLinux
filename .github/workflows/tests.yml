@@ -15,7 +15,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt-get update && apt-get install -y shellcheck jq bash
+          sudo apt-get update && sudo apt-get install -y shellcheck jq bash
 
       - name: Set up environment
         run: |
