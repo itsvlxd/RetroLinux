@@ -1,8 +1,10 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/bluetooth.sh"
 
 cmd_bluetooth() {
+    [[ $(has_bluetooth) != "true" ]] && rx_log "error" "No bluetooth adapter detected" && return 1
     local bt_script="$RETRO_DIR/scripts/bluetooth_core.sh"
     local action="${1,,}"
 
@@ -162,4 +164,6 @@ cmd_bluetooth() {
     esac
 }
 
-register_command "TOOLS" "bluetooth" "Manage bluetooth settings and connections" "cmd_bluetooth"
+if [[ $(has_bluetooth) == "true" ]]; then
+    register_command "TOOLS" "bluetooth" "Manage bluetooth settings and connections" "cmd_bluetooth"
+fi
