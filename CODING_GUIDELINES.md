@@ -24,6 +24,8 @@ The project provides the `retro` CLI - a unified command center to manage the en
 | `lib/` | **Internal** core libraries (colors, logging, fs, driver detection, etc.) |
 | `cmds/` | **User-facing** commands (tools, system, modules subdirectories) |
 | `scripts/` | Backend automation scripts (core logic for each feature) |
+| `scripts/events/` | Event hook modules (on_event_*) |
+| `scripts/watchers/` | Background system monitors (start_watcher_*) |
 | `modules/` | Desktop environment configurations (hyprland, ags, rofi, etc.) |
 | `icons/` | Project icons and assets |
 | `wallpapers/` | Wallpaper assets |
@@ -40,6 +42,8 @@ The project provides the `retro` CLI - a unified command center to manage the en
 |---------|----------|---------|
 | Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `helpers.sh`, `battery.sh` |
 | Backend core scripts | `scripts/` | `audio_core.sh`, `network_core.sh`, `driver_core.sh` |
+| Event hooks | `scripts/events/` | `battery_events.sh`, `power_events.sh` |
+| Watchers | `scripts/watchers/` | `battery.sh`, `bluetooth.sh`, `timers.sh` |
 | Standalone scripts | `scripts/` | `system_update.sh` (UI, invoked from events) |
 | Frontend commands | `cmds/tools/` | `audio.sh`, `network.sh`, `driver.sh` |
 | System commands | `cmds/system/` | `load.sh`, `update.sh`, `setup.sh` |
@@ -789,41 +793,103 @@ Failing to handle interrupts can leave the system in a broken state (half-instal
 
 ### Overview
 
-The **Event System** is a background daemon that continuously monitors system state and fires events when conditions change. Unlike the two-layer tool pattern, this is a **long-running loop** that runs continuously in the background.
+The **Event System** is a background daemon that continuously monitors system state and fires events when conditions change. It uses a **Plugin Architecture** where `event_core.sh` is a "dumb engine" that dynamically loads watchers from `scripts/watchers/`.
 
 ### File Structure
 
 | File | Purpose |
 |------|---------|
-| `scripts/event_core.sh` | Main event loop daemon (runs with `--loop`) |
-| `scripts/events/*.sh` | Event hook modules (define event handlers) |
+| `scripts/event_core.sh` | Dumb engine - loads watchers, dispatches events |
+| `scripts/events/*.sh` | User event hooks (on_event_*) |
+| `scripts/watchers/*.sh` | System monitors (start_watcher_*) |
 | `cmds/tools/event.sh` | Frontend command to manage the daemon |
+
+### The "Dumb Engine" Pattern
+
+The engine (`event_core.sh`) knows nothing about hardware, USB, or Bluetooth. It just:
+
+1. Sources all watchers from `scripts/watchers/`
+2. Uses `declare -F | grep "^start_watcher_"` to find watchers dynamically
+3. Spawns each watcher as a background process
+4. Dispatches events when watchers call `broadcast_event`
+
+```bash
+# scripts/event_core.sh (simplified)
+source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/helpers.sh"
+
+EVENT_DIR="$RETRO_DIR/scripts/events"
+WATCHER_DIR="$RETRO_DIR/scripts/watchers"
+
+broadcast_event() {
+    local event_name="$1"
+    shift
+    for hook_file in "$EVENT_DIR"/*.sh; do
+        [[ -f $hook_file ]] || continue
+        (
+            source "$hook_file"
+            if declare -f "$event_name" >/dev/null 2>&1; then
+                "$event_name" "$@"
+            fi
+        )
+    done
+}
+
+for watcher_file in "$WATCHER_DIR"/*.sh; do
+    [[ -f $watcher_file ]] && source "$watcher_file"
+done
+
+run_event_loop() {
+    broadcast_event "on_event_loop_start"
+    local watchers=$(declare -F | awk '{print $3}' | grep "^start_watcher_")
+    for watcher in $watchers; do
+        "$watcher" &
+        WATCHER_PIDS+=($!)
+    done
+    trap 'kill "${WATCHER_PIDS[@]}" 2>/dev/null; exit' INT TERM
+    wait
+}
+```
 
 ### How It Works
 
-1. **Event Loop** (`event_core.sh --loop`):
-   - Runs as a background daemon (started via `retro event start`)
-   - Polls system state every 1-15 seconds depending on check type
-   - Fires events by calling `broadcast_event "event_name" args`
+1. **Engine** (`event_core.sh --loop`):
+   - Sources all watchers from `scripts/watchers/`
+   - Dynamically finds functions starting with `start_watcher_`
+   - Spawns each as background process with its own PID
+   - Crash isolation: one watcher crashing doesn't kill others
 
-2. **Event Hooks** (`scripts/events/*.sh`):
-   - Each `.sh` file in `scripts/events/` is sourced automatically
-   - Functions named `on_event_name()` become event handlers
-   - Multiple hooks can respond to the same event
+2. **Watchers** (`scripts/watchers/*.sh`):
+   - Define function `start_watcher_<name>()`
+   - Run infinite loop with sleep intervals
+   - Call `broadcast_event "on_event_name"` to fire events
 
-3. **Event Commands**:
+3. **Event Hooks** (`scripts/events/*.sh`):
+   - Define functions like `on_event_name()`
+   - Source automatically when event fires
+   - Run in subshell - don't block watchers
+
+4. **Event Commands**:
    - `retro event start` - Start the daemon in background
    - `retro event stop` - Stop the running daemon
    - `retro event status` - Show if daemon is running
    - `retro event trigger <name>` - Manually fire an event
-   - `retro event list` - Show all available hooks
+   - `retro event list` - Show all available watchers
+
+### Available Watchers (Examples)
+
+| Watcher | File | Purpose |
+|--------|------|---------|
+| Battery Monitor | `watchers/battery.sh` | Battery state, saver mode, usage |
+| Bluetooth Monitor | `watchers/bluetooth.sh` | Device connections, pairing |
+| Timers | `watchers/timers.sh` | Package/Retro update checks |
 
 ### Available Events
 
 | Event | Trigger |
 |-------|---------|
 | `on_event_loop_start` | Daemon starts |
-| `on_power_disconnect` | Battery power connected |
+| `on_power_disconnect` | AC power removed |
 | `on_power_connect` | AC power connected |
 | `on_battery_low` | Battery below threshold |
 | `on_battery_critical` | Battery critically low |
@@ -839,6 +905,75 @@ The **Event System** is a background daemon that continuously monitors system st
 | `on_bluetooth_connected` | BT device connected |
 | `on_bluetooth_disconnected` | BT device disconnected |
 | `on_slideshow_tick` | Wallpaper slideshow tick |
+
+### Creating a New Watcher
+
+1. Create a new file in `scripts/watchers/`:
+```bash
+#!/bin/bash
+# scripts/watchers/mytemp.sh
+
+check_temp_state() {
+    local temp
+    temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "0")
+    local temp_c=$((temp / 1000))
+
+    if [[ $temp_c -ge 80 ]]; then
+        broadcast_event "on_temperature_critical" "$temp_c"
+    elif [[ $temp_c -ge 70 ]]; then
+        broadcast_event "on_temperature_high" "$temp_c"
+    fi
+}
+
+start_watcher_mytemp() {
+    while true; do
+        check_temp_state
+        sleep 30
+    done
+}
+```
+
+2. The engine automatically finds and runs it:
+   - Function must start with `start_watcher_`
+   - Should contain infinite `while true` loop
+   - Must have `sleep` to avoid blocking
+
+### Variable Persistence in Watchers
+
+Watchers run in separate processes - they don't share variables. Use `get_var`/`set_var`:
+
+```bash
+start_watcher_battery() {
+    last_bat_saver=$(get_var "BAT_SAVER_ACTIVE" "false")
+    last_notified_level=0
+
+    while true; do
+        if [[ $current_cap -le 20 && $last_notified_level -ne 20 ]]; then
+            broadcast_event "on_battery_low" "20"
+            set_var "BAT_LAST_NOTIFIED" "20"
+        fi
+        sleep 15
+    done
+}
+```
+
+### Crash Isolation
+
+Each watcher runs as independent background process. If `timers.sh` crashes:
+- `battery.sh` keeps monitoring
+- `bluetooth.sh` keeps detecting devices
+- The daemon stays alive
+
+```bash
+# In event_core.sh
+for watcher in $watchers; do
+    "$watcher" &
+    WATCHER_PIDS+=($!)
+done
+
+# Clean shutdown on signal
+trap 'kill "${WATCHER_PIDS[@]}" 2>/dev/null; exit' INT TERM
+```
 
 ### Adding a New Event Handler
 
@@ -864,9 +999,10 @@ on_battery_low() {
 
 ### Important Notes
 
-- Event hooks run in a **subshell** - they don't share variables with the main loop
-- Use `get_var`/`set_var` from `lib/helpers.sh` for persistent state
-- Long-running operations in hooks can delay the main loop
+- Watchers run in **background processes** - crash isolation guaranteed
+- Event hooks run in **subshells** - they don't block watchers
+- Use `get_var`/`set_var` for persistent state across restarts
+- Always include `sleep` in watcher loops (blocks at 0% CPU)
 - The daemon auto-starts on login (via `retro load`)
 
 ---
@@ -895,6 +1031,11 @@ RetroLinux/
 │   ├── battery_events.sh
 │   ├── power_events.sh
 │   └── ...
+├── scripts/watchers/            # Background system monitors
+│   ├── battery.sh
+│   ├── bluetooth.sh
+│   ├── timers.sh
+│   └── ...
 ├── cmds/tools/                 # Frontend commands
 │   ├── audio.sh
 │   ├── network.sh
@@ -908,7 +1049,7 @@ RetroLinux/
 ### Key Patterns Summary
 
 | Pattern | Code |
-|---------|------|
+|--------|------|
 | Status header | `echo -e "\n ${PINK}󰑊 Title${RESET}"` |
 | Separator | `echo -e " ${PINK}󰇝${MUTE} ───────..."` |
 | Table row | `printf " ${PINK}󰄾${RESET} %-36s ${PINK}%s${RESET}\n" "Label" "Value"` |
@@ -917,3 +1058,4 @@ RetroLinux/
 | Log error | `rx_log "error" "Message" && return 1` |
 | Register cmd | `register_command "TOOLS" "cmd|alias" "desc" "cmd_cmd"` |
 | Event hook | `on_event_name() { ... }` in `scripts/events/*.sh` |
+| Watcher | `start_watcher_name() { ... }` in `scripts/watchers/*.sh` |

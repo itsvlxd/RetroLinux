@@ -19,17 +19,26 @@ cmd_event() {
             ;;
 
         "list")
-            rx_table_header "󱐋" "Active Event Modules: ${hook_dir}"
+            rx_table_header "󱐋" "Event Modules"
+
+            local watcher_dir="$RETRO_DIR/scripts/watchers"
+
+            local watcher_scripts=$(ls "$watcher_dir"/*.sh 2>/dev/null)
+            for w in $watcher_scripts; do
+                local name=$(basename "$w")
+                local func_count=$(grep -c "^start_watcher_" "$w")
+                rx_table_list_single "󱐋" "$name [$func_count watcher]" "$GRAY"
+            done
 
             local hooks=$(ls "$hook_dir"/*.sh 2>/dev/null)
-            if [[ -z $hooks ]]; then
-                rx_table_simple "󰓅" "(No scripts found)" "$MUTE"
-            else
-                for h in $hooks; do
-                    local name=$(basename "$h")
-                    local func_count=$(grep -c "^[a-zA-Z0-9_]*()" "$h")
-                    rx_table_simple "󱐋" "$name: [$func_count hooks]" "$GRAY"
-                done
+            for h in $hooks; do
+                local name=$(basename "$h")
+                local func_count=$(grep -c "^[a-zA-Z0-9_]*()" "$h")
+                rx_table_list_single "󱐋" "$name [$func_count hooks]" "$GRAY"
+            done
+
+            if [[ -z $watcher_scripts && -z $hooks ]]; then
+                rx_table_simple "󰓅" "(No modules found)" "$MUTE"
             fi
             rx_table_separator
             rx_table_spacer

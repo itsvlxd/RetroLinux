@@ -37,7 +37,7 @@ on_battery_usage_high() {
     local cpu="$3"
     local pid="$4"
 
-    ACTION=$(notify-send -u normal -i dialog-warning-symbolic -t 15000 \
+    ACTION=$(notify-send -a "retro_battery_usage_$app" -u normal -i dialog-warning-symbolic -t 15000 \
         "Battery Usage" \
         "High battery usage detected.\n<b>$app ($pid)</b> is pulling ${watts}W and ${cpu}% CPU" \
         -A "terminate=Terminate Process" \
@@ -87,7 +87,7 @@ on_usb_connected() {
 
     (
         ACTION=$(
-            notify-send -u normal -i drive-removable-media-symbolic -t 10000 -w \
+            notify-send -a "retro_usb_con_$label" -u normal -i drive-removable-media-symbolic -t 10000 -w \
                 "USB Drive Detected" \
                 "<b>$label</b> has been mounted.\nLocation: $mount_path" \
                 -A "open=Open in $fm_display" \
@@ -124,7 +124,7 @@ on_usb_disconnected() {
                 local label=$(basename "$link")
 
                 if [[ "|$ignore_list|" != *"|$label|"* ]]; then
-                    notify-send -u normal -i drive-removable-media-symbolic -t 10000 \
+                    notify-send -a "retro_usb_dis_$dev_name" -u normal -i drive-removable-media-symbolic -t 10000 \
                         "USB Drive Removed" \
                         "Drive <b>$label</b> ($dev_name) has been disconnected."
                 fi
@@ -142,7 +142,7 @@ on_bluetooth_connected() {
     local icon_path=$(rx_get_icon "$name")
 
     (
-        local ACTION=$(notify-send -u normal -i "$icon_path" -t 10000 \
+        local ACTION=$(notify-send -a "retro_bluetooth_con_$mac" -u normal -i "$icon_path" -t 10000 \
             "Connection Established" \
             "<b>$name</b> ($mac) has been connected successfully." \
             -A "disconnect=Disconnect" \
@@ -167,7 +167,7 @@ on_bluetooth_disconnected() {
     local mac="$2"
     local icon_path=$(rx_get_icon "$name")
 
-    notify-send -u normal -i "$icon_path" -t 5000 \
+    notify-send -a "retro_bluetooth_dis_$mac" -u normal -i "$icon_path" -t 5000 \
         "Connection Severed" \
         "<b>$name</b> ($mac) is no longer active."
 }
@@ -178,7 +178,7 @@ on_bluetooth_pairing_request() {
 
     local icon_path=$(rx_get_icon "$name")
 
-    local ACTION=$(notify-send -u critical -i "$icon_path" -w \
+    local ACTION=$(notify-send -a "retro_bluetooth_pair_$mac" -u critical -i "$icon_path" -w \
         "Bluetooth Pairing Request" \
         "Device <b>$name</b> sent a bluetooth pairing request.\nAddress: $mac" \
         -A "pair=Pair" \
