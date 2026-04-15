@@ -57,6 +57,9 @@ cmd_setup() {
 
     rx_log "success" "Setup complete!"
 
+    mkdir -p /etc/retro
+    touch /etc/retro/setup_complete
+
     sleep 1
     exec $SHELL
 }

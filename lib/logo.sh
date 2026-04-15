@@ -11,7 +11,7 @@ apply_terminal_gradient() {
     local colors=("$@")
     local num_colors=${#colors[@]}
 
-    IFS=$'\n' read -rd '' -a lines <<<"$text"
+    IFS=$'\n' read -rd '' -a lines <<<"$text" || true
     local height=${#lines[@]}
     local width=0
     for line in "${lines[@]}"; do
@@ -91,17 +91,28 @@ EOF
 )
 
 rx_logo() {
+    local input="$1"
+
     clear
 
     local version=$(rx_git_version)
     local branch=$(rx_git_branch)
 
-    local logo_choice=$(random_int 1 2)
     local active_logo
-    [[ $logo_choice -eq 1 ]] && active_logo="$LOGO_1" || active_logo="$LOGO_2"
+    if [[ -n "$input" ]]; then
+        if [[ -f "$input" ]]; then
+            active_logo=$(cat "$input")
+        else
+            active_logo="$input"
+        fi
+    else
+        local logo_choice=$(random_int 1 2)
+        [[ $logo_choice -eq 1 ]] && active_logo="$LOGO_1" || active_logo="$LOGO_2"
+    fi
 
     local angle=$(random_int 0 360)
-    if [[ $logo_choice -eq 1 ]]; then
+    local logo_choice=$(random_int 1 2)
+    if [[ $logo_choice -eq 1 || -n "$input" ]]; then
         apply_terminal_gradient "$active_logo" "$angle" 32
     else
         apply_terminal_gradient "$active_logo" "$angle" 35 32 33 31
