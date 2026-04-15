@@ -1059,5 +1059,3 @@ RetroLinux/
 | Register cmd | `register_command "TOOLS" "cmd|alias" "desc" "cmd_cmd"` |
 | Event hook | `on_event_name() { ... }` in `scripts/events/*.sh` |
 | Watcher | `start_watcher_name() { ... }` in `scripts/watchers/*.sh` |
-
-(End of file - total 1062 lines)

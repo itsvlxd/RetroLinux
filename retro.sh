@@ -28,11 +28,13 @@ source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/pkg_manager.sh"
 
 export SKIP_PROMPT=false
+SETUP_MODE=false
 CLEAN_ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
         -y | --yes) SKIP_PROMPT=true ;;
+        --setup) SETUP_MODE=true ;;
         *) CLEAN_ARGS+=("$arg") ;;
     esac
 done
@@ -65,6 +67,20 @@ if [ -d "$RETRO_DIR/cmds" ]; then
         source "$f"
     done
     shopt -u globstar
+fi
+
+if [[ $SETUP_MODE == true ]]; then
+    if [[ -n ${CMDS_EXEC[setup]} ]]; then
+        ${CMDS_EXEC[setup]}
+    elif [[ -n ${CMDS_EXEC[--setup]} ]]; then
+        ${CMDS_EXEC[--setup]}
+    elif [[ -n ${CMDS_EXEC[-s]} ]]; then
+        ${CMDS_EXEC[-s]}
+    else
+        rx_log "error" "Setup command not found"
+        rx_log "info" "Available: ${!CMDS_EXEC[@]}"
+        exit 1
+    fi
 fi
 
 if [[ -z $CMD || $CMD == "-h" || $CMD == "--help" ]]; then
