@@ -1,1 +1,10 @@
 MangoHud.conf
+
+# ISO build artifacts
+iso/work/
+iso/out/*.iso
+iso/profile/packages-cache
+iso/profile/airootfs/var
+
+# Build outputs
+*.iso

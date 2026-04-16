@@ -5,7 +5,6 @@ rx_log() {
     local message="$2"
     local icon=""
     local color=""
-    local echo_opts="-e"
 
     case "${level}" in
         "INFO")
@@ -30,9 +29,14 @@ rx_log() {
             ;;
     esac
 
-    if [[ $message =~ \[(y/N|Y/n|Default:[^\]]*)\][[:space:]:]*$ ]]; then
-        echo_opts="-ne"
-    fi
+    local stripped_msg
+    stripped_msg="$(echo "$message" | sed 's/'$'\033''\[[0-9;]*m//g')"
 
-    echo $echo_opts "${color}[${icon}${level}]${RESET} ${message}"
+    if [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]:[[:space:]]* ]] ||
+        [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]$ ]] ||
+        [[ $stripped_msg =~ \[Default: ]]; then
+        printf "${color}[${icon}${level}]${RESET} ${message}"
+    else
+        printf "${color}[${icon}${level}]${RESET} ${message}\n"
+    fi
 }

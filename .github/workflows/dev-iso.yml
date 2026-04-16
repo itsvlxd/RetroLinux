@@ -1,0 +1,86 @@
+name: ISO Release (Develop)
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build ISO
+        env:
+          RETRO_DIR: ${{ github.workspace }}
+        run: |
+          chmod +x ./iso/build.sh
+          ./iso/build.sh -y
+
+      - name: Find ISO
+        id: iso
+        run: |
+          ISO_FILE=$(ls iso/out/*.iso | head -1)
+          echo "filename=$(basename $ISO_FILE)" >> $GITHUB_OUTPUT
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrolinux-iso
+          path: iso/out/*.iso
+          retention-days: 5
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Download ISO
+        uses: actions/download-artifact@v4
+        with:
+          name: retrolinux-iso
+          path: .
+
+      - name: Create Release Notes
+        id: create-release-notes
+        run: |
+          cat > release_notes.md << 'NOTES'
+          ## ⚠️ Unstable Development Build
+
+          **This is an UNSTABLE development build of RetroLinux ISO.**
+
+          **This image is NOT recommended for production use.**
+
+          ### Disclaimer
+          While this image may work fine, it is an unstable development snapshot. Use at your own risk. Production environments should only use official stable releases.
+
+          ### Build Info
+          - **Commit:** `${{ github.sha }}`
+          - **Branch:** develop
+          - **Date:** `$(date '+%Y-%m-%d')`
+
+          NOTES
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh release create develop-latest \
+            --title "RetroLinux ISO (Develop)" \
+            --notes-file release_notes.md \
+            --clobber \
+            --repo "${{ github.repository }}" \
+            "${{ needs.build.outputs.filename }}"
