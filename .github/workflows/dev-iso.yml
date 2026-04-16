@@ -31,8 +31,15 @@ jobs:
       - name: Find ISO
         id: iso
         run: |
-          ISO_FILE=$(ls iso/out/*.iso | head -1)
-          echo "filename=$(basename $ISO_FILE)" >> $GITHUB_OUTPUT
+          shopt -s nullglob
+          iso_files=(iso/out/*.iso)
+          if [[ ${#iso_files[@]} -eq 0 ]]; then
+            echo "ERROR: No ISO found in iso/out/"
+            ls -la iso/out/ || true
+            exit 1
+          fi
+          echo "filename=${iso_files[0]##*/}" >> $GITHUB_OUTPUT
+          echo "Full path: ${iso_files[0]}"
 
       - name: Create Release Notes
         run: |
@@ -64,4 +71,4 @@ jobs:
             --title "RetroLinux ISO (Develop)" \
             --notes-file release_notes.md \
             --repo "${{ github.repository }}" \
-            "${{ steps.iso.outputs.filename }}"
+            "iso/out/${{ steps.iso.outputs.filename }}"
