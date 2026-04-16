@@ -89,34 +89,8 @@ rx_tools_menu() {
 
 rx_check_root() {
     if [[ $EUID -ne 0 ]]; then
-        rx_log "error" "This script needs ${PINK}root${RESET} privileges to build an ISO"
+        rx_log "error" "This script needs ${PINK}root${RESET} privileges"
         return 1
     fi
     return 0
-}
-
-rx_confirm() {
-    local message="$1"
-    local default="${2:-N}"
-
-    if [[ $SKIP_PROMPT == "1" ]] || [[ $SKIP_PROMPT == "true" ]]; then
-        return 0
-    fi
-
-    local yn_pattern="[y/N]"
-    if [[ $default == "Y" ]]; then
-        yn_pattern="[Y/n]"
-    fi
-
-    echo -ne " ${PINK}󰄾${RESET} ${message} ${MUTE}${yn_pattern}${RESET}: " >&2
-    read -r confirm
-
-    if [[ -z $confirm ]]; then
-        confirm="$default"
-    fi
-
-    if [[ $confirm =~ ^[Yy]$ ]]; then
-        return 0
-    fi
-    return 1
 }

@@ -148,6 +148,11 @@ rx_table_list_single() {
 rx_confirm() {
     local message="$1"
     local default="${2:-N}"
+    local skip="${3:-false}"
+
+    if [[ $skip == "true" ]]; then
+        return 0
+    fi
 
     if [[ $default == "Y" ]]; then
         rx_log "info" "${message} ${PINK}[Y/n]${RESET}: "
@@ -178,4 +183,3 @@ rx_yesno() {
 
     [[ $result =~ ^[Yy]$ ]]
 }
-
