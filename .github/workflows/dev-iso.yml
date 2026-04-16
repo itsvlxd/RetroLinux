@@ -78,9 +78,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
+          gh release delete develop-latest --yes || true
           gh release create develop-latest \
             --title "RetroLinux ISO (Develop)" \
             --notes-file release_notes.md \
-            --clobber \
             --repo "${{ github.repository }}" \
             "${{ needs.build.outputs.filename }}"
