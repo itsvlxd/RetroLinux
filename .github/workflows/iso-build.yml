@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-linux:
-    name: Build on Linux
+  build:
     runs-on: ubuntu-latest
-    container: archlinux/archlinux:latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,62 +19,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install Docker and bc
-        run: |
-          pacman -Sy --noconfirm docker bc
-
       - name: Build ISO
         env:
           RETRO_DIR: ${{ github.workspace }}
-          TERM: dumb
         run: |
           chmod +x ./iso/build.sh
           ./iso/build.sh -y
 
       - name: Find ISO
+        id: iso
         run: |
-          ls -la iso/out/ || echo "No output directory"
+          ISO_FILE=$(ls iso/out/*.iso | head -1)
+          echo "filename=$(basename $ISO_FILE)" >> $GITHUB_OUTPUT
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
-          name: retrolinux-iso-linux
-          path: iso/out/*.iso
-          retention-days: 5
-
-  build-windows:
-    name: Build on Windows
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Check Docker
-        id: docker_check
-        run: |
-          $docker = Get-Command docker -ErrorAction SilentlyContinue
-          if ($docker) {
-            echo "available=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "available=false" >> $env:GITHUB_OUTPUT
-            echo "Docker not available on Windows GitHub runner. Use self-hosted runner for Windows builds."
-          }
-
-      - name: Build ISO
-        if: steps.docker_check.outputs.available == 'true'
-        env:
-          RETRO_DIR: ${{ github.workspace }}
-        shell: cmd
-        run: |
-          call iso\build.bat -y
-
-      - name: Upload ISO artifact
-        if: steps.docker_check.outputs.available == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: retrolinux-iso-windows
+          name: retrolinux-iso
           path: iso/out/*.iso
           retention-days: 5

@@ -15,13 +15,6 @@ set "WARN_ICON=[WARN] "
 set "ERROR_ICON=[ERROR] "
 
 echo.
-echo ██████╗ ███████╗████████╗██████╗  ██████╗     ██╗███████╗ ██████╗ 
-echo ██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗    ██║██╔════╝██╔═══██╗
-echo ██████╔╝█████╗     ██║   ██████╔╝██║   ██║    ██║███████╗██║   ██║
-echo ██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║    ██║╚════██║██║   ██║
-echo ██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝    ██║███████║╚██████╔╝
-echo ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝     ╚═╝╚══════╝ ╚═════╝ 
-echo.
 echo      RetroLinux ISO Build
 echo.
 
@@ -52,6 +45,11 @@ call :init_cache
 if %ERRORLEVEL% neq 0 (
     set /a ERROR_COUNT+=1
     goto :error_exit
+)
+
+call :check_network
+if %ERRORLEVEL% neq 0 (
+    call :rx_log WARN "Network check failed - attempting build anyway"
 )
 
 call :update_cache
@@ -100,27 +98,6 @@ if "%level%"=="INFO" (
 endlocal & ver > nul
 goto :eof
 
-:check_docker
-call :rx_log INFO "Checking Docker installation..."
-
-where docker >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    call :rx_log ERROR "Docker is not installed"
-    call :rx_log INFO "Please install Docker Desktop from: https://docker.com/desktop"
-    exit /b 1
-)
-
-call :rx_log INFO "Docker found, checking if daemon is running..."
-docker info >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    call :rx_log ERROR "Docker daemon is not running"
-    call :rx_log INFO "Please start Docker Desktop and wait for it to initialize"
-    exit /b 1
-)
-
-call :rx_log SUCCESS "Docker is ready"
-exit /b 0
-
 :init_cache
 echo.
 call :rx_log INFO "Initializing offline package cache..."
@@ -138,18 +115,7 @@ if %ERRORLEVEL% equ 0 (
 
 call :rx_log INFO "Downloading packages to cache..."
 
-docker run --rm ^
-    -v "%PROFILE_DIR%:/profile:ro" ^
-    -v "%CACHE_VOLUME%:/packages-cache" ^
-    archlinux/archlinux:latest bash -c " ^
-        set -e
-        pacman -Sy --noconfirm
-        grep -v '^#' /profile/packages.x86_64 | grep -v '^$' > /tmp/packages.txt
-        mkdir -p /packages-cache /tmp/offlinedb
-        pacman -Syw --noconfirm --cachedir /packages-cache --dbpath /tmp/offlinedb $(cat /tmp/packages.txt)
-        repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
-        touch /packages-cache/.cache-initialized
-    "
+docker run --rm --network=host --dns 8.8.8.8 --dns 8.8.4.4 -v "%PROFILE_DIR%:/profile:ro" -v "%CACHE_VOLUME%:/packages-cache" archlinux/archlinux:latest bash -c "set -e; pacman -Sy --noconfirm; mkdir -p /packages-cache /tmp/offlinedb; tr -d '\r' < /profile/packages.x86_64 | while IFS= read -r pkg; do [[ -z $pkg ]] && continue; pacman -Syw --noconfirm --cachedir /packages-cache --dbpath /tmp/offlinedb $pkg; done; repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst; touch /packages-cache/.cache-initialized"
 
 if %ERRORLEVEL% neq 0 (
     call :rx_log ERROR "Failed to initialize package cache"
@@ -159,22 +125,30 @@ if %ERRORLEVEL% neq 0 (
 call :rx_log SUCCESS "Cache initialized"
 exit /b 0
 
+:check_network
+echo.
+call :rx_log INFO "Testing network connectivity..."
+
+docker run --rm --network=host --dns 8.8.8.8 --dns 8.8.4.4 archlinux/archlinux:latest bash -c "ping -c 1 -W 3 archlinux.org > /dev/null 2>&1 && echo 'DNS_OK' || echo 'DNS_FAIL'" | findstr "DNS_OK" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    call :rx_log WARN "DNS test failed"
+    exit /b 1
+)
+
+docker run --rm --network=host --dns 8.8.8.8 --dns 8.8.4.4 archlinux/archlinux:latest bash -c "curl -s --connect-timeout 5 https://www.archlinux.org > /dev/null 2>&1 && echo 'HTTP_OK' || echo 'HTTP_FAIL'" | findstr "HTTP_OK" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    call :rx_log WARN "HTTPS test failed"
+    exit /b 1
+)
+
+call :rx_log SUCCESS "Network OK"
+exit /b 0
+
 :update_cache
 echo.
 call :rx_log INFO "Updating offline package cache..."
 
-docker run --rm ^
-    -v "%PROFILE_DIR%:/profile:ro" ^
-    -v "%CACHE_VOLUME%:/packages-cache" ^
-    archlinux/archlinux:latest bash -c " ^
-        set -e
-        pacman -Sy --noconfirm
-        grep -v '^#' /profile/packages.x86_64 | grep -v '^$' > /tmp/packages.txt
-        mkdir -p /tmp/offlinedb
-        pacman -Syw --noconfirm --cachedir /packages-cache --dbpath /tmp/offlinedb $(cat /tmp/packages.txt)
-        rm -f /packages-cache/offline.db.tar.gz
-        repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
-    "
+docker run --rm --network=host --dns 8.8.8.8 --dns 8.8.4.4 -v "%PROFILE_DIR%:/profile:ro" -v "%CACHE_VOLUME%:/packages-cache" archlinux/archlinux:latest bash -c "set -e; pacman -Sy --noconfirm; mkdir -p /tmp/offlinedb; tr -d '\r' < /profile/packages.x86_64 | while IFS= read -r pkg; do [[ -z $pkg ]] && continue; pacman -Syw --noconfirm --cachedir /packages-cache --dbpath /tmp/offlinedb $pkg; done; rm -f /packages-cache/offline.db.tar.gz; repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst"
 
 if %ERRORLEVEL% neq 0 (
     call :rx_log ERROR "Failed to update package cache"
@@ -229,18 +203,7 @@ call :rx_log INFO "Preparing airootfs offline packages..."
 set "OFFLINE_DIR=%PROFILE_DIR%\airootfs\var\cache\retrolinux\mirror\offline"
 if not exist "%OFFLINE_DIR%" mkdir "%OFFLINE_DIR%"
 
-docker run --rm ^
-    -v "%CACHE_VOLUME%:/cache:ro" ^
-    -v "%OFFLINE_DIR%:/dest:rw" ^
-    archlinux/archlinux:latest bash -c " ^
-        set -e
-        mkdir -p /dest
-        if [ -d /cache ] && [ -n \"$(ls -A /cache 2>/dev/null)\" ]; then
-            cp -r /cache/* /dest/
-        else
-            echo 'Warning: Cache is empty'
-        fi
-    "
+docker run --rm --network=host --dns 8.8.8.8 --dns 8.8.4.4 -v "%CACHE_VOLUME%:/cache:ro" -v "%OFFLINE_DIR%:/dest:rw" archlinux/archlinux:latest bash -c "set -e; mkdir -p /dest; if [ -d /cache ] && [ -n \"$(ls -A /cache 2>/dev/null)\" ]; then cp -r /cache/* /dest/; else echo 'Warning: Cache is empty'; fi"
 
 if %ERRORLEVEL% neq 0 (
     call :rx_log ERROR "Failed to copy packages to airootfs"
@@ -270,18 +233,7 @@ call :rx_log INFO "Building RetroLinux ISO %VERSION% (%BRANCH%)..."
 call :rx_log INFO "Starting Docker build (this may take a while)..."
 echo.
 
-docker run --rm --privileged ^
-    -v "%PROFILE_DIR%:/profile:ro" ^
-    -v "%WORK_DIR%:/work" ^
-    -v "%OUTPUT_DIR%:/out" ^
-    -v "%CACHE_VOLUME%:/var/cache/retrolinux/mirror/offline:ro" ^
-    archlinux/archlinux:latest bash -c " ^
-        set -e
-        rm -f /var/lib/pacman/db.lck 2>/dev/null || true
-        pacman -Sy --noconfirm
-        pacman --noconfirm -Sy archiso git sudo base-devel jq grub
-        mkarchiso -v -w /work/ -o /out /profile/
-    "
+docker run --rm --privileged --network=host --dns 8.8.8.8 --dns 8.8.4.4 -v "%PROFILE_DIR%:/profile:ro" -v "%WORK_DIR%:/work" -v "%OUTPUT_DIR%:/out" -v "%CACHE_VOLUME%:/var/cache/retrolinux/mirror/offline:ro" archlinux/archlinux:latest bash -c "set -e; rm -f /var/lib/pacman/db.lck 2>/dev/null || true; pacman -Sy --noconfirm; pacman --noconfirm -Sy archiso git sudo base-devel jq grub; mkarchiso -v -w /work/ -o /out /profile/"
 
 if %ERRORLEVEL% neq 0 (
     echo.
