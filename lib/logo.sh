@@ -91,7 +91,7 @@ EOF
 )
 
 rx_logo() {
-    local input="$1"
+    local input="${1:-}"
 
     clear
 

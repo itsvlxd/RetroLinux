@@ -3,7 +3,7 @@
 
 iso_name="retrolinux"
 iso_label="RETRO_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
-iso_publisher="RetroLinux <https://github.com/retrolinux>"
+iso_publisher="RetroLinux <https://github.com/itsvlxd/RetroLinux>"
 iso_application="RetroLinux Live ISO"
 iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
 install_dir="retro"
