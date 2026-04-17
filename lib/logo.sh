@@ -93,7 +93,9 @@ EOF
 rx_logo() {
     local input="${1:-}"
 
-    clear
+    if [[ -t 1 ]] && [[ -z "${CI:-}" ]]; then
+        clear
+    fi
 
     local version=$(rx_git_version)
     local branch=$(rx_git_branch)

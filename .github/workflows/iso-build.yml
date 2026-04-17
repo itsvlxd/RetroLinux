@@ -8,22 +8,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: linux
-            runner: ubuntu-latest
-            container: archlinux/archlinux:latest
-          - os: macos
-            runner: macos-latest
-            skip: false
-          - os: windows
-            runner: windows-latest
-
+  build-linux:
+    name: Build on Linux
+    runs-on: ubuntu-latest
+    container: archlinux/archlinux:latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,92 +19,56 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Check Docker on macOS
-        if: matrix.os == 'macos'
-        id: docker_check
-        run: |
-          if command -v docker &> /dev/null; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-            echo "Docker not available on macOS runner. Install Docker Desktop or use a self-hosted runner."
-          fi
-
-      - name: Setup Docker on macOS
-        if: matrix.os == 'macos' && steps.docker_check.outputs.available == 'true'
-        run: |
-          if [ -d "/Applications/Docker.app" ]; then
-            open -a Docker
-            sleep 15
-          fi
-          docker info || echo "Docker daemon may not be running"
-
-      - name: Setup Docker on Windows
-        if: matrix.os == 'windows'
-        run: |
-          $docker = Get-Command docker -ErrorAction SilentlyContinue
-          if (-not $docker) {
-            echo "Docker not found. Please install Docker Desktop for Windows."
-            exit 1
-          }
-          $dockerInfo = docker info 2>&1
-          if ($dockerInfo -match "Cannot connect") {
-            echo "Docker daemon not running. Attempting to start..."
-            Start-Process -FilePath "docker" -ArgumentList "update" -Wait
-            Start-Sleep -Seconds 5
-          }
-
-      - name: Build ISO (Linux)
-        if: matrix.os == 'linux'
+      - name: Build ISO
         env:
           RETRO_DIR: ${{ github.workspace }}
+          TERM: dumb
         run: |
           chmod +x ./iso/build.sh
           ./iso/build.sh -y
-
-      - name: Build ISO (macOS)
-        if: matrix.os == 'macos' && steps.docker_check.outputs.available == 'true'
-        env:
-          RETRO_DIR: ${{ github.workspace }}
-        run: |
-          chmod +x ./iso/build.sh
-          ./iso/build.sh -y
-
-      - name: Build ISO (Windows)
-        if: matrix.os == 'windows'
-        env:
-          RETRO_DIR: ${{ github.workspace }}
-        shell: cmd
-        run: |
-          call iso\build.bat -y
 
       - name: Find ISO
-        if: matrix.os != 'macos' || steps.docker_check.outputs.available == 'true'
         run: |
-          if [[ "${{ matrix.os }}" == "windows" ]]; then
-            dir iso/out/ 2>nul || echo "No output directory"
-          else
-            ls -la iso/out/ 2>/dev/null || echo "No output directory"
-          fi
+          ls -la iso/out/ || echo "No output directory"
 
       - name: Upload ISO artifact
-        if: matrix.os == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: retrolinux-iso-linux
           path: iso/out/*.iso
           retention-days: 5
 
-      - name: Upload ISO artifact (macOS)
-        if: matrix.os == 'macos' && steps.docker_check.outputs.available == 'true'
-        uses: actions/upload-artifact@v4
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          name: retrolinux-iso-macos
-          path: iso/out/*.iso
-          retention-days: 5
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Upload ISO artifact (Windows)
-        if: matrix.os == 'windows'
+      - name: Check Docker
+        id: docker_check
+        run: |
+          $docker = Get-Command docker -ErrorAction SilentlyContinue
+          if ($docker) {
+            echo "available=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "available=false" >> $env:GITHUB_OUTPUT
+            echo "Docker not available on Windows GitHub runner. Use self-hosted runner for Windows builds."
+          }
+
+      - name: Build ISO
+        if: steps.docker_check.outputs.available == 'true'
+        env:
+          RETRO_DIR: ${{ github.workspace }}
+        shell: cmd
+        run: |
+          call iso\build.bat -y
+
+      - name: Upload ISO artifact
+        if: steps.docker_check.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: retrolinux-iso-windows
