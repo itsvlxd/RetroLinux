@@ -76,15 +76,12 @@ _init_offline_cache() {
 
             pacman -Sy --noconfirm
 
-            mapfile -t packages < <(grep -v '^#' /profile/packages.x86_64 | grep -v '^$')
-            total=\${#packages[@]}
-
             mkdir -p /packages-cache
             mkdir -p /tmp/offlinedb
 
-            pacman -Syw \"\${packages[@]}\" --noconfirm \
+            xargs pacman -Syw --noconfirm \
                 --cachedir /packages-cache \
-                --dbpath /tmp/offlinedb
+                --dbpath /tmp/offlinedb < /profile/packages.x86_64
 
             repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
 
@@ -112,12 +109,10 @@ _update_offline_cache() {
 
             pacman -Sy --noconfirm
 
-            mapfile -t packages < <(grep -v '^#' /profile/packages.x86_64 | grep -v '^$')
-
             mkdir -p /tmp/offlinedb
-            pacman -Syw \"\${packages[@]}\" --noconfirm \
+            xargs pacman -Syw --noconfirm \
                 --cachedir /packages-cache \
-                --dbpath /tmp/offlinedb
+                --dbpath /tmp/offlinedb < /profile/packages.x86_64
 
             rm -f /packages-cache/offline.db.tar.gz
             repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
