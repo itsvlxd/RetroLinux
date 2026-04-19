@@ -30,6 +30,16 @@ rx_logo "$(
 EOF
 )"
 
+_generate_splashscreen() {
+    local theme_dir="$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux"
+    local splash_png="${theme_dir}/logo.png"
+    local source_logo="$RETRO_DIR/assets/logo-palm-wide-transparent-bg.png"
+
+    mkdir -p "$theme_dir"
+
+    magick "$source_logo" -resize 60% "$splash_png"
+}
+
 _docker_check() {
     rx_log "info" "Checking Docker..."
 
@@ -189,6 +199,7 @@ _docker_build() {
 
     _docker_check || return 1
 
+    _generate_splashscreen
     _init_offline_cache
     _update_offline_cache
     _cleanup_build

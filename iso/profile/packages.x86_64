@@ -87,6 +87,7 @@ partclone
 parted
 partimage
 pcsclite
+plymouth
 ppp
 pptpclient
 pv
