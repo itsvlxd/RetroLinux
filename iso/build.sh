@@ -265,7 +265,6 @@ _docker_build() {
     local _build_start_time=$SECONDS
 
     rx_log "info" "Starting docker build function..."
-    rx_log "info" "skip_prompt=$skip_prompt"
 
     export SKIP_PROMPT="$skip_prompt"
 
