@@ -333,6 +333,7 @@ _docker_build() {
             if [[ -n \$KERNEL_PKG ]]; then
                 KERNEL_VER=\${KERNEL_PKG##*/linux-}
                 KERNEL_VER=\${KERNEL_VER%.pkg.tar.zst}
+                KERNEL_VER=\${KERNEL_VER%%-*}
             fi
             [[ -z \$KERNEL_VER ]] && KERNEL_VER=unknown
 
