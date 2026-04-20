@@ -11,7 +11,7 @@ buildmodes=('iso')
 bootmodes=('bios.syslinux' 'uefi.grub')
 pacman_conf="pacman-offline.conf"
 airootfs_image_type="squashfs"
-airootfs_image_tool_options=('-comp' 'zstd' '-b' '1M')
+airootfs_image_tool_options=('-comp' 'zstd' '-b' '1M' '-Xcompression-level' '3')
 bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--long' '-19')
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
