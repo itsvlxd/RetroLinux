@@ -99,12 +99,10 @@ jobs:
         env:
           KERNEL_VERSION: ${{ needs.build.outputs.kernel }}
         run: |
-          cat > release_body.md << 'EOF'
+          cat > release_body.md << ENDOFFILE
           <p align="center">
-            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux" width="400">
+            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux" width="900">
           </p>
-
-          <h1 align="center">Nightly Build</h1>
 
           <p align="center">
             This ISO is built from the latest <code>develop</code> branch.<br>
@@ -119,13 +117,9 @@ jobs:
             <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
           </p>
 
-          ---
-
           ### ⚠️ Warnings
 
           This build may contain bugs, regressions, or broken features that have not been fully tested. Do not use this build for production systems or any mission-critical tasks. Always backup your data before testing any pre-release software. Expect breaking changes between nightly builds.
-
-          ---
 
           ### 💻 About
 
@@ -137,14 +131,10 @@ jobs:
 
           For a stable, reliable system for daily use, please wait for an official stable release and download it from the [Releases page](https://github.com/itsvlxd/RetroLinux/releases).
 
-          ---
-
           [🐛 Report a Bug](https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug) · [✨ Request a Feature](https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement) · [📖 Documentation](https://github.com/itsvlxd/RetroLinux/wiki)
 
-          ---
-
           **Commit:** ${{ github.sha }} · **Built:** ${{ github.event.head_commit.timestamp }}
-          EOF
+          ENDOFFILE
 
       - name: Create Nightly Release
         uses: softprops/action-gh-release@v2
