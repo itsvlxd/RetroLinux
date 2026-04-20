@@ -378,6 +378,11 @@ _docker_build() {
             fi
             rx_log "info" "SHA256: ${sha256}"
             rx_log "info" "Build time: ${build_time_formatted}"
+
+            local kernel_version=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/" | jq -r '.pkgver' 2>/dev/null)
+            if [[ -n $kernel_version ]]; then
+                rx_log "info" "Kernel: ${kernel_version}"
+            fi
         fi
     fi
 }
