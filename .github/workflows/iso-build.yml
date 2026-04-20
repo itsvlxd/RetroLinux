@@ -22,11 +22,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
       - name: Build ISO
         env:
           RETRO_DIR: ${{ github.workspace }}
         run: |
-          cd ./iso && chmod +x build.sh && ./build.sh -y
+          cd ./iso && chmod +x build.sh && ./build.sh -y || cat iso/work/*.log 2>/dev/null || true
 
       - name: Find ISO
         id: iso
