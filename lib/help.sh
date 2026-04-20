@@ -33,7 +33,7 @@ rx_help_spacer() {
 
 rx_help_examples() {
     echo -e ""
-    echo -e " ${PINK}  ${RESET}Examples${GRAY}:${RESET}"
+    echo -e "${PINK} ${RESET}Examples${GRAY}:${RESET}"
 }
 
 rx_help_section() {
