@@ -98,72 +98,52 @@ jobs:
           tag_name: nightly
           name: 'RetroLinux Nightly'
           body: |
-            <div align="center">
-              <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-wide-transparent-bg.png" alt="RetroLinux" style="max-width:100%;">
-            </div>
-
-            ---
-
-            <h1 align="center">Nightly Build</h1>
-
             <p align="center">
-              <strong>This ISO is built from the latest <code>develop</code> branch and is not recommended for production use.</strong>
+              <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux Nightly">
             </p>
 
-            ---
+            ## ⚠️ Nightly Build
 
-            <h2>⚠️ Important Warnings</h2>
-
-            <ul>
-              <li>This build may contain bugs, regressions, or broken features that have not been fully tested.</li>
-              <li>Do not use this build for production systems or any mission-critical tasks.</li>
-              <li>Always backup your data before testing any pre-release software.</li>
-              <li>Expect breaking changes between nightly builds. Configuration files and data may not be compatible with future versions.</li>
-            </ul>
+            This ISO is built from the latest `develop` branch and is **not recommended for production use**.
 
             ---
 
-            <h2>About Nightly Builds</h2>
+            ### Warnings
 
-            <p>Nightly builds are automatically created from the latest code committed to the <code>develop</code> branch. These builds represent the current state of active development and may include unfinished features, recent bug fixes, performance improvements, and other changes that have not yet been validated for a stable release.</p>
-
-            <p>If you encounter any issues, please report them on the <a href="https://github.com/itsvlxd/RetroLinux/issues">issue tracker</a>. Your feedback helps improve RetroLinux for everyone.</p>
-
-            ---
-
-            <h2>Who Should Use This?</h2>
-
-            <p>Nightly builds are best suited for developers and contributors who want to test new features as they are being worked on, or for experienced users who are comfortable troubleshooting issues and providing detailed bug reports. If you need a stable, reliable system for daily use, please wait for an official stable release.</p>
+            - This build may contain bugs, regressions, or broken features that have not been fully tested
+            - Do not use this build for production systems or any mission-critical tasks
+            - Always backup your data before testing any pre-release software
+            - Expect breaking changes between nightly builds
 
             ---
 
-            <h2>Stable Releases</h2>
+            ### About Nightly Builds
 
-            <p>For a tested, stable experience, please download official releases from the <a href="https://github.com/itsvlxd/RetroLinux/releases">Releases page</a>. Stable releases have been thoroughly tested and are recommended for most users.</p>
+            Nightly builds are automatically created from the latest code committed to the `develop` branch. These builds represent the current state of active development and may include unfinished features, recent bug fixes, performance improvements, and other changes that have not yet been validated for a stable release.
 
-            ---
-
-            <h2>Quick Links</h2>
-
-            <ul>
-              <li><a href="https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug">Report a Bug</a></li>
-              <li><a href="https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement">Request a Feature</a></li>
-              <li><a href="https://github.com/itsvlxd/RetroLinux/wiki">Documentation</a></li>
-            </ul>
+            If you encounter any issues, please report them on the [issue tracker](https://github.com/itsvlxd/RetroLinux/issues). Your feedback helps improve RetroLinux for everyone.
 
             ---
 
-            <h2>Build Information</h2>
+            ### Who Should Use This?
 
-            <ul>
-              <li><strong>Commit:</strong> <code>${{ github.sha }}</code></li>
-              <li><strong>Built:</strong> ${{ github.event.head_commit.timestamp }}</li>
-              <li><strong>Branch:</strong> <code>develop</code></li>
-            </ul>
+            Nightly builds are best suited for developers and contributors who want to test new features as they are being worked on, or for experienced users who are comfortable troubleshooting issues and providing detailed bug reports.
+
+            If you need a stable, reliable system for daily use, please wait for an official stable release and download it from the [Releases page](https://github.com/itsvlxd/RetroLinux/releases).
 
             ---
 
-            <p align="center"><em>RetroLinux is under active development.</em></p>
+            ### Quick Links
+
+            - [Report a Bug](https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug)
+            - [Request a Feature](https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement)
+            - [Documentation](https://github.com/itsvlxd/RetroLinux/wiki)
+
+            ---
+
+            **Build Info:** `${{ github.sha }}` | Built: `${{ github.event.head_commit.timestamp }}`
+
+            *RetroLinux is under active development*
           draft: false
           prerelease: false
           overwrite: true
