@@ -329,10 +329,16 @@ _docker_build() {
             pacman -Sy --noconfirm
             pacman --noconfirm -Sy archiso git sudo base-devel jq grub bc imagemagick
 
-            KERNEL_VER=\$(pacman -Q linux)
-            echo \"\$KERNEL_VER\" > /out/kernel-version.txt
+            KERNEL_PKG=\$(ls /var/cache/retrolinux/mirror/offline/linux-*.pkg.tar.zst 2>/dev/null | head -1)
+            if [[ -n \$KERNEL_PKG ]]; then
+                KERNEL_VER=\${KERNEL_PKG##*/linux-}
+                KERNEL_VER=\${KERNEL_VER%.pkg.tar.zst}
+            fi
+            [[ -z \$KERNEL_VER ]] && KERNEL_VER=unknown
 
             mkarchiso -v -w /work/ -o /out /profile/
+
+            echo \"\$KERNEL_VER\" > /out/kernel-version.txt
 
             chown -R $host_uid:$host_gid /out/
         "
