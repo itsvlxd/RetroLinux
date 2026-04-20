@@ -95,7 +95,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: iso/out/*.iso
-          tag: nightly
+          tag_name: nightly
           name: 'RetroLinux Nightly'
           body: |
             # ⚠️ Nightly Build - Development Only ⚠️
@@ -154,7 +154,7 @@ jobs:
             *RetroLinux is under active development*
           draft: false
           prerelease: true
-          replace: true
+          overwrite: true
           token: ${{ secrets.GH_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
