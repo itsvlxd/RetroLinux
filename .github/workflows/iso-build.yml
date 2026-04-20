@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      kernel: ${{ steps.iso.outputs.kernel }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +26,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y bc imagemagick
+          sudo apt-get update && sudo apt-get install -y bc imagemagick jq
 
       - name: Build ISO
         env:
@@ -42,8 +44,10 @@ jobs:
         id: iso
         run: |
           ISO_FILE=$(ls iso/out/*.iso | head -1)
+          KERNEL_VERSION=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/" | jq -r '.[0].version')
           echo "filename=$(basename $ISO_FILE)" >> $GITHUB_OUTPUT
           echo "size=$(stat -c%s $ISO_FILE)" >> $GITHUB_OUTPUT
+          echo "kernel=$KERNEL_VERSION" >> $GITHUB_OUTPUT
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
@@ -91,45 +95,64 @@ jobs:
           name: retrolinux-iso
           path: iso/out/
 
+      - name: Generate Release Notes
+        env:
+          KERNEL_VERSION: ${{ needs.build.outputs.kernel }}
+        run: |
+          cat > release_body.md << 'EOF'
+          <p align="center">
+            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux" width="400">
+          </p>
+
+          <h1 align="center">Nightly Build</h1>
+
+          <p align="center">
+            This ISO is built from the latest <code>develop</code> branch.<br>
+            It is <strong>not recommended for production use</strong>.
+          </p>
+
+          <p align="center">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=develop&label=Tests&style=for-the-badge">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=develop&label=Build&style=for-the-badge">
+            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-blueviolet?style=for-the-badge&logo=linux">
+            <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&color=cyan">
+            <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
+          </p>
+
+          ---
+
+          ### ⚠️ Warnings
+
+          This build may contain bugs, regressions, or broken features that have not been fully tested. Do not use this build for production systems or any mission-critical tasks. Always backup your data before testing any pre-release software. Expect breaking changes between nightly builds.
+
+          ---
+
+          ### 💻 About
+
+          Nightly builds are automatically created from the latest code committed to the <code>develop</code> branch. They represent the current state of active development and may include unfinished features, recent bug fixes, performance improvements, and other changes that have not yet been validated for a stable release.
+
+          If you encounter any issues, please report them on the [issue tracker](https://github.com/itsvlxd/RetroLinux/issues). Your feedback helps improve RetroLinux for everyone.
+
+          Nightly builds are best suited for developers and contributors who want to test new features as they are being worked on, or for experienced users who are comfortable troubleshooting issues and providing detailed bug reports.
+
+          For a stable, reliable system for daily use, please wait for an official stable release and download it from the [Releases page](https://github.com/itsvlxd/RetroLinux/releases).
+
+          ---
+
+          [🐛 Report a Bug](https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug) · [✨ Request a Feature](https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement) · [📖 Documentation](https://github.com/itsvlxd/RetroLinux/wiki)
+
+          ---
+
+          **Commit:** ${{ github.sha }} · **Built:** ${{ github.event.head_commit.timestamp }}
+          EOF
+
       - name: Create Nightly Release
         uses: softprops/action-gh-release@v2
         with:
           files: iso/out/*.iso
           tag_name: nightly
           name: 'RetroLinux Nightly'
-          body: |
-            ![RetroLinux Nightly](https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png)
-
-            ---
-
-            ## ⚠️ Nightly Build
-
-            This ISO is built from the latest `develop` branch and is **not recommended for production use**.
-
-            ### Warnings
-
-            - This build may contain bugs, regressions, or broken features that have not been fully tested
-            - Do not use this build for production systems or any mission-critical tasks
-            - Always backup your data before testing any pre-release software
-            - Expect breaking changes between nightly builds
-
-            ### About
-
-            Nightly builds are automatically created from the latest code committed to the `develop` branch. They represent the current state of active development and may include unfinished features, recent bug fixes, performance improvements, and other changes that have not yet been validated for a stable release.
-
-            If you encounter any issues, please report them on the [issue tracker](https://github.com/itsvlxd/RetroLinux/issues). Your feedback helps improve RetroLinux for everyone.
-
-            Nightly builds are best suited for developers and contributors who want to test new features as they are being worked on, or for experienced users who are comfortable troubleshooting issues and providing detailed bug reports.
-
-            For a stable, reliable system for daily use, please wait for an official stable release and download it from the [Releases page](https://github.com/itsvlxd/RetroLinux/releases).
-
-            ### Quick Links
-
-            [Report a Bug](https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug) · [Request a Feature](https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement) · [Documentation](https://github.com/itsvlxd/RetroLinux/wiki)
-
-            ---
-
-            **Commit:** `${{ github.sha }}` · **Built:** `${{ github.event.head_commit.timestamp }}`
+          body_path: release_body.md
           draft: false
           prerelease: false
           overwrite: true
