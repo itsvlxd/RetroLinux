@@ -329,6 +329,9 @@ _docker_build() {
             pacman -Sy --noconfirm
             pacman --noconfirm -Sy archiso git sudo base-devel jq grub bc imagemagick
 
+            KERNEL_VER=\$(pacman -Q linux)
+            echo \"\$KERNEL_VER\" > /out/kernel-version.txt
+
             mkarchiso -v -w /work/ -o /out /profile/
 
             chown -R $host_uid:$host_gid /out/
@@ -379,9 +382,12 @@ _docker_build() {
             rx_log "info" "SHA256: ${sha256}"
             rx_log "info" "Build time: ${build_time_formatted}"
 
-            local kernel_version=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/" | jq -r '.pkgver' 2>/dev/null)
-            if [[ -n $kernel_version ]]; then
-                rx_log "info" "Kernel: ${kernel_version}"
+            local kernel_version_file="$OUTPUT_DIR/kernel-version.txt"
+            if [[ -f $kernel_version_file ]]; then
+                local kernel_version_in_iso=$(cat "$kernel_version_file")
+                if [[ -n $kernel_version_in_iso ]]; then
+                    rx_log "info" "Kernel: ${kernel_version_in_iso}"
+                fi
             fi
         fi
     fi
