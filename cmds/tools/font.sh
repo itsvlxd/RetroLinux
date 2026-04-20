@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/menu.sh"
 
 cmd_font() {
     local font_core="$RETRO_DIR/scripts/font_core.sh"
@@ -13,6 +14,130 @@ cmd_font() {
     case "$action" in
         "install")
             [[ -z $type ]] && rx_log "error" "What font should I search for?" && return 1
+
+            local input_path="$type"
+            if [[ -n "$value" ]]; then
+                input_path="$type/$value"
+            fi
+
+            local is_file=false
+            local is_glob=false
+
+            if [[ "$input_path" == *\** ]]; then
+                is_glob=true
+            elif [[ -f "$input_path" ]]; then
+                is_file=true
+                input_path="$(cd "$(dirname "$input_path")" 2>/dev/null && pwd)/$(basename "$input_path")"
+            elif [[ -f "$(readlink -f "$input_path")" ]]; then
+                is_file=true
+                input_path="$(readlink -f "$input_path")"
+            fi
+
+            if [[ "$is_file" == "true" || "$is_glob" == "true" ]]; then
+                local ext="${input_path##*.}"
+                ext="${ext,,}"
+                case "$ext" in
+                    ttf|otf|woff|woff2|ttc)
+                        ;;
+                    *)
+                        rx_log "error" "Unsupported font file extension: ${PINK}$ext${RESET}"
+                        rx_log "info" "Supported formats: TTF, OTF, WOFF, WOFF2, TTC"
+                        return 1
+                        ;;
+                esac
+
+                rx_log "info" "Installing font from ${PINK}$input_path${RESET}..."
+
+                local result
+                result=$(bash "$font_core" --install-file "$input_path" 2>&1)
+
+                local first_word
+                first_word=$(echo "$result" | head -1 | awk -F'|' '{print $1}')
+
+                if [[ "$first_word" == "FILE_NOT_FOUND" ]]; then
+                    rx_log "error" "File not found: ${PINK}$input_path${RESET}"
+                    return 1
+                elif [[ "$first_word" == "INVALID_EXT" ]]; then
+                    local inv_file
+                    inv_file=$(echo "$result" | head -1 | awk -F'|' '{print $2}')
+                    rx_log "error" "Invalid font file: ${PINK}$inv_file${RESET}"
+                    return 1
+                elif [[ "$first_word" == "DIRECTORY_EMPTY" ]]; then
+                    rx_log "error" "Directory is empty: ${PINK}$input_path${RESET}"
+                    return 1
+                fi
+
+                local exists_line
+                exists_line=$(echo "$result" | grep "^EXISTS|" | head -1)
+
+                local needs_confirm="false"
+                local filename="${input_path##*/}"
+                local font_display="${filename%.*}"
+                local target_path="$HOME/.local/share/fonts/$filename"
+                local is_identical="false"
+
+                if [[ -n "$exists_line" ]]; then
+                    needs_confirm="true"
+                    filename=$(echo "$exists_line" | awk -F'|' '{print $2}')
+                    font_display=$(echo "$exists_line" | awk -F'|' '{print $3}')
+                    target_path=$(echo "$exists_line" | awk -F'|' '{print $4}')
+                    is_identical=$(echo "$exists_line" | awk -F'|' '{print $5}' | grep -q "true" && echo "true" || echo "false")
+                fi
+
+                if [[ "$needs_confirm" == "true" ]]; then
+                    if [[ "$is_identical" == "true" ]]; then
+                        rx_log "info" "Font '${font_display}' is already installed (identical file)"
+                    else
+                        rx_log "info" "Font '${font_display}' already exists with different content"
+                    fi
+
+                    local choice
+                    choice=$(rx_menu "󰅸" "Font '$font_display' exists. Choose action:" \
+                        "Overwrite" \
+                        "Skip" \
+                        "Keep both (rename)")
+
+                    case "$choice" in
+                        "Overwrite")
+                            bash "$font_core" --install-file-overwrite "$input_path" "$target_path" >/dev/null
+                            bash "$font_core" --install-file-cache >/dev/null
+                            rx_log "success" "Font ${PINK}$font_display${RESET} overwritten"
+                            ;;
+                        "Skip")
+                            rx_log "info" "Font skipped"
+                            ;;
+                        "Keep both (rename)")
+                            local new_result
+                            new_result=$(bash "$font_core" --install-file-rename "$input_path" "$HOME/.local/share/fonts" 2>/dev/null)
+                            local new_name
+                            new_name=$(echo "$new_result" | awk -F'|' '{print $2}')
+                            bash "$font_core" --install-file-cache >/dev/null
+                            rx_log "success" "Font installed as ${PINK}$new_name${RESET}"
+                            ;;
+                        *)
+                            rx_log "info" "No changes made"
+                            ;;
+                    esac
+                else
+                    local result_line
+                    result_line=$(echo "$result" | grep "^RESULT|" | head -1)
+                    local installed
+                    installed=$(echo "$result_line" | grep -oP 'installed=\K\d+' || echo "0")
+                    local skipped
+                    skipped=$(echo "$result_line" | grep -oP 'skipped=\K\d+' || echo "0")
+
+                    if [[ $installed -gt 0 ]]; then
+                        rx_log "success" "Font ${PINK}$font_display${RESET} installed"
+                    elif [[ $skipped -gt 0 ]]; then
+                        rx_log "info" "Font already installed"
+                    fi
+                    bash "$font_core" --install-file-cache >/dev/null
+                fi
+
+                bash "$font_core" --sync
+                return 0
+            fi
+
             local helper=$(get_var "PKG_HELPER")
             [[ -z $helper ]] && helper="yay"
 
@@ -248,7 +373,7 @@ cmd_font() {
         *)
             rx_help_usage "retro font <command>"
             rx_help_commands "Available commands"
-            rx_help_cmd "install <pkg>" "Install a font package"
+            rx_help_cmd "install <pkg|file>" "Install font package or local file"
             rx_help_cmd "set [cat] <font>" "Set active font for category"
             rx_help_cmd "edit" "Edit fontconfig override file"
             rx_help_cmd "list" "List all installed fonts"
@@ -256,9 +381,10 @@ cmd_font() {
             rx_help_cmd "status" "Show active fonts and count"
             rx_help_cmd "setup" "Interactive font setup wizard"
             rx_help_examples
-            rx_help_example "retro font status" "Show active fonts and count"
+            rx_help_example "retro font install ttf-jetbrains" "Install from package"
+            rx_help_example "retro font install ~/Fonts/Roboto.ttf" "Install from file"
+            rx_help_example "retro font install ~/Downloads/*.otf" "Install multiple files"
             rx_help_example "retro font list" "List all installed fonts"
-            rx_help_example "retro font remote inter" "Search for Inter font"
             rx_help_spacer
             ;;
     esac
