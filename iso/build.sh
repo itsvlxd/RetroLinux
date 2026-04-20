@@ -15,33 +15,31 @@ source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/git.sh"
 
 CACHE_VOLUME="retrolinux-pkg-cache"
-
 REQUIRED_DEPS=("bc" "convert")
-BUILD_DEPS=("archiso" "git" "sudo" "base-devel" "jq" "grub" "bc" "imagemagick")
 
 _check_deps() {
     rx_log "info" "Checking dependencies..."
 
     local missing=()
-    for dep in "${REQUIRED_DEPS[@]}"; do
-        if ! command -v "$dep" &>/dev/null; then
-            rx_log "warn" "Missing: $dep"
-            missing+=("$dep")
+    for cmd in "${REQUIRED_DEPS[@]}"; do
+        if ! command -v "$cmd" &>/dev/null; then
+            rx_log "warn" "Missing: $cmd"
+            missing+=("$cmd")
         else
-            rx_log "info" "Found: $dep at $(which "$dep")"
+            rx_log "info" "Found: $cmd at $(which "$cmd")"
         fi
     done
 
     if [[ ${#missing[@]} -gt 0 ]]; then
-        rx_log "error" "Missing required dependencies: ${PINK}${missing[*]}${RESET}"
-        rx_log "info" "Install with: sudo pacman -S ${missing[*]}"
-        return 1
+        rx_log "warn" "Missing host dependencies: ${PINK}${missing[*]}${RESET}"
+        rx_log "info" "Docker container will install its own packages"
+    else
+        rx_log "success" "All host dependencies satisfied"
     fi
-
-    rx_log "success" "All dependencies satisfied"
 }
 
 _build_help() {
@@ -276,7 +274,7 @@ _docker_build() {
     local old_iso_size=0
     local old_iso_file
     old_iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1 || true)
-    if [[ -n "$old_iso_file" && -f "$old_iso_file" ]]; then
+    if [[ -n $old_iso_file && -f $old_iso_file ]]; then
         old_iso_size=$(stat -c%s "$old_iso_file" 2>/dev/null || echo "0")
         rx_log "info" "Found old ISO: $old_iso_file ($old_iso_size bytes)"
     else
@@ -284,7 +282,10 @@ _docker_build() {
     fi
 
     rx_log "info" "Running docker check..."
-    _docker_check || { rx_log "error" "Docker check failed"; return 1; }
+    _docker_check || {
+        rx_log "error" "Docker check failed"
+        return 1
+    }
 
     rx_log "info" "Running deps check (optional on host)..."
     if ! _check_deps 2>/dev/null; then
@@ -342,43 +343,43 @@ _docker_build() {
 
     local iso_file
     iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1)
-    if [[ -n "$iso_file" ]]; then
+    if [[ -n $iso_file ]]; then
         rx_log "info" "Found ISO: $iso_file"
 
-    if [[ -f $iso_file ]]; then
-        local filename="${iso_file##*/}"
-        local size_bytes=$(stat -c%s "$iso_file")
-        local size_gb=$(awk "BEGIN {printf \"%.2f\", $size_bytes / 1024 / 1024 / 1024}")
-        local sha256=$(sha256sum "$iso_file" | awk '{print $1}')
-        local build_time=$((SECONDS - _build_start_time))
-        local build_time_formatted=""
+        if [[ -f $iso_file ]]; then
+            local filename="${iso_file##*/}"
+            local size_bytes=$(stat -c%s "$iso_file")
+            local size_gb=$(awk "BEGIN {printf \"%.2f\", $size_bytes / 1024 / 1024 / 1024}")
+            local sha256=$(sha256sum "$iso_file" | awk '{print $1}')
+            local build_time=$((SECONDS - _build_start_time))
+            local build_time_formatted=""
 
-        if [[ $build_time -ge 60 ]]; then
-            build_time_formatted=$(printf '%dm %ds' $((build_time / 60)) $((build_time % 60)))
-        else
-            build_time_formatted="${build_time}s"
-        fi
-
-        rx_log "info" "Build completed"
-        rx_log "info" "Filename: ${filename}"
-        rx_log "info" "Size: ${size_gb} GB (${size_bytes} bytes)"
-        if [[ $old_iso_size -gt 0 ]]; then
-            local old_size_gb=$(awk "BEGIN {printf \"%.2f\", $old_iso_size / 1024 / 1024 / 1024}")
-            local size_diff=$((size_bytes - old_iso_size))
-            local size_diff_abs=${size_diff#-}
-            local diff_mb=$(awk "BEGIN {printf \"%.2f\", $size_diff_abs / 1024 / 1024}")
-            local diff_gb=$(awk "BEGIN {printf \"%.2f\", $size_diff_abs / 1024 / 1024 / 1024}")
-            if [[ $size_diff -lt 0 ]]; then
-                rx_log "info" "Previous ISO: ${old_size_gb} GB (-${diff_mb} MB, smaller)"
-            elif [[ $size_diff -gt 0 ]]; then
-                rx_log "info" "Previous ISO: ${old_size_gb} GB (+${diff_mb} MB, larger)"
+            if [[ $build_time -ge 60 ]]; then
+                build_time_formatted=$(printf '%dm %ds' $((build_time / 60)) $((build_time % 60)))
             else
-                rx_log "info" "Previous ISO: ${old_size_gb} GB (same size)"
+                build_time_formatted="${build_time}s"
             fi
+
+            rx_log "info" "Build completed"
+            rx_log "info" "Filename: ${filename}"
+            rx_log "info" "Size: ${size_gb} GB (${size_bytes} bytes)"
+            if [[ $old_iso_size -gt 0 ]]; then
+                local old_size_gb=$(awk "BEGIN {printf \"%.2f\", $old_iso_size / 1024 / 1024 / 1024}")
+                local size_diff=$((size_bytes - old_iso_size))
+                local size_diff_abs=${size_diff#-}
+                local diff_mb=$(awk "BEGIN {printf \"%.2f\", $size_diff_abs / 1024 / 1024}")
+                local diff_gb=$(awk "BEGIN {printf \"%.2f\", $size_diff_abs / 1024 / 1024 / 1024}")
+                if [[ $size_diff -lt 0 ]]; then
+                    rx_log "info" "Previous ISO: ${old_size_gb} GB (-${diff_mb} MB, smaller)"
+                elif [[ $size_diff -gt 0 ]]; then
+                    rx_log "info" "Previous ISO: ${old_size_gb} GB (+${diff_mb} MB, larger)"
+                else
+                    rx_log "info" "Previous ISO: ${old_size_gb} GB (same size)"
+                fi
+            fi
+            rx_log "info" "SHA256: ${sha256}"
+            rx_log "info" "Build time: ${build_time_formatted}"
         fi
-        rx_log "info" "SHA256: ${sha256}"
-        rx_log "info" "Build time: ${build_time_formatted}"
-    fi
     fi
 }
 
