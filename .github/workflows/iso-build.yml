@@ -26,8 +26,9 @@ jobs:
         env:
           RETRO_DIR: ${{ github.workspace }}
         run: |
-          chmod +x ./iso/build.sh
-          ./iso/build.sh -y
+          cd ./iso
+          chmod +x build.sh
+          build.sh -y
 
       - name: Find ISO
         id: iso
