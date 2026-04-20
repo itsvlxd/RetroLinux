@@ -19,6 +19,26 @@ source "$RETRO_DIR/lib/git.sh"
 
 CACHE_VOLUME="retrolinux-pkg-cache"
 
+REQUIRED_DEPS=("bc" "magick")
+BUILD_DEPS=("archiso" "git" "sudo" "base-devel" "jq" "grub" "bc" "imagemagick")
+
+_check_deps() {
+    local missing=()
+    for dep in "${REQUIRED_DEPS[@]}"; do
+        if ! command -v "$dep" &>/dev/null; then
+            missing+=("$dep")
+        fi
+    done
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        rx_log "error" "Missing required dependencies: ${PINK}${missing[*]}${RESET}"
+        rx_log "info" "Install with: sudo pacman -S ${missing[*]}"
+        return 1
+    fi
+
+    rx_log "success" "All dependencies satisfied"
+}
+
 _build_help() {
     rx_help_usage "./build.sh <command> [options]"
     rx_help_commands "Available commands"
@@ -241,6 +261,8 @@ _docker_build() {
     local skip_prompt="$1"
     local _build_start_time=$SECONDS
 
+    export SKIP_PROMPT="$skip_prompt"
+
     local old_iso_size=0
     local old_iso_file
     old_iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1)
@@ -249,6 +271,7 @@ _docker_build() {
     fi
 
     _docker_check || return 1
+    _check_deps || return 1
 
     _init_offline_cache
     _update_offline_cache
@@ -284,7 +307,7 @@ _docker_build() {
             rm -f /var/lib/pacman/db.lck 2>/dev/null || true
 
             pacman -Sy --noconfirm
-            pacman --noconfirm -Sy archiso git sudo base-devel jq grub
+            pacman --noconfirm -Sy archiso git sudo base-devel jq grub bc imagemagick
 
             mkarchiso -v -w /work/ -o /out /profile/
 
@@ -420,7 +443,7 @@ EOF
 }
 
 if [[ ${BASH_SOURCE[0]} != "${0}" ]]; then
-    export -f _iso_main _docker_check _docker_build _init_offline_cache _update_offline_cache _prepare_airootfs_offline _cleanup_build _generate_splashscreen _build_help _clean_all
+    export -f _iso_main _docker_check _docker_build _init_offline_cache _update_offline_cache _prepare_airootfs_offline _cleanup_build _generate_splashscreen _build_help _clean_all _check_deps
 else
     _iso_main "$@"
 fi
