@@ -44,7 +44,7 @@ jobs:
         id: iso
         run: |
           ISO_FILE=$(ls iso/out/*.iso | head -1)
-          KERNEL_VERSION=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/" | jq -r '.pkgver')
+          KERNEL_VERSION=$(cat iso/out/kernel-version.txt 2>/dev/null || echo "unknown")
           echo "filename=$(basename $ISO_FILE)" >> $GITHUB_OUTPUT
           echo "size=$(stat -c%s $ISO_FILE)" >> $GITHUB_OUTPUT
           echo "kernel=$KERNEL_VERSION" >> $GITHUB_OUTPUT
@@ -101,7 +101,7 @@ jobs:
         run: |
           cat > release_body.md << ENDOFFILE
           <p align="center">
-            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux" width="900">
+            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux" width="1200">
           </p>
 
           <p align="center">

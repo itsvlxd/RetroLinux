@@ -2,7 +2,7 @@ MangoHud.conf
 
 # ISO build artifacts
 iso/work/
-iso/out/*.iso
+iso/out/
 iso/profile/packages-cache
 iso/profile/airootfs/var
 
