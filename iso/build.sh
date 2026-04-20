@@ -19,14 +19,19 @@ source "$RETRO_DIR/lib/git.sh"
 
 CACHE_VOLUME="retrolinux-pkg-cache"
 
-REQUIRED_DEPS=("bc" "magick")
+REQUIRED_DEPS=("bc" "convert")
 BUILD_DEPS=("archiso" "git" "sudo" "base-devel" "jq" "grub" "bc" "imagemagick")
 
 _check_deps() {
+    rx_log "info" "Checking dependencies..."
+
     local missing=()
     for dep in "${REQUIRED_DEPS[@]}"; do
         if ! command -v "$dep" &>/dev/null; then
+            rx_log "warn" "Missing: $dep"
             missing+=("$dep")
+        else
+            rx_log "info" "Found: $dep at $(which "$dep")"
         fi
     done
 
@@ -126,7 +131,7 @@ _init_offline_cache() {
             mkdir -p /packages-cache
             mkdir -p /tmp/offlinedb
 
-            xargs pacman -Syw --noconfirm \
+            yes | xargs pacman -Syw --noconfirm \
                 --cachedir /packages-cache \
                 --dbpath /tmp/offlinedb < /profile/packages.x86_64
 
@@ -157,7 +162,7 @@ _update_offline_cache() {
             pacman -Sy --noconfirm
 
             mkdir -p /tmp/offlinedb
-            xargs pacman -Syw --noconfirm \
+            yes | xargs pacman -Syw --noconfirm \
                 --cachedir /packages-cache \
                 --dbpath /tmp/offlinedb < /profile/packages.x86_64
 
@@ -261,17 +266,32 @@ _docker_build() {
     local skip_prompt="$1"
     local _build_start_time=$SECONDS
 
+    rx_log "info" "Starting docker build function..."
+    rx_log "info" "skip_prompt=$skip_prompt"
+
     export SKIP_PROMPT="$skip_prompt"
+
+    rx_log "info" "Checking for existing ISO size..."
 
     local old_iso_size=0
     local old_iso_file
-    old_iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1)
-    if [[ -f $old_iso_file ]]; then
-        old_iso_size=$(stat -c%s "$old_iso_file")
+    old_iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1 || true)
+    if [[ -n "$old_iso_file" && -f "$old_iso_file" ]]; then
+        old_iso_size=$(stat -c%s "$old_iso_file" 2>/dev/null || echo "0")
+        rx_log "info" "Found old ISO: $old_iso_file ($old_iso_size bytes)"
+    else
+        rx_log "info" "No existing ISO found"
     fi
 
-    _docker_check || return 1
-    _check_deps || return 1
+    rx_log "info" "Running docker check..."
+    _docker_check || { rx_log "error" "Docker check failed"; return 1; }
+
+    rx_log "info" "Running deps check (optional on host)..."
+    if ! _check_deps 2>/dev/null; then
+        rx_log "warn" "Some host dependencies missing, but Docker build will use its own packages"
+    fi
+
+    rx_log "info" "All checks passed, starting build..."
 
     _init_offline_cache
     _update_offline_cache
@@ -316,8 +336,14 @@ _docker_build() {
 
     rx_log "success" "ISO built successfully"
 
+    rx_log "info" "Build output directory: $OUTPUT_DIR"
+    rx_log "info" "Listing output dir contents:"
+    ls -la "$OUTPUT_DIR/" 2>&1 || rx_log "warn" "Could not list output directory"
+
     local iso_file
     iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1)
+    if [[ -n "$iso_file" ]]; then
+        rx_log "info" "Found ISO: $iso_file"
 
     if [[ -f $iso_file ]]; then
         local filename="${iso_file##*/}"
@@ -352,6 +378,7 @@ _docker_build() {
         fi
         rx_log "info" "SHA256: ${sha256}"
         rx_log "info" "Build time: ${build_time_formatted}"
+    fi
     fi
 }
 

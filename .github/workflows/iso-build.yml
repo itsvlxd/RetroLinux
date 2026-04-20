@@ -30,7 +30,13 @@ jobs:
         env:
           RETRO_DIR: ${{ github.workspace }}
         run: |
-          cd ./iso && chmod +x build.sh && ./build.sh -y
+          cd ./iso && chmod +x build.sh
+          ./build.sh -y 2>&1 || {
+            echo "=== Build failed, checking logs ==="
+            ls -la iso/out/ 2>/dev/null || true
+            ls -la iso/work/ 2>/dev/null || true
+            exit 1
+          }
 
       - name: Find ISO
         id: iso
