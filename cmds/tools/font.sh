@@ -16,16 +16,16 @@ cmd_font() {
             [[ -z $type ]] && rx_log "error" "What font should I search for?" && return 1
 
             local input_path="$type"
-            if [[ -n "$value" ]]; then
+            if [[ -n $value ]]; then
                 input_path="$type/$value"
             fi
 
             local is_file=false
             local is_glob=false
 
-            if [[ "$input_path" == *\** ]]; then
+            if [[ $input_path == *\** ]]; then
                 is_glob=true
-            elif [[ -f "$input_path" ]]; then
+            elif [[ -f $input_path ]]; then
                 is_file=true
                 input_path="$(cd "$(dirname "$input_path")" 2>/dev/null && pwd)/$(basename "$input_path")"
             elif [[ -f "$(readlink -f "$input_path")" ]]; then
@@ -33,11 +33,11 @@ cmd_font() {
                 input_path="$(readlink -f "$input_path")"
             fi
 
-            if [[ "$is_file" == "true" || "$is_glob" == "true" ]]; then
+            if [[ $is_file == "true" || $is_glob == "true" ]]; then
                 local ext="${input_path##*.}"
                 ext="${ext,,}"
                 case "$ext" in
-                    ttf|otf|woff|woff2|ttc)
+                    ttf | otf | woff | woff2 | ttc)
                         ;;
                     *)
                         rx_log "error" "Unsupported font file extension: ${PINK}$ext${RESET}"
@@ -54,15 +54,15 @@ cmd_font() {
                 local first_word
                 first_word=$(echo "$result" | head -1 | awk -F'|' '{print $1}')
 
-                if [[ "$first_word" == "FILE_NOT_FOUND" ]]; then
+                if [[ $first_word == "FILE_NOT_FOUND" ]]; then
                     rx_log "error" "File not found: ${PINK}$input_path${RESET}"
                     return 1
-                elif [[ "$first_word" == "INVALID_EXT" ]]; then
+                elif [[ $first_word == "INVALID_EXT" ]]; then
                     local inv_file
                     inv_file=$(echo "$result" | head -1 | awk -F'|' '{print $2}')
                     rx_log "error" "Invalid font file: ${PINK}$inv_file${RESET}"
                     return 1
-                elif [[ "$first_word" == "DIRECTORY_EMPTY" ]]; then
+                elif [[ $first_word == "DIRECTORY_EMPTY" ]]; then
                     rx_log "error" "Directory is empty: ${PINK}$input_path${RESET}"
                     return 1
                 fi
@@ -76,7 +76,7 @@ cmd_font() {
                 local target_path="$HOME/.local/share/fonts/$filename"
                 local is_identical="false"
 
-                if [[ -n "$exists_line" ]]; then
+                if [[ -n $exists_line ]]; then
                     needs_confirm="true"
                     filename=$(echo "$exists_line" | awk -F'|' '{print $2}')
                     font_display=$(echo "$exists_line" | awk -F'|' '{print $3}')
@@ -84,15 +84,15 @@ cmd_font() {
                     is_identical=$(echo "$exists_line" | awk -F'|' '{print $5}' | grep -q "true" && echo "true" || echo "false")
                 fi
 
-                if [[ "$needs_confirm" == "true" ]]; then
-                    if [[ "$is_identical" == "true" ]]; then
-                        rx_log "info" "Font '${font_display}' is already installed (identical file)"
+                if [[ $needs_confirm == "true" ]]; then
+                    if [[ $is_identical == "true" ]]; then
+                        rx_log "info" "Font ${PINK}${font_display}${RESET} is already installed (identical file)"
                     else
-                        rx_log "info" "Font '${font_display}' already exists with different content"
+                        rx_log "info" "Font ${PINK}${font_display}${RESET} already exists with different content"
                     fi
 
                     local choice
-                    choice=$(rx_menu "󰅸" "Font '$font_display' exists. Choose action:" \
+                    choice=$(rx_menu "󰅸" "Font ${PINK}${font_display}${RESET} exists. Choose action:" \
                         "Overwrite" \
                         "Skip" \
                         "Keep both (rename)")
@@ -312,7 +312,12 @@ cmd_font() {
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
 
                 if [[ -n $match ]]; then
-                    rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || { rx_log "info" "Enter the exact font family name: "; read -r font_name; set_var "RETRO_FONT_MAIN" "${font_name:-$match}"; return 0; }
+                    rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || {
+                        rx_log "info" "Enter the exact font family name: "
+                        read -r font_name
+                        set_var "RETRO_FONT_MAIN" "${font_name:-$match}"
+                        return 0
+                    }
                     set_var "RETRO_FONT_MAIN" "$match"
                 fi
             fi
@@ -329,7 +334,12 @@ cmd_font() {
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
 
                 if [[ -n $match ]]; then
-                    rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || { rx_log "info" "Enter the exact font family name: "; read -r font_name; set_var "RETRO_FONT_NERD" "${font_name:-$match}"; return 0; }
+                    rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || {
+                        rx_log "info" "Enter the exact font family name: "
+                        read -r font_name
+                        set_var "RETRO_FONT_NERD" "${font_name:-$match}"
+                        return 0
+                    }
                     set_var "RETRO_FONT_NERD" "$match"
                 fi
             fi
