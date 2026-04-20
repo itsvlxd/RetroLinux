@@ -44,7 +44,7 @@ jobs:
         id: iso
         run: |
           ISO_FILE=$(ls iso/out/*.iso | head -1)
-          KERNEL_VERSION=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/" | jq -r '.[0].version')
+          KERNEL_VERSION=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/" | jq -r '.pkgver')
           echo "filename=$(basename $ISO_FILE)" >> $GITHUB_OUTPUT
           echo "size=$(stat -c%s $ISO_FILE)" >> $GITHUB_OUTPUT
           echo "kernel=$KERNEL_VERSION" >> $GITHUB_OUTPUT
