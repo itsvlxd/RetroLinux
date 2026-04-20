@@ -19,16 +19,21 @@ source "$RETRO_DIR/lib/git.sh"
 
 CACHE_VOLUME="retrolinux-pkg-cache"
 
-rx_logo "$(
-    cat <<'EOF'
-██████╗ ███████╗████████╗██████╗  ██████╗     ██╗███████╗ ██████╗ 
-██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗    ██║██╔════╝██╔═══██╗
-██████╔╝█████╗     ██║   ██████╔╝██║   ██║    ██║███████╗██║   ██║
-██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║    ██║╚════██║██║   ██║
-██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝    ██║███████║╚██████╔╝
-╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝     ╚═╝╚══════╝ ╚═════╝ 
-EOF
-)"
+_build_help() {
+    rx_help_usage "./build.sh <command> [options]"
+    rx_help_commands "Available commands"
+    rx_help_cmd "build, b" "Build the full ISO (default)"
+    rx_help_cmd "--plymouth, -p" "Generate Plymouth splashscreen only"
+    rx_help_cmd "--clean, -c" "Clean cache and work dir, then build"
+    rx_help_cmd "--yes, -y" "Skip all confirmations"
+    rx_help_cmd "--help, -h" "Show this help message"
+    rx_help_examples
+    rx_help_example "./build.sh" "Build ISO with prompts"
+    rx_help_example "./build.sh --yes" "Build ISO, skip prompts"
+    rx_help_example "./build.sh --plymouth" "Generate splashscreen only"
+    rx_help_example "./build.sh --clean" "Clean everything and rebuild"
+    rx_help_example "./build.sh -c -y" "Clean and build, skip prompts"
+}
 
 _generate_splashscreen() {
     local theme_dir="$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux"
@@ -37,7 +42,19 @@ _generate_splashscreen() {
 
     mkdir -p "$theme_dir"
 
+    if [[ ! -f $source_logo ]]; then
+        rx_log "error" "Source logo not found: ${source_logo}"
+        return 1
+    fi
+
+    rx_log "info" "Generating Plymouth splashscreen..."
     magick "$source_logo" -resize 60% "$splash_png"
+
+    local size_bytes=$(stat -c%s "$splash_png")
+    local size_kb=$(awk "BEGIN {printf \"%.2f\", $size_bytes / 1024}")
+
+    rx_log "success" "Splashscreen generated: ${splash_png}"
+    rx_log "info" "Size: ${size_kb} KB"
 }
 
 _docker_check() {
@@ -124,6 +141,33 @@ _update_offline_cache() {
                 --cachedir /packages-cache \
                 --dbpath /tmp/offlinedb < /profile/packages.x86_64
 
+            cd /packages-cache
+
+            for pkg in *.pkg.tar.zst; do
+                [[ -f \$pkg ]] || continue
+                base=\${pkg%.pkg.tar.zst}
+                name=\${base%-*-*}
+                version=\${base#*-\$name-}
+                version=\${version%-[0-9]*}
+
+                duplicates=(\$(ls -1 \$name-*.pkg.tar.zst 2>/dev/null | sort -t'-' -k2 -V))
+                if [[ \${#duplicates[@]} -gt 1 ]]; then
+                    for dup in \"\${duplicates[@]:0:\$(( \${#duplicates[@]} - 1 ))}\"; do
+                        rm -f \"\$dup\"
+                    done
+                fi
+            done
+
+            rm -f linux-firmware-nvidia-*.pkg.tar.zst
+            rm -f linux-firmware-marvell-*.pkg.tar.zst
+            rm -f linux-firmware-atheros-*.pkg.tar.zst
+            rm -f linux-firmware-mediatek-*.pkg.tar.zst
+            rm -f linux-firmware-broadcom-*.pkg.tar.zst
+            rm -f linux-firmware-other-*.pkg.tar.zst
+            rm -f linux-firmware-cirrus-*.pkg.tar.zst
+            rm -f linux-firmware-radeon-*.pkg.tar.zst
+            rm -f linux-firmware-20260309-1-any.pkg.tar.zst
+
             rm -f /packages-cache/offline.db.tar.gz
             repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
 
@@ -197,9 +241,15 @@ _docker_build() {
     local skip_prompt="$1"
     local _build_start_time=$SECONDS
 
+    local old_iso_size=0
+    local old_iso_file
+    old_iso_file=$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.iso' 2>/dev/null | head -n1)
+    if [[ -f $old_iso_file ]]; then
+        old_iso_size=$(stat -c%s "$old_iso_file")
+    fi
+
     _docker_check || return 1
 
-    _generate_splashscreen
     _init_offline_cache
     _update_offline_cache
     _cleanup_build
@@ -263,17 +313,90 @@ _docker_build() {
         rx_log "info" "Build completed"
         rx_log "info" "Filename: ${filename}"
         rx_log "info" "Size: ${size_gb} GB (${size_bytes} bytes)"
+        if [[ $old_iso_size -gt 0 ]]; then
+            local old_size_gb=$(awk "BEGIN {printf \"%.2f\", $old_iso_size / 1024 / 1024 / 1024}")
+            local size_diff=$((size_bytes - old_iso_size))
+            local size_diff_abs=${size_diff#-}
+            local diff_mb=$(awk "BEGIN {printf \"%.2f\", $size_diff_abs / 1024 / 1024}")
+            local diff_gb=$(awk "BEGIN {printf \"%.2f\", $size_diff_abs / 1024 / 1024 / 1024}")
+            if [[ $size_diff -lt 0 ]]; then
+                rx_log "info" "Previous ISO: ${old_size_gb} GB (-${diff_mb} MB, smaller)"
+            elif [[ $size_diff -gt 0 ]]; then
+                rx_log "info" "Previous ISO: ${old_size_gb} GB (+${diff_mb} MB, larger)"
+            else
+                rx_log "info" "Previous ISO: ${old_size_gb} GB (same size)"
+            fi
+        fi
         rx_log "info" "SHA256: ${sha256}"
         rx_log "info" "Build time: ${build_time_formatted}"
     fi
 }
 
+_clean_all() {
+    rx_log "info" "Cleaning all build artifacts..."
+
+    rx_log "info" "Removing work directory..."
+    if [[ -d $WORK_DIR ]]; then
+        if rm -rf "$WORK_DIR" 2>/dev/null; then
+            rx_log "success" "Work directory removed"
+        else
+            rx_log "warn" "Failed to remove work directory, trying with sudo..."
+            if sudo rm -rf "$WORK_DIR" 2>/dev/null; then
+                rx_log "success" "Work directory removed"
+            else
+                rx_log "error" "Failed to remove work directory. Please remove manually: sudo rm -rf $WORK_DIR"
+            fi
+        fi
+    else
+        rx_log "info" "Work directory does not exist"
+    fi
+
+    rx_log "info" "Removing Docker package cache..."
+    if docker volume rm "$CACHE_VOLUME" 2>/dev/null; then
+        rx_log "success" "Docker cache volume removed"
+    else
+        rx_log "info" "Docker cache volume does not exist or already removed"
+    fi
+
+    rx_log "success" "Clean complete"
+}
+
 _iso_main() {
+    rx_logo "$(
+        cat <<'EOF'
+██████╗ ███████╗████████╗██████╗  ██████╗     ██╗███████╗ ██████╗
+██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗    ██║██╔════╝██╔═══██╗
+██████╔╝█████╗     ██║   ██████╔╝██║   ██║    ██║███████╗██║   ██║
+██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║    ██║╚════██║██║   ██║
+██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝    ██║███████║╚██████╔╝
+╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝     ╚═╝╚══════╝ ╚═════╝
+EOF
+    )"
+
     local skip_prompt="false"
+    local command="build"
+    local do_clean="false"
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -h | --help)
+                _build_help
+                exit 0
+                ;;
             -y | --yes)
                 skip_prompt="true"
+                shift
+                ;;
+            -p | --plymouth)
+                command="plymouth"
+                shift
+                ;;
+            -c | --clean)
+                do_clean="true"
+                shift
+                ;;
+            build | b)
+                command="build"
                 shift
                 ;;
             *)
@@ -282,11 +405,22 @@ _iso_main() {
         esac
     done
 
-    _docker_build "$skip_prompt"
+    if [[ $do_clean == "true" ]]; then
+        _clean_all
+    fi
+
+    case "$command" in
+        plymouth)
+            _generate_splashscreen
+            ;;
+        build)
+            _docker_build "$skip_prompt"
+            ;;
+    esac
 }
 
 if [[ ${BASH_SOURCE[0]} != "${0}" ]]; then
-    export -f _iso_main _docker_check _docker_build _init_offline_cache _update_offline_cache _prepare_airootfs_offline _cleanup_build
+    export -f _iso_main _docker_check _docker_build _init_offline_cache _update_offline_cache _prepare_airootfs_offline _cleanup_build _generate_splashscreen _build_help _clean_all
 else
     _iso_main "$@"
 fi
