@@ -1,6 +1,7 @@
 MangoHud.conf
 
 # ISO build artifacts
+.env
 iso/work/
 iso/out/
 iso/profile/packages-cache
