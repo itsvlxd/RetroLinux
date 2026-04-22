@@ -124,8 +124,6 @@ _init_offline_cache() {
         archlinux/archlinux:latest bash -c "
             set -e
 
-            pacman -Sy --noconfirm
-
             mkdir -p /packages-cache
             mkdir -p /tmp/offlinedb
 
@@ -154,10 +152,8 @@ _update_offline_cache() {
         -e "HOST_GID=$host_gid" \
         -v "$PROFILE_DIR:/profile:ro" \
         -v "${CACHE_VOLUME}:/packages-cache" \
-        archlinux/archlinux:latest bash -c "
+        archlinux/archlinux:latest bash -c '
             set -e
-
-            pacman -Sy --noconfirm
 
             mkdir -p /tmp/offlinedb
             yes | xargs pacman -Syw --noconfirm \
@@ -167,16 +163,16 @@ _update_offline_cache() {
             cd /packages-cache
 
             for pkg in *.pkg.tar.zst; do
-                [[ -f \$pkg ]] || continue
-                base=\${pkg%.pkg.tar.zst}
-                name=\${base%-*-*}
-                version=\${base#*-\$name-}
-                version=\${version%-[0-9]*}
+                [[ -f "$pkg" ]] || continue
+                base="${pkg%.pkg.tar.zst}"
+                name="${base%-*-*}"
+                version="${base#*-${name}-}"
+                version="${version%-[0-9]*}"
 
-                duplicates=(\$(ls -1 \$name-*.pkg.tar.zst 2>/dev/null | sort -t'-' -k2 -V))
-                if [[ \${#duplicates[@]} -gt 1 ]]; then
-                    for dup in \"\${duplicates[@]:0:\$(( \${#duplicates[@]} - 1 ))}\"; do
-                        rm -f \"\$dup\"
+                duplicates=$(ls -1 "$name"-*.pkg.tar.zst 2>/dev/null | sort -t"-" -k2 -V)
+                if [[ ${#duplicates[@]} -gt 1 ]]; then
+                    for dup in "${duplicates[@]:0:$(( ${#duplicates[@]} - 1 ))}"; do
+                        rm -f "$dup"
                     done
                 fi
             done
@@ -194,8 +190,8 @@ _update_offline_cache() {
             rm -f /packages-cache/offline.db.tar.gz
             repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
 
-            chown -R $host_uid:$host_gid /packages-cache
-        "
+            chown -R $HOST_UID:$HOST_GID /packages-cache
+        '
 
     rx_log "success" "Cache updated"
 }
@@ -326,7 +322,6 @@ _docker_build() {
 
             rm -f /var/lib/pacman/db.lck 2>/dev/null || true
 
-            pacman -Sy --noconfirm
             pacman --noconfirm -Sy archiso git sudo base-devel jq grub bc imagemagick
 
             KERNEL_PKG=\$(ls /var/cache/retrolinux/mirror/offline/linux-*.pkg.tar.zst 2>/dev/null | head -1)
