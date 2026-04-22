@@ -28,9 +28,23 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y bc imagemagick jq
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Pull Docker image
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/retrolinux-build:latest || echo "Image not found, build may fail"
+          docker tag ghcr.io/${{ github.repository_owner }}/retrolinux-build:latest retrolinux-build:latest 2>/dev/null || true
+
       - name: Build ISO
         env:
           RETRO_DIR: ${{ github.workspace }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_USER: ${{ github.repository_owner }}
         run: |
           cd ./iso && chmod +x build.sh
           ./build.sh -y 2>&1 || {
