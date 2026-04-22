@@ -11,6 +11,12 @@ if [[ -z ${RETRO_DIR:-} ]]; then
     export RETRO_DIR="$(dirname "$SCRIPT_DIR")"
 fi
 
+if [[ -f "$RETRO_DIR/.env" ]]; then
+    set -a
+    source "$RETRO_DIR/.env"
+    set +a
+fi
+
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/logo.sh"
@@ -18,8 +24,12 @@ source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/git.sh"
 
-CACHE_VOLUME="retrolinux-pkg-cache"
-REQUIRED_DEPS=("bc" "convert")
+BUILD_IMAGE="retrolinux-build:latest"
+REGISTRY="ghcr.io"
+GITHUB_USER="${GITHUB_USER:-itsvlxd}"
+FULL_IMAGE="${REGISTRY}/${GITHUB_USER}/retrolinux-build:latest"
+CACHE_VOLUME="retrolinux-cache"
+REQUIRED_DEPS=("docker" "bc" "convert")
 
 _check_deps() {
     rx_log "info" "Checking dependencies..."
@@ -42,20 +52,72 @@ _check_deps() {
     fi
 }
 
+_calculate_build_checksum() {
+    local packages_file="$PROFILE_DIR/packages.x86_64"
+
+    if [[ ! -f "$packages_file" ]]; then
+        echo "missing"
+        return
+    fi
+
+    local checksum=$(cat "$packages_file" | sha256sum | awk '{print $1}')
+    echo "$checksum"
+}
+
+_should_skip_build() {
+    local current_checksum
+    current_checksum=$(_calculate_build_checksum)
+    local checksum_file="$OUTPUT_DIR/.build-checksum"
+    local last_checksum
+    local iso_file
+    local iso_files=()
+
+    shopt -s nullglob
+    iso_files=( "$OUTPUT_DIR"/*.iso )
+    shopt -u nullglob
+
+    if [[ -z $current_checksum ]] || [[ "$current_checksum" == "missing" ]]; then
+        return 1
+    fi
+
+    if [[ ! -f "$checksum_file" ]] || [[ ${#iso_files[@]} -eq 0 ]]; then
+        return 1
+    fi
+
+    iso_file="${iso_files[0]}"
+    last_checksum=$(cat "$checksum_file" 2>/dev/null || echo "")
+
+    if [[ "$current_checksum" == "$last_checksum" ]]; then
+        rx_log "info" "Build inputs unchanged, skipping build..."
+        rx_log "info" "Use --force to rebuild anyway"
+        return 0
+    fi
+
+    return 1
+}
+
+_save_build_checksum() {
+    local checksum=$(_calculate_build_checksum)
+    echo "$checksum" > "$OUTPUT_DIR/.build-checksum"
+}
+
 _build_help() {
     rx_help_usage "./build.sh <command> [options]"
     rx_help_commands "Available commands"
     rx_help_cmd "build, b" "Build the full ISO (default)"
     rx_help_cmd "--plymouth, -p" "Generate Plymouth splashscreen only"
-    rx_help_cmd "--clean, -c" "Clean cache and work dir, then build"
+    rx_help_cmd "--clean, -c" "Clean build artifacts"
+    rx_help_cmd "--docker, -d" "Build and push Docker image to registry"
     rx_help_cmd "--yes, -y" "Skip all confirmations"
+    rx_help_cmd "--force, -f" "Force rebuild even if inputs unchanged"
     rx_help_cmd "--help, -h" "Show this help message"
     rx_help_examples
     rx_help_example "./build.sh" "Build ISO with prompts"
     rx_help_example "./build.sh --yes" "Build ISO, skip prompts"
-    rx_help_example "./build.sh --plymouth" "Generate splashscreen only"
-    rx_help_example "./build.sh --clean" "Clean everything and rebuild"
-    rx_help_example "./build.sh -c -y" "Clean and build, skip prompts"
+    rx_help_example "./build.sh --plymouth" "Generate Plymouth splashscreen only"
+    rx_help_example "./build.sh --clean" "Clean artifacts"
+    rx_help_example "./build.sh --docker" "Build and push Docker image only"
+    rx_help_example "./build.sh --force" "Force rebuild even if unchanged"
 }
 
 _generate_splashscreen() {
@@ -99,101 +161,99 @@ _docker_check() {
     rx_log "success" "Docker is ready"
 }
 
-_init_offline_cache() {
+_build_docker_image() {
+    rx_log "info" "Building custom Docker image..."
 
-    docker volume inspect "$CACHE_VOLUME" >/dev/null 2>&1 || {
-        docker volume create "$CACHE_VOLUME" >/dev/null 2>&1
-    }
+    local dockerfile="$SCRIPT_DIR/Dockerfile"
+    local context_dir="$SCRIPT_DIR"
 
-    if docker run --rm -v "${CACHE_VOLUME}:/cache" archlinux/archlinux:latest bash -c "test -f /cache/.cache-initialized" 2>/dev/null; then
-        rx_log "info" "Using existing cache"
+    if [[ ! -f "$dockerfile" ]]; then
+        rx_log "error" "Dockerfile not found: $dockerfile"
+        return 1
+    fi
+
+    rx_log "info" "Dockerfile: $dockerfile"
+
+    rx_log "info" "Building image (this may take a few minutes first time)..."
+
+    export DOCKER_BUILDKIT=1
+
+    if docker build \
+        --tag "$BUILD_IMAGE" \
+        --tag "$FULL_IMAGE" \
+        --force-rm \
+        "$context_dir"; then
+        rx_log "success" "Custom Docker image built: $BUILD_IMAGE"
+
+        local img_size=$(docker image inspect "$BUILD_IMAGE" --format '{{.Size}}')
+        local size_mb=$((img_size / 1024 / 1024))
+        rx_log "info" "Image size: ${size_mb} MB"
+    else
+        rx_log "error" "Failed to build Docker image"
+        return 1
+    fi
+}
+
+_push_docker_image() {
+    if [[ -z ${GH_TOKEN:-} ]]; then
+        rx_log "warn" "GH_TOKEN not set, skipping image push"
         return 0
     fi
 
-    rx_log "info" "Initializing offline package cache..."
-    rx_log "info" "Downloading packages to cache..."
+    rx_log "info" "Pushing Docker image to $FULL_IMAGE..."
 
-    local host_uid=$(id -u)
-    local host_gid=$(id -g)
+    echo "$GH_TOKEN" | docker login "$REGISTRY" -u "$GITHUB_USER" --password-stdin
 
-    docker run --rm \
-        -e "HOST_UID=$host_uid" \
-        -e "HOST_GID=$host_gid" \
-        -v "$PROFILE_DIR:/profile:ro" \
-        -v "${CACHE_VOLUME}:/packages-cache" \
-        archlinux/archlinux:latest bash -c "
-            set -e
+    rx_log "info" "Tagging image..."
+    docker tag "$BUILD_IMAGE" "$FULL_IMAGE"
 
-            mkdir -p /packages-cache
-            mkdir -p /tmp/offlinedb
+    rx_log "info" "Pushing image..."
+    if docker push "$FULL_IMAGE"; then
+        rx_log "success" "Image pushed to $FULL_IMAGE"
+    else
+        rx_log "error" "Failed to push image"
+        docker logout "$REGISTRY" 2>/dev/null || true
+        return 1
+    fi
 
-            yes | xargs pacman -Syw --noconfirm \
-                --cachedir /packages-cache \
-                --dbpath /tmp/offlinedb < /profile/packages.x86_64
-
-            repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
-
-            chown -R $host_uid:$host_gid /packages-cache
-
-            touch /packages-cache/.cache-initialized
-        "
-
-    rx_log "success" "Cache initialized"
+    docker logout "$REGISTRY" 2>/dev/null || true
 }
 
-_update_offline_cache() {
-    rx_log "info" "Updating offline package cache..."
+_pull_docker_image() {
+    if [[ -z ${GH_TOKEN:-} ]]; then
+        rx_log "info" "GH_TOKEN not set, will build locally"
+        return 0
+    fi
 
-    local host_uid=$(id -u)
-    local host_gid=$(id -g)
+    rx_log "info" "Checking for cached image at $FULL_IMAGE..."
 
-    docker run --rm \
-        -e "HOST_UID=$host_uid" \
-        -e "HOST_GID=$host_gid" \
-        -v "$PROFILE_DIR:/profile:ro" \
-        -v "${CACHE_VOLUME}:/packages-cache" \
-        archlinux/archlinux:latest bash -c '
-            set -e
+    if docker image inspect "$FULL_IMAGE" &>/dev/null; then
+        rx_log "info" "Found cached image, tagging as $BUILD_IMAGE"
+        docker tag "$FULL_IMAGE" "$BUILD_IMAGE"
+        return 0
+    fi
 
-            mkdir -p /tmp/offlinedb
-            yes | xargs pacman -Syw --noconfirm \
-                --cachedir /packages-cache \
-                --dbpath /tmp/offlinedb < /profile/packages.x86_64
+    rx_log "info" "No cached image found locally"
 
-            cd /packages-cache
+    rx_log "info" "Attempting to pull from registry..."
 
-            for pkg in *.pkg.tar.zst; do
-                [[ -f "$pkg" ]] || continue
-                base="${pkg%.pkg.tar.zst}"
-                name="${base%-*-*}"
-                version="${base#*-${name}-}"
-                version="${version%-[0-9]*}"
+    if echo "$GH_TOKEN" | docker login "$REGISTRY" -u "$GITHUB_USER" --password-stdin 2>/dev/null; then
+        if docker pull "$FULL_IMAGE"; then
+            docker tag "$FULL_IMAGE" "$BUILD_IMAGE"
+            rx_log "success" "Image pulled and tagged as $BUILD_IMAGE"
+            docker logout "$REGISTRY" 2>/dev/null || true
+            return 0
+        fi
+        docker logout "$REGISTRY" 2>/dev/null || true
+    fi
 
-                duplicates=$(ls -1 "$name"-*.pkg.tar.zst 2>/dev/null | sort -t"-" -k2 -V)
-                if [[ ${#duplicates[@]} -gt 1 ]]; then
-                    for dup in "${duplicates[@]:0:$(( ${#duplicates[@]} - 1 ))}"; do
-                        rm -f "$dup"
-                    done
-                fi
-            done
+    rx_log "info" "Could not pull image, will build locally"
+    return 0
+}
 
-            rm -f linux-firmware-nvidia-*.pkg.tar.zst
-            rm -f linux-firmware-marvell-*.pkg.tar.zst
-            rm -f linux-firmware-atheros-*.pkg.tar.zst
-            rm -f linux-firmware-mediatek-*.pkg.tar.zst
-            rm -f linux-firmware-broadcom-*.pkg.tar.zst
-            rm -f linux-firmware-other-*.pkg.tar.zst
-            rm -f linux-firmware-cirrus-*.pkg.tar.zst
-            rm -f linux-firmware-radeon-*.pkg.tar.zst
-            rm -f linux-firmware-20260309-1-any.pkg.tar.zst
-
-            rm -f /packages-cache/offline.db.tar.gz
-            repo-add /packages-cache/offline.db.tar.gz /packages-cache/*.pkg.tar.zst
-
-            chown -R $HOST_UID:$HOST_GID /packages-cache
-        '
-
-    rx_log "success" "Cache updated"
+_init_and_update_cache() {
+    rx_log "info" "Cache volume approach enabled"
+    rx_log "success" "Cache ready"
 }
 
 _cleanup_build() {
@@ -239,15 +299,14 @@ _prepare_airootfs_offline() {
     mkdir -p "$offline_dir"
 
     docker run --rm \
-        -v "${CACHE_VOLUME}:/cache:ro" \
         -v "${offline_dir}:/dest:rw" \
-        archlinux/archlinux:latest bash -c "
+        "$BUILD_IMAGE" bash -c "
             set -e
             mkdir -p /dest
-            if [[ -d /cache ]] && [[ -n \"\$(ls -A /cache 2>/dev/null)\" ]]; then
-                cp -r /cache/* /dest/
+            if [[ -d /var/cache/retrolinux/mirror/offline ]] && [[ -n \"\$(ls -A /var/cache/retrolinux/mirror/offline 2>/dev/null)\" ]]; then
+                cp -r /var/cache/retrolinux/mirror/offline/* /dest/
             else
-                echo 'Warning: Cache is empty'
+                echo 'Warning: Cache is empty inside image'
             fi
         "
 
@@ -256,13 +315,104 @@ _prepare_airootfs_offline() {
     rx_log "success" "Airootfs prepared"
 }
 
+_init_cache_volume() {
+    rx_log "info" "Initializing cache volume..."
+
+    docker volume inspect "$CACHE_VOLUME" >/dev/null 2>&1 || {
+        docker volume create "$CACHE_VOLUME" >/dev/null
+    }
+
+    if docker run --rm -v "${CACHE_VOLUME}:/cache" "$BUILD_IMAGE" bash -c "test -f /cache/.initialized" 2>/dev/null; then
+        rx_log "info" "Cache volume already populated"
+        return 0
+    fi
+
+    rx_log "info" "Populating cache volume from image..."
+
+    docker run --rm \
+        -v "${CACHE_VOLUME}:/cache" \
+        "$BUILD_IMAGE" bash -c "
+            set -e
+            mkdir -p /cache
+            cp -r /var/cache/retrolinux/mirror/offline/* /cache/ 2>/dev/null || true
+            touch /cache/.initialized
+        "
+
+    rx_log "success" "Cache volume populated"
+}
+
+_check_cache_versions() {
+    rx_log "info" "Checking if package cache is up to date..."
+
+    if ! docker image inspect "$BUILD_IMAGE" &>/dev/null; then
+        rx_log "warn" "Image not found, cannot check versions"
+        return 1
+    fi
+
+    local current_versions="/tmp/.current-versions.$$"
+    local cached_versions="/tmp/.cached-versions.$$"
+
+    docker run --rm -v "${CACHE_VOLUME}:/cache:ro" "$BUILD_IMAGE" bash -c "cat /var/cache/retrolinux/mirror/offline/.versions" > "$cached_versions" 2>/dev/null || true
+
+    if [[ ! -f "$cached_versions" ]] || [[ ! -s "$cached_versions" ]]; then
+        rx_log "info" "No cached versions found"
+        rm -f "$current_versions" "$cached_versions"
+        return 1
+    fi
+
+    while IFS= read -r pkg; do
+        [[ -z "$pkg" ]] && continue
+        name="${pkg%% *}"
+        echo "$name"
+    done < "$PROFILE_DIR/packages.x86_64" | sort > "$current_versions"
+
+    local cached_pkgs
+    cached_pkgs=$(sort -u "$cached_versions" | wc -l)
+    local current_pkgs
+    current_pkgs=$(sort -u "$current_versions" | wc -l)
+
+    local diff_count
+    diff_count=$(comm -13 <(sort -u "$cached_versions") <(sort -u "$current_versions") | wc -l)
+
+    rm -f "$current_versions" "$cached_versions"
+
+    if [[ "$diff_count" -gt 0 ]]; then
+        rx_log "info" "Package list changed ($diff_count differences detected)"
+        return 0
+    fi
+
+    rx_log "info" "Package cache is up to date"
+    return 1
+}
+
+_remove_copy_step() {
+    local airootfs_cache="$PROFILE_DIR/airootfs/var/cache/retrolinux/mirror/offline"
+
+    if [[ -d "$airootfs_cache" ]]; then
+        rm -rf "$airootfs_cache"/* 2>/dev/null || true
+    fi
+}
+
 _docker_build() {
     local skip_prompt="$1"
+    local force_build="${FORCE_BUILD:-false}"
+
+    if [[ "$skip_prompt" == "force" ]]; then
+        force_build="true"
+    fi
+
     local _build_start_time=$SECONDS
 
     rx_log "info" "Starting docker build function..."
 
     export SKIP_PROMPT="$skip_prompt"
+
+    if ! _should_skip_build || [[ "$force_build" == "true" ]]; then
+        rx_log "info" "Continuing with build..."
+    else
+        rx_log "info" "Skipping build (no changes detected)"
+        return 0
+    fi
 
     rx_log "info" "Checking for existing ISO size..."
 
@@ -282,17 +432,37 @@ _docker_build() {
         return 1
     }
 
-    rx_log "info" "Running deps check (optional on host)..."
-    if ! _check_deps 2>/dev/null; then
-        rx_log "warn" "Some host dependencies missing, but Docker build will use its own packages"
+    if ! docker image inspect "$BUILD_IMAGE" &>/dev/null; then
+        rx_log "warn" "Image $BUILD_IMAGE not found locally"
+        rx_log "info" "Rebuilding image..."
+        _build_docker_image || {
+            rx_log "error" "Failed to build Docker image"
+            return 1
+        }
     fi
 
-    rx_log "info" "All checks passed, starting build..."
+    rx_log "info" "Initializing cache volume..."
+    _init_cache_volume
 
-    _init_offline_cache
-    _update_offline_cache
+    if _check_cache_versions; then
+        rx_log "info" "Package cache is outdated, rebuilding Docker image..."
+        _build_docker_image || {
+            rx_log "error" "Failed to rebuild Docker image"
+            return 1
+        }
+        if [[ -n ${GH_TOKEN:-} ]]; then
+            _push_docker_image || {
+                rx_log "warn" "Failed to push updated image"
+            }
+        fi
+        rx_log "info" "Reinitializing cache volume with new packages..."
+        docker volume rm "$CACHE_VOLUME" 2>/dev/null || true
+        _init_cache_volume
+    fi
+
+    rx_log "info" "Cleaning build directory..."
     _cleanup_build
-    _prepare_airootfs_offline
+    _remove_copy_step
 
     local version=$(rx_git_version)
     local branch=$(rx_git_branch)
@@ -317,12 +487,10 @@ _docker_build() {
         -v "$WORK_DIR:/work" \
         -v "$OUTPUT_DIR:/out" \
         -v "${CACHE_VOLUME}:/var/cache/retrolinux/mirror/offline:ro" \
-        archlinux/archlinux:latest bash -c "
+        "$BUILD_IMAGE" bash -c "
             set -e
 
             rm -f /var/lib/pacman/db.lck 2>/dev/null || true
-
-            pacman --noconfirm -Sy archiso git sudo base-devel jq grub bc imagemagick
 
             KERNEL_PKG=\$(ls /var/cache/retrolinux/mirror/offline/linux-*.pkg.tar.zst 2>/dev/null | head -1)
             if [[ -n \$KERNEL_PKG ]]; then
@@ -338,6 +506,8 @@ _docker_build() {
 
             chown -R $host_uid:$host_gid /out/
         "
+
+    _save_build_checksum
 
     rx_log "success" "ISO built successfully"
 
@@ -414,11 +584,13 @@ _clean_all() {
         rx_log "info" "Work directory does not exist"
     fi
 
-    rx_log "info" "Removing Docker package cache..."
-    if docker volume rm "$CACHE_VOLUME" 2>/dev/null; then
-        rx_log "success" "Docker cache volume removed"
-    else
-        rx_log "info" "Docker cache volume does not exist or already removed"
+    rx_log "info" "Removing output directory..."
+    if [[ -d $OUTPUT_DIR ]]; then
+        if rm -rf "$OUTPUT_DIR" 2>/dev/null; then
+            rx_log "success" "Output directory removed"
+        else
+            rx_log "warn" "Failed to remove output directory..."
+        fi
     fi
 
     rx_log "success" "Clean complete"
@@ -458,6 +630,14 @@ EOF
                 do_clean="true"
                 shift
                 ;;
+            -d | --docker)
+                command="docker"
+                shift
+                ;;
+            -f | --force)
+                export FORCE_BUILD=true
+                shift
+                ;;
             build | b)
                 command="build"
                 shift
@@ -476,6 +656,11 @@ EOF
         plymouth)
             _generate_splashscreen
             ;;
+        docker)
+            _docker_check || exit 1
+            _build_docker_image || exit 1
+            _push_docker_image || exit 1
+            ;;
         build)
             _docker_build "$skip_prompt"
             ;;
@@ -483,7 +668,7 @@ EOF
 }
 
 if [[ ${BASH_SOURCE[0]} != "${0}" ]]; then
-    export -f _iso_main _docker_check _docker_build _init_offline_cache _update_offline_cache _prepare_airootfs_offline _cleanup_build _generate_splashscreen _build_help _clean_all _check_deps
+    export -f _iso_main _docker_check _docker_build _build_docker_image _push_docker_image _pull_docker_image _init_and_update_cache _prepare_airootfs_offline _cleanup_build _generate_splashscreen _build_help _clean_all _check_deps _calculate_build_checksum _should_skip_build _save_build_checksum _init_cache_volume _check_cache_versions _remove_copy_step
 else
     _iso_main "$@"
 fi

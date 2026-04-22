@@ -1,0 +1,7 @@
+**/packages-cache
+**/var/cache
+**/work
+**/out
+**/*.iso
+**/*.tar.gz
+**/.cache
