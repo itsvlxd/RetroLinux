@@ -444,22 +444,6 @@ _docker_build() {
     rx_log "info" "Initializing cache volume..."
     _init_cache_volume
 
-    if _check_cache_versions; then
-        rx_log "info" "Package cache is outdated, rebuilding Docker image..."
-        _build_docker_image || {
-            rx_log "error" "Failed to rebuild Docker image"
-            return 1
-        }
-        if [[ -n ${GH_TOKEN:-} ]]; then
-            _push_docker_image || {
-                rx_log "warn" "Failed to push updated image"
-            }
-        fi
-        rx_log "info" "Reinitializing cache volume with new packages..."
-        docker volume rm "$CACHE_VOLUME" 2>/dev/null || true
-        _init_cache_volume
-    fi
-
     rx_log "info" "Cleaning build directory..."
     _cleanup_build
     _remove_copy_step
