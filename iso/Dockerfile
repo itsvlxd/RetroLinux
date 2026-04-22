@@ -33,7 +33,7 @@ RUN pacman -Sy --noconfirm && \
     mkdir -p /var/cache/retrolinux/mirror/offline && \
     while IFS= read -r pkg; do \
         [[ -z "$pkg" ]] && continue; \
-        version=$(pacman -Qi "$pkg" 2>/dev/null | awk '/^Version/{print $3}') || continue; \
+        version=$(pacman -Si "$pkg" 2>/dev/null | awk '/^Version/{print $3}') || continue; \
         echo "$pkg $version"; \
     done < /tmp/packages.x86_64 > /var/cache/retrolinux/mirror/offline/.versions && \
     rm -rf /var/lib/pacman/db.lck
