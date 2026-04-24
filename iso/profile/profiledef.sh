@@ -18,6 +18,9 @@ file_permissions=(
   ["/root"]="0:0:750"
   ["/root/.automated_script.sh"]="0:0:755"
   ["/root/.gnupg"]="0:0:700"
+  ["/root/configurator"]="0:0:755"
+  ["/root/retrolinux-install/"]="0:0:755"
   ["/usr/local/bin/choose-mirror"]="0:0:755"
   ["/usr/local/bin/Installation_guide"]="0:0:755"
+  ["/var/cache/retrolinux/mirror/offline/"]="0:0:775"
 )
