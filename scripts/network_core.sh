@@ -381,6 +381,10 @@ interface_info() {
     echo "iface=$iface|state=$state|mac=$mac|mtu=${mtu#mtu }|ips=$ips"
 }
 
+rx_check_internet() {
+    ping -c 1 -W 3 1.1.1.1 &>/dev/null
+}
+
 case "$1" in
     "--wifi-on") wifi_on "$2" ;;
     "--wifi-off") wifi_off "$2" ;;
@@ -397,4 +401,5 @@ case "$1" in
     "--vlan-list") vlan_list ;;
     "--dns-flush") dns_flush ;;
     "--interface-info") interface_info "$2" ;;
+    "--check-internet") rx_check_internet && echo "result=online" || echo "result=offline" ;;
 esac
