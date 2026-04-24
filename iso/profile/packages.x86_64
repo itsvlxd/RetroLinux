@@ -35,6 +35,7 @@ gpart
 gpm
 gptfdisk
 grml-zsh-config
+gum
 grub
 hdparm
 hyperv
@@ -118,6 +119,7 @@ udftools
 usb_modeswitch
 usbmuxd
 usbutils
+nvim
 vim
 virtualbox-guest-utils-nox
 vpnc

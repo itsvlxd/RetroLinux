@@ -28,7 +28,7 @@ BUILD_IMAGE="retrolinux-build:latest"
 REGISTRY="ghcr.io"
 GITHUB_USER="${GITHUB_USER:-itsvlxd}"
 FULL_IMAGE="${REGISTRY}/${GITHUB_USER}/retrolinux-build:latest"
-CACHE_VOLUME="retrolinux-cache"
+PKG_CACHE_VOLUME="retrolinux-pkg-cache"
 REQUIRED_DEPS=("docker" "bc" "convert")
 
 _check_deps() {
@@ -252,8 +252,21 @@ _pull_docker_image() {
 }
 
 _init_and_update_cache() {
-    rx_log "info" "Cache volume approach enabled"
+    rx_log "info" "Online-only mode - packages will be downloaded during build"
     rx_log "success" "Cache ready"
+}
+
+_init_pkg_cache_volume() {
+    rx_log "info" "Setting up package cache volume..."
+
+    if ! docker volume inspect "$PKG_CACHE_VOLUME" >/dev/null 2>&1; then
+        docker volume create "$PKG_CACHE_VOLUME" >/dev/null
+        rx_log "info" "Created package cache volume"
+    else
+        rx_log "info" "Using existing package cache volume"
+    fi
+
+    rx_log "success" "Package cache ready"
 }
 
 _cleanup_build() {
@@ -290,107 +303,6 @@ _cleanup_build() {
 
     mkdir -p "$OUTPUT_DIR"
     mkdir -p "$WORK_DIR"
-}
-
-_prepare_airootfs_offline() {
-    rx_log "info" "Preparing airootfs offline packages..."
-
-    local offline_dir="$PROFILE_DIR/airootfs/var/cache/retrolinux/mirror/offline"
-    mkdir -p "$offline_dir"
-
-    docker run --rm \
-        -v "${offline_dir}:/dest:rw" \
-        "$BUILD_IMAGE" bash -c "
-            set -e
-            mkdir -p /dest
-            if [[ -d /var/cache/retrolinux/mirror/offline ]] && [[ -n \"\$(ls -A /var/cache/retrolinux/mirror/offline 2>/dev/null)\" ]]; then
-                cp -r /var/cache/retrolinux/mirror/offline/* /dest/
-            else
-                echo 'Warning: Cache is empty inside image'
-            fi
-        "
-
-    cp "$PROFILE_DIR/pacman-offline.conf" "$PROFILE_DIR/airootfs/etc/pacman.conf"
-
-    rx_log "success" "Airootfs prepared"
-}
-
-_init_cache_volume() {
-    rx_log "info" "Initializing cache volume..."
-
-    docker volume inspect "$CACHE_VOLUME" >/dev/null 2>&1 || {
-        docker volume create "$CACHE_VOLUME" >/dev/null
-    }
-
-    if docker run --rm -v "${CACHE_VOLUME}:/cache" "$BUILD_IMAGE" bash -c "test -f /cache/.initialized" 2>/dev/null; then
-        rx_log "info" "Cache volume already populated"
-        return 0
-    fi
-
-    rx_log "info" "Populating cache volume from image..."
-
-    docker run --rm \
-        -v "${CACHE_VOLUME}:/cache" \
-        "$BUILD_IMAGE" bash -c "
-            set -e
-            mkdir -p /cache
-            cp -r /var/cache/retrolinux/mirror/offline/* /cache/ 2>/dev/null || true
-            touch /cache/.initialized
-        "
-
-    rx_log "success" "Cache volume populated"
-}
-
-_check_cache_versions() {
-    rx_log "info" "Checking if package cache is up to date..."
-
-    if ! docker image inspect "$BUILD_IMAGE" &>/dev/null; then
-        rx_log "warn" "Image not found, cannot check versions"
-        return 1
-    fi
-
-    local current_versions="/tmp/.current-versions.$$"
-    local cached_versions="/tmp/.cached-versions.$$"
-
-    docker run --rm -v "${CACHE_VOLUME}:/cache:ro" "$BUILD_IMAGE" bash -c "cat /var/cache/retrolinux/mirror/offline/.versions" > "$cached_versions" 2>/dev/null || true
-
-    if [[ ! -f "$cached_versions" ]] || [[ ! -s "$cached_versions" ]]; then
-        rx_log "info" "No cached versions found"
-        rm -f "$current_versions" "$cached_versions"
-        return 1
-    fi
-
-    while IFS= read -r pkg; do
-        [[ -z "$pkg" ]] && continue
-        name="${pkg%% *}"
-        echo "$name"
-    done < "$PROFILE_DIR/packages.x86_64" | sort > "$current_versions"
-
-    local cached_pkgs
-    cached_pkgs=$(sort -u "$cached_versions" | wc -l)
-    local current_pkgs
-    current_pkgs=$(sort -u "$current_versions" | wc -l)
-
-    local diff_count
-    diff_count=$(comm -13 <(sort -u "$cached_versions") <(sort -u "$current_versions") | wc -l)
-
-    rm -f "$current_versions" "$cached_versions"
-
-    if [[ "$diff_count" -gt 0 ]]; then
-        rx_log "info" "Package list changed ($diff_count differences detected)"
-        return 0
-    fi
-
-    rx_log "info" "Package cache is up to date"
-    return 1
-}
-
-_remove_copy_step() {
-    local airootfs_cache="$PROFILE_DIR/airootfs/var/cache/retrolinux/mirror/offline"
-
-    if [[ -d "$airootfs_cache" ]]; then
-        rm -rf "$airootfs_cache"/* 2>/dev/null || true
-    fi
 }
 
 _docker_build() {
@@ -441,12 +353,11 @@ _docker_build() {
         }
     fi
 
-    rx_log "info" "Initializing cache volume..."
-    _init_cache_volume
+    rx_log "info" "Setting up package cache..."
+    _init_pkg_cache_volume
 
     rx_log "info" "Cleaning build directory..."
     _cleanup_build
-    _remove_copy_step
 
     local version=$(rx_git_version)
     local branch=$(rx_git_branch)
@@ -456,6 +367,16 @@ _docker_build() {
 
     mkdir -p "$OUTPUT_DIR"
     mkdir -p "$WORK_DIR"
+
+    rx_log "info" "Copying RetroLinux project to airootfs..."
+    mkdir -p "$PROFILE_DIR/airootfs/opt"
+    rsync -av --delete \
+        --exclude='.git/' \
+        --exclude='iso/work/' \
+        --exclude='iso/out/' \
+        --exclude='iso/profile/packages-cache/' \
+        /home/vlad/.essentials/retro-arch/ \
+        "$PROFILE_DIR/airootfs/opt/retrolinux/"
 
     rx_log "info" "Building RetroLinux ISO ${version} (${branch})..."
     rx_log "info" "Starting Docker build (this may take a while)..."
@@ -470,23 +391,13 @@ _docker_build() {
         -v "$PROFILE_DIR:/profile:ro" \
         -v "$WORK_DIR:/work" \
         -v "$OUTPUT_DIR:/out" \
-        -v "${CACHE_VOLUME}:/var/cache/retrolinux/mirror/offline:ro" \
+        -v "${PKG_CACHE_VOLUME}:/var/cache/pacman/pkg:rw" \
         "$BUILD_IMAGE" bash -c "
             set -e
 
             rm -f /var/lib/pacman/db.lck 2>/dev/null || true
 
-            KERNEL_PKG=\$(ls /var/cache/retrolinux/mirror/offline/linux-*.pkg.tar.zst 2>/dev/null | head -1)
-            if [[ -n \$KERNEL_PKG ]]; then
-                KERNEL_VER=\${KERNEL_PKG##*/linux-}
-                KERNEL_VER=\${KERNEL_VER%.pkg.tar.zst}
-                KERNEL_VER=\${KERNEL_VER%%-*}
-            fi
-            [[ -z \$KERNEL_VER ]] && KERNEL_VER=unknown
-
             mkarchiso -v -w /work/ -o /out /profile/
-
-            echo \"\$KERNEL_VER\" > /out/kernel-version.txt
 
             chown -R $host_uid:$host_gid /out/
         "
@@ -577,6 +488,15 @@ _clean_all() {
         fi
     fi
 
+    rx_log "info" "Removing retrolinux from airootfs..."
+    if [[ -d "$PROFILE_DIR/airootfs/opt/retrolinux" ]]; then
+        if rm -rf "$PROFILE_DIR/airootfs/opt/retrolinux" 2>/dev/null; then
+            rx_log "success" "Retrolinux directory removed"
+        else
+            rx_log "warn" "Failed to remove retrolinux directory..."
+        fi
+    fi
+
     rx_log "success" "Clean complete"
 }
 
@@ -652,7 +572,7 @@ EOF
 }
 
 if [[ ${BASH_SOURCE[0]} != "${0}" ]]; then
-    export -f _iso_main _docker_check _docker_build _build_docker_image _push_docker_image _pull_docker_image _init_and_update_cache _prepare_airootfs_offline _cleanup_build _generate_splashscreen _build_help _clean_all _check_deps _calculate_build_checksum _should_skip_build _save_build_checksum _init_cache_volume _check_cache_versions _remove_copy_step
+    export -f _iso_main _docker_check _docker_build _build_docker_image _push_docker_image _pull_docker_image _init_and_update_cache _init_pkg_cache_volume _cleanup_build _generate_splashscreen _build_help _clean_all _check_deps _calculate_build_checksum _should_skip_build _save_build_checksum
 else
     _iso_main "$@"
 fi

@@ -1,43 +1,69 @@
 #!/usr/bin/env bash
 
-script_cmdline() {
-    local param
-    for param in $(</proc/cmdline); do
-        case "${param}" in
-            script=*)
-                echo "${param#*=}"
-                return 0
-                ;;
-        esac
-    done
+export RETRO_INSTALL="/opt/retrolinux/bin"
+source "$RETRO_INSTALL/helpers/all.sh"
+
+RETROLINUX_USER=""
+
+run_configurator() {
+    /opt/retrolinux/bin/retroinstall
+    if [[ ! -f /root/user_configuration.json || ! -f /root/user_credentials.json ]]; then
+        echo "ERROR: Configuration files not created."
+        return 1
+    fi
+    export RETROLINUX_USER="$(jq -r '.users[0].username' /root/user_credentials.json 2>/dev/null || echo 'root')"
 }
 
-automated_script() {
-    local script rt
-    script="$(script_cmdline)"
-    if [[ -n "${script}" && ! -x /tmp/startup_script ]]; then
-        if [[ "${script}" =~ ^((http|https|ftp|tftp)://) ]]; then
-            printf '%s: downloading %s\n' "$0" "${script}"
-            # there's no synchronization for network availability before executing this script; to ensure the network
-            # is online, we use a transient systemd service that depends on network-online.target to download the
-            # script rather than manually polling the target
-            systemd-run --pty --quiet -p Wants=network-online.target -p After=network-online.target \
-                curl "${script}" --location --retry-connrefused --retry 10 --fail -s -o /tmp/startup_script
-            rt=$?
-        else
-            cp "${script}" /tmp/startup_script
-            rt=$?
-        fi
-        if [[ ${rt} -eq 0 ]]; then
-            chmod +x /tmp/startup_script
-            printf '%s: executing automated script\n' "$0"
-            # note that script is executed when other services (like pacman-init) may be still in progress, please
-            # synchronize to "systemctl is-system-running --wait" when your script depends on other services
-            /tmp/startup_script
-        fi
+install_arch() {
+    clear_logo
+    gum style --foreground 3 --padding "1 0 0 $PADDING_LEFT" "Installing..."
+
+    pacman-key --init 2>/dev/null || true
+    pacman-key --populate archlinux 2>/dev/null || true
+
+    findmnt -R /mnt >/dev/null && umount -R /mnt 2>/dev/null || true
+
+    if ! archinstall \
+        --config /root/user_configuration.json \
+        --creds /root/user_credentials.json \
+        --silent \
+        --skip-ntp \
+        --skip-wkd; then
+        echo "ERROR: archinstall failed"
+        cat /var/log/archinstall/install.log 2>/dev/null || true
+        return 1
+    fi
+
+    cp /etc/pacman.conf /mnt/etc/pacman.conf 2>/dev/null || true
+
+    mkdir -p /mnt/etc/sudoers.d
+    cat >/mnt/etc/sudoers.d/99-retrolinux-installer <<EOF
+root ALL=(ALL:ALL) NOPASSWD: ALL
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL
+$RETROLINUX_USER ALL=(ALL:ALL) NOPASSWD: ALL
+EOF
+    chmod 440 /mnt/etc/sudoers.d/99-retrolinux-installer 2>/dev/null || true
+
+    if [[ -n $RETROLINUX_USER && $RETROLINUX_USER != "root" ]]; then
+        mkdir -p /mnt/home/$RETROLINUX_USER
+        chown -R 1000:1000 /mnt/home/$RETROLINUX_USER/.local/ 2>/dev/null || true
     fi
 }
 
 if [[ $(tty) == "/dev/tty1" ]]; then
-    automated_script
+    echo "Starting RetroLinux installer..."
+    run_configurator || {
+        echo "Configurator failed"
+        exit 1
+    }
+    install_arch || {
+        echo "Installation failed"
+        exit 1
+    }
+
+    echo
+    echo "Installation complete! Rebooting..."
+    sleep 3
+    reboot
 fi
+
