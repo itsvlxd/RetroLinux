@@ -1,9 +1,1 @@
-To install Retro Linux follow the installation guide:
-https://github.com/itsvlxd/RetroLinux/wiki
-
-For Wi-Fi, authenticate to the wireless network using the iwctl utility.
-For mobile broadband (WWAN) modems, connect with the mmcli utility.
-Ethernet, WLAN and WWAN interfaces using DHCP should work automatically.
-
-After connecting to the internet, the installation guide can be accessed
-via the convenience script Installation_guide.
+Run '${PINK}retroinstall${RESET}' for system setup or '${PINK}retro${RESET}' for CLI.
