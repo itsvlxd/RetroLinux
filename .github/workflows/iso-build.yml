@@ -124,11 +124,11 @@ jobs:
           </p>
 
           <p align="center">
+            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-blueviolet?style=for-the-badge&logo=linux">
+            <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
             <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=develop&label=Tests&style=for-the-badge">
             <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=develop&label=Build&style=for-the-badge">
-            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-blueviolet?style=for-the-badge&logo=linux">
             <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&color=cyan">
-            <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
           </p>
 
           ### ⚠️ Warnings
