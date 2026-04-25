@@ -67,9 +67,11 @@ cmd_bluetooth() {
 
             local is_scanning=$(bluetoothctl show | grep -i "Discovering:" | awk '{print $2}' | xargs)
             if [[ $is_scanning != "yes" ]]; then
-                rx_log "error" "Bluetooth scanning is ${GRAY}OFF${RESET}."
-                rx_log "info" "Scanning must be active to establish a handshake."
-                return 1
+                #rx_log "error" "Bluetooth scanning is ${GRAY}OFF${RESET}."
+                #rx_log "info" "Scanning must be active to establish a handshake."
+                #return 1
+
+                cmd_bluetooth "scan" "on"
             fi
 
             rx_log "info" "Attempting to connect to ${PINK}$mac${RESET}..."
