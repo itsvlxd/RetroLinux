@@ -1,0 +1,554 @@
+#!/bin/bash
+
+export RETRO_DIR="/opt/retrolinux"
+export RETRO_INSTALL="/opt/retrolinux/bin"
+
+RX_DEBUG=0
+if [[ ${1:-} == "--debug" ]]; then
+    RX_DEBUG=1
+    export RX_DEBUG
+    shift
+fi
+
+source "$RETRO_INSTALL/helpers/all.sh"
+
+is_laptop() {
+    local battery_path
+    battery_path=$(find /sys/class/power_supply/ -name "BAT*" -type l 2>/dev/null | head -n 1)
+    [[ -n $battery_path && -d $battery_path ]]
+}
+
+if ! setup_network; then
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Network setup failed"
+    echo
+    gum style "Would you like to retry or exit?"
+    echo
+    if gum confirm --negative "Exit" --affirmative "Retry" "Network setup" --padding "$GUM_CONFIRM_PADDING"; then
+        exec /opt/retrolinux/bin/retroinstall
+    fi
+    gum style "Run 'retroinstall' to try again"
+    exit 1
+fi
+
+retry_or_exit() {
+    local message="${1:-Something went wrong.}"
+    clear_logo
+    echo
+    gum style --foreground 1 "$message"
+    echo
+    if gum confirm --negative "Exit" --affirmative "Retry" "Retry?" --padding "$GUM_CONFIRM_PADDING"; then
+        return 0
+    fi
+    return 1
+}
+
+step_error() {
+    local step_num=$1
+    local step_name=$2
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error in step $step_num: $step_name"
+    echo
+}
+
+retry_or_exit() {
+    local message="${1:-Something went wrong.}"
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "$message"
+    echo
+    if gum confirm --negative "Exit" --affirmative "Retry" "Retry?" --padding "$GUM_CONFIRM_PADDING"; then
+        return 0
+    fi
+    return 1
+}
+
+abort() {
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "${1:-Installation aborted}"
+    echo
+    gum style "Run 'retroinstall' to try again"
+    echo
+    exit 1
+}
+
+step() {
+    clear_logo
+    echo
+    gum style "$1"
+    echo
+}
+
+notice() {
+    clear_logo
+    echo
+    gum spin --spinner dot --title "$1" -- sleep "${2:-2}"
+    echo
+}
+
+abort() {
+    clear_logo
+    echo
+    gum style --foreground 1 "${1:-Installation aborted}"
+    echo
+    gum style "Run 'retroinstall' to try again"
+    echo
+    exit 1
+}
+
+step() {
+    clear_logo
+    echo
+    gum style "$1"
+    echo
+}
+
+notice() {
+    clear_logo
+    echo
+    gum spin --spinner dot --title "$1" -- sleep "${2:-2}"
+    echo
+}
+
+keyboard_form() {
+    step "Let's setup your machine..."
+    keyboards=$'Azerbaijani|azerty
+Belarusian|by
+Belgian|be-latin1
+Bosnian|ba
+Bulgarian|bg-cp1251
+Croatian|croat
+Czech|cz
+Danish|dk-latin1
+Dutch|nl
+English (UK)|uk
+English (US)|us
+English (US, Dvorak)|dvorak
+Estonian|et
+Finnish|fi
+French|fr
+French (Canada)|cf
+French (Switzerland)|fr_CH
+Georgian|ge
+German|de
+German (Switzerland)|de_CH-latin1
+Greek|gr
+Hebrew|il
+Hungarian|hu
+Icelandic|is-latin1
+Irish|ie
+Italian|it
+Japanese|jp106
+Kazakh|kazakh
+Khmer (Cambodia)|khmer
+Kyrgyz|kyrgyz
+Lao|la-latin1
+Latvian|lv
+Lithuanian|lt
+Macedonian|mk-utf
+Norwegian|no-latin1
+Polish|pl
+Portuguese|pt-latin1
+Portuguese (Brazil)|br-abnt2
+Romanian|ro
+Russian|ru
+Serbian|sr-latin
+Slovak|sk-qwertz
+Slovenian|slovene
+Spanish|es
+Spanish (Latin American)|la-latin1
+Swedish|sv-latin1
+Tajik|tj_alt-UTF8
+Turkish|trq
+Ukrainian|ua'
+    choice=$(printf '%s\n' "$keyboards" | cut -d'|' -f1 | gum choose --height 10 --selected "English (US)" --header "Keyboard layout" --padding "$GUM_CHOOSE_PADDING") || {
+        step_error "1" "Keyboard selection cancelled"
+        retry_or_exit "Keyboard selection is required" || abort
+        keyboard_form
+        return
+    }
+    keyboard=$(printf '%s\n' "$keyboards" | awk -F'|' -v c="$choice" '$1==c{print $2; exit}')
+
+    if [[ $(tty 2>/dev/null) == "/dev/tty"* ]]; then
+        loadkeys "$keyboard" 2>/dev/null || true
+    fi
+}
+
+keyboard_form
+
+user_form() {
+    step "Let's setup your user account..."
+
+    while true; do
+        username=$(gum input --placeholder "Pick a username" --prompt.foreground="#ff79c6" --prompt "Username> " --padding "$GUM_INPUT_PADDING") || {
+            step_error "2" "Username input failed"
+            retry_or_exit "Username is required" || abort
+        }
+
+        if [[ $username =~ ^[a-z_][a-z0-9_-]*[$]?$ ]]; then
+            break
+        else
+            notice "Letters, numbers, underscores only" 1
+        fi
+    done
+
+    while true; do
+        password=$(gum input --placeholder "Create a password" --prompt.foreground="#ff79c6" --password --prompt "Password> " --padding "$GUM_INPUT_PADDING") || {
+            step_error "2" "Password input failed"
+            retry_or_exit "Password is required" || abort
+        }
+        password_confirmation=$(gum input --placeholder "Confirm your password" --prompt.foreground="#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
+            step_error "2" "Password confirmation failed"
+            retry_or_exit "Password confirmation is required" || abort
+        }
+
+        if [[ -n $password && $password == "$password_confirmation" ]]; then
+            break
+        elif [[ -z $password ]]; then
+            notice "Password cannot be empty" 1
+        else
+            notice "Passwords do not match" 1
+        fi
+    done
+
+    password_hash=$(printf '%s' "$password" | openssl passwd -6 -stdin) || {
+        step_error "2" "Password hash generation failed"
+        retry_or_exit "Cannot proceed without password hash" || abort
+        continue
+    }
+
+    while true; do
+        hostname=$(gum input --placeholder "retrolinux" --prompt.foreground="#ff79c6" --prompt "Hostname> " --padding "$GUM_INPUT_PADDING") || {
+            step_error "2" "Hostname input failed"
+            retry_or_exit "Hostname is required" || abort
+            continue
+        }
+
+        if [[ $hostname =~ ^[A-Za-z_][A-Za-z0-9_-]*\$?$ ]]; then
+            break
+        elif [[ -z $hostname ]]; then
+            hostname="retrolinux"
+            break
+        else
+            notice "Letters, numbers, dashes/underscores only" 1
+        fi
+    done
+
+    timezone=$(timedatectl list-timezones 2>/dev/null | gum filter --height 10 --header "Timezone" --padding "$GUM_FILTER_PADDING") || {
+        step_error "2" "Timezone selection failed"
+        retry_or_exit "Timezone is required" || abort
+        return
+    }
+}
+
+user_form
+
+while true; do
+    clear_logo
+    gum style --foreground 5 --padding "1 0 1 $PADDING_LEFT" "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    gum style --foreground 7 "Username   $username"
+    gum style --foreground 7 "Password   $(printf "%${#password}s" | tr ' ' '•')"
+    gum style --foreground 7 "Hostname   $hostname"
+    gum style --foreground 7 "Timezone   $timezone"
+    gum style --foreground 7 "Keyboard   $keyboard"
+    gum style --foreground 5 --padding "0 0 1 $PADDING_LEFT" "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    if gum confirm --negative "No, change it" --affirmative "Yes, looks good" "Does this look right?" --padding "$GUM_CONFIRM_PADDING"; then
+        break
+    else
+        keyboard_form
+        user_form
+    fi
+done
+
+get_disk_info() {
+    local device="$1"
+    local size vendor model label
+
+    size=$(lsblk -dno SIZE "$device" 2>/dev/null)
+    vendor=$(lsblk -dno VENDOR "$device" 2>/dev/null | sed 's/ *$//')
+    model=$(lsblk -dno MODEL "$device" 2>/dev/null | sed 's/ *$//')
+
+    label=""
+    if [[ -n $vendor && -n $model ]]; then
+        if [[ $model == *$vendor* ]]; then
+            label="$model"
+        else
+            label="$vendor $model"
+        fi
+    elif [[ -n $model ]]; then
+        label="$model"
+    elif [[ -n $vendor ]]; then
+        label="$vendor"
+    fi
+
+    local display="$device"
+    [[ -n $size ]] && display="$display ($size)"
+    [[ -n $label ]] && display="$display - $label"
+
+    local part_summary
+    part_summary=$(lsblk -nro TYPE,NAME,FSTYPE,MOUNTPOINT "$device" 2>/dev/null |
+        awk '$1=="part" { printf "%s%s%s", s, ($3==""?"?":$3), ($4==""?"":"("$4")"); s=", " }')
+    [[ -n $part_summary ]] && display+=" [$part_summary]"
+
+    echo "$display"
+}
+
+disk_form() {
+    step "Let's select where to install RetroLinux..."
+
+    local exclude_disk
+    exclude_disk=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null || true)
+
+    local available_disks
+    available_disks=$(
+        lsblk -dpno NAME,TYPE 2>/dev/null |
+            awk '$2=="disk"{print $1}' |
+            grep -E '/dev/(sd|hd|vd|nvme|mmcblk|xv)' |
+            { if [[ -n $exclude_disk ]]; then grep -Fvx "$exclude_disk"; else cat; fi; }
+    ) || {
+        step_error "3" "Could not list available disks"
+        retry_or_exit "Cannot list disks" || abort
+        return
+    }
+
+    if [[ -z $available_disks ]]; then
+        step_error "3" "No disks found"
+        retry_or_exit "No disks available" || abort
+        return
+    fi
+
+    local disk_options=""
+    while IFS= read -r device; do
+        if [[ -n $device ]]; then
+            disk_info=$(get_disk_info "$device")
+            disk_options="$disk_options$disk_info"$'\n'
+        fi
+    done <<<"$available_disks"
+
+    selected_display=$(echo "$disk_options" | gum choose --header "Select install disk" --padding "$GUM_CHOOSE_PADDING") || {
+        step_error "3" "Disk selection cancelled"
+        retry_or_exit "Disk selection required" || abort
+        return
+    }
+    disk=$(echo "$selected_display" | awk '{print $1}')
+
+    if [[ ! -b $disk ]]; then
+        step_error "3" "Invalid disk selected"
+        retry_or_exit "Invalid disk" || abort
+        return
+    fi
+}
+
+disk_form
+
+while true; do
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Warning: This will erase ALL data on $disk"
+    gum style --padding "0 0 0 $PADDING_LEFT" "There is no going back from this point."
+    echo
+
+    if gum confirm --affirmative "Yes, wipe disk" --negative "No, go back" "Confirm disk wipe" --padding "$GUM_CONFIRM_PADDING"; then
+        break
+    else
+        disk_form
+    fi
+done
+
+step "Writing configuration..."
+
+clear
+
+password_escaped=$(echo -n "$password" | jq -Rsa) || {
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password"
+    echo
+    retry_or_exit "JSON processing failed" || abort
+    return
+}
+
+password_hash_escaped=$(echo -n "$password_hash" | jq -Rsa) || {
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password hash"
+    echo
+    retry_or_exit "JSON processing failed" || abort
+    return
+}
+
+username_escaped=$(echo -n "$username" | jq -Rsa) || {
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"
+    echo
+    retry_or_exit "JSON processing failed" || abort
+    return
+}
+
+cat <<-_EOF_ >user_credentials.json
+{
+    "encryption_password": $password_escaped,
+    "root_enc_password": $password_hash_escaped,
+    "users": [
+        {
+            "enc_password": $password_hash_escaped,
+            "groups": [],
+            "sudo": true,
+            "username": $username_escaped
+        }
+    ]
+}
+_EOF_
+
+disk_size=$(lsblk -bdno SIZE "$disk" 2>/dev/null) || {
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not read disk size"
+    echo
+    retry_or_exit "Cannot read disk" || abort
+    return
+}
+
+mib=$((1024 * 1024))
+gib=$((mib * 1024))
+disk_size_in_mib=$((disk_size / mib * mib))
+
+gpt_backup_reserve=$((mib))
+boot_partition_start=$((mib))
+boot_partition_size=$((2 * gib))
+
+main_partition_start=$((boot_partition_size + boot_partition_start))
+main_partition_size=$((disk_size_in_mib - main_partition_start - gpt_backup_reserve))
+
+if [[ $main_partition_size -le 0 ]]; then
+    clear_logo
+    echo
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Disk is too small"
+    gum style --padding "0 0 0 $PADDING_LEFT" "Minimum 2GB required"
+    echo
+    retry_or_exit "Disk too small" || abort
+    return
+fi
+
+cat <<-_EOF_ >user_configuration.json
+{
+    "app_config": null,
+    "archinstall-language": "English",
+    "auth_config": {},
+    "audio_config": { "audio": "pipewire" },
+    "bootloader": "grub",
+    "custom_commands": [],
+    "disk_config": {
+        "btrfs_options": {},
+        "config_type": "default_layout",
+        "device_modifications": [
+            {
+                "device": "$disk",
+                "partitions": [
+                    {
+                        "btrfs": [],
+                        "dev_path": null,
+                        "flags": [ "boot", "esp" ],
+                        "fs_type": "fat32",
+                        "mount_options": [],
+                        "mountpoint": "/boot",
+                        "obj_id": "ea21d3f2-82bb-49cc-ab5d-6f81ae94e18d",
+                        "size": {
+                            "sector_size": { "unit": "B", "value": 512 },
+                            "unit": "B",
+                            "value": $boot_partition_size
+                        },
+                        "start": {
+                            "sector_size": { "unit": "B", "value": 512 },
+                            "unit": "B",
+                            "value": $boot_partition_start
+                        },
+                        "status": "create",
+                        "type": "primary"
+                    },
+                    {
+                        "btrfs": [
+                            { "mountpoint": "/", "name": "@" },
+                            { "mountpoint": "/home", "name": "@home" },
+                            { "mountpoint": "/var/log", "name": "@log" },
+                            { "mountpoint": "/var/cache/pacman/pkg", "name": "@pkg" }
+                        ],
+                        "dev_path": null,
+                        "flags": [],
+                        "fs_type": "btrfs",
+                        "mount_options": [ "compress=zstd" ],
+                        "mountpoint": null,
+                        "obj_id": "8c2c2b92-1070-455d-b76a-56263bab24aa",
+                        "size": {
+                            "sector_size": { "unit": "B", "value": 512 },
+                            "unit": "B",
+                            "value": $main_partition_size
+                        },
+                        "start": {
+                            "sector_size": { "unit": "B", "value": 512 },
+                            "unit": "B",
+                            "value": $main_partition_start
+                        },
+                        "status": "create",
+                        "type": "primary"
+                    }
+                ],
+                "wipe": true
+            }
+        ],
+        "disk_encryption": {
+            "encryption_type": "luks",
+            "lvm_volumes": [],
+            "iter_time": 2000,
+            "partitions": [ "8c2c2b92-1070-455d-b76a-56263bab24aa" ],
+            "encryption_password": $password_escaped
+        }
+    },
+    "hostname": "$hostname",
+    "kernels": [ "linux" ],
+    "network_config": { "type": "iso" },
+    "ntp": true,
+    "parallel_downloads": 8,
+    "script": null,
+    "services": [],
+    "swap": true,
+    "timezone": "$timezone",
+    "locale_config": {
+        "kb_layout": "$keyboard",
+        "sys_enc": "UTF-8",
+        "sys_lang": "en_US.UTF-8"
+    },
+    "mirror_config": {
+        "custom_repositories": [],
+        "custom_servers": [
+            {"url": "https://geo.mirror.pkgbuild.com/\$repo/os/\$arch"}
+        ],
+        "mirror_regions": {},
+        "optional_repositories": []
+    },
+    "packages": [
+        "base-devel",
+        "git",
+        "neovim"
+    ],
+    "profile_config": {
+        "gfx_driver": null,
+        "greeter": null,
+        "profile": {}
+    },
+    "version": "3.0.9"
+}
+_EOF_
+
+if [[ $1 == "dry" ]]; then
+    echo "User Configuration:"
+    cat user_configuration.json
+    echo "User Credentials:"
+    cat user_credentials.json
+    rm user_configuration.json user_credentials.json
+fi

@@ -23,6 +23,7 @@ The project provides the `retro` CLI - a unified command center to manage the en
 |-----------|---------|
 | `retro.sh` | Main entry point, command routing, global state |
 | `lib/` | **Internal** core libraries (colors, logging, fs, driver detection, etc.) |
+| `bin/` | **Installer** system (retroinstall, helpers, lib) |
 | `cmds/` | **User-facing** commands (tools, system, modules subdirectories) |
 | `scripts/` | Backend automation scripts (core logic for each feature) |
 | `scripts/events/` | Event hook modules (on_event_*) |
@@ -42,6 +43,8 @@ The project provides the `retro` CLI - a unified command center to manage the en
 | Pattern | Location | Example |
 |---------|----------|---------|
 | Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `helpers.sh`, `battery.sh` |
+| Installer libraries | `bin/lib/` | `display.sh`, `wifi.sh`, `errors.sh`, `gum.sh` |
+| Installer helpers | `bin/helpers/` | `network.sh`, `disk.sh`, `input.sh`, `handlers.sh` |
 | Backend core scripts | `scripts/` | `audio_core.sh`, `network_core.sh`, `driver_core.sh` |
 | Event hooks | `scripts/events/` | `battery_events.sh`, `power_events.sh` |
 | Watchers | `scripts/watchers/` | `battery.sh`, `bluetooth.sh`, `timers.sh` |
@@ -50,6 +53,7 @@ The project provides the `retro` CLI - a unified command center to manage the en
 | System commands | `cmds/system/` | `load.sh`, `update.sh`, `setup.sh` |
 | Module definitions | `modules/<name>/` | `modules/hyprland/`, `modules/ags/` |
 | Helper modules | `cmds/tools/clipboard/` | Subdirectories for complex tools |
+| Installer entry | `bin/` | `retroinstall` |
 
 ---
 
@@ -68,7 +72,7 @@ The project provides the `retro` CLI - a unified command center to manage the en
 
 ### Shellcheck Compliance
 
-All scripts must pass shellcheck before being merged. Run `shellcheck scripts/*.sh cmds/**/*.sh lib/*.sh` locally to check.
+All scripts must pass shellcheck before being merged. Run `shellcheck scripts/*.sh cmds/**/*.sh lib/*.sh bin/**/*.sh` locally to check.
 
 Exceptions can be added inline for intentional cases:
 ```bash
@@ -78,9 +82,9 @@ local result=$myvar1$myvar2  # intentional concatenation
 
 ### Critical Rule: Never Duplicate Functions
 
-> Before creating a new function, check `./lib/` first. If a function already exists that does what you need, use it.
+> Before creating a new function, check `./lib/` or `./bin/lib/` first. If a function already exists that does what you need, use it.
 
-If you need a utility that doesn't exist, add it to the appropriate lib file in `./lib/`, not in your command file.
+If you need a utility that doesn't exist, add it to the appropriate lib file in `./lib/` or `./bin/lib/`, not in your command file.
 
 ### Example
 
@@ -111,10 +115,10 @@ Every tool in this project follows a strict two-layer architecture:
 │  - Table formatting with printf                             │
 │  - Handles -y/--yes skip flag                               │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ calls core script
-                              ▼ parses output
-                              ▼ formats for user
+                               │
+                               ▼ calls core script
+                               ▼ parses output
+                               ▼ formats for user
 ┌─────────────────────────────────────────────────────────────┐
 │  BACKEND (Logic Layer)                                      │
 │  File: scripts/name_core.sh                                 │
@@ -264,18 +268,6 @@ rx_help_example 30 "retro tool status" "Show current status"
 | `rx_help_separator` | Prints separator line |
 | `rx_help_footer` | Prints footer with separator |
 
-**Real example** (from `cmds/tools/driver.sh`):
-
-```bash
-rx_help_usage "retro driver <command>"
-rx_help_commands "Available commands"
-rx_help_cmd "status" "Scan hardware and report driver status"
-rx_help_cmd "install" "Install missing drivers"
-rx_help_examples
-rx_help_example "retro driver status" "Scan hardware..."
-rx_help_spacer
-```
-
 ### Table and Status Display Functions
 
 For displaying status information and tables, use the centralized table functions from `lib/help.sh`:
@@ -309,30 +301,6 @@ rx_table_spacer
 |----------|---------|
 | `rx_confirm "message"` | Yes/no prompt, returns 0 for yes |
 | `rx_yesno "message"` | Yes/no with SKIP_PROMPT support |
-
-**Real example** (from `cmds/tools/audio.sh`):
-
-```bash
-rx_table_header "󰑊" "Audio Status"
-rx_table_row "󰿅" "PipeWire:" "$pw_ver" "$GRAY" "14"
-rx_table_row "󰛫" "WirePlumber:" "$wp_ver" "$GRAY" "14"
-rx_table_separator
-rx_table_row "󰝥" "Volume:" "${sink_vol}%" "$PINK" "14"
-rx_table_row_gray "󰈐" "Output:" "${sink_name:0:35}" "14"
-rx_table_separator
-rx_table_spacer
-```
-
-**Real example for lists** (from `cmds/tools/service.sh`):
-
-```bash
-rx_table_header "󰒑" "System Services"
-while IFS='|' read -r _ name load active sub; do
-    rx_table_list_row "$name" "$active" "$sub" "$PINK" "$active_color" "$sub_color"
-done <<<"$result"
-rx_table_separator
-rx_table_spacer
-```
 
 ### Section Separator Pattern
 
@@ -983,7 +951,7 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 
 3. **Array handling**: Use `local arr=()` for local arrays to avoid polluting global state.
 
-4. **Exit codes**: Core scripts should return 0 on success, 1 on failure. Frontend handles the messaging.
+4. **Exit codes**: Core scripts should return 0 on success, 1 for failure. Frontend handles the messaging.
 
 5. **Icon padding**: Always use `${PINK}icon${RESET}` pattern, never plain icon alone.
 
@@ -1007,7 +975,187 @@ Failing to handle interrupts can leave the system in a broken state (half-instal
 
 ---
 
-## 17. Quick Reference
+## 17. Installer System (bin/)
+
+The Installer is a self-contained system that runs during initial system setup. It follows a **three-layer architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ENTRY POINT (bin/retroinstall)                             │
+│  - Sources helpers, orchestrates flow                       │
+│  - Contains only entry-point logic                           │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼ sources
+┌─────────────────────────────────────────────────────────────┐
+│  ORCHESTRATION (bin/helpers/*)                              │
+│  - Network setup, disk selection, user forms               │
+│  - Calls functions from bin/lib/                            │
+│  - Sets up traps and error handlers                          │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼ sources
+┌─────────────────────────────────────────────────────────────┐
+│  UTILITIES (bin/lib/*)                                      │
+│  - Pure functions, no orchestration                          │
+│  - display, wifi, errors, gum wrappers                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+bin/
+├── retroinstall              # Main entry point
+├── logo.txt                  # ASCII art logo
+├── lib/                      # Low-level utilities
+│   ├── display.sh            # Terminal detection, padding, rx_clear_logo
+│   ├── errors.sh             # rx_retry_or_exit, rx_step, rx_notice, rx_abort
+│   ├── wifi.sh               # rx_iwctl_connect, rx_get_wifi_iface
+│   ├── gum.sh                # rx_gum_spin, rx_gum_input wrappers
+│   └── qr.sh                 # rx_generate_error_qr
+└── helpers/                  # Orchestration layer
+    ├── all.sh                 # Sources all bin/lib/ files
+    ├── network.sh             # setup_network orchestration
+    ├── disk.sh                # disk_form, get_disk_info
+    ├── input.sh               # keyboard_form, user_form
+    ├── handlers.sh            # catch_errors, trap setup
+    ├── output.sh              # Log output functions
+    └── debug.sh               # rx_debug
+```
+
+### Padding System
+
+All installer UI is centered using a padding system calculated from terminal width and logo width:
+
+```bash
+# bin/lib/display.sh
+export TERM_WIDTH=$(stty size | awk '{print $2}')
+export LOGO_WIDTH=74
+export PADDING_LEFT=$(((TERM_WIDTH - LOGO_WIDTH) / 2))
+export PADDING="0 0 0 $PADDING_LEFT"
+
+export GUM_CHOOSE_PADDING="$PADDING"
+export GUM_FILTER_PADDING="$PADDING"
+export GUM_INPUT_PADDING="$PADDING"
+export GUM_CONFIRM_PADDING="$PADDING"
+```
+
+### Gum Style Patterns
+
+The installer uses gum for all UI. All gum commands use padding variables:
+
+```bash
+# Text display (centered, no color)
+gum style "Message text" --padding "$PADDING"
+
+# Text display (centered, with color)
+gum style --foreground 1 "Error message" --padding "1 0 1 $PADDING_LEFT"
+
+# Interactive elements (centered)
+gum choose ... --padding "$GUM_CHOOSE_PADDING"
+gum input ... --padding "$GUM_INPUT_PADDING"
+gum confirm ... --padding "$GUM_CONFIRM_PADDING"
+gum filter ... --padding "$GUM_FILTER_PADDING"
+```
+
+### Tokyo Night Color Codes
+
+Installer uses numeric color codes (not $PINK, $GRAY, etc.):
+
+| Code | Color | Usage |
+|------|-------|-------|
+| 1 | Red (#f7768e) | Errors, failure messages |
+| 2 | Green (#9ece6a) | Success, connected |
+| 3 | Yellow (#e0af68) | Warnings, waiting |
+| 5 | Magenta (#bb9af7) | Highlights, dividers |
+| 6 | Cyan (#7dcfff) | Prompts, borders |
+| 7 | White (#a9b1d6) | Regular text |
+
+### WiFi Connection Pattern
+
+The `rx_iwctl_connect` function in `bin/lib/wifi.sh` follows this exact pattern:
+
+1. Run `iwctl --passphrase "$password" station "$iface" connect "$ssid"`
+2. **No output = success** (iwctl only outputs on failure)
+3. Wait 4 seconds for connection handshake
+4. Ping 1.1.1.1 to verify connectivity
+5. Return 0 on success, 1 on failure
+
+```bash
+rx_iwctl_connect() {
+    local ssid="$1"
+    local password="$2"
+    local iface="${3:-}"
+
+    [[ -z $iface ]] && iface=$(rx_get_wifi_iface)
+    [[ -z $iface ]] && return 1
+
+    ip link set "$iface" up 2>/dev/null
+
+    if [[ -n $password ]]; then
+        iwctl --passphrase "$password" station "$iface" connect "$ssid"
+    else
+        iwctl station "$iface" connect "$ssid"
+    fi
+
+    sleep 4
+
+    if ping -c 1 -W 5 1.1.1.1 &>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+```
+
+### Error Handling Pattern
+
+All installer scripts set up traps for error handling:
+
+```bash
+# In bin/helpers/handlers.sh
+trap catch_errors ERR
+trap 'rx_show_signal_info "SIGINT"' INT
+trap 'rx_show_signal_info "SIGTERM"' TERM
+trap exit_handler EXIT
+
+catch_errors() {
+    rx_restore_outputs
+    rx_clear_logo
+    rx_show_cursor
+    # ... error display ...
+}
+```
+
+### QR Code Error Reporting
+
+Errors generate a QR code with system info for GitHub issues:
+
+```bash
+rx_generate_error_qr() {
+    local exit_code=$1
+    local repo_url="github.com/itsvlxd/RetroLinux/issues/new"
+    local issue_title="Installation Halt - Exit Code $exit_code"
+    local system_specs
+    system_specs=$(rx_gather_system_info)
+
+    local issue_body="Installer failed during RetroLinux setup.
+
+=== SYSTEM SPECS ===
+$system_specs
+=== ERROR LOG ===
+$log_content
+
+Please describe what happened below:"
+
+    local full_url="https://${repo_url}?title=${issue_title// /+}&body=${issue_body// /+}"
+    qrencode -t ANSIUTF8 "$full_url"
+}
+```
+
+---
+
+## 18. Quick Reference
 
 ### File Locations
 
@@ -1022,6 +1170,23 @@ RetroLinux/
 │   ├── helpers.sh
 │   ├── module.sh
 │   └── ...
+├── bin/                        # Installer system
+│   ├── retroinstall            # Main entry point
+│   ├── logo.txt                # ASCII art logo
+│   ├── lib/                    # Low-level utilities
+│   │   ├── display.sh
+│   │   ├── errors.sh
+│   │   ├── wifi.sh
+│   │   ├── gum.sh
+│   │   └── qr.sh
+│   └── helpers/               # Orchestration
+│       ├── all.sh
+│       ├── network.sh
+│       ├── disk.sh
+│       ├── input.sh
+│       ├── handlers.sh
+│       ├── output.sh
+│       └── debug.sh
 ├── scripts/                    # Backend core scripts
 │   ├── audio_core.sh
 │   ├── network_core.sh
@@ -1059,3 +1224,7 @@ RetroLinux/
 | Register cmd | `register_command "TOOLS" "cmd|alias" "desc" "cmd_cmd"` |
 | Event hook | `on_event_name() { ... }` in `scripts/events/*.sh` |
 | Watcher | `start_watcher_name() { ... }` in `scripts/watchers/*.sh` |
+| Installer clear | `rx_clear_logo` in `bin/lib/display.sh` |
+| Installer error | `rx_retry_or_exit "message"` in `bin/lib/errors.sh` |
+| WiFi connect | `rx_iwctl_connect "$ssid" "$password"` in `bin/lib/wifi.sh` |
+| Gum choose | `gum choose ... --padding "$GUM_CHOOSE_PADDING"` |
