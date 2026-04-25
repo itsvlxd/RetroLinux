@@ -33,6 +33,7 @@ foot-terminfo
 fsarchiver
 gpart
 gpm
+git
 gptfdisk
 grml-zsh-config
 gum
@@ -94,7 +95,8 @@ plymouth
 ppp
 pptpclient
 pv
-qemu-guest-agent
+qrencode
+quilt
 refind
 reflector
 rsync
