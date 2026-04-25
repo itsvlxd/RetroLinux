@@ -93,7 +93,7 @@ EOF
 rx_logo() {
     local input="${1:-}"
 
-    if [[ -t 1 ]] && [[ -z "${CI:-}" ]]; then
+    if [[ -t 1 ]] && [[ -z ${CI:-} ]]; then
         clear
     fi
 
@@ -101,8 +101,8 @@ rx_logo() {
     local branch=$(rx_git_branch)
 
     local active_logo
-    if [[ -n "$input" ]]; then
-        if [[ -f "$input" ]]; then
+    if [[ -n $input ]]; then
+        if [[ -f $input ]]; then
             active_logo=$(cat "$input")
         else
             active_logo="$input"
@@ -112,12 +112,16 @@ rx_logo() {
         [[ $logo_choice -eq 1 ]] && active_logo="$LOGO_1" || active_logo="$LOGO_2"
     fi
 
-    local angle=$(random_int 0 360)
-    local logo_choice=$(random_int 1 2)
-    if [[ $logo_choice -eq 1 || -n "$input" ]]; then
-        apply_terminal_gradient "$active_logo" "$angle" 32
+    if [[ -n $input ]]; then
+        echo -e "$active_logo"
     else
-        apply_terminal_gradient "$active_logo" "$angle" 35 32 33 31
+        local angle=$(random_int 0 360)
+        local logo_choice=$(random_int 1 2)
+        if [[ $logo_choice -eq 1 ]]; then
+            apply_terminal_gradient "$active_logo" "$angle" 32
+        else
+            apply_terminal_gradient "$active_logo" "$angle" 35 32 33 31
+        fi
     fi
 
     local logo_w=$(get_width "$active_logo")

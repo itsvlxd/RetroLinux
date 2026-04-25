@@ -33,15 +33,15 @@ wifi_list() {
     fi
 
     local state=$(ip link show "$iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
-    if [[ "$state" != "UP" ]]; then
+    if [[ $state != "UP" ]]; then
         ip link set "$iface" up 2>/dev/null
         sleep 2
     fi
 
     nmcli -t -f SSID,SIGNAL,SECURITY,BSSID device wifi list ifname "$iface" 2>/dev/null | while IFS=: read -r ssid signal security bssid; do
-        [[ -z "$ssid" ]] && continue
+        [[ -z $ssid ]] && continue
         local sec="Open"
-        [[ "$security" != "--" && -n "$security" ]] && sec="$security"
+        [[ $security != "--" && -n $security ]] && sec="$security"
         echo "network|$ssid|$signal|$sec|$bssid"
     done
 }
@@ -51,7 +51,7 @@ wifi_connect() {
     local password="$2"
     local iface="${3:-wlan0}"
 
-    if [[ -z "$ssid" ]]; then
+    if [[ -z $ssid ]]; then
         echo "result=error|reason=ssid_required"
         return 1
     fi
@@ -65,7 +65,7 @@ wifi_connect() {
 
     local current_ssid
     current_ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
-    if [[ "$current_ssid" == "$ssid" ]]; then
+    if [[ $current_ssid == "$ssid" ]]; then
         echo "result=already_connected|ssid=$ssid"
         return 0
     fi
@@ -75,39 +75,39 @@ wifi_connect() {
         is_iwd_active=true
     fi
 
-    if [[ "$is_iwd_active" == "true" ]]; then
-        if [[ -n "$password" ]]; then
+    if [[ $is_iwd_active == "true" ]]; then
+        if [[ -n $password ]]; then
             echo "connect $ssid
 $password" | iwd station "$iface" 2>/dev/null
         else
             iwd station "$iface" connect "$ssid" 2>/dev/null
         fi
-        
+
         local count=0
         while [[ $count -lt 15 ]]; do
             current_ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
-            [[ "$current_ssid" == "$ssid" ]] && break
+            [[ $current_ssid == "$ssid" ]] && break
             sleep 1
             ((count++))
         done
-        
-        if [[ "$current_ssid" == "$ssid" ]]; then
+
+        if [[ $current_ssid == "$ssid" ]]; then
             echo "result=success|method=iwd|ssid=$ssid"
             return 0
         fi
     fi
 
     local existing=$(nmcli -t -f SSID device wifi list ifname "$iface" 2>/dev/null | grep "^$ssid$")
-    
-    if [[ -n "$existing" ]]; then
+
+    if [[ -n $existing ]]; then
         local is_connected=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
-        if [[ "$is_connected" == "$ssid" ]]; then
+        if [[ $is_connected == "$ssid" ]]; then
             echo "result=already_connected|ssid=$ssid"
             return 0
         fi
     fi
 
-    if [[ -n "$password" ]]; then
+    if [[ -n $password ]]; then
         nmcli device wifi connect "$ssid" password "$password" ifname "$iface" >/dev/null 2>&1
     else
         nmcli device wifi connect "$ssid" ifname "$iface" >/dev/null 2>&1
@@ -116,8 +116,8 @@ $password" | iwd station "$iface" 2>/dev/null
     sleep 3
 
     local connected_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
-    
-    if [[ "$connected_ssid" == "$ssid" ]]; then
+
+    if [[ $connected_ssid == "$ssid" ]]; then
         echo "result=success|method=nmcli|ssid=$ssid"
     else
         echo "result=error|reason=connection_failed|ssid=$ssid"
@@ -143,13 +143,13 @@ wifi_status() {
     echo "iface=$iface|state=$state"
 
     local conn_info=$(nmcli -t -f GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS device show "$iface" 2>/dev/null | tr -d '\r')
-    
+
     local ssid=$(echo "$conn_info" | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
     local ipaddr=$(echo "$conn_info" | grep "IP4.ADDRESS\[1\]:" | sed 's/IP4.ADDRESS\[1\]://')
     local gateway=$(echo "$conn_info" | grep "IP4.GATEWAY:" | sed 's/IP4.GATEWAY://')
     local dns=$(echo "$conn_info" | grep "IP4.DNS\[1\]:" | sed 's/IP4.DNS\[1\]://')
 
-    if [[ -z "$ssid" || "$ssid" == "--" ]]; then
+    if [[ -z $ssid || $ssid == "--" ]]; then
         ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
         ipaddr=$(ip addr show "$iface" 2>/dev/null | grep -oP "inet \K[\d.]+")
         gateway=$(ip route show default dev "$iface" 2>/dev/null | grep -oP "via \K[\d.]+")
@@ -173,7 +173,7 @@ ethernet_status() {
     echo "iface=$iface|state=$state"
 
     local conn_info=$(nmcli -t -f GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS device show "$iface" 2>/dev/null | tr -d '\r')
-    
+
     local ssid=$(echo "$conn_info" | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
     local ipaddr=$(echo "$conn_info" | grep "IP4.ADDRESS\[1\]:" | sed 's/IP4.ADDRESS\[1\]://')
     local gateway=$(echo "$conn_info" | grep "IP4.GATEWAY:" | sed 's/IP4.GATEWAY://')
@@ -193,18 +193,18 @@ network_status() {
 
     echo "wifi_iface=${wifi_iface:-none}|eth_iface=${eth_iface:-none}"
 
-    if [[ -n "$wifi_iface" ]]; then
+    if [[ -n $wifi_iface ]]; then
         local wifi_state=$(ip link show "$wifi_iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
         local wifi_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$wifi_iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
-        
-        if [[ -z "$wifi_ssid" || "$wifi_ssid" == "--" ]]; then
+
+        if [[ -z $wifi_ssid || $wifi_ssid == "--" ]]; then
             wifi_ssid=$(iwd station "$wifi_iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
         fi
-        
+
         echo "wifi_state=${wifi_state:-down}|wifi_ssid=${wifi_ssid:-none}"
     fi
 
-    if [[ -n "$eth_iface" ]]; then
+    if [[ -n $eth_iface ]]; then
         local eth_state=$(ip link show "$eth_iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
         echo "eth_state=${eth_state:-down}"
     fi
@@ -218,7 +218,7 @@ manual_ip() {
     local ip_cidr="$2"
     local gateway="$3"
 
-    if [[ -z "$iface" || -z "$ip_cidr" ]]; then
+    if [[ -z $iface || -z $ip_cidr ]]; then
         echo "result=error|reason=missing_params"
         return 1
     fi
@@ -230,20 +230,20 @@ manual_ip() {
 
     local ip_part="${ip_cidr%/*}"
     local cidr="${ip_cidr#*/}"
-    
-    if [[ -z "$cidr" || "$cidr" == "$ip_cidr" ]]; then
+
+    if [[ -z $cidr || $cidr == "$ip_cidr" ]]; then
         cidr=24
     fi
 
     ip addr flush dev "$iface" >/dev/null 2>&1
     ip addr add "$ip_cidr" dev "$iface" >/dev/null 2>&1
 
-    if [[ -n "$gateway" ]]; then
+    if [[ -n $gateway ]]; then
         ip route replace default via "$gateway" dev "$iface" >/dev/null 2>&1
     fi
 
     nmcli connection modify "$iface" ipv4.method manual ipv4.addresses "$ip_cidr" >/dev/null 2>&1
-    [[ -n "$gateway" ]] && nmcli connection modify "$iface" ipv4.gateway "$gateway" >/dev/null 2>&1
+    [[ -n $gateway ]] && nmcli connection modify "$iface" ipv4.gateway "$gateway" >/dev/null 2>&1
 
     echo "result=success|iface=$iface|ip=$ip_cidr|gateway=${gateway:-none}"
 }
@@ -251,7 +251,7 @@ manual_ip() {
 set_dhcp() {
     local iface="$1"
 
-    if [[ -z "$iface" ]]; then
+    if [[ -z $iface ]]; then
         echo "result=error|reason=interface_required"
         return 1
     fi
@@ -279,7 +279,7 @@ vlan_create() {
     local vlan_id="$2"
     local vlan_name="${3:-${parent}.${vlan_id}}"
 
-    if [[ -z "$parent" || -z "$vlan_id" ]]; then
+    if [[ -z $parent || -z $vlan_id ]]; then
         echo "result=error|reason=missing_params"
         return 1
     fi
@@ -298,7 +298,7 @@ vlan_create() {
 vlan_delete() {
     local vlan_name="$1"
 
-    if [[ -z "$vlan_name" ]]; then
+    if [[ -z $vlan_name ]]; then
         echo "result=error|reason=vlan_name_required"
         return 1
     fi
@@ -316,8 +316,8 @@ vlan_delete() {
 
 vlan_list() {
     local vlans=$(ip link show | grep -E "\.[0-9]+@" | awk -F': ' '{print $2}')
-    
-    if [[ -z "$vlans" ]]; then
+
+    if [[ -z $vlans ]]; then
         echo "result=none"
         return 0
     fi
@@ -357,7 +357,7 @@ dns_flush() {
 interface_info() {
     local iface="$1"
 
-    if [[ -z "$iface" ]]; then
+    if [[ -z $iface ]]; then
         local wifis=$(get_wifi_interfaces)
         local eths=$(get_ethernet_interfaces)
         local vlans=$(ip link show | grep -E "\.[0-9]+@" | awk -F': ' '{print $2}')
@@ -381,7 +381,7 @@ interface_info() {
     echo "iface=$iface|state=$state|mac=$mac|mtu=${mtu#mtu }|ips=$ips"
 }
 
-rx_check_internet() {
+check_internet() {
     ping -c 1 -W 3 1.1.1.1 &>/dev/null
 }
 
@@ -401,5 +401,6 @@ case "$1" in
     "--vlan-list") vlan_list ;;
     "--dns-flush") dns_flush ;;
     "--interface-info") interface_info "$2" ;;
-    "--check-internet") rx_check_internet && echo "result=online" || echo "result=offline" ;;
+    "--check-internet") check_internet && echo "result=online" || echo "result=offline" ;;
 esac
+
