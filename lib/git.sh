@@ -21,3 +21,9 @@ rx_git_version() {
 
     echo "$version"
 }
+
+rx_git_latest_tag() {
+    local tag
+    tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 2>/dev/null)
+    echo "${tag:-}"
+}

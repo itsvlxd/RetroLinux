@@ -18,16 +18,27 @@ if [[ -f "$RETRO_DIR/.env" ]]; then
 fi
 
 source "$RETRO_DIR/lib/colors.sh"
-source "$RETRO_DIR/lib/log.sh"
-source "$RETRO_DIR/lib/logo.sh"
-source "$RETRO_DIR/lib/help.sh"
-source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/git.sh"
+source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/logo.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 BUILD_IMAGE="retrolinux-build:latest"
 REGISTRY="ghcr.io"
 GITHUB_USER="${GITHUB_USER:-itsvlxd}"
 FULL_IMAGE="${REGISTRY}/${GITHUB_USER}/retrolinux-build:latest"
+
+show_build_logo() {
+    local logo_path="$RETRO_DIR/bin/logo.txt"
+    local term_width="${TERM_WIDTH:-80}"
+    local logo_width=74
+    local padding_left=$(((term_width - logo_width) / 2))
+
+    if [[ -f $logo_path ]]; then
+        gum style --foreground 2 --padding "1 0 0 $padding_left" "$(<"$logo_path")"
+    fi
+}
 PKG_CACHE_VOLUME="retrolinux-pkg-cache"
 REQUIRED_DEPS=("docker" "bc" "convert")
 
@@ -55,7 +66,7 @@ _check_deps() {
 _calculate_build_checksum() {
     local packages_file="$PROFILE_DIR/packages.x86_64"
 
-    if [[ ! -f "$packages_file" ]]; then
+    if [[ ! -f $packages_file ]]; then
         echo "missing"
         return
     fi
@@ -73,21 +84,21 @@ _should_skip_build() {
     local iso_files=()
 
     shopt -s nullglob
-    iso_files=( "$OUTPUT_DIR"/*.iso )
+    iso_files=("$OUTPUT_DIR"/*.iso)
     shopt -u nullglob
 
-    if [[ -z $current_checksum ]] || [[ "$current_checksum" == "missing" ]]; then
+    if [[ -z $current_checksum ]] || [[ $current_checksum == "missing" ]]; then
         return 1
     fi
 
-    if [[ ! -f "$checksum_file" ]] || [[ ${#iso_files[@]} -eq 0 ]]; then
+    if [[ ! -f $checksum_file ]] || [[ ${#iso_files[@]} -eq 0 ]]; then
         return 1
     fi
 
     iso_file="${iso_files[0]}"
     last_checksum=$(cat "$checksum_file" 2>/dev/null || echo "")
 
-    if [[ "$current_checksum" == "$last_checksum" ]]; then
+    if [[ $current_checksum == "$last_checksum" ]]; then
         rx_log "info" "Build inputs unchanged, skipping build..."
         rx_log "info" "Use --force to rebuild anyway"
         return 0
@@ -98,7 +109,7 @@ _should_skip_build() {
 
 _save_build_checksum() {
     local checksum=$(_calculate_build_checksum)
-    echo "$checksum" > "$OUTPUT_DIR/.build-checksum"
+    echo "$checksum" >"$OUTPUT_DIR/.build-checksum"
 }
 
 _build_help() {
@@ -167,7 +178,7 @@ _build_docker_image() {
     local dockerfile="$SCRIPT_DIR/Dockerfile"
     local context_dir="$SCRIPT_DIR"
 
-    if [[ ! -f "$dockerfile" ]]; then
+    if [[ ! -f $dockerfile ]]; then
         rx_log "error" "Dockerfile not found: $dockerfile"
         return 1
     fi
@@ -309,7 +320,7 @@ _docker_build() {
     local skip_prompt="$1"
     local force_build="${FORCE_BUILD:-false}"
 
-    if [[ "$skip_prompt" == "force" ]]; then
+    if [[ $skip_prompt == "force" ]]; then
         force_build="true"
     fi
 
@@ -319,7 +330,7 @@ _docker_build() {
 
     export SKIP_PROMPT="$skip_prompt"
 
-    if ! _should_skip_build || [[ "$force_build" == "true" ]]; then
+    if ! _should_skip_build || [[ $force_build == "true" ]]; then
         rx_log "info" "Continuing with build..."
     else
         rx_log "info" "Skipping build (no changes detected)"
@@ -359,24 +370,17 @@ _docker_build() {
     rx_log "info" "Cleaning build directory..."
     _cleanup_build
 
-    local version=$(rx_git_version)
-    local branch=$(rx_git_branch)
-    local iso_date=$(date '+%Y.%m.%d')
-
-    sed -i "s|@ISO_VERSION@|${iso_date}|g" "$PROFILE_DIR/profiledef.sh"
-
     mkdir -p "$OUTPUT_DIR"
     mkdir -p "$WORK_DIR"
 
-    rx_log "info" "Copying RetroLinux project to airootfs..."
-    mkdir -p "$PROFILE_DIR/airootfs/opt"
+    rx_log "info" "Copying RetroLinux to airootfs..."
+    mkdir -p "$PROFILE_DIR/airootfs/opt/retrolinux"
     rsync -av --delete \
-        --exclude='.git/' \
-        --exclude='iso/work/' \
-        --exclude='iso/out/' \
-        --exclude='iso/profile/packages-cache/' \
-        /home/vlad/.essentials/retro-arch/ \
-        "$PROFILE_DIR/airootfs/opt/retrolinux/"
+        "$RETRO_DIR/bin/" \
+        "$PROFILE_DIR/airootfs/opt/retrolinux/bin/"
+
+    local version=$(rx_git_version)
+    local branch=$(rx_git_branch)
 
     rx_log "info" "Building RetroLinux ISO ${version} (${branch})..."
     rx_log "info" "Starting Docker build (this may take a while)..."
@@ -384,7 +388,7 @@ _docker_build() {
     local host_uid=$(id -u)
     local host_gid=$(id -g)
 
-    docker run --rm \
+docker run --rm \
         --privileged \
         -e "HOST_UID=$host_uid" \
         -e "HOST_GID=$host_gid" \
@@ -398,6 +402,18 @@ _docker_build() {
             rm -f /var/lib/pacman/db.lck 2>/dev/null || true
 
             mkarchiso -v -w /work/ -o /out /profile/
+
+            KERNEL_PKG=\$(ls /var/cache/pacman/pkg/ | grep -E '^linux-[0-9]' | grep -v '.sig$' | sort -V | tail -1)
+            if [[ -n \$KERNEL_PKG ]]; then
+                KERNEL_VER=\${KERNEL_PKG#linux-}
+                KERNEL_VER=\${KERNEL_VER%.pkg.tar.zst}
+                KERNEL_VER=\${KERNEL_VER%%-*}
+                KERNEL_VER=\$(echo \"\$KERNEL_VER\" | cut -d. -f1-3)
+            else
+                KERNEL_VER=unknown
+            fi
+
+            echo \"\$KERNEL_VER\" > /out/kernel-version.txt
 
             chown -R $host_uid:$host_gid /out/
         "
@@ -456,6 +472,8 @@ _docker_build() {
                     rx_log "info" "Kernel: ${kernel_version_in_iso}"
                 fi
             fi
+
+            rx_log "info" "Build completed: $(date '+%H:%M:%S %d.%m.%Y')"
         fi
     fi
 }
@@ -501,20 +519,18 @@ _clean_all() {
 }
 
 _iso_main() {
-    rx_logo "$(
-        cat <<'EOF'
-██████╗ ███████╗████████╗██████╗  ██████╗     ██╗███████╗ ██████╗
-██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗    ██║██╔════╝██╔═══██╗
-██████╔╝█████╗     ██║   ██████╔╝██║   ██║    ██║███████╗██║   ██║
-██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║    ██║╚════██║██║   ██║
-██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝    ██║███████║╚██████╔╝
-╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝     ╚═╝╚══════╝ ╚═════╝
-EOF
-    )"
-
     local skip_prompt="false"
     local command="build"
     local do_clean="false"
+
+    local build_logo="    ██████╗ ███████╗████████╗██████╗  ██████╗     ██╗███████╗ ██████╗
+    ██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗    ██║██╔════╝██╔═══██╗
+    ██████╔╝█████╗     ██║   ██████╔╝██║   ██║    ██║███████╗██║   ██║
+    ██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║    ██║╚════██║██║   ██║
+    ██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝    ██║███████║╚██████╔╝
+    ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝     ╚═╝╚══════╝ ╚═════╝"
+
+    rx_logo "${PINK}$build_logo${RESET}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
