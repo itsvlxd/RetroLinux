@@ -54,6 +54,13 @@ rx_is_laptop() {
     [[ -n $battery_path && -d $battery_path ]]
 }
 
+rx_disk_has_partitions() {
+    local device="$1"
+    local partitions
+    partitions=$(lsblk -nro TYPE "$device" 2>/dev/null | grep -c "part" || echo "0")
+    [[ "$partitions" -gt 0 ]]
+}
+
 rx_confirm_disk_wipe() {
     rx_clear_logo
     echo
