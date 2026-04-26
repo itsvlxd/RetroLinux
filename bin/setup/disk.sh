@@ -33,6 +33,20 @@ setup_disk() {
         return 1
     }
     DISK_SELECTED=$(echo "$selected_display" | awk '{print $1}')
+
+    if rx_disk_has_partitions "$DISK_SELECTED"; then
+        rx_clear_logo
+        echo
+        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Warning: $DISK_SELECTED contains existing partitions"
+        gum style --padding "0 0 0 $PADDING_LEFT" "All data on this disk will be ERASED to set up BTRFS encryption."
+        echo
+        gum style --padding "0 0 0 $PADDING_LEFT" "This cannot be undone."
+        echo
+        if ! gum confirm --affirmative "I understand, continue" --negative "Go back" "Confirm disk wipe" --padding "$GUM_CONFIRM_PADDING"; then
+            exec /opt/retrolinux/bin/retroinstall
+        fi
+    fi
+
     rx_save_state
 
     if [[ ! -b $DISK_SELECTED ]]; then
