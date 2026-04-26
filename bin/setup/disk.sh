@@ -42,8 +42,8 @@ setup_disk() {
         echo
         gum style --padding "0 0 0 $PADDING_LEFT" "This cannot be undone."
         echo
-        if ! gum confirm --affirmative "I understand, continue" --negative "Go back" "Confirm disk wipe" --padding "$GUM_CONFIRM_PADDING"; then
-            exec /opt/retrolinux/bin/retroinstall
+        if ! gum confirm --affirmative "I understand, continue" --negative "Go back" "Confirm disk wipe" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+            return 42
         fi
     fi
 
@@ -58,7 +58,7 @@ setup_disk() {
     return 0
 }
 
-if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then
+if [[ ${RETRO_SETUP_SOURCED:-} != "1" ]]; then
     export RETRO_SETUP_SOURCED=1
     source "$RETRO_INSTALL/lib/display.sh"
     source "$RETRO_INSTALL/lib/errors.sh"
