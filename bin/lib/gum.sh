@@ -1,12 +1,5 @@
 #!/bin/bash
 
-rx_step() {
-    rx_clear_logo
-    echo
-    gum style "$1"
-    echo
-}
-
 rx_notice() {
     rx_clear_logo
     echo

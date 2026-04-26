@@ -51,11 +51,7 @@ rx_restore_outputs() {
 }
 
 rx_catch_errors() {
-    if [[ $ERROR_HANDLING == "true" ]]; then
-        return
-    else
-        ERROR_HANDLING=true
-    fi
+    ERROR_HANDLING=false
 
     local exit_code=$?
 
@@ -81,6 +77,7 @@ rx_catch_errors() {
     echo
     gum style "Get help from the community via QR code or at https://github.com/itsvlxd/RetroLinux/issues"
 
+    ERROR_HANDLING=true
     while true; do
         local options=()
 
@@ -89,7 +86,7 @@ rx_catch_errors() {
         options+=("Exit")
 
         local choice
-        choice=$(gum choose "${options[@]}" --header "What would you like to do?" --height 6 --padding "$GUM_CHOOSE_PADDING")
+        choice=$(gum choose "${options[@]}" --header "What would you like to do?" --height 6 --padding "$GUM_CHOOSE_PADDING") || break
 
         case "$choice" in
             "Retry installation")
@@ -140,4 +137,26 @@ rx_setup_traps() {
     trap 'rx_show_signal_info "SIGTERM"' TERM
     trap rx_exit_handler EXIT
     rx_save_original_outputs
+}
+
+rx_save_state() {
+    cat <<EOF > "$RETRO_STATE"
+KEYBOARD="$KEYBOARD"
+SYS_LANG="$SYS_LANG"
+SYS_ENC="$SYS_ENC"
+USER_PASSWORD_HASH="$USER_PASSWORD_HASH"
+USER_PASSWORD="$USER_PASSWORD"
+USER_NAME="$USER_NAME"
+USER_HOSTNAME="$USER_HOSTNAME"
+USER_TIMEZONE="$USER_TIMEZONE"
+DISK_SELECTED="$DISK_SELECTED"
+RX_CURRENT_STEP="$RX_CURRENT_STEP"
+RX_START_STEP="${RX_START_STEP:-1}"
+EOF
+}
+
+rx_load_state() {
+    if [[ -f "$RETRO_STATE" ]]; then
+        source "$RETRO_STATE"
+    fi
 }

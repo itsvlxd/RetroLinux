@@ -43,8 +43,7 @@ The project provides the `retro` CLI - a unified command center to manage the en
 | Pattern | Location | Example |
 |---------|----------|---------|
 | Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `helpers.sh`, `battery.sh` |
-| Installer libraries | `bin/lib/` | `display.sh`, `wifi.sh`, `errors.sh`, `gum.sh` |
-| Installer helpers | `bin/helpers/` | `network.sh`, `disk.sh`, `input.sh`, `handlers.sh` |
+| Installer libraries | `bin/lib/` | `display.sh`, `wifi.sh`, `errors.sh`, `gum.sh`, `disk.sh`, `handlers.sh`, `output.sh`, `debug.sh`, `setup.sh` |
 | Backend core scripts | `scripts/` | `audio_core.sh`, `network_core.sh`, `driver_core.sh` |
 | Event hooks | `scripts/events/` | `battery_events.sh`, `power_events.sh` |
 | Watchers | `scripts/watchers/` | `battery.sh`, `bluetooth.sh`, `timers.sh` |
@@ -977,28 +976,30 @@ Failing to handle interrupts can leave the system in a broken state (half-instal
 
 ## 17. Installer System (bin/)
 
-The Installer is a self-contained system that runs during initial system setup. It follows a **three-layer architecture**:
+The Installer is a self-contained system that runs during initial system setup. It follows a **modular setup flow architecture**:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  ENTRY POINT (bin/retroinstall)                             │
-│  - Sources helpers, orchestrates flow                       │
-│  - Contains only entry-point logic                           │
+│  - Sources lib utilities                                   │
+│  - Sets up traps and global state                          │
+│  - Executes setup scripts in order                          │
 └─────────────────────────────────────────────────────────────┘
                                │
-                               ▼ sources
+                               ▼ execs
 ┌─────────────────────────────────────────────────────────────┐
-│  ORCHESTRATION (bin/helpers/*)                              │
-│  - Network setup, disk selection, user forms               │
-│  - Calls functions from bin/lib/                            │
-│  - Sets up traps and error handlers                          │
+│  SETUP SCRIPTS (bin/setup/*)                               │
+│  - Each step is a separate, executable script              │
+│  - Can be run independently or as part of flow           │
+│  - Numbered prefix for ordering (01-, 02-, etc.)         │
+│  - Return 0 on success, non-zero on failure/cancel        │
 └─────────────────────────────────────────────────────────────┘
                                │
                                ▼ sources
 ┌─────────────────────────────────────────────────────────────┐
 │  UTILITIES (bin/lib/*)                                      │
 │  - Pure functions, no orchestration                          │
-│  - display, wifi, errors, gum wrappers                       │
+│  - display, errors, gum, locale, timezone, disk, handlers    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -1008,21 +1009,128 @@ The Installer is a self-contained system that runs during initial system setup. 
 bin/
 ├── retroinstall              # Main entry point
 ├── logo.txt                  # ASCII art logo
-├── lib/                      # Low-level utilities
+├── lib/                      # Low-level utilities (pure functions)
 │   ├── display.sh            # Terminal detection, padding, rx_clear_logo
 │   ├── errors.sh             # rx_retry_or_exit, rx_step, rx_notice, rx_abort
-│   ├── wifi.sh               # rx_iwctl_connect, rx_get_wifi_iface
-│   ├── gum.sh                # rx_gum_spin, rx_gum_input wrappers
-│   └── qr.sh                 # rx_generate_error_qr
-└── helpers/                  # Orchestration layer
-    ├── all.sh                 # Sources all bin/lib/ files
-    ├── network.sh             # setup_network orchestration
-    ├── disk.sh                # disk_form, get_disk_info
-    ├── input.sh               # keyboard_form, user_form
-    ├── handlers.sh            # catch_errors, trap setup
-    ├── output.sh              # Log output functions
-    └── debug.sh               # rx_debug
+│   ├── gum.sh                # rx_step, rx_notice
+│   ├── qr.sh                 # rx_generate_error_qr, rx_gather_system_info
+│   ├── locale.sh             # Keyboard/layout names, locale translations
+│   ├── timezone.sh           # rx_list_timezones
+│   ├── disk.sh               # rx_get_disk_info, rx_get_available_disks
+│   ├── handlers.sh           # rx_setup_traps, rx_catch_errors, rx_exit_handler
+│   ├── output.sh             # rx_start_log_output, rx_start_install_log, rx_run_logged
+│   ├── debug.sh              # rx_debug
+│   └── setup.sh              # rx_chrootable_systemctl_enable
+└── setup/                    # Modular setup step scripts (numbered)
+    ├── 01-network.sh         # Network connectivity check
+    ├── 02-keyboard.sh        # Keyboard layout selection (filter)
+    ├── 03-locale.sh          # System language selection (filter)
+    ├── 04-timezone.sh        # Timezone selection (filter)
+    ├── 05-user.sh            # User account creation
+    ├── 06-review.sh          # Review settings before disk selection
+    ├── 07-disk.sh            # Disk selection
+    ├── 08-confirm.sh         # Disk wipe confirmation
+    ├── 09-config.sh          # Write configuration files
+    └── 10-summary.sh         # Final summary before archinstall
 ```
+
+### Setup Flow
+
+Each setup script:
+1. Sources lib utilities if not already sourced (via `RETRO_SETUP_SOURCED` guard)
+2. Defines a `setup_*()` function
+3. Executes the function when run directly
+4. Exports state via global variables for use by subsequent scripts
+
+**Global State Variables:**
+| Variable | Description |
+|----------|-------------|
+| `KEYBOARD` | Selected keyboard layout code (e.g., `us`, `de`, `fr`) |
+| `SYS_LANG` | System language in locale format (e.g., `en.UTF-8`, `de.UTF-8`) |
+| `USER_TIMEZONE` | Selected timezone |
+| `USER_NAME` | Username |
+| `USER_PASSWORD` | User password (plain) |
+| `USER_PASSWORD_HASH` | User password hash |
+| `USER_HOSTNAME` | Hostname |
+| `DISK_SELECTED` | Selected disk device |
+
+### User Input Patterns
+
+#### Filter Input (Recommended for Lists)
+
+Use `gum filter` for selectable lists with search/filter capability:
+
+```bash
+# Keyboard selection with filter
+choice=$(echo "$keyboards" | gum filter --height 15 --selected "$current" --header "Select layout")
+
+# Language selection with filter
+choice=$(echo "$languages" | gum filter --height 15 --selected "$current" --header "Select language")
+
+# Timezone selection with filter
+USER_TIMEZONE=$(timedatectl list-timezones 2>/dev/null | gum filter --height 15 --header "Timezone")
+```
+
+#### Confirm Input
+
+```bash
+# Simple yes/no confirmation
+if gum confirm --affirmative "Continue" --negative "Go back" --padding "$GUM_CONFIRM_PADDING"; then
+    # user selected affirmative
+fi
+```
+
+#### Password Input
+
+```bash
+# Hidden password input
+password=$(gum input --password --placeholder "Create a password" --prompt "Password> " --padding "$GUM_INPUT_PADDING")
+```
+
+### Language and Keyboard Naming
+
+The installer uses human-readable names for display but stores locale codes internally:
+
+```bash
+# Display: "English", "German", "Romanian"
+# Backend: "en.UTF-8", "de.UTF-8", "ro.UTF-8"
+
+# rx_locale_to_lang_name() converts locale code to display name
+rx_locale_to_lang_name "de.UTF-8"  # Returns "German"
+
+# rx_keyboard_display_name() converts keymap to display name  
+rx_keyboard_display_name "de"  # Returns "German"
+```
+
+### Review Step (06-review.sh)
+
+The review step shows a read-only summary of settings before disk selection. It does not allow editing - users can only confirm to continue:
+
+```
+┌──────────────────────────────────────┐
+│   Review Your Settings               │
+├──────────────────────────────────────┤
+│  Keyboard:   English (US)            │
+│  Language:   German                  │
+│  Timezone:   Europe/Berlin           │
+├──────────────────────────────────────┤
+│  Username:   john                    │
+│  Hostname:   mypc                     │
+└──────────────────────────────────────┘
+```
+
+Editing is available by running individual setup scripts directly if needed.
+
+### Error Handling Pattern
+
+All installer scripts set up traps for error handling:
+
+```bash
+# In bin/lib/handlers.sh
+trap rx_catch_errors ERR
+trap 'rx_show_signal_info "SIGINT"' INT
+trap 'rx_show_signal_info "SIGTERM"' TERM
+trap rx_exit_handler EXIT
 
 ### Padding System
 
@@ -1071,61 +1179,6 @@ Installer uses numeric color codes (not $PINK, $GRAY, etc.):
 | 5 | Magenta (#bb9af7) | Highlights, dividers |
 | 6 | Cyan (#7dcfff) | Prompts, borders |
 | 7 | White (#a9b1d6) | Regular text |
-
-### WiFi Connection Pattern
-
-The `rx_iwctl_connect` function in `bin/lib/wifi.sh` follows this exact pattern:
-
-1. Run `iwctl --passphrase "$password" station "$iface" connect "$ssid"`
-2. **No output = success** (iwctl only outputs on failure)
-3. Wait 4 seconds for connection handshake
-4. Ping 1.1.1.1 to verify connectivity
-5. Return 0 on success, 1 on failure
-
-```bash
-rx_iwctl_connect() {
-    local ssid="$1"
-    local password="$2"
-    local iface="${3:-}"
-
-    [[ -z $iface ]] && iface=$(rx_get_wifi_iface)
-    [[ -z $iface ]] && return 1
-
-    ip link set "$iface" up 2>/dev/null
-
-    if [[ -n $password ]]; then
-        iwctl --passphrase "$password" station "$iface" connect "$ssid"
-    else
-        iwctl station "$iface" connect "$ssid"
-    fi
-
-    sleep 4
-
-    if ping -c 1 -W 5 1.1.1.1 &>/dev/null; then
-        return 0
-    fi
-    return 1
-}
-```
-
-### Error Handling Pattern
-
-All installer scripts set up traps for error handling:
-
-```bash
-# In bin/helpers/handlers.sh
-trap catch_errors ERR
-trap 'rx_show_signal_info "SIGINT"' INT
-trap 'rx_show_signal_info "SIGTERM"' TERM
-trap exit_handler EXIT
-
-catch_errors() {
-    rx_restore_outputs
-    rx_clear_logo
-    rx_show_cursor
-    # ... error display ...
-}
-```
 
 ### QR Code Error Reporting
 
@@ -1177,16 +1230,12 @@ RetroLinux/
 │   │   ├── display.sh
 │   │   ├── errors.sh
 │   │   ├── wifi.sh
-│   │   ├── gum.sh
-│   │   └── qr.sh
-│   └── helpers/               # Orchestration
-│       ├── all.sh
-│       ├── network.sh
-│       ├── disk.sh
-│       ├── input.sh
-│       ├── handlers.sh
-│       ├── output.sh
-│       └── debug.sh
+│   │   └── ...
+│   └── setup/                  # Modular setup scripts
+│       ├── 01-network.sh
+│       ├── 02-keyboard.sh
+│       ├── 03-locale.sh
+│       └── ...
 ├── scripts/                    # Backend core scripts
 │   ├── audio_core.sh
 │   ├── network_core.sh
@@ -1226,5 +1275,6 @@ RetroLinux/
 | Watcher | `start_watcher_name() { ... }` in `scripts/watchers/*.sh` |
 | Installer clear | `rx_clear_logo` in `bin/lib/display.sh` |
 | Installer error | `rx_retry_or_exit "message"` in `bin/lib/errors.sh` |
-| WiFi connect | `rx_iwctl_connect "$ssid" "$password"` in `bin/lib/wifi.sh` |
-| Gum choose | `gum choose ... --padding "$GUM_CHOOSE_PADDING"` |
+| Setup script guard | `if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then` |
+| Run setup step | `/opt/retrolinux/bin/setup/01-network.sh` |
+| Gum filter | `gum filter ... --padding "$GUM_FILTER_PADDING"` |
