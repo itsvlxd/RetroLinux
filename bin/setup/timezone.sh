@@ -8,7 +8,7 @@ setup_timezone() {
     current_tz=$(rx_get_current_timezone)
 
     # shellcheck disable=SC2034
-    USER_TIMEZONE=$(timedatectl list-timezones 2>/dev/null | gum filter --height "$GUM_FILTER_HEIGHT" --header "Timezone" --selected "$current_tz" --padding "$GUM_FILTER_PADDING") || {
+    USER_TIMEZONE=$(timedatectl list-timezones | gum filter --height "$GUM_FILTER_HEIGHT" --header "Timezone" --value "$current_tz" --prompt "Filter> " --padding "$GUM_FILTER_PADDING") || {
         rx_step_error "1" "Timezone selection failed"
         rx_retry_or_exit "Timezone is required" || rx_abort
         return 1
