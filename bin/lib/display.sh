@@ -1,11 +1,12 @@
 #!/bin/bash
 
 rx_set_retro_colors() {
-    export GUM_CONFIRM_PROMPT_FOREGROUND="6"
-    export GUM_CONFIRM_SELECTED_FOREGROUND="0"
-    export GUM_CONFIRM_SELECTED_BACKGROUND="2"
+    export GUM_CONFIRM_PROMPT_FOREGROUND="5"
+    export GUM_CONFIRM_SELECTED_FOREGROUND="7"
+    export GUM_CONFIRM_SELECTED_BACKGROUND="5"
     export GUM_CONFIRM_UNSELECTED_FOREGROUND="7"
-    export GUM_CONFIRM_UNSELECTED_BACKGROUND="0"
+    export GUM_CONFIRM_UNSELECTED_BACKGROUND="240"
+    export GUM_CONFIRM_STYLE="--selected.foreground $GUM_CONFIRM_SELECTED_FOREGROUND --selected.background $GUM_CONFIRM_SELECTED_BACKGROUND --unselected.foreground $GUM_CONFIRM_UNSELECTED_FOREGROUND --unselected.background $GUM_CONFIRM_UNSELECTED_BACKGROUND"
 }
 
 if [[ -z ${RETRO_DIR:-} ]]; then
@@ -66,3 +67,4 @@ rx_clear_logo() {
     printf "\033[H\033[2J"
     gum style --foreground 5 --padding "1 0 0 $PADDING_LEFT" "$(<"$LOGO_PATH")"
 }
+
