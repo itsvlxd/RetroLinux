@@ -2,6 +2,7 @@
 
 export RETRO_DIR="/opt/retrolinux"
 export RETRO_INSTALL="/opt/retrolinux/bin"
+export RETRO_STATE="/tmp/retroinstall_state"
 
 RX_DEBUG=0
 if [[ ${1:-} == "--debug" ]]; then
@@ -10,54 +11,138 @@ if [[ ${1:-} == "--debug" ]]; then
     shift
 fi
 
-source "$RETRO_INSTALL/helpers/all.sh"
+source "$RETRO_INSTALL/lib/display.sh"
+source "$RETRO_INSTALL/lib/errors.sh"
+source "$RETRO_INSTALL/lib/gum.sh"
+source "$RETRO_INSTALL/lib/wifi.sh"
+source "$RETRO_INSTALL/lib/qr.sh"
+source "$RETRO_INSTALL/lib/locale.sh"
+source "$RETRO_INSTALL/lib/timezone.sh"
+source "$RETRO_INSTALL/lib/handlers.sh"
+source "$RETRO_INSTALL/lib/output.sh"
+source "$RETRO_INSTALL/lib/debug.sh"
 
+rx_set_retro_colors
 rx_setup_traps
 
-run_installer() {
-    if ! rx_setup_network; then
-        rx_clear_logo
-        echo
-        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Network setup failed"
-        echo
-        gum style "Would you like to retry or exit?"
-        echo
-        if gum confirm --negative "Exit" --affirmative "Retry" "Network setup" --padding "$GUM_CONFIRM_PADDING"; then
-            exec /opt/retrolinux/bin/retroinstall
-        fi
-        gum style "Run 'retroinstall' to try again"
-        exit 1
-    fi
+SETUP_SCRIPTS=(
+    "network.sh"
+    "keyboard.sh"
+    "locale.sh"
+    "timezone.sh"
+    "user.sh"
+    "disk.sh"
+    "confirm.sh"
+    "config.sh"
+)
 
-    rx_keyboard_form
-    rx_user_form
-    rx_review_user_config
+if [[ -f $RETRO_STATE ]]; then
+    rx_load_state
+else
+    KEYBOARD="us"
+    SYS_LANG="en_US.UTF-8"
+    SYS_ENC="UTF-8"
+    USER_PASSWORD_HASH=""
+    USER_PASSWORD=""
+    USER_NAME=""
+    USER_HOSTNAME=""
+    USER_TIMEZONE=""
+    DISK_SELECTED=""
+    rx_save_state
+fi
 
-    rx_disk_form
+rx_show_error_and_qr() {
+    local exit_code=$1
+    rx_clear_logo
+    rx_show_cursor
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "RetroLinux installation stopped!"
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error during setup (exit code: $exit_code)"
+    echo
+    rx_generate_error_qr "$exit_code"
+    echo
+    gum style "Get help at https://github.com/itsvlxd/RetroLinux/issues"
+    echo
+    gum confirm --affirmative "Retry installation" --negative "Exit" --padding "$GUM_CONFIRM_PADDING" && exec /opt/retrolinux/bin/retroinstall || exit 1
+}
 
-    while true; do
-        if rx_confirm_disk_wipe; then
-            break
-        else
-            rx_disk_form
-        fi
-    done
+rx_run_step() {
+    local script="$1"
 
-    rx_step "Writing configuration..."
-
-    clear
-
-    if ! rx_write_configuration "$USER_PASSWORD" "$USER_NAME" "$USER_HOSTNAME" "$USER_TIMEZONE" "$KEYBOARD"; then
-        return 1
-    fi
-
-    if [[ $1 == "dry" ]]; then
-        echo "User Configuration:"
-        cat user_configuration.json
-        echo "User Credentials:"
-        cat user_credentials.json
-        rm user_configuration.json user_credentials.json
+    rx_clear_logo
+    rx_load_state
+    /opt/retrolinux/bin/setup/"$script"
+    local exit_code=$?
+    rx_load_state
+    if [[ $exit_code -ne 0 ]]; then
+        rx_show_error_and_qr "$exit_code"
     fi
 }
 
-run_installer "$@"
+for script in "${SETUP_SCRIPTS[@]}"; do
+    rx_run_step "$script"
+done
+
+rx_install_system() {
+    rx_load_state
+
+    rx_clear_logo
+    gum style --padding "1 0 1 $PADDING_LEFT" "Lets configure your RetroLinux installation..."
+
+    local disk_name disk_size
+    disk_name=$(basename "$DISK_SELECTED" 2>/dev/null || echo "?")
+    disk_size=$(lsblk -dno SIZE "$DISK_SELECTED" 2>/dev/null || echo "?")
+
+    echo -e "Field,Value\nDisk,/dev/${disk_name} (${disk_size})\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nTimezone,${USER_TIMEZONE:-unknown}\nUsername,${USER_NAME:-unknown}\nHostname,${USER_HOSTNAME:-unknown}" |
+        gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
+
+    if gum confirm --affirmative "Install now" --negative "Go back" "Ready to Install" --selected.background 5 --selected.foreground 7 --unselected.background 240 --unselected.foreground 7 --padding "$GUM_CONFIRM_PADDING"; then
+        :
+    else
+        exec /opt/retrolinux/bin/retroinstall
+    fi
+
+    rx_clear_logo
+    echo
+    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Installing RetroLinux..."
+    echo
+
+    archinstall \
+        --config user_configuration.json \
+        --creds user_credentials.json \
+        --silent \
+        --skip-ntp \
+        --skip-wkd \
+        --skip-wifi-check
+
+    local arch_exit_code=$?
+
+    if [[ $arch_exit_code -ne 0 ]]; then
+        rx_clear_logo
+        echo
+        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Installation failed (exit code: $arch_exit_code)"
+        echo
+        rx_generate_error_qr "$arch_exit_code"
+        echo
+        gum confirm --affirmative "Retry" --negative "Exit" --padding "$GUM_CONFIRM_PADDING" && exec /opt/retrolinux/bin/retroinstall || exit 1
+    fi
+
+    rx_clear_logo
+    echo
+    gum style --foreground 2 --padding "1 0 1 $PADDING_LEFT" "Installation Complete!"
+    gum style --padding "1 0 1 $PADDING_LEFT" "Reboot to start using RetroLinux."
+    echo
+    gum style --foreground 7 "Press Enter to reboot or Ctrl+C to exit."
+    read -r
+
+    reboot
+}
+
+if [[ $1 != "dry" ]]; then
+    rx_install_system
+else
+    echo "User Configuration:"
+    cat user_configuration.json
+    echo "User Credentials:"
+    cat user_credentials.json
+    rm user_configuration.json user_credentials.json
+fi

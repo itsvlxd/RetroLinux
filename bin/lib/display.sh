@@ -12,6 +12,14 @@ if [[ -z ${RETRO_DIR:-} ]]; then
     export RETRO_DIR="/opt/retrolinux"
 fi
 
+if [[ -z ${RETRO_INSTALL:-} ]]; then
+    export RETRO_INSTALL="$RETRO_DIR/bin"
+fi
+
+if [[ -z ${RETRO_PATH:-} ]]; then
+    export RETRO_PATH="$RETRO_INSTALL"
+fi
+
 if [[ -e /dev/tty ]]; then
     TERM_SIZE=$(stty size 2>/dev/null </dev/tty)
     if [[ -n $TERM_SIZE ]]; then
@@ -26,8 +34,6 @@ else
     export TERM_HEIGHT=24
 fi
 
-export RETRO_PATH="/opt/retrolinux/bin"
-export RETRO_INSTALL="$RETRO_PATH"
 export RETRO_INSTALL_LOG_FILE="/var/log/retrolinux-install.log"
 
 export LOGO_PATH="$RETRO_DIR/bin/logo.txt"
@@ -43,6 +49,11 @@ fi
 export PADDING_LEFT=$(((TERM_WIDTH - LOGO_WIDTH) / 2))
 export PADDING_LEFT_SPACES=$(printf "%*s" $PADDING_LEFT "")
 export PADDING="0 0 0 $PADDING_LEFT"
+
+export GUM_HEIGHT=15
+export GUM_CHOOSE_HEIGHT=15
+export GUM_FILTER_HEIGHT=15
+export GUM_INPUT_HEIGHT=15
 
 export GUM_CHOOSE_PADDING="$PADDING"
 export GUM_FILTER_PADDING="$PADDING"

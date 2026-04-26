@@ -1,122 +1,57 @@
 #!/bin/bash
 
-rx_is_laptop() {
-    local battery_path
-    battery_path=$(find /sys/class/power_supply/ -name "BAT*" -type l 2>/dev/null | head -n 1)
-    [[ -n $battery_path && -d $battery_path ]]
-}
+setup_config() {
+    rx_load_state
 
-rx_get_disk_info() {
-    local device="$1"
-    local size vendor model label
-
-    size=$(lsblk -dno SIZE "$device" 2>/dev/null)
-    vendor=$(lsblk -dno VENDOR "$device" 2>/dev/null | sed 's/ *$//')
-    model=$(lsblk -dno MODEL "$device" 2>/dev/null | sed 's/ *$//')
-
-    label=""
-    if [[ -n $vendor && -n $model ]]; then
-        if [[ $model == *$vendor* ]]; then
-            label="$model"
-        else
-            label="$vendor $model"
-        fi
-    elif [[ -n $model ]]; then
-        label="$model"
-    elif [[ -n $vendor ]]; then
-        label="$vendor"
+    if [[ $RX_DEBUG == 1 ]]; then
+        gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "[DEBUG] DISK_SELECTED='$DISK_SELECTED'"
+        sleep 2
     fi
 
-    local display="$device"
-    [[ -n $size ]] && display="$display ($size)"
-    [[ -n $label ]] && display="$display - $label"
+    rx_step "Writing configuration..."
 
-    local part_summary
-    part_summary=$(lsblk -nro TYPE,NAME,FSTYPE,MOUNTPOINT "$device" 2>/dev/null |
-        awk '$1=="part" { printf "%s%s%s", s, ($3==""?"?":$3), ($4==""?"":"("$4")"); s=", " }')
-    [[ -n $part_summary ]] && display+=" [$part_summary]"
-
-    echo "$display"
-}
-
-rx_get_available_disks() {
-    local exclude_disk
-    exclude_disk=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null || true)
-
-    local available_disks
-    available_disks=$(
-        lsblk -dpno NAME,TYPE 2>/dev/null |
-            awk '$2=="disk"{print $1}' |
-            grep -E '/dev/(sd|hd|vd|nvme|mmcblk|xv)' |
-            { if [[ -n $exclude_disk ]]; then grep -Fvx "$exclude_disk"; else cat; fi; }
-    ) || return 1
-
-    echo "$available_disks"
-}
-
-rx_disk_form() {
-    rx_step "Let's select where to install RetroLinux..."
-
-    local available_disks
-    available_disks=$(rx_get_available_disks) || {
-        rx_step_error "3" "Could not list available disks"
-        rx_retry_or_exit "Cannot list disks" || rx_abort
-        return
-    }
-
-    if [[ -z $available_disks ]]; then
-        rx_step_error "3" "No disks found"
-        rx_retry_or_exit "No disks available" || rx_abort
-        return
-    fi
-
-    local disk_options=""
-    while IFS= read -r device; do
-        if [[ -n $device ]]; then
-            local disk_info
-            disk_info=$(rx_get_disk_info "$device")
-            disk_options="$disk_options$disk_info"$'\n'
-        fi
-    done <<<"$available_disks"
-
-    local selected_display
-    selected_display=$(echo "$disk_options" | gum choose --header "Select install disk" --padding "$GUM_CHOOSE_PADDING") || {
-        rx_step_error "3" "Disk selection cancelled"
-        rx_retry_or_exit "Disk selection required" || rx_abort
-        return
-    }
-    DISK_SELECTED=$(echo "$selected_display" | awk '{print $1}')
-
-    if [[ ! -b $DISK_SELECTED ]]; then
-        rx_step_error "3" "Invalid disk selected"
-        rx_retry_or_exit "Invalid disk" || rx_abort
-        return
-    fi
-}
-
-rx_confirm_disk_wipe() {
-    rx_clear_logo
-    echo
-    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Warning: This will erase ALL data on $DISK_SELECTED"
-    gum style --padding "0 0 0 $PADDING_LEFT" "There is no going back from this point."
-    echo
-
-    if gum confirm --affirmative "Yes, wipe disk" --negative "No, go back" "Confirm disk wipe" --padding "$GUM_CONFIRM_PADDING"; then
-        return 0
-    else
+    if [[ -z $DISK_SELECTED ]]; then
+        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: No disk selected"
+        gum style --padding "0 0 0 $PADDING_LEFT" "Please go back and select a disk"
+        echo
+        rx_retry_or_exit "No disk selected" || rx_abort
         return 1
     fi
-}
 
-rx_write_configuration() {
-    local password="$1"
-    local username="$2"
-    local hostname="$3"
-    local timezone="$4"
-    local keyboard="$5"
+    local disk_size
+    local retry=0
+    local max_retries=3
+    while ((retry < max_retries)); do
+        disk_size=$(lsblk -bdno SIZE "$DISK_SELECTED" 2>/dev/null)
+        if [[ -n $disk_size ]]; then
+            break
+        fi
+        ((retry++))
+        if ((retry < max_retries)); then
+            gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Retrying disk read ($retry/$max_retries)..."
+            sleep 1
+        fi
+    done
+
+    if [[ -z $disk_size ]]; then
+        rx_clear_logo
+        echo
+        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not read disk size"
+        gum style --padding "0 0 0 $PADDING_LEFT" "Selected: $DISK_SELECTED"
+        echo
+        rx_retry_or_exit "Cannot read disk" || rx_abort
+        return 1
+    fi
+
+    local sys_lang="${SYS_LANG:-en_US.UTF-8}"
+    local sys_enc="UTF-8"
+    if [[ "$sys_lang" == *.* ]]; then
+        sys_enc="${sys_lang##*.}"
+        sys_lang="${sys_lang%.*}.${sys_enc}"
+    fi
 
     local password_escaped
-    password_escaped=$(echo -n "$password" | jq -Rsa) || {
+    password_escaped=$(echo -n "$USER_PASSWORD" | jq -Rsa) || {
         rx_clear_logo
         echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password"
@@ -136,7 +71,7 @@ rx_write_configuration() {
     }
 
     local username_escaped
-    username_escaped=$(echo -n "$username" | jq -Rsa) || {
+    username_escaped=$(echo -n "$USER_NAME" | jq -Rsa) || {
         rx_clear_logo
         echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"
@@ -159,16 +94,6 @@ rx_write_configuration() {
     ]
 }
 _EOF_
-
-    local disk_size
-    disk_size=$(lsblk -bdno SIZE "$DISK_SELECTED" 2>/dev/null) || {
-        rx_clear_logo
-        echo
-        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not read disk size"
-        echo
-        rx_retry_or_exit "Cannot read disk" || rx_abort
-        return 1
-    }
 
     local mib=$((1024 * 1024))
     local gib=$((mib * 1024))
@@ -265,7 +190,7 @@ _EOF_
             "encryption_password": $password_escaped
         }
     },
-    "hostname": "$hostname",
+    "hostname": "$USER_HOSTNAME",
     "kernels": [ "linux" ],
     "network_config": { "type": "iso" },
     "ntp": true,
@@ -273,11 +198,11 @@ _EOF_
     "script": null,
     "services": [],
     "swap": true,
-    "timezone": "$timezone",
+    "timezone": "$USER_TIMEZONE",
     "locale_config": {
-        "kb_layout": "$keyboard",
-        "sys_enc": "UTF-8",
-        "sys_lang": "en_US.UTF-8"
+        "kb_layout": "$KEYBOARD",
+        "sys_enc": "$sys_enc",
+        "sys_lang": "$sys_lang"
     },
     "mirror_config": {
         "custom_repositories": [],
@@ -302,3 +227,21 @@ _EOF_
 _EOF_
     return 0
 }
+
+if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then
+    export RETRO_SETUP_SOURCED=1
+    source "$RETRO_INSTALL/lib/display.sh"
+    source "$RETRO_INSTALL/lib/errors.sh"
+    source "$RETRO_INSTALL/lib/gum.sh"
+    source "$RETRO_INSTALL/lib/wifi.sh"
+    source "$RETRO_INSTALL/lib/qr.sh"
+    source "$RETRO_INSTALL/lib/locale.sh"
+    source "$RETRO_INSTALL/lib/timezone.sh"
+    source "$RETRO_INSTALL/lib/handlers.sh"
+    source "$RETRO_INSTALL/lib/output.sh"
+    source "$RETRO_INSTALL/lib/debug.sh"
+    source "$RETRO_INSTALL/lib/progress.sh"
+    rx_set_retro_colors
+fi
+
+setup_config
