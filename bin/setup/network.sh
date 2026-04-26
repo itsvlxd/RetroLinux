@@ -32,6 +32,9 @@ setup_network() {
             local result=$?
 
             if ((result == 0)); then
+                NETWORK_TYPE="WiFi"
+                WIFI_SSID="$WIFI_SELECTED_SSID"
+                rx_save_state
                 return 0
             elif ((result == 2)); then
                 ((retry++))
@@ -57,6 +60,9 @@ setup_network() {
 
     if [[ -n $eth_iface ]]; then
         if rx_wait_for_ethernet "$eth_iface" && rx_check_internet; then
+            NETWORK_TYPE="Ethernet"
+            WIFI_SSID=""
+            rx_save_state
             rx_clear_logo
             echo
             gum style --foreground 2 "Ethernet connected"
