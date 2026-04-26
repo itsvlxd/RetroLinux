@@ -32,7 +32,6 @@ SETUP_SCRIPTS=(
     "timezone.sh"
     "user.sh"
     "disk.sh"
-    "confirm.sh"
     "config.sh"
 )
 
@@ -94,6 +93,7 @@ rx_install_system() {
 
     echo -e "Field,Value\nDisk,/dev/${disk_name} (${disk_size})\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nTimezone,${USER_TIMEZONE:-unknown}\nUsername,${USER_NAME:-unknown}\nHostname,${USER_HOSTNAME:-unknown}" |
         gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
+    echo
 
     if gum confirm --affirmative "Install now" --negative "Go back" "Ready to Install" --selected.background 5 --selected.foreground 7 --unselected.background 240 --unselected.foreground 7 --padding "$GUM_CONFIRM_PADDING"; then
         :
