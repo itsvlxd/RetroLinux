@@ -72,7 +72,9 @@ rx_run_step() {
     /opt/retrolinux/bin/setup/"$script"
     local exit_code=$?
     rx_load_state
-    if [[ $exit_code -ne 0 ]]; then
+    if [[ $exit_code -eq 42 ]]; then
+        exec /opt/retrolinux/bin/retroinstall
+    elif [[ $exit_code -ne 0 ]]; then
         rx_show_error_and_qr "$exit_code"
     fi
 }
@@ -91,11 +93,16 @@ rx_install_system() {
     disk_name=$(basename "$DISK_SELECTED" 2>/dev/null || echo "?")
     disk_size=$(lsblk -dno SIZE "$DISK_SELECTED" 2>/dev/null || echo "?")
 
-    echo -e "Field,Value\nDisk,/dev/${disk_name} (${disk_size})\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nTimezone,${USER_TIMEZONE:-unknown}\nUsername,${USER_NAME:-unknown}\nHostname,${USER_HOSTNAME:-unknown}" |
+    local network_info="Ethernet"
+    if [[ "${NETWORK_TYPE:-}" == "WiFi" ]]; then
+        network_info="WiFi (${WIFI_SSID:-unknown})"
+    fi
+
+    echo -e "Field,Value\nDisk,/dev/${disk_name} (${disk_size})\nNetwork,${network_info}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nTimezone,${USER_TIMEZONE:-unknown}\nUsername,${USER_NAME:-unknown}\nHostname,${USER_HOSTNAME:-unknown}" | \
         gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
     echo
 
-    if gum confirm --affirmative "Install now" --negative "Go back" "Ready to Install" --selected.background 5 --selected.foreground 7 --unselected.background 240 --unselected.foreground 7 --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Install now" --negative "Go back" "Ready to Install" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         :
     else
         exec /opt/retrolinux/bin/retroinstall

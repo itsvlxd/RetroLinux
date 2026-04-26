@@ -8,7 +8,7 @@ setup_timezone() {
     current_tz=$(rx_get_current_timezone)
 
     # shellcheck disable=SC2034
-    USER_TIMEZONE=$(timedatectl list-timezones | gum filter --height "$GUM_FILTER_HEIGHT" --header "Timezone" --value "$current_tz" --prompt "Filter> " --padding "$GUM_FILTER_PADDING") || {
+    USER_TIMEZONE=$(timedatectl list-timezones | gum filter --height "$GUM_FILTER_HEIGHT" --prompt "Timezone> " --placeholder "Please select your timezone" --prompt.foreground "$GUM_CONFIRM_PROMPT_FOREGROUND" --selected "$current_tz" --padding "$GUM_FILTER_PADDING") || {
         rx_step_error "1" "Timezone selection failed"
         rx_retry_or_exit "Timezone is required" || rx_abort
         return 1
@@ -17,7 +17,7 @@ setup_timezone() {
     return 0
 }
 
-if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then
+if [[ ${RETRO_SETUP_SOURCED:-} != "1" ]]; then
     export RETRO_SETUP_SOURCED=1
     source "$RETRO_INSTALL/lib/display.sh"
     source "$RETRO_INSTALL/lib/errors.sh"
