@@ -43,6 +43,8 @@ setup_disk() {
         gum style --padding "0 0 0 $PADDING_LEFT" "This cannot be undone."
         echo
         if ! gum confirm --affirmative "I understand, continue" --negative "Go back" "Confirm disk wipe" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+            RX_GO_BACK_TO="disk"
+            rx_save_state
             return 42
         fi
     fi
