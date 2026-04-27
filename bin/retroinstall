@@ -26,12 +26,19 @@ rx_set_retro_colors
 rx_setup_traps
 
 SETUP_SCRIPTS=(
-    "network.sh"
+    "user.sh"
+    "root.sh"
+    "hostname.sh"
     "keyboard.sh"
     "locale.sh"
+    "mirrors.sh"
     "timezone.sh"
-    "user.sh"
     "disk.sh"
+    "luks.sh"
+    "kernel.sh"
+    "bluetooth.sh"
+    "print.sh"
+    "network.sh"
     "config.sh"
 )
 
@@ -41,12 +48,22 @@ else
     KEYBOARD="us"
     SYS_LANG="en_US.UTF-8"
     SYS_ENC="UTF-8"
-    USER_PASSWORD_HASH=""
-    USER_PASSWORD=""
     USER_NAME=""
+    USER_PASSWORD=""
+    USER_PASSWORD_HASH=""
     USER_HOSTNAME=""
+    ROOT_PASSWORD=""
+    ROOT_PASSWORD_HASH=""
+    MIRROR_REGIONS=""
+    CUSTOM_MIRRORS=""
     USER_TIMEZONE=""
     DISK_SELECTED=""
+    LUKS_ENABLED=""
+    LUKS_PASSWORD=""
+    LUKS_ITER_TIME=""
+    KERNEL_SELECTION=""
+    BLUETOOTH_ENABLED=""
+    PRINT_SERVICE_ENABLED=""
     NETWORK_TYPE=""
     WIFI_SSID=""
     RX_SKIP_STEP=""
@@ -82,7 +99,7 @@ rx_run_step() {
     local exit_code=$?
     rx_load_state
     if [[ $exit_code -eq 42 ]]; then
-        RX_SKIP_STEP=4
+        RX_SKIP_STEP=6
         rx_save_state
         exec /opt/retrolinux/bin/retroinstall
     elif [[ $exit_code -ne 0 ]]; then
@@ -109,7 +126,44 @@ rx_install_system() {
         network_info="WiFi (${WIFI_SSID:-unknown})"
     fi
 
-    echo -e "Field,Value\nDisk,/dev/${disk_name} (${disk_size})\nNetwork,${network_info}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nTimezone,${USER_TIMEZONE:-unknown}\nUsername,${USER_NAME:-unknown}\nHostname,${USER_HOSTNAME:-unknown}" | \
+    local luks_info="Disabled"
+    if [[ "$LUKS_ENABLED" == "true" ]]; then
+        luks_info="Enabled (${LUKS_ITER_TIME:-2000}ms iter)"
+    fi
+
+    local root_pw_dots=""
+    local root_pw_len=0
+    if [[ -n "${ROOT_PASSWORD:-}" ]]; then
+        root_pw_len=${#ROOT_PASSWORD}
+        root_pw_dots=$(printf '%*s' "$root_pw_len" | tr ' ' '•')
+    fi
+
+    local user_pw_dots=""
+    local user_pw_len=0
+    if [[ -n "$USER_PASSWORD" ]]; then
+        user_pw_len=${#USER_PASSWORD}
+        user_pw_dots=$(printf '%*s' "$user_pw_len" | tr ' ' '•')
+    fi
+
+    local bt_info="Disabled"
+    if [[ "$BLUETOOTH_ENABLED" == "true" ]]; then
+        bt_info="Enabled"
+    fi
+
+    local print_info="Disabled"
+    if [[ "$PRINT_SERVICE_ENABLED" == "true" ]]; then
+        print_info="Enabled"
+    fi
+
+    local mirror_info="Auto"
+    if [[ -n "$MIRROR_REGIONS" ]]; then
+        mirror_info="$MIRROR_REGIONS"
+    fi
+    if [[ -n "$CUSTOM_MIRRORS" ]]; then
+        mirror_info="$mirror_info + custom"
+    fi
+
+    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info}\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" | \
         gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
     echo
 
