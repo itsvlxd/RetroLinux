@@ -23,7 +23,7 @@ The project provides the `retro` CLI - a unified command center to manage the en
 |-----------|---------|
 | `retro.sh` | Main entry point, command routing, global state |
 | `lib/` | **Internal** core libraries (colors, logging, fs, driver detection, etc.) |
-| `bin/` | **Installer** system (retroinstall, helpers, lib) |
+| `bin/` | **Installer** system (retroinstall, lib, setup) |
 | `cmds/` | **User-facing** commands (tools, system, modules subdirectories) |
 | `scripts/` | Backend automation scripts (core logic for each feature) |
 | `scripts/events/` | Event hook modules (on_event_*) |
@@ -980,26 +980,29 @@ The Installer is a self-contained system that runs during initial system setup. 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ENTRY POINT (bin/retroinstall)                             │
-│  - Sources lib utilities                                   │
-│  - Sets up traps and global state                          │
-│  - Executes setup scripts in order                          │
+│  retroinstall (parent process)                              │
+│  - Holds all state variables                               │
+│  - Exports RETRO_STATE="/tmp/retroinstall_state"           │
+│  - Calls rx_load_state before each step                    │
+│  - Calls rx_load_state after each step                      │
 └─────────────────────────────────────────────────────────────┘
                                │
-                               ▼ execs
+                               │ execs setup script
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  SETUP SCRIPTS (bin/setup/*)                               │
-│  - Each step is a separate, executable script              │
-│  - Can be run independently or as part of flow           │
-│  - Numbered prefix for ordering (01-, 02-, etc.)         │
-│  - Return 0 on success, non-zero on failure/cancel        │
+│  setup/*.sh (child process)                                 │
+│  - Sources lib/setup_lib.sh to load utilities               │
+│  - Collects user input, modifies variables                  │
+│  - Calls rx_save_state to write updated values              │
+│  - Exits with success/failure code                         │
 └─────────────────────────────────────────────────────────────┘
                                │
                                ▼ sources
 ┌─────────────────────────────────────────────────────────────┐
-│  UTILITIES (bin/lib/*)                                      │
-│  - Pure functions, no orchestration                          │
-│  - display, errors, gum, locale, timezone, disk, handlers    │
+│  UTILITIES (bin/lib/*)                                     │
+│  - Pure functions, no orchestration                         │
+│  - display, errors, gum, wifi, locale, timezone, disk,      │
+│    handlers, output, debug, progress, qr, setup_lib, setup  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -1008,51 +1011,186 @@ The Installer is a self-contained system that runs during initial system setup. 
 ```
 bin/
 ├── retroinstall              # Main entry point
-├── logo.txt                  # ASCII art logo
-├── lib/                      # Low-level utilities (pure functions)
-│   ├── display.sh            # Terminal detection, padding, rx_clear_logo
-│   ├── errors.sh             # rx_retry_or_exit, rx_step, rx_notice, rx_abort
-│   ├── gum.sh                # rx_step, rx_notice
-│   ├── qr.sh                 # rx_generate_error_qr, rx_gather_system_info
-│   ├── locale.sh             # Keyboard/layout names, locale translations
-│   ├── timezone.sh           # rx_list_timezones
-│   ├── disk.sh               # rx_get_disk_info, rx_get_available_disks
-│   ├── handlers.sh           # rx_setup_traps, rx_catch_errors, rx_exit_handler
-│   ├── output.sh             # rx_start_log_output, rx_start_install_log, rx_run_logged
-│   ├── debug.sh              # rx_debug
-│   └── setup.sh              # rx_chrootable_systemctl_enable
-└── setup/                    # Modular setup step scripts (numbered)
-    ├── 01-network.sh         # Network connectivity check
-    ├── 02-keyboard.sh        # Keyboard layout selection (filter)
-    ├── 03-locale.sh          # System language selection (filter)
-    ├── 04-timezone.sh        # Timezone selection (filter)
-    ├── 05-user.sh            # User account creation
-    ├── 06-review.sh          # Review settings before disk selection
-    ├── 07-disk.sh            # Disk selection
-    ├── 08-confirm.sh         # Disk wipe confirmation
-    ├── 09-config.sh          # Write configuration files
-    └── 10-summary.sh         # Final summary before archinstall
+├── logo.txt                  # ASCII art logo (5-line, 74 chars wide)
+├── lib/                      # Low-level utilities (14 files)
+│   ├── debug.sh             # rx_debug conditional output
+│   ├── disk.sh              # rx_get_disk_info, rx_get_available_disks, rx_write_configuration
+│   ├── display.sh           # Terminal sizing, logo rendering, GUM_CONFIRM_STYLE, GUM_FILTER_STYLE
+│   ├── errors.sh            # rx_retry_or_exit, rx_step_error, rx_abort
+│   ├── gum.sh               # rx_notice (gum spin wrapper)
+│   ├── handlers.sh          # rx_setup_traps, rx_catch_errors, rx_save_state, rx_load_state
+│   ├── locale.sh            # Keyboard/layout names, LOCALE_LANG_NAMES, KEYBOARD_LAYOUT_NAMES arrays
+│   ├── output.sh            # rx_start_log_output, rx_start_install_log, rx_run_logged
+│   ├── progress.sh          # rx_step progress tracking [n/total]
+│   ├── qr.sh                # rx_generate_error_qr, rx_gather_system_info
+│   ├── setup_lib.sh        # Shared sourcing hub, rx_setup_fail
+│   ├── setup.sh            # rx_chrootable_systemctl_enable wrapper
+│   ├── timezone.sh          # rx_list_timezones, rx_get_current_timezone
+│   └── wifi.sh              # WiFi setup functions (iwctl based), rx_check_internet, rx_select_wifi_network
+└── setup/                    # Modular setup step scripts (14 scripts, unnumbered)
+    ├── bluetooth.sh         # Bluetooth service enable toggle
+    ├── config.sh           # Write user_configuration.json and user_credentials.json
+    ├── disk.sh             # Disk selection, wipe confirmation, returns 42 on go-back
+    ├── hostname.sh          # Machine hostname
+    ├── kernel.sh            # Kernel selection (linux, linux-lts, linux-zen, linux-hardened)
+    ├── keyboard.sh          # Keyboard layout selection (hardcoded list of 54 layouts)
+    ├── locale.sh            # System language selection (filter from LOCALE_LANG_NAMES)
+    ├── luks.sh              # LUKS encryption enable/password/iteration time
+    ├── mirrors.sh           # Mirror region and custom mirror URL
+    ├── network.sh           # Network connectivity check and WiFi/Ethernet setup
+    ├── print.sh             # CUPS printing service enable toggle
+    ├── root.sh              # Root password
+    ├── timezone.sh          # Timezone selection via timedatectl
+    └── user.sh              # Username, user password, sudo access
+```
+
+### SETUP_SCRIPTS Array (exact order)
+
+From `retroinstall` lines 28-43:
+
+```bash
+SETUP_SCRIPTS=(
+    "user.sh"        # index 0
+    "root.sh"        # index 1
+    "hostname.sh"    # index 2
+    "keyboard.sh"    # index 3
+    "locale.sh"      # index 4
+    "mirrors.sh"     # index 5
+    "timezone.sh"    # index 6
+    "disk.sh"        # index 7
+    "luks.sh"        # index 8
+    "kernel.sh"      # index 9
+    "bluetooth.sh"   # index 10
+    "print.sh"       # index 11
+    "network.sh"     # index 12
+    "config.sh"      # index 13
+)
 ```
 
 ### Setup Flow
 
-Each setup script:
-1. Sources lib utilities if not already sourced (via `RETRO_SETUP_SOURCED` guard)
-2. Defines a `setup_*()` function
-3. Executes the function when run directly
-4. Exports state via global variables for use by subsequent scripts
+**rx_run_step function** (retroinstall lines 89-109):
 
-**Global State Variables:**
-| Variable | Description |
-|----------|-------------|
-| `KEYBOARD` | Selected keyboard layout code (e.g., `us`, `de`, `fr`) |
-| `SYS_LANG` | System language in locale format (e.g., `en.UTF-8`, `de.UTF-8`) |
-| `USER_TIMEZONE` | Selected timezone |
-| `USER_NAME` | Username |
-| `USER_PASSWORD` | User password (plain) |
-| `USER_PASSWORD_HASH` | User password hash |
-| `USER_HOSTNAME` | Hostname |
-| `DISK_SELECTED` | Selected disk device |
+```bash
+rx_run_step() {
+    local script="$1"
+    local step_index=$2
+
+    # Skip if step_index <= RX_SKIP_STEP
+    if [[ -n "$RX_SKIP_STEP" && $step_index -le $RX_SKIP_STEP ]]; then
+        return 0
+    fi
+
+    rx_clear_logo
+    rx_load_state                    # Reload state before running step
+    /opt/retrolinux/bin/setup/"$script"  # Execute setup script
+    local exit_code=$?
+    rx_load_state                    # Reload state after step
+
+    # Exit code 42 = go back (skip to step 6 = timezone, then restart)
+    if [[ $exit_code -eq 42 ]]; then
+        RX_SKIP_STEP=6
+        rx_save_state
+        exec /opt/retrolinux/bin/retroinstall  # Restart installer
+    elif [[ $exit_code -ne 0 ]]; then
+        rx_show_error_and_qr "$exit_code"
+    fi
+}
+```
+
+**Main loop** (retroinstall lines 111-113):
+```bash
+for i in "${!SETUP_SCRIPTS[@]}"; do
+    rx_run_step "${SETUP_SCRIPTS[$i]}" "$i"
+done
+```
+
+**Return codes:**
+- `0` = success, proceed to next step
+- `42` = go back to disk selection (disk.sh returns 42 when user declines wipe confirmation)
+- `non-zero, not 42` = error, show error QR and offer retry
+
+**Go-back mechanism:**
+- `disk.sh` returns exit code `42` when user declines disk wipe confirmation
+- On `42`: Sets `RX_SKIP_STEP=6`, saves state, restarts installer via `exec`
+- The installer loops, skipping steps 0-6 (user through timezone), resumes from disk.sh (index 7)
+
+### State Management (CRITICAL)
+
+Setup scripts run as subprocesses of `retroinstall`. Because subprocesses cannot share variables with their parent, all state is persisted to `/tmp/retroinstall_state` (exported as `$RETRO_STATE`).
+
+**State Functions** (defined in `bin/lib/handlers.sh`):
+
+| Function | Purpose |
+|----------|---------|
+| `rx_save_state` | Writes all state variables to `$RETRO_STATE` |
+| `rx_load_state` | Sources `$RETRO_STATE` if it exists |
+
+**All state variables saved to `$RETRO_STATE`:**
+```bash
+KEYBOARD              # Keyboard layout code (e.g., "us")
+SYS_LANG              # System language (e.g., "en_US.UTF-8")
+SYS_ENC               # System encoding (e.g., "UTF-8")
+USER_NAME             # Username
+USER_PASSWORD         # Plain text user password
+USER_PASSWORD_HASH    # OpenSSL passwd hash of user password (openssl passwd -6)
+USER_HOSTNAME         # hostname
+USER_TIMEZONE         # timezone (e.g., "America/New_York")
+DISK_SELECTED         # Selected disk device (e.g., "/dev/sda")
+NETWORK_TYPE          # "WiFi" or "Ethernet"
+WIFI_SSID             # WiFi SSID if connected via WiFi
+ROOT_PASSWORD         # Plain text root password
+ROOT_PASSWORD_HASH    # OpenSSL passwd hash of root password
+USER_SUDO             # "true" or "false"
+LUKS_ENABLED          # "true" or "false"
+LUKS_PASSWORD         # Plain text LUKS encryption password
+LUKS_ITER_TIME        # LUKS iteration time in ms (e.g., 2000)
+KERNEL_SELECTION      # Kernel package (e.g., "linux", "linux-lts", "linux-zen", "linux-hardened")
+BLUETOOTH_ENABLED     # "true" or "false"
+PRINT_SERVICE_ENABLED # "true" or "false"
+CUSTOM_MIRRORS        # Custom mirror URL
+MIRROR_REGIONS        # Mirror regions (space-separated)
+RX_CURRENT_STEP       # Current step number (saved but not actively used)
+RX_START_STEP         # Starting step (default 1, saved but not actively used)
+RX_SKIP_STEP          # Step to skip to (used for "go back" skip)
+RX_GO_BACK_TO         # Name of step to go back to (set by disk.sh)
+```
+
+**Rules for State Management**:
+
+1. **Every script that sets a state variable MUST call `rx_save_state`** before returning
+2. **Never assume variables persist between scripts** - always load state at start
+3. **`rx_load_state` is called automatically** by `rx_run_step` before/after each step
+4. **State file location**: `/tmp/retroinstall_state` (exported as `$RETRO_STATE`)
+
+**Setup Scripts and Their Variables**:
+
+| Step | Script | Variables Set |
+|------|--------|---------------|
+| 0 | `user.sh` | `USER_NAME`, `USER_PASSWORD`, `USER_PASSWORD_HASH`, `USER_SUDO` |
+| 1 | `root.sh` | `ROOT_PASSWORD`, `ROOT_PASSWORD_HASH` |
+| 2 | `hostname.sh` | `USER_HOSTNAME` |
+| 3 | `keyboard.sh` | `KEYBOARD` (hardcoded list of 54 layouts) |
+| 4 | `locale.sh` | `SYS_LANG` (from `LOCALE_LANG_NAMES` array) |
+| 5 | `mirrors.sh` | `MIRROR_REGIONS`, `CUSTOM_MIRRORS` |
+| 6 | `timezone.sh` | `USER_TIMEZONE` (via timedatectl) |
+| 7 | `disk.sh` | `DISK_SELECTED`, `RX_GO_BACK_TO`; returns 42 on decline |
+| 8 | `luks.sh` | `LUKS_ENABLED`, `LUKS_PASSWORD`, `LUKS_ITER_TIME` |
+| 9 | `kernel.sh` | `KERNEL_SELECTION` (linux, linux-lts, linux-zen, linux-hardened) |
+| 10 | `bluetooth.sh` | `BLUETOOTH_ENABLED` |
+| 11 | `print.sh` | `PRINT_SERVICE_ENABLED` |
+| 12 | `network.sh` | `NETWORK_TYPE`, `WIFI_SSID` |
+| 13 | `config.sh` | Writes JSON files (no state variables) |
+
+### rx_install_system Function
+
+After all setup steps complete, `rx_install_system` (retroinstall lines 224+) does:
+
+1. **Display summary table** with all configured values (username, passwords masked, hostname, keyboard, language, mirrors, timezone, disk, LUKS status, kernel, bluetooth, printing, network type)
+2. **Ask for confirmation** to proceed with installation
+3. **Run archinstall** with JSON config files and `--silent --skip-ntp --skip-wkd --skip-wifi-check`
+4. **On failure**: Show error QR code, offer retry
+5. **On success**: Display "Installation Complete!" message, wait for Enter, reboot
 
 ### User Input Patterns
 
@@ -1061,21 +1199,15 @@ Each setup script:
 Use `gum filter` for selectable lists with search/filter capability:
 
 ```bash
-# Keyboard selection with filter
-choice=$(echo "$keyboards" | gum filter --height 15 --selected "$current" --header "Select layout")
-
-# Language selection with filter
-choice=$(echo "$languages" | gum filter --height 15 --selected "$current" --header "Select language")
-
-# Timezone selection with filter
-USER_TIMEZONE=$(timedatectl list-timezones 2>/dev/null | gum filter --height 15 --header "Timezone")
+# Use GUM_FILTER_STYLE from display.sh
+choice=$(echo "$items" | gum filter --height 15 --selected "$current" --header "Select" --style "${GUM_FILTER_STYLE[@]}" --padding "$GUM_FILTER_PADDING")
 ```
 
 #### Confirm Input
 
 ```bash
-# Simple yes/no confirmation
-if gum confirm --affirmative "Continue" --negative "Go back" --padding "$GUM_CONFIRM_PADDING"; then
+# Simple yes/no confirmation with GUM_CONFIRM_STYLE
+if gum confirm --affirmative "Continue" --negative "Go back" --padding "$GUM_CONFIRM_PADDING" "${GUM_CONFIRM_STYLE[@]}"; then
     # user selected affirmative
 fi
 ```
@@ -1087,39 +1219,64 @@ fi
 password=$(gum input --password --placeholder "Create a password" --prompt "Password> " --padding "$GUM_INPUT_PADDING")
 ```
 
-### Language and Keyboard Naming
+### Centralized Style Variables
 
-The installer uses human-readable names for display but stores locale codes internally:
+**From `lib/display.sh` - GUM_CONFIRM_STYLE:**
 
 ```bash
-# Display: "English", "German", "Romanian"
-# Backend: "en.UTF-8", "de.UTF-8", "ro.UTF-8"
-
-# rx_locale_to_lang_name() converts locale code to display name
-rx_locale_to_lang_name "de.UTF-8"  # Returns "German"
-
-# rx_keyboard_display_name() converts keymap to display name  
-rx_keyboard_display_name "de"  # Returns "German"
+export GUM_CONFIRM_PROMPT_FOREGROUND="5"    # Magenta prompt
+export GUM_CONFIRM_SELECTED_FOREGROUND="7"  # White text on selected
+export GUM_CONFIRM_SELECTED_BACKGROUND="5"   # Magenta background
+export GUM_CONFIRM_UNSELECTED_FOREGROUND="7"
+export GUM_CONFIRM_UNSELECTED_BACKGROUND="240"
+export GUM_CONFIRM_STYLE="--selected.foreground $GUM_CONFIRM_SELECTED_FOREGROUND --selected.background $GUM_CONFIRM_SELECTED_BACKGROUND --unselected.foreground $GUM_CONFIRM_UNSELECTED_FOREGROUND --unselected.background $GUM_CONFIRM_UNSELECTED_BACKGROUND"
 ```
 
-### Review Step (06-review.sh)
+**From `lib/display.sh` - GUM_FILTER_STYLE:**
 
-The review step shows a read-only summary of settings before disk selection. It does not allow editing - users can only confirm to continue:
-
-```
-┌──────────────────────────────────────┐
-│   Review Your Settings               │
-├──────────────────────────────────────┤
-│  Keyboard:   English (US)            │
-│  Language:   German                  │
-│  Timezone:   Europe/Berlin           │
-├──────────────────────────────────────┤
-│  Username:   john                    │
-│  Hostname:   mypc                     │
-└──────────────────────────────────────┘
+```bash
+export GUM_FILTER_STYLE=(--indicator="> " --prompt.foreground 5 --placeholder.foreground 8)
 ```
 
-Editing is available by running individual setup scripts directly if needed.
+**Padding system:**
+
+```bash
+export TERM_WIDTH=$(stty size | awk '{print $2}')
+export LOGO_WIDTH=74
+export PADDING_LEFT=$(((TERM_WIDTH - LOGO_WIDTH) / 2))
+export PADDING="0 0 0 $PADDING_LEFT"
+
+export GUM_CHOOSE_PADDING="$PADDING"
+export GUM_FILTER_PADDING="$PADDING"
+export GUM_INPUT_PADDING="$PADDING"
+export GUM_SPIN_PADDING="$PADDING"
+export GUM_TABLE_PADDING="$PADDING"
+export GUM_CONFIRM_PADDING="$PADDING"
+
+export GUM_HEIGHT=15
+export GUM_CHOOSE_HEIGHT=15
+export GUM_FILTER_HEIGHT=15
+export GUM_INPUT_HEIGHT=15
+```
+
+### Language and Keyboard Arrays
+
+**LOCALE_LANG_NAMES** (in `lib/locale.sh`, ~80 entries):
+Maps language codes to display names, e.g.:
+```bash
+LOCALE_LANG_NAMES["en"]="English"
+LOCALE_LANG_NAMES["fr"]="French"
+LOCALE_LANG_NAMES["de"]="German"
+```
+
+**KEYBOARD_LAYOUT_NAMES** (in `lib/locale.sh`, many entries):
+Maps keymap codes to display names, e.g.:
+```bash
+KEYBOARD_LAYOUT_NAMES["us"]="English (US)"
+KEYBOARD_LAYOUT_NAMES["uk"]="English (UK)"
+KEYBOARD_LAYOUT_NAMES["fr"]="French"
+KEYBOARD_LAYOUT_NAMES["de"]="German"
+```
 
 ### Error Handling Pattern
 
@@ -1131,54 +1288,7 @@ trap rx_catch_errors ERR
 trap 'rx_show_signal_info "SIGINT"' INT
 trap 'rx_show_signal_info "SIGTERM"' TERM
 trap rx_exit_handler EXIT
-
-### Padding System
-
-All installer UI is centered using a padding system calculated from terminal width and logo width:
-
-```bash
-# bin/lib/display.sh
-export TERM_WIDTH=$(stty size | awk '{print $2}')
-export LOGO_WIDTH=74
-export PADDING_LEFT=$(((TERM_WIDTH - LOGO_WIDTH) / 2))
-export PADDING="0 0 0 $PADDING_LEFT"
-
-export GUM_CHOOSE_PADDING="$PADDING"
-export GUM_FILTER_PADDING="$PADDING"
-export GUM_INPUT_PADDING="$PADDING"
-export GUM_CONFIRM_PADDING="$PADDING"
 ```
-
-### Gum Style Patterns
-
-The installer uses gum for all UI. All gum commands use padding variables:
-
-```bash
-# Text display (centered, no color)
-gum style "Message text" --padding "$PADDING"
-
-# Text display (centered, with color)
-gum style --foreground 1 "Error message" --padding "1 0 1 $PADDING_LEFT"
-
-# Interactive elements (centered)
-gum choose ... --padding "$GUM_CHOOSE_PADDING"
-gum input ... --padding "$GUM_INPUT_PADDING"
-gum confirm ... --padding "$GUM_CONFIRM_PADDING"
-gum filter ... --padding "$GUM_FILTER_PADDING"
-```
-
-### Tokyo Night Color Codes
-
-Installer uses numeric color codes (not $PINK, $GRAY, etc.):
-
-| Code | Color | Usage |
-|------|-------|-------|
-| 1 | Red (#f7768e) | Errors, failure messages |
-| 2 | Green (#9ece6a) | Success, connected |
-| 3 | Yellow (#e0af68) | Warnings, waiting |
-| 5 | Magenta (#bb9af7) | Highlights, dividers |
-| 6 | Cyan (#7dcfff) | Prompts, borders |
-| 7 | White (#a9b1d6) | Regular text |
 
 ### QR Code Error Reporting
 
@@ -1189,22 +1299,24 @@ rx_generate_error_qr() {
     local exit_code=$1
     local repo_url="github.com/itsvlxd/RetroLinux/issues/new"
     local issue_title="Installation Halt - Exit Code $exit_code"
-    local system_specs
-    system_specs=$(rx_gather_system_info)
-
-    local issue_body="Installer failed during RetroLinux setup.
-
-=== SYSTEM SPECS ===
-$system_specs
-=== ERROR LOG ===
-$log_content
-
-Please describe what happened below:"
-
-    local full_url="https://${repo_url}?title=${issue_title// /+}&body=${issue_body// /+}"
-    qrencode -t ANSIUTF8 "$full_url"
+    # ... gathers system specs, generates QR code URL
 }
 ```
+
+### Installer Color Codes
+
+The installer uses numeric color codes for gum style commands:
+
+| Code | Color | Usage |
+|------|-------|-------|
+| 1 | Red | Errors, failure messages |
+| 2 | Green | Success, connected |
+| 3 | Yellow | Warnings, waiting |
+| 5 | Magenta | Highlights, dividers, prompts |
+| 6 | Cyan | Prompts, borders |
+| 7 | White | Regular text |
+| 8 | Gray | Placeholder text |
+| 240 | Dark gray | Unselected items background |
 
 ---
 
@@ -1226,16 +1338,36 @@ RetroLinux/
 ├── bin/                        # Installer system
 │   ├── retroinstall            # Main entry point
 │   ├── logo.txt                # ASCII art logo
-│   ├── lib/                    # Low-level utilities
+│   ├── lib/                    # Low-level utilities (14 files)
+│   │   ├── debug.sh
+│   │   ├── disk.sh
 │   │   ├── display.sh
 │   │   ├── errors.sh
-│   │   ├── wifi.sh
-│   │   └── ...
-│   └── setup/                  # Modular setup scripts
-│       ├── 01-network.sh
-│       ├── 02-keyboard.sh
-│       ├── 03-locale.sh
-│       └── ...
+│   │   ├── gum.sh
+│   │   ├── handlers.sh
+│   │   ├── locale.sh
+│   │   ├── output.sh
+│   │   ├── progress.sh
+│   │   ├── qr.sh
+│   │   ├── setup_lib.sh
+│   │   ├── setup.sh
+│   │   ├── timezone.sh
+│   │   └── wifi.sh
+│   └── setup/                  # Modular setup scripts (14 scripts)
+│       ├── bluetooth.sh
+│       ├── config.sh
+│       ├── disk.sh
+│       ├── hostname.sh
+│       ├── kernel.sh
+│       ├── keyboard.sh
+│       ├── locale.sh
+│       ├── luks.sh
+│       ├── mirrors.sh
+│       ├── network.sh
+│       ├── print.sh
+│       ├── root.sh
+│       ├── timezone.sh
+│       └── user.sh
 ├── scripts/                    # Backend core scripts
 │   ├── audio_core.sh
 │   ├── network_core.sh
@@ -1245,7 +1377,7 @@ RetroLinux/
 │   ├── battery_events.sh
 │   ├── power_events.sh
 │   └── ...
-├── scripts/watchers/            # Background system monitors
+├── scripts/watchers/           # Background system monitors
 │   ├── battery.sh
 │   ├── bluetooth.sh
 │   ├── timers.sh
@@ -1254,7 +1386,7 @@ RetroLinux/
 │   ├── audio.sh
 │   ├── network.sh
 │   └── ...
-└── modules/                   # Desktop environment configs
+└── modules/                    # Desktop environment configs
     ├── hyprland/
     ├── ags/
     └── ...
@@ -1276,5 +1408,8 @@ RetroLinux/
 | Installer clear | `rx_clear_logo` in `bin/lib/display.sh` |
 | Installer error | `rx_retry_or_exit "message"` in `bin/lib/errors.sh` |
 | Setup script guard | `if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then` |
-| Run setup step | `/opt/retrolinux/bin/setup/01-network.sh` |
-| Gum filter | `gum filter ... --padding "$GUM_FILTER_PADDING"` |
+| Run setup step | `/opt/retrolinux/bin/setup/network.sh` |
+| Gum filter with style | `gum filter ... --padding "$GUM_FILTER_PADDING" "${GUM_FILTER_STYLE[@]}"` |
+| Gum confirm with style | `gum confirm ... --padding "$GUM_CONFIRM_PADDING" ${GUM_CONFIRM_STYLE}` |
+| Save state | `rx_save_state` (in `bin/lib/handlers.sh`) |
+| Load state | `rx_load_state` (in `bin/lib/handlers.sh`) |
