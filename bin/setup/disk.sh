@@ -29,7 +29,7 @@ setup_disk() {
     done <<<"$available_disks"
 
     local selected_display
-    selected_display=$(echo "$disk_options" | gum choose --header "Select install disk" --padding "$GUM_CHOOSE_PADDING") || {
+    selected_display=$(echo "$disk_options" | gum choose --header "Select install disk" --height 15 --padding "$GUM_CHOOSE_PADDING") || {
         rx_step_error "3" "Disk selection cancelled"
         rx_retry_or_exit "Disk selection required" || rx_abort
         return 1
@@ -38,7 +38,6 @@ setup_disk() {
 
     if rx_disk_has_partitions "$DISK_SELECTED"; then
         rx_clear_logo
-        echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Warning: $DISK_SELECTED contains existing partitions"
         gum style --padding "0 0 0 $PADDING_LEFT" "All data on this disk will be ERASED to set up BTRFS encryption."
         echo
@@ -65,3 +64,4 @@ setup_disk() {
 if ! setup_disk; then
     rx_setup_fail "Disk"
 fi
+

@@ -6,6 +6,11 @@ setup_root() {
     rx_load_state
     rx_step "Let's setup the root password..."
 
+    if [[ -n $USER_PASSWORD ]]; then
+        gum style --foreground 3 --padding "0 0 0 $PADDING_LEFT" "Security tip: Use a different password than your user password"
+        echo
+    fi
+
     while true; do
         local password
         password=$(gum input --placeholder "Create a root password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Password> " --padding "$GUM_INPUT_PADDING") || {
@@ -45,3 +50,4 @@ setup_root() {
 if ! setup_root; then
     rx_setup_fail "Root"
 fi
+

@@ -6,7 +6,6 @@ setup_luks() {
     rx_load_state
     rx_step "Let's setup disk encryption..."
 
-    echo
     if gum confirm --affirmative "Yes, enable encryption" --negative "No, skip encryption" "LUKS Encryption" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         # shellcheck disable=SC2034
         LUKS_ENABLED="true"
@@ -67,7 +66,7 @@ setup_luks() {
         esac
 
         local iter_choice
-        iter_choice=$(echo "$iter_time_options" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --value "$current_iter" --prompt "Iteration> " --placeholder "Select iteration time" --padding "$GUM_FILTER_PADDING") || {
+        iter_choice=$(echo "$iter_time_options" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --prompt "Iteration> " --placeholder "Select iteration time" --padding "$GUM_FILTER_PADDING") || {
             rx_step_error "2" "Iteration time selection cancelled"
             rx_retry_or_exit "Iteration time is required" || rx_abort
             return 1
@@ -102,3 +101,4 @@ setup_luks() {
 if ! setup_luks; then
     rx_setup_fail "LUKS"
 fi
+

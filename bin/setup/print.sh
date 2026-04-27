@@ -6,7 +6,6 @@ setup_print() {
     rx_load_state
     rx_step "Let's setup printing service..."
 
-    echo
     if gum confirm --affirmative "Yes, enable printing" --negative "No, skip printing" "CUPS Print Service" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         # shellcheck disable=SC2034
         PRINT_SERVICE_ENABLED="true"
@@ -22,3 +21,4 @@ setup_print() {
 if ! setup_print; then
     rx_setup_fail "Print"
 fi
+
