@@ -7,6 +7,7 @@ rx_set_retro_colors() {
     export GUM_CONFIRM_UNSELECTED_FOREGROUND="7"
     export GUM_CONFIRM_UNSELECTED_BACKGROUND="240"
     export GUM_CONFIRM_STYLE="--selected.foreground $GUM_CONFIRM_SELECTED_FOREGROUND --selected.background $GUM_CONFIRM_SELECTED_BACKGROUND --unselected.foreground $GUM_CONFIRM_UNSELECTED_FOREGROUND --unselected.background $GUM_CONFIRM_UNSELECTED_BACKGROUND"
+    export GUM_FILTER_STYLE=(--indicator="> " --prompt.foreground 5 --placeholder.foreground 8)
 }
 
 if [[ -z ${RETRO_DIR:-} ]]; then
@@ -67,4 +68,3 @@ rx_clear_logo() {
     printf "\033[H\033[2J"
     gum style --foreground 5 --padding "1 0 0 $PADDING_LEFT" "$(<"$LOGO_PATH")"
 }
-
