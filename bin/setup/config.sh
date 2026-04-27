@@ -112,6 +112,11 @@ setup_config() {
             rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process LUKS password"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
     fi
 
+    local sudo_json="false"
+    if [[ "$USER_SUDO" == "true" ]]; then
+        sudo_json="true"
+    fi
+
     cat >user_credentials.json <<EOF
 {
     "encryption_password": $encryption_password_escaped,
@@ -120,7 +125,7 @@ setup_config() {
         {
             "enc_password": $user_pw_escaped,
             "groups": [],
-            "sudo": true,
+            "sudo": $sudo_json,
             "username": $username_escaped
         }
     ]
