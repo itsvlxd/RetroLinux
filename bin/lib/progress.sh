@@ -1,9 +1,5 @@
 #!/bin/bash
 
-PINK="\033[5;38;2;187;122;255m"
-RESET="\033[0m"
-GRAY="\033[2m"
-
 rx_step() {
     local message="$1"
     rx_clear_logo
@@ -20,4 +16,3 @@ rx_step_error() {
     echo
     return 0
 }
-
