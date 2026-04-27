@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_INSTALL/lib/setup_lib.sh"
+
 setup_disk() {
     rx_load_state
     rx_step "Let's select where to install RetroLinux..."
@@ -60,21 +62,6 @@ setup_disk() {
     return 0
 }
 
-if [[ ${RETRO_SETUP_SOURCED:-} != "1" ]]; then
-    export RETRO_SETUP_SOURCED=1
-    source "$RETRO_INSTALL/lib/display.sh"
-    source "$RETRO_INSTALL/lib/errors.sh"
-    source "$RETRO_INSTALL/lib/gum.sh"
-    source "$RETRO_INSTALL/lib/wifi.sh"
-    source "$RETRO_INSTALL/lib/qr.sh"
-    source "$RETRO_INSTALL/lib/locale.sh"
-    source "$RETRO_INSTALL/lib/timezone.sh"
-    source "$RETRO_INSTALL/lib/handlers.sh"
-    source "$RETRO_INSTALL/lib/output.sh"
-    source "$RETRO_INSTALL/lib/debug.sh"
-    source "$RETRO_INSTALL/lib/disk.sh"
-    source "$RETRO_INSTALL/lib/progress.sh"
-    rx_set_retro_colors
+if ! setup_disk; then
+    rx_setup_fail "Disk"
 fi
-
-setup_disk

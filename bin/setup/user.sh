@@ -1,12 +1,14 @@
 #!/bin/bash
 
+source "$RETRO_INSTALL/lib/setup_lib.sh"
+
 setup_user() {
     rx_load_state
     rx_step "Let's setup your user account..."
 
     while true; do
         local username
-        username=$(gum input --placeholder "Pick a username" --prompt.foreground="#ff79c6" --prompt "Username> " --padding "$GUM_INPUT_PADDING") || {
+        username=$(gum input --placeholder "Pick a username" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Username> " --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Username input failed"
             rx_retry_or_exit "Username is required" || rx_abort
             return 1
@@ -23,13 +25,13 @@ setup_user() {
 
     while true; do
         local password
-        password=$(gum input --placeholder "Create a password" --prompt.foreground="#ff79c6" --password --prompt "Password> " --padding "$GUM_INPUT_PADDING") || {
+        password=$(gum input --placeholder "Create a password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Password> " --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Password input failed"
             rx_retry_or_exit "Password is required" || rx_abort
             return 1
         }
         local password_confirmation
-        password_confirmation=$(gum input --placeholder "Confirm your password" --prompt.foreground="#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
+        password_confirmation=$(gum input --placeholder "Confirm your password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Password confirmation failed"
             rx_retry_or_exit "Password confirmation is required" || rx_abort
             return 1
@@ -55,7 +57,7 @@ setup_user() {
 
     while true; do
         local hostname
-        hostname=$(gum input --placeholder "retrolinux" --prompt.foreground="#ff79c6" --prompt "Hostname> " --padding "$GUM_INPUT_PADDING") || {
+        hostname=$(gum input --placeholder "retrolinux" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Hostname> " --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Hostname input failed"
             rx_retry_or_exit "Hostname is required" || rx_abort
             return 1
@@ -78,20 +80,6 @@ setup_user() {
     return 0
 }
 
-if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then
-    export RETRO_SETUP_SOURCED=1
-    source "$RETRO_INSTALL/lib/display.sh"
-    source "$RETRO_INSTALL/lib/errors.sh"
-    source "$RETRO_INSTALL/lib/gum.sh"
-    source "$RETRO_INSTALL/lib/wifi.sh"
-    source "$RETRO_INSTALL/lib/qr.sh"
-    source "$RETRO_INSTALL/lib/locale.sh"
-    source "$RETRO_INSTALL/lib/timezone.sh"
-    source "$RETRO_INSTALL/lib/handlers.sh"
-    source "$RETRO_INSTALL/lib/output.sh"
-    source "$RETRO_INSTALL/lib/debug.sh"
-    source "$RETRO_INSTALL/lib/progress.sh"
-    rx_set_retro_colors
+if ! setup_user; then
+    rx_setup_fail "User"
 fi
-
-setup_user
