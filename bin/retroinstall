@@ -46,7 +46,7 @@ if [[ -f $RETRO_STATE ]]; then
     rx_load_state
 else
     KEYBOARD="us"
-    SYS_LANG="en_US.UTF-8"
+    SYS_LANG="en_US"
     SYS_ENC="UTF-8"
     USER_NAME=""
     USER_PASSWORD=""

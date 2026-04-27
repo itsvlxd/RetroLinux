@@ -45,11 +45,11 @@ setup_config() {
         return 1
     fi
 
-    local sys_lang="${SYS_LANG:-en_US.UTF-8}"
+    local sys_lang="${SYS_LANG:-en_US}"
     local sys_enc="UTF-8"
     if [[ "$sys_lang" == *.* ]]; then
         sys_enc="${sys_lang##*.}"
-        sys_lang="${sys_lang%.*}.${sys_enc}"
+        sys_lang="${sys_lang%%.*}"
     fi
 
     local mib=$((1024 * 1024))
@@ -73,26 +73,28 @@ setup_config() {
         return 1
     fi
 
-    local kernel_arr="[\"linux\"]"
-    if [[ -n "$KERNEL_SELECTION" ]]; then
-        local kernel_escaped
-        kernel_escaped=$(jq -n --arg v "$KERNEL_SELECTION" '$v' | tr -d '"')
-        kernel_arr="[\"$kernel_escaped\"]"
+    local luks_password_json="null"
+    local luks_iter_time="null"
+    local luks_enc_type="null"
+    if [[ "$LUKS_ENABLED" == "true" && -n "$LUKS_PASSWORD" ]]; then
+        local luks_pw_escaped
+        luks_pw_escaped=$(echo -n "$LUKS_PASSWORD" | jq -Rsa)
+        luks_password_json="$luks_pw_escaped"
+        luks_iter_time="${LUKS_ITER_TIME:-2000}"
+        luks_enc_type="\"luks\""
     fi
 
-    local mirror_regions_json="{}"
-    if [[ -n "$MIRROR_REGIONS" ]]; then
-        local region_escaped
-        region_escaped=$(jq -n --arg v "$MIRROR_REGIONS" '$v')
-        mirror_regions_json="{$region_escaped: []}"
-    fi
+    local root_pw_escaped
+    if ! root_pw_escaped=$(echo -n "$ROOT_PASSWORD_HASH" | jq -Rsa 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process root password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
 
-    local custom_servers_json="[]"
-    if [[ -n "$CUSTOM_MIRRORS" ]]; then
-        local mirror_escaped
-        mirror_escaped=$(jq -n --arg v "$CUSTOM_MIRRORS" '$v')
-        custom_servers_json="[{\"url\": $mirror_escaped}]"
-    fi
+    local user_pw_escaped
+    if ! user_pw_escaped=$(echo -n "$USER_PASSWORD_HASH" | jq -Rsa 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process user password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
+
+    local username_escaped
+    if ! username_escaped=$(echo -n "$USER_NAME" | jq -Rsa 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
 
     local bluetooth_json="false"
     if [[ "$BLUETOOTH_ENABLED" == "true" ]]; then
@@ -104,33 +106,15 @@ setup_config() {
         print_json="true"
     fi
 
-    local luks_partitions="[]"
-    local luks_password_json="null"
-    local luks_iter_time="null"
-    local luks_enc_type="null"
+    local encryption_password_escaped="null"
     if [[ "$LUKS_ENABLED" == "true" && -n "$LUKS_PASSWORD" ]]; then
-        local luks_pw_escaped
-        luks_pw_escaped=$(jq -n --arg v "$LUKS_PASSWORD" '$v')
-        luks_password_json="$luks_pw_escaped"
-        luks_iter_time="${LUKS_ITER_TIME:-2000}"
-        luks_partitions="[\"6c6490d5-7399-4bc1-b32b-fe527ccd75bf\"]"
-        luks_enc_type="\"luks\""
+        if ! encryption_password_escaped=$(echo -n "$LUKS_PASSWORD" | jq -Rsa 2>/dev/null); then
+            rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process LUKS password"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
     fi
-
-    local root_pw_escaped
-    if ! root_pw_escaped=$(jq -n --arg v "$ROOT_PASSWORD_HASH" '$v' 2>/dev/null); then
-        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process root password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
-
-    local user_pw_escaped
-    if ! user_pw_escaped=$(jq -n --arg v "$USER_PASSWORD_HASH" '$v' 2>/dev/null); then
-        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process user password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
-
-    local username_escaped
-    if ! username_escaped=$(jq -n --arg v "$USER_NAME" '$v' 2>/dev/null); then
-        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
 
     cat >user_credentials.json <<EOF
 {
+    "encryption_password": $encryption_password_escaped,
     "root_enc_password": $root_pw_escaped,
     "users": [
         {
@@ -148,7 +132,7 @@ EOF
         luks_block=$(jq -n \
             --arg enc "$luks_enc_type" \
             --argjson iter "$luks_iter_time" \
-            --argjson parts "$luks_partitions" \
+            --argjson parts '["6c6490d5-7399-4bc1-b32b-fe527ccd75bf"]' \
             --arg pw "$LUKS_PASSWORD" \
             '{
                 encryption_type: $enc,
