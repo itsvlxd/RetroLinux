@@ -4,9 +4,9 @@ rx_get_disk_info() {
     local device="$1"
     local size vendor model label
 
-    size=$(lsblk -dno SIZE "$device" 2>/dev/null)
-    vendor=$(lsblk -dno VENDOR "$device" 2>/dev/null | sed 's/ *$//')
-    model=$(lsblk -dno MODEL "$device" 2>/dev/null | sed 's/ *$//')
+    size=$(lsblk -dno SIZE "$device" 2>/dev/null | tr -d ' ')
+    vendor=$(lsblk -dno VENDOR "$device" 2>/dev/null | xargs 2>/dev/null)
+    model=$(lsblk -dno MODEL "$device" 2>/dev/null | xargs 2>/dev/null)
 
     label=""
     if [[ -n $vendor && -n $model ]]; then
@@ -21,14 +21,21 @@ rx_get_disk_info() {
         label="$vendor"
     fi
 
+    local part_count=0
+    part_count=$(lsblk -nro PARTNAME "$device" 2>/dev/null | grep -c '[a-zA-Z0-9]' || true)
+    part_count=${part_count:-0}
+    part_count=$((part_count + 0))
+
     local display="$device"
     [[ -n $size ]] && display="$display ($size)"
     [[ -n $label ]] && display="$display - $label"
 
-    local part_summary
-    part_summary=$(lsblk -nro TYPE,NAME,FSTYPE,MOUNTPOINT "$device" 2>/dev/null |
-        awk '$1=="part" { printf "%s%s%s", s, ($3==""?"?":$3), ($4==""?"":"("$4")"); s=", " }')
-    [[ -n $part_summary ]] && display+=" [$part_summary]"
+    if [[ $part_count -gt 0 ]]; then
+        local part_summary
+        part_summary=$(lsblk -nro TYPE,FSTYPE,MOUNTPOINT "$device" 2>/dev/null |
+            awk '$1=="part" && $2!="" { printf "%s%s%s", s, ($3==""?"?":$3), ($4==""?"":"("$4")"); s=", " }')
+        [[ -n $part_summary ]] && display+=" [$part_summary]"
+    fi
 
     echo "$display"
 }
