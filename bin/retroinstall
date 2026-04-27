@@ -127,8 +127,13 @@ rx_install_system() {
     fi
 
     local luks_info="Disabled"
+    local luks_pw_dots=""
     if [[ "$LUKS_ENABLED" == "true" ]]; then
         luks_info="Enabled (${LUKS_ITER_TIME:-2000}ms iter)"
+        if [[ -n "$LUKS_PASSWORD" ]]; then
+            local luks_pw_len=${#LUKS_PASSWORD}
+            luks_pw_dots=$(printf '%*s' "$luks_pw_len" | tr ' ' '•')
+        fi
     fi
 
     local root_pw_dots=""
@@ -163,7 +168,7 @@ rx_install_system() {
         mirror_info="$mirror_info + custom"
     fi
 
-    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info}\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" | \
+    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info} (${luks_pw_dots:-none})\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" | \
         gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
     echo
 
