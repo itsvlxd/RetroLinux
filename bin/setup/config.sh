@@ -52,51 +52,6 @@ setup_config() {
         sys_lang="${sys_lang%.*}.${sys_enc}"
     fi
 
-    local password_escaped
-    if ! password_escaped=$(echo -n "$USER_PASSWORD" | jq -Rsa); then
-        rx_clear_logo
-        echo
-        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password"
-        echo
-        rx_retry_or_exit "JSON processing failed" || rx_abort
-        return 1
-    fi
-
-    local password_hash_escaped
-    if ! password_hash_escaped=$(echo -n "$USER_PASSWORD_HASH" | jq -Rsa); then
-        rx_clear_logo
-        echo
-        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password hash"
-        echo
-        rx_retry_or_exit "JSON processing failed" || rx_abort
-        return 1
-    fi
-
-    local username_escaped
-    if ! username_escaped=$(echo -n "$USER_NAME" | jq -Rsa); then
-        rx_clear_logo
-        echo
-        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"
-        echo
-        rx_retry_or_exit "JSON processing failed" || rx_abort
-        return 1
-    fi
-
-    cat <<EOF >user_credentials.json
-{
-    "encryption_password": $password_escaped,
-    "root_enc_password": $password_hash_escaped,
-    "users": [
-        {
-            "enc_password": $password_hash_escaped,
-            "groups": [],
-            "sudo": true,
-            "username": $username_escaped
-        }
-    ]
-}
-EOF
-
     local mib=$((1024 * 1024))
     local gib=$((mib * 1024))
     local disk_size_in_mib=$((disk_size / mib * mib))
@@ -118,115 +73,223 @@ EOF
         return 1
     fi
 
-    cat <<EOF >user_configuration.json
+    local kernel_arr="[\"linux\"]"
+    if [[ -n "$KERNEL_SELECTION" ]]; then
+        local kernel_escaped
+        kernel_escaped=$(jq -n --arg v "$KERNEL_SELECTION" '$v' | tr -d '"')
+        kernel_arr="[\"$kernel_escaped\"]"
+    fi
+
+    local mirror_regions_json="{}"
+    if [[ -n "$MIRROR_REGIONS" ]]; then
+        local region_escaped
+        region_escaped=$(jq -n --arg v "$MIRROR_REGIONS" '$v')
+        mirror_regions_json="{$region_escaped: []}"
+    fi
+
+    local custom_servers_json="[]"
+    if [[ -n "$CUSTOM_MIRRORS" ]]; then
+        local mirror_escaped
+        mirror_escaped=$(jq -n --arg v "$CUSTOM_MIRRORS" '$v')
+        custom_servers_json="[{\"url\": $mirror_escaped}]"
+    fi
+
+    local bluetooth_json="false"
+    if [[ "$BLUETOOTH_ENABLED" == "true" ]]; then
+        bluetooth_json="true"
+    fi
+
+    local print_json="false"
+    if [[ "$PRINT_SERVICE_ENABLED" == "true" ]]; then
+        print_json="true"
+    fi
+
+    local luks_partitions="[]"
+    local luks_password_json="null"
+    local luks_iter_time="null"
+    local luks_enc_type="null"
+    if [[ "$LUKS_ENABLED" == "true" && -n "$LUKS_PASSWORD" ]]; then
+        local luks_pw_escaped
+        luks_pw_escaped=$(jq -n --arg v "$LUKS_PASSWORD" '$v')
+        luks_password_json="$luks_pw_escaped"
+        luks_iter_time="${LUKS_ITER_TIME:-2000}"
+        luks_partitions="[\"6c6490d5-7399-4bc1-b32b-fe527ccd75bf\"]"
+        luks_enc_type="\"luks\""
+    fi
+
+    local root_pw_escaped
+    if ! root_pw_escaped=$(jq -n --arg v "$ROOT_PASSWORD_HASH" '$v' 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process root password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
+
+    local user_pw_escaped
+    if ! user_pw_escaped=$(jq -n --arg v "$USER_PASSWORD_HASH" '$v' 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process user password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
+
+    local username_escaped
+    if ! username_escaped=$(jq -n --arg v "$USER_NAME" '$v' 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
+
+    cat >user_credentials.json <<EOF
 {
-    "app_config": null,
-    "archinstall-language": "English",
-    "auth_config": {},
-    "audio_config": { "audio": "pipewire" },
-    "bootloader": "grub",
-    "custom_commands": [],
-    "disk_config": {
-        "btrfs_options": {},
-        "config_type": "default_layout",
-        "device_modifications": [
-            {
-                "device": "$DISK_SELECTED",
-                "partitions": [
-                    {
-                        "btrfs": [],
-                        "dev_path": null,
-                        "flags": [ "boot", "esp" ],
-                        "fs_type": "fat32",
-                        "mount_options": [],
-                        "mountpoint": "/boot",
-                        "obj_id": "ea21d3f2-82bb-49cc-ab5d-6f81ae94e18d",
-                        "size": {
-                            "sector_size": { "unit": "B", "value": 512 },
-                            "unit": "B",
-                            "value": $boot_partition_size
-                        },
-                        "start": {
-                            "sector_size": { "unit": "B", "value": 512 },
-                            "unit": "B",
-                            "value": $boot_partition_start
-                        },
-                        "status": "create",
-                        "type": "primary"
-                    },
-                    {
-                        "btrfs": [
-                            { "mountpoint": "/", "name": "@" },
-                            { "mountpoint": "/home", "name": "@home" },
-                            { "mountpoint": "/var/log", "name": "@log" },
-                            { "mountpoint": "/var/cache/pacman/pkg", "name": "@pkg" }
-                        ],
-                        "dev_path": null,
-                        "flags": [],
-                        "fs_type": "btrfs",
-                        "mount_options": [ "compress=zstd" ],
-                        "mountpoint": null,
-                        "obj_id": "8c2c2b92-1070-455d-b76a-56263bab24aa",
-                        "size": {
-                            "sector_size": { "unit": "B", "value": 512 },
-                            "unit": "B",
-                            "value": $main_partition_size
-                        },
-                        "start": {
-                            "sector_size": { "unit": "B", "value": 512 },
-                            "unit": "B",
-                            "value": $main_partition_start
-                        },
-                        "status": "create",
-                        "type": "primary"
-                    }
-                ],
-                "wipe": true
-            }
-        ],
-        "disk_encryption": {
-            "encryption_type": "luks",
-            "lvm_volumes": [],
-            "iter_time": 2000,
-            "partitions": [ "8c2c2b92-1070-455d-b76a-56263bab24aa" ],
-            "encryption_password": $password_escaped
+    "root_enc_password": $root_pw_escaped,
+    "users": [
+        {
+            "enc_password": $user_pw_escaped,
+            "groups": [],
+            "sudo": true,
+            "username": $username_escaped
         }
-    },
-    "hostname": "$USER_HOSTNAME",
-    "kernels": [ "linux" ],
-    "network_config": { "type": "iso" },
-    "ntp": true,
-    "parallel_downloads": 8,
-    "script": null,
-    "services": [],
-    "swap": true,
-    "timezone": "$USER_TIMEZONE",
-    "locale_config": {
-        "kb_layout": "$KEYBOARD",
-        "sys_enc": "$sys_enc",
-        "sys_lang": "$sys_lang"
-    },
-    "mirror_config": {
-        "custom_repositories": [],
-        "custom_servers": [
-            {"url": "https://geo.mirror.pkgbuild.com/\$repo/os/\$arch"}
-        ],
-        "mirror_regions": {},
-        "optional_repositories": []
-    },
-    "packages": [
-        "base-devel",
-        "git",
-        "neovim"
-    ],
-    "profile_config": {
-        "gfx_driver": null,
-        "greeter": null,
-        "profile": {}
-    },
-    "version": "3.0.9"
+    ]
 }
 EOF
+
+    local luks_block="null"
+    if [[ "$LUKS_ENABLED" == "true" && -n "$LUKS_PASSWORD" ]]; then
+        luks_block=$(jq -n \
+            --arg enc "$luks_enc_type" \
+            --argjson iter "$luks_iter_time" \
+            --argjson parts "$luks_partitions" \
+            --arg pw "$LUKS_PASSWORD" \
+            '{
+                encryption_type: $enc,
+                lvm_volumes: [],
+                iter_time: $iter,
+                partitions: $parts,
+                encryption_password: $pw
+            }')
+    fi
+
+    local user_config_json
+    user_config_json=$(jq -n \
+        --arg device "$DISK_SELECTED" \
+        --argjson boot_size "$boot_partition_size" \
+        --argjson boot_start "$boot_partition_start" \
+        --argjson main_size "$main_partition_size" \
+        --argjson main_start "$main_partition_start" \
+        --arg hostname "$USER_HOSTNAME" \
+        --arg kernel "$KERNEL_SELECTION" \
+        --arg kb "$KEYBOARD" \
+        --arg sys_lang "$sys_lang" \
+        --arg sys_enc "$sys_enc" \
+        --arg timezone "$USER_TIMEZONE" \
+        --argjson bluetooth "$bluetooth_json" \
+        --argjson printing "$print_json" \
+        --arg mirrors "$MIRROR_REGIONS" \
+        --arg custom_mirror "$CUSTOM_MIRRORS" \
+        --argjson luks "$luks_block" \
+        '{
+            app_config: {
+                audio_config: { audio: "pipewire" },
+                bluetooth_config: { enabled: $bluetooth },
+                firewall_config: { firewall: "ufw" },
+                print_service_config: { enabled: $printing }
+            },
+            "archinstall-language": "English",
+            auth_config: {},
+            bootloader_config: {
+                bootloader: "Grub",
+                removable: true,
+                uki: true
+            },
+            custom_commands: [],
+            disk_config: {
+                btrfs_options: {
+                    snapshot_config: {
+                        type: "Timeshift"
+                    }
+                },
+                config_type: "default_layout",
+                device_modifications: [{
+                    device: $device,
+                    partitions: [
+                        {
+                            btrfs: [],
+                            dev_path: null,
+                            flags: ["boot", "esp"],
+                            fs_type: "fat32",
+                            mount_options: [],
+                            mountpoint: "/boot",
+                            obj_id: "5e886548-4794-4b97-9535-7c3e34e744ce",
+                            size: { sector_size: { unit: "B", value: 512 }, unit: "GiB", value: 1 },
+                            start: { sector_size: { unit: "B", value: 512 }, unit: "MiB", value: 1 },
+                            status: "create",
+                            type: "primary"
+                        },
+                        {
+                            btrfs: [
+                                { mountpoint: "/", name: "@" },
+                                { mountpoint: "/home", name: "@home" },
+                                { mountpoint: "/var/log", name: "@log" },
+                                { mountpoint: "/var/cache/pacman/pkg", name: "@pkg" }
+                            ],
+                            dev_path: null,
+                            flags: [],
+                            fs_type: "btrfs",
+                            mount_options: ["compress=zstd"],
+                            mountpoint: null,
+                            obj_id: "6c6490d5-7399-4bc1-b32b-fe527ccd75bf",
+                            size: { sector_size: { unit: "B", value: 512 }, unit: "B", value: $main_size },
+                            start: { sector_size: { unit: "B", value: 512 }, unit: "B", value: $main_start },
+                            status: "create",
+                            type: "primary"
+                        }
+                    ],
+                    wipe: true
+                }]
+            } + (if $luks != null then { disk_encryption: $luks } else {} end),
+            hostname: $hostname,
+            kernels: [$kernel],
+            locale_config: {
+                kb_layout: $kb,
+                sys_enc: $sys_enc,
+                sys_lang: $sys_lang
+            },
+            mirror_config: {
+                custom_repositories: [],
+                custom_servers: (if $custom_mirror != "" then [{ url: $custom_mirror }] else [] end),
+                mirror_regions: (if $mirrors != "" then { ($mirrors): [] } else {} end),
+                optional_repositories: []
+            },
+            network_config: { type: "nm_iwd" },
+            ntp: true,
+            pacman_config: {
+                color: true,
+                parallel_downloads: 5
+            },
+            packages: [],
+            profile_config: {
+                gfx_driver: "All open-source",
+                greeter: "sddm",
+                profile: {
+                    custom_settings: {
+                        Hyprland: {
+                            seat_access: "polkit"
+                        }
+                    },
+                    details: ["Hyprland"],
+                    main: "Desktop"
+                }
+            },
+            script: null,
+            services: [],
+            swap: {
+                algorithm: "zstd",
+                enabled: true
+            },
+            timezone: $timezone,
+            version: "4.3"
+        }')
+
+    echo "$user_config_json" >user_configuration.json
+
+    if ! jq empty user_configuration.json 2>/dev/null; then
+        rx_clear_logo
+        echo
+        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Generated invalid JSON"
+        echo
+        rx_retry_or_exit "JSON validation failed" || rx_abort
+        return 1
+    fi
 
     return 0
 }

@@ -55,27 +55,6 @@ setup_user() {
         return 1
     }
 
-    while true; do
-        local hostname
-        hostname=$(gum input --placeholder "retrolinux" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Hostname> " --padding "$GUM_INPUT_PADDING") || {
-            rx_step_error "2" "Hostname input failed"
-            rx_retry_or_exit "Hostname is required" || rx_abort
-            return 1
-        }
-
-        if [[ $hostname =~ ^[A-Za-z_][A-Za-z0-9_-]*\$?$ ]]; then
-            # shellcheck disable=SC2034
-            USER_HOSTNAME="$hostname"
-            break
-        elif [[ -z $hostname ]]; then
-            # shellcheck disable=SC2034
-            USER_HOSTNAME="retrolinux"
-            break
-        else
-            rx_notice "Letters, numbers, dashes/underscores only" 1
-        fi
-    done
-
     rx_save_state
     return 0
 }
