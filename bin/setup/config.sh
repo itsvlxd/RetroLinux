@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_INSTALL/lib/setup_lib.sh"
+
 setup_config() {
     rx_load_state
 
@@ -51,36 +53,36 @@ setup_config() {
     fi
 
     local password_escaped
-    password_escaped=$(echo -n "$USER_PASSWORD" | jq -Rsa) || {
+    if ! password_escaped=$(echo -n "$USER_PASSWORD" | jq -Rsa); then
         rx_clear_logo
         echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password"
         echo
         rx_retry_or_exit "JSON processing failed" || rx_abort
         return 1
-    }
+    fi
 
     local password_hash_escaped
-    password_hash_escaped=$(echo -n "$USER_PASSWORD_HASH" | jq -Rsa) || {
+    if ! password_hash_escaped=$(echo -n "$USER_PASSWORD_HASH" | jq -Rsa); then
         rx_clear_logo
         echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process password hash"
         echo
         rx_retry_or_exit "JSON processing failed" || rx_abort
         return 1
-    }
+    fi
 
     local username_escaped
-    username_escaped=$(echo -n "$USER_NAME" | jq -Rsa) || {
+    if ! username_escaped=$(echo -n "$USER_NAME" | jq -Rsa); then
         rx_clear_logo
         echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process username"
         echo
         rx_retry_or_exit "JSON processing failed" || rx_abort
         return 1
-    }
+    fi
 
-    cat <<-_EOF_ >user_credentials.json
+    cat <<EOF >user_credentials.json
 {
     "encryption_password": $password_escaped,
     "root_enc_password": $password_hash_escaped,
@@ -93,7 +95,7 @@ setup_config() {
         }
     ]
 }
-_EOF_
+EOF
 
     local mib=$((1024 * 1024))
     local gib=$((mib * 1024))
@@ -116,7 +118,7 @@ _EOF_
         return 1
     fi
 
-    cat <<-_EOF_ >user_configuration.json
+    cat <<EOF >user_configuration.json
 {
     "app_config": null,
     "archinstall-language": "English",
@@ -224,24 +226,11 @@ _EOF_
     },
     "version": "3.0.9"
 }
-_EOF_
+EOF
+
     return 0
 }
 
-if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then
-    export RETRO_SETUP_SOURCED=1
-    source "$RETRO_INSTALL/lib/display.sh"
-    source "$RETRO_INSTALL/lib/errors.sh"
-    source "$RETRO_INSTALL/lib/gum.sh"
-    source "$RETRO_INSTALL/lib/wifi.sh"
-    source "$RETRO_INSTALL/lib/qr.sh"
-    source "$RETRO_INSTALL/lib/locale.sh"
-    source "$RETRO_INSTALL/lib/timezone.sh"
-    source "$RETRO_INSTALL/lib/handlers.sh"
-    source "$RETRO_INSTALL/lib/output.sh"
-    source "$RETRO_INSTALL/lib/debug.sh"
-    source "$RETRO_INSTALL/lib/progress.sh"
-    rx_set_retro_colors
+if ! setup_config; then
+    rx_setup_fail "Config"
 fi
-
-setup_config

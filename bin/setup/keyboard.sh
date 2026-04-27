@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_INSTALL/lib/setup_lib.sh"
+
 setup_keyboard() {
     rx_load_state
     rx_step "Let's setup your machine..."
@@ -55,7 +57,7 @@ Turkish
 Ukrainian'
 
     local choice
-    choice=$(printf '%s\n' "$keyboards" | gum choose --height "$GUM_CHOOSE_HEIGHT" --selected "English (US)" --header "Select keyboard layout" --padding "$GUM_CHOOSE_PADDING") || {
+    choice=$(printf '%s\n' "$keyboards" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --prompt "Keyboard> " --placeholder "Please select your keyboard layout" --padding "$GUM_FILTER_PADDING") || {
         rx_step_error "1" "Keyboard selection cancelled"
         rx_retry_or_exit "Keyboard selection is required" || rx_abort
         return 1
@@ -116,22 +118,9 @@ Ukrainian'
 
     rx_set_keyboard_layout "$KEYBOARD"
     rx_save_state
+    return 0
 }
 
-if [[ "${RETRO_SETUP_SOURCED:-}" != "1" ]]; then
-    export RETRO_SETUP_SOURCED=1
-    source "$RETRO_INSTALL/lib/display.sh"
-    source "$RETRO_INSTALL/lib/errors.sh"
-    source "$RETRO_INSTALL/lib/gum.sh"
-    source "$RETRO_INSTALL/lib/wifi.sh"
-    source "$RETRO_INSTALL/lib/qr.sh"
-    source "$RETRO_INSTALL/lib/locale.sh"
-    source "$RETRO_INSTALL/lib/timezone.sh"
-    source "$RETRO_INSTALL/lib/handlers.sh"
-    source "$RETRO_INSTALL/lib/output.sh"
-    source "$RETRO_INSTALL/lib/debug.sh"
-    source "$RETRO_INSTALL/lib/progress.sh"
-    rx_set_retro_colors
+if ! setup_keyboard; then
+    rx_setup_fail "Keyboard"
 fi
-
-setup_keyboard

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_INSTALL/lib/setup_lib.sh"
+
 setup_timezone() {
     rx_load_state
     rx_step "Let's setup your timezone..."
@@ -8,7 +10,7 @@ setup_timezone() {
     current_tz=$(rx_get_current_timezone)
 
     # shellcheck disable=SC2034
-    USER_TIMEZONE=$(timedatectl list-timezones | gum filter --height "$GUM_FILTER_HEIGHT" --prompt "Timezone> " --placeholder "Please select your timezone" --prompt.foreground "$GUM_CONFIRM_PROMPT_FOREGROUND" --selected "$current_tz" --padding "$GUM_FILTER_PADDING") || {
+    USER_TIMEZONE=$(timedatectl list-timezones | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --prompt "Timezone> " --placeholder "Please select your timezone" --padding "$GUM_FILTER_PADDING") || {
         rx_step_error "1" "Timezone selection failed"
         rx_retry_or_exit "Timezone is required" || rx_abort
         return 1
@@ -17,20 +19,6 @@ setup_timezone() {
     return 0
 }
 
-if [[ ${RETRO_SETUP_SOURCED:-} != "1" ]]; then
-    export RETRO_SETUP_SOURCED=1
-    source "$RETRO_INSTALL/lib/display.sh"
-    source "$RETRO_INSTALL/lib/errors.sh"
-    source "$RETRO_INSTALL/lib/gum.sh"
-    source "$RETRO_INSTALL/lib/wifi.sh"
-    source "$RETRO_INSTALL/lib/qr.sh"
-    source "$RETRO_INSTALL/lib/locale.sh"
-    source "$RETRO_INSTALL/lib/timezone.sh"
-    source "$RETRO_INSTALL/lib/handlers.sh"
-    source "$RETRO_INSTALL/lib/output.sh"
-    source "$RETRO_INSTALL/lib/debug.sh"
-    source "$RETRO_INSTALL/lib/progress.sh"
-    rx_set_retro_colors
+if ! setup_timezone; then
+    rx_setup_fail "Timezone"
 fi
-
-setup_timezone
