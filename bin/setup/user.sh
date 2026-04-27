@@ -55,6 +55,15 @@ setup_user() {
         return 1
     }
 
+    echo
+    if gum confirm --affirmative "Yes, enable sudo" --negative "No, skip sudo" "User sudo access" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+        # shellcheck disable=SC2034
+        USER_SUDO="true"
+    else
+        # shellcheck disable=SC2034
+        USER_SUDO="false"
+    fi
+
     rx_save_state
     return 0
 }

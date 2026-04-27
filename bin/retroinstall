@@ -54,6 +54,7 @@ else
     USER_HOSTNAME=""
     ROOT_PASSWORD=""
     ROOT_PASSWORD_HASH=""
+    USER_SUDO="true"
     MIRROR_REGIONS=""
     CUSTOM_MIRRORS=""
     USER_TIMEZONE=""
@@ -160,6 +161,11 @@ rx_install_system() {
         print_info="Enabled"
     fi
 
+    local sudo_info="Yes"
+    if [[ "$USER_SUDO" == "false" ]]; then
+        sudo_info="No"
+    fi
+
     local mirror_info="Auto"
     if [[ -n "$MIRROR_REGIONS" ]]; then
         mirror_info="$MIRROR_REGIONS"
@@ -168,7 +174,7 @@ rx_install_system() {
         mirror_info="$mirror_info + custom"
     fi
 
-    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US.UTF-8}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info} (${luks_pw_dots:-none})\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" | \
+    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nSudo Access,${sudo_info}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info} (${luks_pw_dots:-none})\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" | \
         gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
     echo
 
