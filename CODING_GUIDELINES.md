@@ -111,7 +111,7 @@ local value=$(rx_get_json "$file" "$key" "default")
 
 ---
 
-## 4. The Two-Layer Tool Pattern (MOST IMPORTANT)
+## 4. The Two-Layer Tool Pattern 🎯 (MOST IMPORTANT)
 
 Every tool in this project follows a strict two-layer architecture:
 
@@ -170,7 +170,7 @@ source "$RETRO_DIR/lib/colors.sh"
 
 ---
 
-## 5. Color and Logging System
+## 5. Color and Logging System 🔥
 
 ### Available Color Variables
 
@@ -214,7 +214,7 @@ printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "command" "description"
 
 ---
 
-## 6. Design Rules and Examples
+## 6. Design Rules and Examples 🎨
 
 ### Status Table Pattern (Use Centralized Functions)
 
@@ -357,7 +357,7 @@ Icons are Nerd Font glyphs. Common icons by category:
 
 ---
 
-## 7. Command System
+## 7. Command System 🚀
 
 ### register_command
 
@@ -429,7 +429,7 @@ esac
 
 ---
 
-## 8. Backend Core Scripts
+## 8. Backend Core Scripts ⚙️
 
 ### CLI Flags Pattern
 
@@ -484,7 +484,7 @@ echo "GPU|nvidia|NVIDIA GeForce RTX 3080|nvidia-open-dkms|nvidia-utils nvidia-se
 
 ---
 
-## 9. Frontend Command Scripts
+## 9. Frontend Command Scripts 💻
 
 ### Calling Core Scripts
 
@@ -541,7 +541,7 @@ rx_log "success" "Action completed"
 
 ---
 
-## 10. Module System
+## 10. Module System 🧩
 
 ### Module Structure
 
@@ -576,7 +576,7 @@ modules/<name>/
 
 ---
 
-## 11. Variable System
+## 11. Variable System 🔧
 
 ### Storage
 
@@ -607,7 +607,7 @@ bash "$RETRO_DIR/scripts/variable_core.sh" --list
 
 ---
 
-## 12. Dependency Management
+## 12. Dependency Management 📦
 
 ### check_dep Function
 
@@ -628,7 +628,7 @@ rx_is_pkg_installed() {
 
 ---
 
-## 13. Event System (Background Daemon)
+## 13. Event System 🖥️ (Background Daemon)
 
 ### Overview
 
@@ -846,7 +846,7 @@ on_battery_low() {
 
 ---
 
-## 14. Walkthrough: Adding a New Tool
+## 14. Walkthrough: Adding a New Tool 🛠️
 
 Now that you know ALL the rules, let's add a hypothetical `temperature` tool:
 
@@ -932,7 +932,7 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 
 ---
 
-## 15. Best Practices and Gotchas
+## 15. Best Practices and Gotchas ✅
 
 ### Do
 
@@ -984,7 +984,7 @@ Failing to handle interrupts can leave the system in a broken state (half-instal
 
 ---
 
-## 16. Installer System (bin/)
+## 16. Installer System 💾 (bin/)
 
 The Installer is a self-contained system that runs during initial system setup. It follows a **modular setup flow architecture**:
 
@@ -1330,58 +1330,34 @@ The installer uses numeric color codes for gum style commands:
 
 ---
 
-## 17. Quick Reference
+## 17. Quick Reference 📚
 
 ### File Locations
 
 ```
 RetroLinux/
 ├── retro.sh                    # Entry point
-├── lib/                        # All shared libraries
+├── lib/                        # Shared libraries
 │   ├── colors.sh
 │   ├── log.sh
 │   ├── fs.sh
-│   ├── driver.sh
-│   ├── helpers.sh
-│   ├── module.sh
 │   └── ...
 ├── bin/                        # Installer system
 │   ├── retroinstall            # Main entry point
 │   ├── logo.txt                # ASCII art logo
-│   ├── lib/                    # Low-level utilities (14 files)
-│   │   ├── debug.sh
-│   │   ├── disk.sh
+│   ├── lib/                    # Low-level utilities
 │   │   ├── display.sh
-│   │   ├── errors.sh
-│   │   ├── gum.sh
 │   │   ├── handlers.sh
-│   │   ├── locale.sh
-│   │   ├── output.sh
-│   │   ├── progress.sh
-│   │   ├── qr.sh
-│   │   ├── setup_lib.sh
-│   │   ├── setup.sh
-│   │   ├── timezone.sh
-│   │   └── wifi.sh
-│   └── setup/                  # Modular setup scripts (14 scripts)
-│       ├── bluetooth.sh
-│       ├── config.sh
+│   │   ├── wifi.sh
+│   │   └── ...
+│   └── setup/                  # Setup step scripts
+│       ├── user.sh
 │       ├── disk.sh
-│       ├── hostname.sh
-│       ├── kernel.sh
-│       ├── keyboard.sh
-│       ├── locale.sh
-│       ├── luks.sh
-│       ├── mirrors.sh
-│       ├── network.sh
-│       ├── print.sh
-│       ├── root.sh
-│       ├── timezone.sh
-│       └── user.sh
+│       ├── config.sh
+│       └── ...
 ├── scripts/                    # Backend core scripts
 │   ├── audio_core.sh
 │   ├── network_core.sh
-│   ├── driver_core.sh
 │   └── ...
 ├── scripts/events/             # Event hook modules
 │   ├── battery_events.sh
@@ -1390,7 +1366,6 @@ RetroLinux/
 ├── scripts/watchers/           # Background system monitors
 │   ├── battery.sh
 │   ├── bluetooth.sh
-│   ├── timers.sh
 │   └── ...
 ├── cmds/tools/                 # Frontend commands
 │   ├── audio.sh
