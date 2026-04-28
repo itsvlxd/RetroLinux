@@ -1,23 +1,33 @@
-# RetroLinux Coding Guidelines
+<p align="center" style="vertical-align: middle">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="140" style="margin-right: 2px; vertical-align: middle">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-main-transparent-bg.png" alt="Logo" width="700" style="margin-right: 2px; vertical-align: middle">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="140" style="vertical-align: middle">
+</p>
 
-A comprehensive guide to developing and extending the RetroLinux project.
+<p align="center">
+
+This document serves as the **single source of truth** for all RetroLinux development. Whether you're writing core scripts, frontend commands, installer utilities, or event handlers - these guidelines apply to everything.
+
+**Who this is for:**
+- **Contributors** building new features or fixing bugs
+- **Maintainers** reviewing pull requests and enforcing standards
+- **Anyone** extending RetroLinux's functionality
+
+**What it covers:**
+- Project structure and file naming conventions
+- Code style rules and shellcheck compliance
+- The two-layer architecture (frontend + backend)
+- Color, logging, and UI patterns
+- Command registration and execution flow
+- The event system and background watchers
+- The installer system (bin/) in detail
+- Quick reference for common patterns
+
+</p>
 
 ---
 
-## 1. Project Overview
-
-RetroLinux is a full, standalone Arch-based Linux distribution built to provide bleeding-edge features with unbreakable stability. It was created as a response to the extremes in modern Linux - traditional desktop environments (GNOME, KDE, Cinnamon) are bloated, while most "minimal" Hyprland setups force users to duct-tape thousands of packages together.
-
-The project provides the `retro` CLI - a unified command center to manage the entire system, from hardware drivers to audio, networking, power profiles, window sessions, and desktop environment configurations.
-
-- **Philosophy**: Fast, fully customizable, modular OS that detects user tweaks and adapts
-- **Target Users**: Developers (terminal-centric workflow), Gamers (zero background bloat), Ricers (customization without breaking the system)
-- **Visual Style**: 80s/90s synthwave aesthetic - neon pinks, wireframes, retro-futurism
-- **Architecture**: Source-based (no compilation), two-layer pattern (backend core + frontend UI)
-
----
-
-## 2. Directory Structure
+## 1. Directory Structure 📁
 
 | Directory | Purpose |
 |-----------|---------|
@@ -32,13 +42,13 @@ The project provides the `retro` CLI - a unified command center to manage the en
 | `icons/` | Project icons and assets |
 | `wallpapers/` | Wallpaper assets |
 
-### Critical Rule
+### Critical Rule ⚠️
 
 > **ALL lib files for anything should stay in `./lib/`** - this is the single source of truth for shared utilities.
 
 ---
 
-## 3. File Naming Conventions
+## 2. File Naming Conventions 📝
 
 | Pattern | Location | Example |
 |---------|----------|---------|
@@ -56,7 +66,7 @@ The project provides the `retro` CLI - a unified command center to manage the en
 
 ---
 
-## 4. Code Style Rules
+## 3. Code Style Rules ✨
 
 ### General Rules
 
@@ -101,7 +111,7 @@ local value=$(rx_get_json "$file" "$key" "default")
 
 ---
 
-## 5. The Two-Layer Tool Pattern (MOST IMPORTANT)
+## 4. The Two-Layer Tool Pattern (MOST IMPORTANT)
 
 Every tool in this project follows a strict two-layer architecture:
 
@@ -160,7 +170,7 @@ source "$RETRO_DIR/lib/colors.sh"
 
 ---
 
-## 6. Color and Logging System
+## 5. Color and Logging System
 
 ### Available Color Variables
 
@@ -204,7 +214,7 @@ printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "command" "description"
 
 ---
 
-## 7. Design Rules and Examples
+## 6. Design Rules and Examples
 
 ### Status Table Pattern (Use Centralized Functions)
 
@@ -347,7 +357,7 @@ Icons are Nerd Font glyphs. Common icons by category:
 
 ---
 
-## 8. Command System
+## 7. Command System
 
 ### register_command
 
@@ -419,7 +429,7 @@ esac
 
 ---
 
-## 9. Backend Core Scripts (scripts/*_core.sh)
+## 8. Backend Core Scripts
 
 ### CLI Flags Pattern
 
@@ -474,7 +484,7 @@ echo "GPU|nvidia|NVIDIA GeForce RTX 3080|nvidia-open-dkms|nvidia-utils nvidia-se
 
 ---
 
-## 10. Frontend Command Scripts (cmds/tools/*.sh)
+## 9. Frontend Command Scripts
 
 ### Calling Core Scripts
 
@@ -531,7 +541,7 @@ rx_log "success" "Action completed"
 
 ---
 
-## 11. Module System
+## 10. Module System
 
 ### Module Structure
 
@@ -566,7 +576,7 @@ modules/<name>/
 
 ---
 
-## 12. Variable System
+## 11. Variable System
 
 ### Storage
 
@@ -597,7 +607,7 @@ bash "$RETRO_DIR/scripts/variable_core.sh" --list
 
 ---
 
-## 13. Dependency Management
+## 12. Dependency Management
 
 ### check_dep Function
 
@@ -618,7 +628,7 @@ rx_is_pkg_installed() {
 
 ---
 
-## 14. Event System (Background Daemon)
+## 13. Event System (Background Daemon)
 
 ### Overview
 
@@ -836,7 +846,7 @@ on_battery_low() {
 
 ---
 
-## 15. Walkthrough: Adding a New Tool
+## 14. Walkthrough: Adding a New Tool
 
 Now that you know ALL the rules, let's add a hypothetical `temperature` tool:
 
@@ -922,7 +932,7 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 
 ---
 
-## 16. Best Practices and Gotchas
+## 15. Best Practices and Gotchas
 
 ### Do
 
@@ -974,7 +984,7 @@ Failing to handle interrupts can leave the system in a broken state (half-instal
 
 ---
 
-## 17. Installer System (bin/)
+## 16. Installer System (bin/)
 
 The Installer is a self-contained system that runs during initial system setup. It follows a **modular setup flow architecture**:
 
@@ -1006,7 +1016,7 @@ The Installer is a self-contained system that runs during initial system setup. 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Directory Structure
+### Directory Structure 📂
 
 ```
 bin/
@@ -1067,7 +1077,7 @@ SETUP_SCRIPTS=(
 )
 ```
 
-### Setup Flow
+### Setup Flow 🔄
 
 **rx_run_step function** (retroinstall lines 89-109):
 
@@ -1115,7 +1125,7 @@ done
 - On `42`: Sets `RX_SKIP_STEP=6`, saves state, restarts installer via `exec`
 - The installer loops, skipping steps 0-6 (user through timezone), resumes from disk.sh (index 7)
 
-### State Management (CRITICAL)
+### State Management 🔐 (CRITICAL)
 
 Setup scripts run as subprocesses of `retroinstall`. Because subprocesses cannot share variables with their parent, all state is persisted to `/tmp/retroinstall_state` (exported as `$RETRO_STATE`).
 
@@ -1182,7 +1192,7 @@ RX_GO_BACK_TO         # Name of step to go back to (set by disk.sh)
 | 12 | `network.sh` | `NETWORK_TYPE`, `WIFI_SSID` |
 | 13 | `config.sh` | Writes JSON files (no state variables) |
 
-### rx_install_system Function
+### rx_install_system Function 🔧
 
 After all setup steps complete, `rx_install_system` (retroinstall lines 224+) does:
 
@@ -1192,7 +1202,7 @@ After all setup steps complete, `rx_install_system` (retroinstall lines 224+) do
 4. **On failure**: Show error QR code, offer retry
 5. **On success**: Display "Installation Complete!" message, wait for Enter, reboot
 
-### User Input Patterns
+### User Input Patterns ⌨️
 
 #### Filter Input (Recommended for Lists)
 
@@ -1320,7 +1330,7 @@ The installer uses numeric color codes for gum style commands:
 
 ---
 
-## 18. Quick Reference
+## 17. Quick Reference
 
 ### File Locations
 
@@ -1392,7 +1402,7 @@ RetroLinux/
     └── ...
 ```
 
-### Key Patterns Summary
+### Key Patterns Summary 📋
 
 | Pattern | Code |
 |--------|------|
