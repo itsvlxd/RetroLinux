@@ -85,12 +85,12 @@ setup_config() {
     fi
 
     local root_pw_escaped
-    if ! root_pw_escaped=$(echo -n "$ROOT_PASSWORD_HASH" | jq -Rsa 2>/dev/null); then
-        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process root password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
+    if ! root_pw_escaped=$(echo -n "$ROOT_PASSWORD" | jq -Rsa 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process root password"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
 
     local user_pw_escaped
-    if ! user_pw_escaped=$(echo -n "$USER_PASSWORD_HASH" | jq -Rsa 2>/dev/null); then
-        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process user password hash"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
+    if ! user_pw_escaped=$(echo -n "$USER_PASSWORD" | jq -Rsa 2>/dev/null); then
+        rx_clear_logo; echo; gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: Could not process user password"; echo; rx_retry_or_exit "JSON processing failed" || rx_abort; return 1; fi
 
     local username_escaped
     if ! username_escaped=$(echo -n "$USER_NAME" | jq -Rsa 2>/dev/null); then
@@ -120,10 +120,10 @@ setup_config() {
     cat >user_credentials.json <<EOF
 {
     "encryption_password": $encryption_password_escaped,
-    "root_enc_password": $root_pw_escaped,
+    "!root_password": $root_pw_escaped,
     "users": [
         {
-            "enc_password": $user_pw_escaped,
+            "!password": $user_pw_escaped,
             "groups": [],
             "sudo": $sudo_json,
             "username": $username_escaped

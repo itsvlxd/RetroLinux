@@ -36,13 +36,6 @@ setup_root() {
         fi
     done
 
-    # shellcheck disable=SC2034
-    ROOT_PASSWORD_HASH=$(printf '%s' "$password" | openssl passwd -6 -stdin) || {
-        rx_step_error "2" "Password hash generation failed"
-        rx_retry_or_exit "Cannot proceed without password hash" || rx_abort
-        return 1
-    }
-
     rx_save_state
     return 0
 }

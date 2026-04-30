@@ -24,6 +24,7 @@ file_permissions=(
     ["/opt/retrolinux/bin/"]="0:0:755"
     ["/opt/retrolinux/bin/retroinstall"]="0:0:755"
     ["/opt/retrolinux/bin/setup/"]="0:0:755"
+    ["/opt/retrolinux/bin/post/"]="0:0:755"
     ["/opt/retrolinux/bin/lib/"]="0:0:755"
     ["/opt/retrolinux/bin/logo.txt"]="0:0:644"
 )

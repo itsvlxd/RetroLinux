@@ -48,13 +48,6 @@ setup_user() {
         fi
     done
 
-    # shellcheck disable=SC2034
-    USER_PASSWORD_HASH=$(printf '%s' "$password" | openssl passwd -6 -stdin) || {
-        rx_step_error "2" "Password hash generation failed"
-        rx_retry_or_exit "Cannot proceed without password hash" || rx_abort
-        return 1
-    }
-
     echo
     if gum confirm --affirmative "Yes, enable sudo" --negative "No, skip sudo" "User sudo access" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         # shellcheck disable=SC2034
