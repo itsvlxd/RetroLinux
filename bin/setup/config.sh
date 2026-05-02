@@ -81,7 +81,7 @@ setup_config() {
         luks_pw_escaped=$(echo -n "$LUKS_PASSWORD" | jq -Rsa)
         luks_password_json="$luks_pw_escaped"
         luks_iter_time="${LUKS_ITER_TIME:-2000}"
-        luks_enc_type="\"luks\""
+        luks_enc_type="luks"
     fi
 
     local root_pw_escaped
@@ -138,13 +138,11 @@ EOF
             --arg enc "$luks_enc_type" \
             --argjson iter "$luks_iter_time" \
             --argjson parts '["6c6490d5-7399-4bc1-b32b-fe527ccd75bf"]' \
-            --arg pw "$LUKS_PASSWORD" \
             '{
                 encryption_type: $enc,
                 lvm_volumes: [],
                 iter_time: $iter,
-                partitions: $parts,
-                encryption_password: $pw
+                partitions: $parts
             }')
     fi
 
