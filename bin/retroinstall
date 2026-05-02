@@ -207,6 +207,18 @@ rx_install_system() {
         gum confirm --affirmative "Retry" --negative "Exit" --padding "$GUM_CONFIRM_PADDING" && exec /opt/retrolinux/bin/retroinstall || exit 1
     fi
 
+    # Run post-installation scripts
+    rx_clear_logo
+    echo
+    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Running post-installation configuration..."
+    echo
+    
+    if [[ -f /opt/retrolinux/bin/post/run.sh ]]; then
+        bash /opt/retrolinux/bin/post/run.sh
+    else
+        gum style --foreground 3 "Post-installation scripts not found, skipping..." --padding "1 0 1 $PADDING_LEFT"
+    fi
+
     rx_clear_logo
     echo
     gum style --foreground 2 --padding "1 0 1 $PADDING_LEFT" "Installation Complete!"
