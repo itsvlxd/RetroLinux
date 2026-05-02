@@ -13,14 +13,38 @@ rx_discover_scripts() {
         [[ " ${EXCLUDE_SCRIPTS[*]} " =~ " ${basename} " ]] && continue
         scripts+=("$script")
     done
-    printf '%s\n' "${scripts[@]}"
+
+    local priority_scripts=(
+        "packages.sh"
+        "network.sh"
+        "aur.sh"
+        "ssh.sh"
+        "clone.sh"
+        "install-modules.sh")
+    local sorted_scripts=()
+    local remaining_scripts=()
+
+    for priority in "${priority_scripts[@]}"; do
+        for script in "${scripts[@]}"; do
+            [[ $script == *"$priority" ]] && sorted_scripts+=("$script") && break
+        done
+    done
+
+    for script in "${scripts[@]}"; do
+        local found=false
+        for p in "${sorted_scripts[@]}"; do
+            [[ $script == "$p" ]] && found=true && break
+        done
+        [[ $found == false ]] && remaining_scripts+=("$script")
+    done
+
+    printf '%s\n' "${sorted_scripts[@]}" "${remaining_scripts[@]}"
 }
 
 rx_run_post_install() {
     rx_clear_logo
     gum style --foreground 5 "Post-Installation Configuration" --padding "1 0 1 $PADDING_LEFT"
     gum style --foreground 7 "Applying final system configuration..." --padding "1 0 1 $PADDING_LEFT"
-    echo
 
     local scripts
     mapfile -t scripts < <(rx_discover_scripts)
@@ -39,7 +63,6 @@ rx_run_post_install() {
         else
             gum style --foreground 1 "  ${display_name^} failed" --padding "1 0 1 $PADDING_LEFT"
         fi
-        echo
         if [[ $RX_DEBUG == 1 ]]; then
             gum style --foreground 7 "Press Enter to continue..." --padding "1 0 1 $PADDING_LEFT"
             read -r

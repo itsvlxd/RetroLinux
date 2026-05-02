@@ -38,6 +38,7 @@ SETUP_SCRIPTS=(
     "kernel.sh"
     "bluetooth.sh"
     "print.sh"
+    "ssh.sh"
     "network.sh"
     "config.sh"
 )
@@ -88,7 +89,7 @@ rx_run_step() {
     local script="$1"
     local step_index=$2
 
-    if [[ -n "$RX_SKIP_STEP" && $step_index -le $RX_SKIP_STEP ]]; then
+    if [[ -n $RX_SKIP_STEP && $step_index -le $RX_SKIP_STEP ]]; then
         return 0
     fi
 
@@ -121,15 +122,15 @@ rx_install_system() {
     disk_size=$(lsblk -dno SIZE "$DISK_SELECTED" 2>/dev/null | tr -d ' ' || echo "?")
 
     local network_info="Ethernet"
-    if [[ "${NETWORK_TYPE:-}" == "WiFi" ]]; then
+    if [[ ${NETWORK_TYPE:-} == "WiFi" ]]; then
         network_info="WiFi (${WIFI_SSID:-unknown})"
     fi
 
     local luks_info="Disabled"
     local luks_pw_dots=""
-    if [[ "$LUKS_ENABLED" == "true" ]]; then
+    if [[ $LUKS_ENABLED == "true" ]]; then
         luks_info="Enabled (${LUKS_ITER_TIME:-2000}ms iter)"
-        if [[ -n "$LUKS_PASSWORD" ]]; then
+        if [[ -n $LUKS_PASSWORD ]]; then
             local luks_pw_len=${#LUKS_PASSWORD}
             luks_pw_dots=$(printf '%*s' "$luks_pw_len" | tr ' ' '•')
         fi
@@ -137,42 +138,42 @@ rx_install_system() {
 
     local root_pw_dots=""
     local root_pw_len=0
-    if [[ -n "${ROOT_PASSWORD:-}" ]]; then
+    if [[ -n ${ROOT_PASSWORD:-} ]]; then
         root_pw_len=${#ROOT_PASSWORD}
         root_pw_dots=$(printf '%*s' "$root_pw_len" | tr ' ' '•')
     fi
 
     local user_pw_dots=""
     local user_pw_len=0
-    if [[ -n "$USER_PASSWORD" ]]; then
+    if [[ -n $USER_PASSWORD ]]; then
         user_pw_len=${#USER_PASSWORD}
         user_pw_dots=$(printf '%*s' "$user_pw_len" | tr ' ' '•')
     fi
 
     local bt_info="Disabled"
-    if [[ "$BLUETOOTH_ENABLED" == "true" ]]; then
+    if [[ $BLUETOOTH_ENABLED == "true" ]]; then
         bt_info="Enabled"
     fi
 
     local print_info="Disabled"
-    if [[ "$PRINT_SERVICE_ENABLED" == "true" ]]; then
+    if [[ $PRINT_SERVICE_ENABLED == "true" ]]; then
         print_info="Enabled"
     fi
 
     local sudo_info="Yes"
-    if [[ "$USER_SUDO" == "false" ]]; then
+    if [[ $USER_SUDO == "false" ]]; then
         sudo_info="No"
     fi
 
     local mirror_info="Auto"
-    if [[ -n "$MIRROR_REGIONS" ]]; then
+    if [[ -n $MIRROR_REGIONS ]]; then
         mirror_info="$MIRROR_REGIONS"
     fi
-    if [[ -n "$CUSTOM_MIRRORS" ]]; then
+    if [[ -n $CUSTOM_MIRRORS ]]; then
         mirror_info="$mirror_info + custom"
     fi
 
-    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nSudo Access,${sudo_info}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info} (${luks_pw_dots:-none})\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" | \
+    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nSudo Access,${sudo_info}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info} (${luks_pw_dots:-none})\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" |
         gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
     echo
 
@@ -212,7 +213,7 @@ rx_install_system() {
     echo
     gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Running post-installation configuration..."
     echo
-    
+
     if [[ -f /opt/retrolinux/bin/post/run.sh ]]; then
         bash /opt/retrolinux/bin/post/run.sh
     else
@@ -239,3 +240,4 @@ else
     cat user_credentials.json
     rm user_configuration.json user_credentials.json
 fi
+

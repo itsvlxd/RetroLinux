@@ -176,7 +176,7 @@ EOF
             bootloader_config: {
                 bootloader: "Grub",
                 removable: true,
-                uki: true
+                uki: false
             },
             custom_commands: [],
             disk_config: {
