@@ -1,0 +1,4 @@
+{
+    "config": "files",
+    "install": "/boot/grub/themes"
+}
