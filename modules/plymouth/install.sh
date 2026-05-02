@@ -26,32 +26,36 @@ install_plymouth_themes() {
 
 set_plymouth_theme() {
     local theme_name="retrolinux"
-    local plymouth_conf="/etc/plymouth/plymouthd.conf"
     
     rx_log "info" "Setting Plymouth theme to ${PINK}$theme_name${RESET}..."
     
-    mkdir -p /etc/plymouth
-    
-    cat > "$plymouth_conf" << EOF
+    if command -v plymouth-set-default-theme >/dev/null 2>&1; then
+        if plymouth-set-default-theme "$theme_name" --rebuild-initrd >/dev/null 2>&1; then
+            rx_log "success" "Plymouth theme set to $theme_name and initrd rebuilt"
+        else
+            rx_log "info" "Theme set via config file (command unavailable)"
+            
+            mkdir -p /etc/plymouth
+            cat > /etc/plymouth/plymouthd.conf << EOF
 [Daemon]
 Theme=$theme_name
 ShowDelay=0
 EOF
-    
-    if [[ -f "$plymouth_conf" ]]; then
-        rx_log "success" "Plymouth config created at $plymouth_conf"
-        cat "$plymouth_conf"
-    else
-        rx_log "error" "Failed to create Plymouth config"
-        return 1
-    fi
-    
-    if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-        if plymouth-set-default-theme "$theme_name" >/dev/null 2>&1; then
-            rx_log "success" "Plymouth theme set via command"
-        else
-            rx_log "info" "Theme set via config file (command unavailable)"
+            
+            rm -f /usr/share/plymouth/themes/default.plymouth
+            ln -s $theme_name/$theme_name.plymouth /usr/share/plymouth/themes/default.plymouth
+            
+            rx_log "success" "Plymouth theme configured via fallback method"
         fi
+    else
+        mkdir -p /etc/plymouth
+        cat > /etc/plymouth/plymouthd.conf << EOF
+[Daemon]
+Theme=$theme_name
+ShowDelay=0
+EOF
+        
+        rx_log "success" "Plymouth config created at /etc/plymouth/plymouthd.conf"
     fi
     
     return 0
@@ -67,11 +71,6 @@ add_plymouth_hook() {
         return 1
     fi
     
-    if grep -q "plymouth" "$mkinitcpio_conf"; then
-        rx_log "info" "Plymouth hook already present in mkinitcpio.conf"
-        return 0
-    fi
-    
     local hooks_line=$(grep "^HOOKS=" "$mkinitcpio_conf")
     
     if [[ -z "$hooks_line" ]]; then
@@ -81,22 +80,30 @@ add_plymouth_hook() {
     
     rx_log "info" "Current HOOKS: $hooks_line"
     
-    if [[ "$hooks_line" == *"block"* ]]; then
-        sed -i 's/\(HOOKS=.*block\)/\1 plymouth/' "$mkinitcpio_conf"
-        rx_log "success" "Plymouth hook added after 'block'"
-    elif [[ "$hooks_line" == *"udev"* ]]; then
+    if echo "$hooks_line" | grep -q "plymouth"; then
+        rx_log "info" "Plymouth hook already present in mkinitcpio.conf"
+        
+        if echo "$hooks_line" | grep -q "udev.*plymouth.*autodetect"; then
+            rx_log "success" "Plymouth hook is in correct position (after udev, before autodetect)"
+            return 0
+        else
+            rx_log "warn" "Plymouth hook is in wrong position, fixing..."
+        fi
+    fi
+    
+    if echo "$hooks_line" | grep -q "udev"; then
         sed -i 's/\(HOOKS=.*udev\)/\1 plymouth/' "$mkinitcpio_conf"
         rx_log "success" "Plymouth hook added after 'udev'"
     else
         sed -i 's/HOOKS=\(.*\)/HOOKS=\1 plymouth/' "$mkinitcpio_conf"
-        rx_log "success" "Plymouth hook added to end of HOOKS"
+        rx_log "success" "Plymouth hook added to HOOKS"
     fi
     
     local new_hooks_line=$(grep "^HOOKS=" "$mkinitcpio_conf")
     rx_log "info" "New HOOKS: $new_hooks_line"
     
     if grep -q "plymouth" "$mkinitcpio_conf"; then
-        rx_log "success" "Plymouth hook successfully added to mkinitcpio.conf"
+        rx_log "success" "Plymouth hook successfully configured in mkinitcpio.conf"
         return 0
     else
         rx_log "error" "Failed to add Plymouth hook"
@@ -108,11 +115,10 @@ rebuild_initramfs() {
     rx_log "info" "Rebuilding initramfs..."
     
     if command -v mkinitcpio >/dev/null 2>&1; then
-        if mkinitcpio -P 2>&1 | tee /tmp/mkinitcpio.log; then
+        if mkinitcpio -P; then
             rx_log "success" "Initramfs rebuilt successfully"
         else
             rx_log "error" "Initramfs rebuild failed"
-            rx_log "info" "Check /tmp/mkinitcpio.log for details"
             return 1
         fi
     else
@@ -123,9 +129,7 @@ rebuild_initramfs() {
     return 0
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    install_plymouth_themes
-    set_plymouth_theme
-    add_plymouth_hook
-    rebuild_initramfs
-fi
+install_plymouth_themes
+set_plymouth_theme
+add_plymouth_hook
+rebuild_initramfs

@@ -41,6 +41,7 @@ show_build_logo() {
 }
 PKG_CACHE_VOLUME="retrolinux-pkg-cache"
 REQUIRED_DEPS=("docker" "bc" "convert")
+INCLUDE_REPO=false
 
 _check_deps() {
     rx_log "info" "Checking dependencies..."
@@ -119,6 +120,7 @@ _build_help() {
     rx_help_cmd "--plymouth, -p" "Generate Plymouth splashscreen only"
     rx_help_cmd "--clean, -c" "Clean build artifacts"
     rx_help_cmd "--docker, -d" "Build and push Docker image to registry"
+    rx_help_cmd "--repo, -r" "Include full repo in ISO at /opt/retrolinux"
     rx_help_cmd "--yes, -y" "Skip all confirmations"
     rx_help_cmd "--force, -f" "Force rebuild even if inputs unchanged"
     rx_help_cmd "--help, -h" "Show this help message"
@@ -129,6 +131,7 @@ _build_help() {
     rx_help_example "./build.sh --clean" "Clean artifacts"
     rx_help_example "./build.sh --docker" "Build and push Docker image only"
     rx_help_example "./build.sh --force" "Force rebuild even if unchanged"
+    rx_help_example "./build.sh --repo" "Build ISO with full repo included"
 }
 
 _generate_splashscreen() {
@@ -378,6 +381,16 @@ _docker_build() {
     rsync -av --delete \
         "$RETRO_DIR/bin/" \
         "$PROFILE_DIR/airootfs/opt/retrolinux/bin/"
+    
+    if [[ $INCLUDE_REPO == true ]]; then
+        rx_log "info" "Including full repo in ISO (--repo flag)..."
+        rsync -av \
+            --exclude='.env' \
+            "$RETRO_DIR/" \
+            "$PROFILE_DIR/airootfs/opt/retrolinux/" || true
+        find "$PROFILE_DIR/airootfs/opt/retrolinux" -type f -name "*.sh" -exec chmod +x {} \;
+        rx_log "success" "Full repo included in ISO"
+    fi
 
     local version=$(rx_git_version)
     local branch=$(rx_git_branch)
@@ -552,6 +565,10 @@ _iso_main() {
                 ;;
             -d | --docker)
                 command="docker"
+                shift
+                ;;
+            -r | --repo)
+                INCLUDE_REPO=true
                 shift
                 ;;
             -f | --force)
