@@ -518,7 +518,7 @@ run_full_install() {
         [[ -z $line ]] && continue
         IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
         case "$type" in
-            GPU|NPU|NET|BT|FW|OTHER)
+            GPU|CPU|NPU|NET|BT|FW|OTHER)
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
         esac
@@ -543,7 +543,7 @@ run_full_install_confirmed() {
                 gpu_vendors_found+=("$vendor")
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
-            NPU|NET|BT|FW|OTHER)
+            CPU|NPU|NET|BT|FW|OTHER)
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
         esac
