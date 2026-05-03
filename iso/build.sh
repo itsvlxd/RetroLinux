@@ -386,6 +386,7 @@ _docker_build() {
         rx_log "info" "Including full repo in ISO (--repo flag)..."
         rsync -av \
             --exclude='.env' \
+            --exclude='.git/' \
             "$RETRO_DIR/" \
             "$PROFILE_DIR/airootfs/opt/retrolinux/" || true
         find "$PROFILE_DIR/airootfs/opt/retrolinux" -type f -name "*.sh" -exec chmod +x {} \;
