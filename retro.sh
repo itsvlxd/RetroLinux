@@ -25,7 +25,6 @@ source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/module.sh"
 source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/lib/pkg_manager.sh"
 
 export SKIP_PROMPT=false
 SETUP_MODE=false
