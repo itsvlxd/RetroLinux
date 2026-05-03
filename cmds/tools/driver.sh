@@ -250,6 +250,10 @@ cmd_driver() {
         "install")
             check_dep "lspci" "pciutils" || return 1
 
+            if [[ $flag == "--yes" || $flag == "-y" ]]; then
+                export SKIP_PROMPT=true
+            fi
+
             local first_pass
             first_pass=$(bash "$driver_script" --install)
             [[ -z $first_pass ]] && rx_log "error" "Failed to scan for missing drivers" && return 1
@@ -274,7 +278,7 @@ cmd_driver() {
             local tagged=$(_tag_missing "$missing_pkgs")
             rx_log "info" "The following packages will be installed: ${PINK}$tagged${RESET}"
 
-            if [[ "$SKIP_PROMPT" != "true" ]]; then
+            if [[ $SKIP_PROMPT != "true" ]]; then
                 rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                 read -r confirm
                 if [[ ! $confirm =~ ^[Yy]$ ]]; then
@@ -349,7 +353,7 @@ cmd_driver() {
             [[ -n $driver ]] && rx_table_simple "󰓡" "Driver: $driver" "$PINK"
             [[ -n $modules ]] && rx_table_simple "󰓅" "Modules: $modules" "$PINK"
             for detail in "${details[@]}"; do
-            rx_table_simple "$detail" ""
+                rx_table_simple "$detail" ""
             done
             rx_table_separator
             rx_table_spacer
@@ -387,7 +391,7 @@ cmd_driver() {
                 fi
             fi
 
-            if [[ "$SKIP_PROMPT" != "true" ]]; then
+            if [[ $SKIP_PROMPT != "true" ]]; then
                 rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                 read -r confirm
                 [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
@@ -532,7 +536,7 @@ cmd_driver() {
                 MISSING:*)
                     local missing="${status#MISSING:}"
                     rx_log "info" "Will install: ${PINK}$missing${RESET}"
-                    if [[ "$SKIP_PROMPT" != "true" ]]; then
+                    if [[ $SKIP_PROMPT != "true" ]]; then
                         rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
@@ -574,7 +578,7 @@ cmd_driver() {
                 MISSING:*)
                     local missing="${status#MISSING:}"
                     rx_log "info" "Will install: ${PINK}$missing${RESET}"
-                    if [[ "$SKIP_PROMPT" != "true" ]]; then
+                    if [[ $SKIP_PROMPT != "true" ]]; then
                         rx_log "info" "Continue? ${PINK}[y/N]${RESET}: "
                         read -r confirm
                         [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
@@ -765,16 +769,16 @@ cmd_driver() {
             esac
             ;;
 
-        hypr|hyprenv)
+        hypr | hyprenv)
             local force_vendor="$2"
             local hypr_result=$(bash "$driver_script" --hypr "$force_vendor")
 
             local result_type=$(echo "$hypr_result" | grep -oP "result=\K[^|]+")
             local gpu_type=$(echo "$hypr_result" | grep -oP "type=\K[^|]+")
 
-            if [[ "$result_type" == "success" ]]; then
+            if [[ $result_type == "success" ]]; then
                 rx_log "success" "Generated ${gpu_type^^} env.conf"
-            elif [[ "$result_type" == "warn" ]]; then
+            elif [[ $result_type == "warn" ]]; then
                 rx_log "warn" "No GPU detected, generated generic env.conf"
             fi
 
@@ -797,7 +801,7 @@ cmd_driver() {
 
             if echo "$mkinit_result" | grep -q "result=error"; then
                 local reason=$(echo "$mkinit_result" | grep -oP "reason=\K[^|]+")
-                if [[ "$reason" == "mkinit_conf_not_found" ]]; then
+                if [[ $reason == "mkinit_conf_not_found" ]]; then
                     rx_log "error" "mkinitcpio.conf not found"
                 fi
                 return 1
@@ -809,7 +813,7 @@ cmd_driver() {
             fi
 
             local backup=$(echo "$mkinit_result" | grep -oP "backup=\K[^|]+")
-            if [[ -n "$backup" ]]; then
+            if [[ -n $backup ]]; then
                 rx_log "info" "Backup created: $backup"
             fi
 
@@ -824,7 +828,7 @@ cmd_driver() {
             rx_help_usage "retro driver <command>"
             rx_help_commands "Available commands"
             rx_help_cmd "status" "Scan hardware and report driver status"
-            rx_help_cmd "install" "Install missing drivers"
+            rx_help_cmd "install [--yes|-y]" "Install missing drivers"
             rx_help_cmd "env" "Show GPU compute env (CUDA/ONEAPI/RADV)"
             rx_help_cmd "info <keyword>" "Show detailed device info"
             rx_help_cmd "switch [xe|i915]" "Switch Intel GPU kernel driver"
