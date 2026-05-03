@@ -300,6 +300,24 @@ cmd_font() {
             local helper=$(get_var "PKG_HELPER")
             [[ -z $helper ]] && helper="sudo pacman"
 
+            if [[ $SKIP_PROMPT == "true" ]]; then
+                cmd_font "install" "inter-font"
+                cmd_font "install" "ttf-jetbrains-mono-nerd"
+                cmd_font "install" "ttf-apple-emoji"
+
+                local installed_fonts=$(bash "$font_core" --list-installed)
+                local main_match=$(echo "$installed_fonts" | grep -i "inter" | head -1)
+                local nerd_match=$(echo "$installed_fonts" | grep -i "jetbrains" | head -1)
+
+                [[ -n $main_match ]] && set_var "RETRO_FONT_MAIN" "$main_match"
+                [[ -n $nerd_match ]] && set_var "RETRO_FONT_NERD" "$nerd_match"
+                set_var "RETRO_FONT_EMOJI" "Apple Color Emoji"
+
+                bash "$font_core" --sync
+                rx_log "success" "Fonts installed with defaults"
+                return 0
+            fi
+
             if [[ -z $(get_var "RETRO_FONT_MAIN") ]]; then
                 rx_log "info" "Enter the main font package name ${PINK}[Default: inter-font]${RESET}: "
                 read -r input_pkg
