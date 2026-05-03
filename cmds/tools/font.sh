@@ -300,6 +300,10 @@ cmd_font() {
             local helper=$(get_var "PKG_HELPER")
             [[ -z $helper ]] && helper="sudo pacman"
 
+            if [[ $flag == "--yes" || $flag == "-y" ]]; then
+                export SKIP_PROMPT=true
+            fi
+
             if [[ $SKIP_PROMPT == "true" ]]; then
                 cmd_font "install" "inter-font"
                 cmd_font "install" "ttf-jetbrains-mono-nerd"
@@ -407,7 +411,7 @@ cmd_font() {
             rx_help_cmd "list" "List all installed fonts"
             rx_help_cmd "remote [query]" "Search remote font packages"
             rx_help_cmd "status" "Show active fonts and count"
-            rx_help_cmd "setup" "Interactive font setup wizard"
+            rx_help_cmd "setup [--yes|-y]" "Interactive font setup wizard"
             rx_help_examples
             rx_help_example "retro font install ttf-jetbrains" "Install from package"
             rx_help_example "retro font install ~/Fonts/Roboto.ttf" "Install from file"
