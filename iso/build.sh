@@ -376,6 +376,22 @@ _docker_build() {
     mkdir -p "$OUTPUT_DIR"
     mkdir -p "$WORK_DIR"
 
+    rx_log "info" "Copying GRUB theme from modules..."
+    if [[ -d "$RETRO_DIR/modules/grub/files" ]]; then
+        mkdir -p "$PROFILE_DIR/grub/themes"
+        rsync -av --delete \
+            "$RETRO_DIR/modules/grub/files/" \
+            "$PROFILE_DIR/grub/themes/"
+    fi
+
+    rx_log "info" "Copying Plymouth theme from modules..."
+    if [[ -d "$RETRO_DIR/modules/plymouth/files" ]]; then
+        mkdir -p "$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux"
+        rsync -av --delete \
+            "$RETRO_DIR/modules/plymouth/files/retrolinux/" \
+            "$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux/"
+    fi
+
     rx_log "info" "Copying RetroLinux to airootfs..."
     mkdir -p "$PROFILE_DIR/airootfs/opt/retrolinux"
     rsync -av --delete \
