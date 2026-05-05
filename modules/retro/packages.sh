@@ -13,12 +13,16 @@ net-tools
 inetutils
 base-devel
 pacman-contrib
+xdg-desktop-portal-gtk
 
 # Audio
 wireplumber
 easyeffects
 libwireplumber
 lsp-plugins-lv2
+
+# Network
+networkmanager
 
 # Wallpaper
 awww-bin
