@@ -8,5 +8,9 @@ iso/profile/packages-cache
 iso/profile/airootfs/var
 iso/profile/airootfs/opt/retrolinux/
 
+# Static themes in ISO (generated from modules during build)
+iso/profile/grub/themes/
+iso/profile/airootfs/usr/share/plymouth/themes/retrolinux/
+
 # Build outputs
 *.iso
