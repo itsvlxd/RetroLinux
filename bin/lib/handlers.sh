@@ -139,6 +139,9 @@ rx_setup_traps() {
     rx_save_original_outputs
 }
 
+# Global state - always load on module source
+rx_load_state
+
 rx_save_state() {
     cat <<EOF > "$RETRO_STATE"
 KEYBOARD="$KEYBOARD"
@@ -165,6 +168,20 @@ RX_CURRENT_STEP="$RX_CURRENT_STEP"
 RX_START_STEP="${RX_START_STEP:-1}"
 RX_SKIP_STEP="$RX_SKIP_STEP"
 RX_GO_BACK_TO="$RX_GO_BACK_TO"
+SSH_ENABLED="$SSH_ENABLED"
+SSH_PORT="$SSH_PORT"
+SSH_PASSWORD_LOGIN="$SSH_PASSWORD_LOGIN"
+SSH_KEY_LOGIN="$SSH_KEY_LOGIN"
+SSH_ROOT_LOGIN="$SSH_ROOT_LOGIN"
+GRUB_THEME_CHOICE="$GRUB_THEME_CHOICE"
+BOOT_VIDEO_GRUB="$BOOT_VIDEO_GRUB"
+GRUB_OS_PROBER="$GRUB_OS_PROBER"
+AUR_HELPER="$AUR_HELPER"
+EDITOR_CHOICE="$EDITOR_CHOICE"
+FILEMANAGER_CHOICE="$FILEMANAGER_CHOICE"
+BROWSER_CHOICE="$BROWSER_CHOICE"
+WALLPAPER_RES="$WALLPAPER_RES"
+FINGERPRINT_ENABLED="$FINGERPRINT_ENABLED"
 EOF
 }
 
@@ -172,4 +189,34 @@ rx_load_state() {
     if [[ -f "$RETRO_STATE" ]]; then
         source "$RETRO_STATE"
     fi
+}
+
+rx_restore_disk_selection() {
+    rx_clear_logo
+    RX_CURRENT_STEP="disk"
+    rx_step "Selecting install disk..."
+    
+    local available_disks
+    available_disks=$(rx_get_available_disks) || return 1
+    
+    [[ -z $available_disks ]] && return 1
+    
+    local disk_options=""
+    while IFS= read -r device; do
+        if [[ -n $device ]]; then
+            local disk_info
+            disk_info=$(rx_get_disk_info "$device")
+            disk_options="$disk_options$disk_info"$'\n'
+        fi
+    done <<<"$available_disks"
+    
+    local selected_display
+    selected_display=$(echo "$disk_options" | gum choose --header "Select install disk" --height 15 --padding "$GUM_CHOOSE_PADDING") || return 1
+    
+    DISK_SELECTED=$(echo "$selected_display" | awk '{print $1}')
+    
+    [[ -z $DISK_SELECTED ]] && return 1
+    
+    rx_save_state
+    return 0
 }
