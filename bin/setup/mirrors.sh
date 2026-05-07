@@ -65,7 +65,7 @@ United States'
     echo
 
     local current_region=""
-    if [[ -n "$MIRROR_REGIONS" ]]; then
+    if [[ -n $MIRROR_REGIONS ]]; then
         current_region="$MIRROR_REGIONS"
     fi
 
@@ -79,18 +79,17 @@ United States'
     # shellcheck disable=SC2034
     MIRROR_REGIONS="$selected_regions"
 
-    echo
     gum style --padding "0 0 0 $PADDING_LEFT" "Add custom mirror URL? (leave empty to skip)"
     echo
 
     local custom_mirror
-    custom_mirror=$(gum input --placeholder "https://mirror.example.com/\$repo/os/\$arch" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Custom URL> " --padding "$GUM_INPUT_PADDING") || {
+    custom_mirror=$(gum input --placeholder 'https://mirror.example.com/$repo/os/$arch' --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Custom URL> " --padding "$GUM_INPUT_PADDING") || {
         rx_step_error "7" "Custom mirror input cancelled"
         rx_retry_or_exit "Custom mirror input" || rx_abort
         return 1
     }
 
-    if [[ -n "$custom_mirror" ]]; then
+    if [[ -n $custom_mirror ]]; then
         # shellcheck disable=SC2034
         CUSTOM_MIRRORS="$custom_mirror"
     else
@@ -105,3 +104,4 @@ United States'
 if ! setup_mirrors; then
     rx_setup_fail "Mirrors"
 fi
+
