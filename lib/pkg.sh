@@ -2,6 +2,7 @@
 
 rx_pkg_install() {
     local list_file="$1"
+    local sudo_run="${2:-false}"
     [[ ! -f $list_file ]] && return 0
 
     local all_pkgs=$(grep -v '^#' "$list_file" | xargs)
@@ -18,9 +19,16 @@ rx_pkg_install() {
 
     rx_log "info" "Installing missing packages: ${PINK}${missing_pkgs[*]}${RESET}"
 
+    local install_cmd=""
     if command -v yay >/dev/null; then
-        yay -S --needed --noconfirm "${missing_pkgs[@]}"
+        install_cmd="yay -S --needed --noconfirm"
     else
-        sudo pacman -S --needed --noconfirm "${missing_pkgs[@]}"
+        install_cmd="pacman -S --needed --noconfirm"
+    fi
+
+    if [[ $sudo_run == "true" ]]; then
+        sudo bash -c "$install_cmd ${missing_pkgs[*]}"
+    else
+        $install_cmd "${missing_pkgs[@]}"
     fi
 }
