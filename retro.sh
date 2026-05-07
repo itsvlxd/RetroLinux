@@ -93,6 +93,15 @@ if [[ -z $CMD || $CMD == "-h" || $CMD == "--help" ]]; then
     exit 0
 fi
 
+if [[ $CMD == "-i" && "${CLEAN_ARGS[1]}" == "--help" ]]; then
+    if command -v show_install_help >/dev/null; then
+        show_install_help
+    else
+        rx_log "error" "Install help not available"
+    fi
+    exit 0
+fi
+
 if [[ -n ${CMDS_EXEC[$CMD]} ]]; then
     ${CMDS_EXEC[$CMD]} "${CLEAN_ARGS[@]:1}"
 else
