@@ -24,9 +24,9 @@ for mod_dir in "${MODULES_DIRS[@]}"; do
         [[ $has_install == true ]] && continue
         MISSING+=("$mod_name: missing packages.sh")
     fi
-    if [[ ! -f "$mod_dir/targets.json" ]]; then
+    if [[ ! -f "$mod_dir/properties.json" ]]; then
         [[ $has_install == true ]] && continue
-        MISSING+=("$mod_name: missing targets.json")
+        MISSING+=("$mod_name: missing properties.json")
     fi
 done
 
