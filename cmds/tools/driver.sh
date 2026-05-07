@@ -789,7 +789,7 @@ cmd_driver() {
                 cat "$env_path" | sed 's/^/ /'
                 rx_table_separator
                 rx_table_simple "󰈐" "Location: $env_path" "$GRAY"
-                rx_table_simple "󰈐" "Source in Hyprland: source = ~/.cache/retro/env.conf" "$GRAY"
+                rx_table_simple "󰈐" "Source in Hyprland: source = ~/.config/retro/env.conf" "$GRAY"
                 rx_table_spacer
             else
                 rx_log "error" "env.conf not found. Run: retro driver hypr"

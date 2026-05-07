@@ -2,7 +2,7 @@
 
 source "$RETRO_DIR/cmds/tools/power.sh"
 
-RETRO_CACHE="$HOME/.cache/retro"
+RETRO_CONFIG="$HOME/.cache/retro"
 source_bin="$RETRO_DIR/retro.sh"
 bin_dir="/usr/local/bin"
 cmd_name="retro"
@@ -32,7 +32,7 @@ patch_env() {
 }
 
 patch_env "$HOME/.profile" "RETRO_DIR" "$RETRO_DIR"
-patch_env "$HOME/.profile" "RETRO_CACHE" "$RETRO_CACHE"
+patch_env "$HOME/.profile" "RETRO_CONFIG" "$RETRO_CONFIG"
 
 shell_conf=""
 [[ -f "$HOME/.zshrc" ]] && shell_conf="$HOME/.zshrc"
@@ -44,7 +44,7 @@ if [[ -n $shell_conf ]]; then
     fi
 
     patch_env "$shell_conf" "RETRO_DIR" "$RETRO_DIR"
-    patch_env "$shell_conf" "RETRO_CACHE" "$RETRO_CACHE"
+    patch_env "$shell_conf" "RETRO_CONFIG" "$RETRO_CONFIG"
 fi
 
-[[ ! -d $RETRO_CACHE ]] && mkdir -p "$RETRO_CACHE"
+[[ ! -d $RETRO_CONFIG ]] && mkdir -p "$RETRO_CONFIG"

@@ -97,7 +97,7 @@ cmd_var() {
             ;;
 
         "edit")
-            local var_file="$HOME/.cache/retro/variables.sh"
+            local var_file="$RETRO_CONFIG/variables.sh"
 
             if [[ ! -f $var_file ]]; then
                 rx_log "error" "Variables cache not found at $var_file" && return 1
@@ -109,13 +109,13 @@ cmd_var() {
             ;;
 
         "reset")
-            rm -rf "$HOME/.cache/retro/variables.sh"
+            rm -rf "$RETRO_CONFIG/variables.sh"
             rx_vars_defaults "-f"
             rx_log "success" "Variables reset to defaults."
             ;;
 
         "list")
-            rx_table_header "" "Cache Location: ${RETRO_CACHE}"
+            rx_table_header "" "Cache Location: ${RETRO_CONFIG}"
 
             local raw_list=$(bash "$var_script" --list 2>/dev/null)
 

@@ -5,7 +5,7 @@ source "$RETRO_DIR/lib/help.sh"
 cmd_wallpaper() {
     local wall_script="$RETRO_DIR/scripts/wallpaper_core.sh"
     local var_script="$RETRO_DIR/scripts/variable_core.sh"
-    local wall_dir="$HOME/.cache/retro/wallpapers"
+    local wall_dir="$RETRO_CONFIG/wallpapers"
     local action="${1,,}"
     local value="$2"
     local options="$3"

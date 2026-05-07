@@ -33,7 +33,7 @@ _kernel_version_ge() {
     local kver=$(uname -r | cut -d. -f1,2)
     local k_major=${kver%%.*}
     local k_minor=${kver##*.}
-    (( k_major > major || (k_major == major && k_minor >= minor) ))
+    ((k_major > major || (k_major == major && k_minor >= minor)))
 }
 
 _check_multilib() {
@@ -100,7 +100,7 @@ detect_cpu() {
     local vendor="unknown"
     case "$vendor_id" in
         *Intel*) vendor="intel" ;;
-        *AMD*)   vendor="amd" ;;
+        *AMD*) vendor="amd" ;;
     esac
     echo "${vendor}|${model_name}"
 }
@@ -117,9 +117,9 @@ detect_npu() {
         local vendor_id="${vd_pair%%:*}"
         local model=$(echo "$nn_line" | sed 's/.*\]://;s/\s*\[[0-9a-f]*:[0-9a-f]*\].*//' | xargs)
         local driver=$(lspci -k -s "$pci_id" 2>/dev/null | grep "Kernel driver in use:" | awk -F': ' '{print $2}')
-        if [[ "$vendor_id" == "8086" ]]; then
+        if [[ $vendor_id == "8086" ]]; then
             npus+=("intel|${model}|${driver}")
-        elif [[ "$vendor_id" == "1002" ]]; then
+        elif [[ $vendor_id == "1002" ]]; then
             npus+=("amd|${model}|${driver}")
         fi
     done < <(lspci | grep -iE "Processing accelerators|NPU|Ryzen.*AI")
@@ -299,12 +299,12 @@ get_network_packages() {
     case "$type" in
         wifi)
             case "$vendor" in
-                intel)    echo "iwd linux-firmware" ;;
-                realtek)  echo "linux-firmware rtl88xxau-aircrack-dkms-git" ;;
+                intel) echo "iwd linux-firmware" ;;
+                realtek) echo "linux-firmware rtl88xxau-aircrack-dkms-git" ;;
                 broadcom) echo "broadcom-wl-dkms linux-firmware" ;;
                 mediatek) echo "linux-firmware" ;;
-                atheros)  echo "linux-firmware ath9k-htc-firmware" ;;
-                *)        echo "linux-firmware iwd" ;;
+                atheros) echo "linux-firmware ath9k-htc-firmware" ;;
+                *) echo "linux-firmware iwd" ;;
             esac
             ;;
         ethernet)
@@ -335,7 +335,7 @@ get_profile_packages() {
     local profile="$1"
     local gpus=$(detect_gpus)
     local gpu_vendor="unknown"
-    if [[ -n $gpus && "$gpus" != "NONE" ]]; then
+    if [[ -n $gpus && $gpus != "NONE" ]]; then
         local first=$(echo "$gpus" | head -1)
         IFS='|' read -r pci_id vendor_id vendor model driver <<<"$first"
         gpu_vendor="$vendor"
@@ -439,7 +439,7 @@ configure_ai_env() {
 run_full_scan() {
     local results=""
     local gpus=$(detect_gpus)
-    if [[ "$gpus" != "NONE" && -n $gpus ]]; then
+    if [[ $gpus != "NONE" && -n $gpus ]]; then
         while IFS= read -r gpu; do
             IFS='|' read -r pci_id vendor_id vendor model driver <<<"$gpu"
             local pkgs=$(get_gpu_packages "$vendor" "$model" "$driver")
@@ -451,14 +451,14 @@ run_full_scan() {
     if [[ -n $cpu ]]; then
         IFS='|' read -r vendor model <<<"$cpu"
         local ucode_pkg=""
-        [[ "$vendor" == "intel" ]] && ucode_pkg="intel-ucode"
-        [[ "$vendor" == "amd" ]] && ucode_pkg="amd-ucode"
+        [[ $vendor == "intel" ]] && ucode_pkg="intel-ucode"
+        [[ $vendor == "amd" ]] && ucode_pkg="amd-ucode"
         local ucode_missing=""
         [[ -n $ucode_pkg ]] && ucode_missing=$(_get_missing "$ucode_pkg")
         results+="CPU|${vendor}|${model}||${ucode_pkg}|${ucode_missing}\n"
     fi
     local npus=$(detect_npu)
-    if [[ "$npus" != "NONE" && -n $npus ]]; then
+    if [[ $npus != "NONE" && -n $npus ]]; then
         while IFS= read -r npu; do
             IFS='|' read -r vendor model driver <<<"$npu"
             local pkgs=$(get_npu_packages "$vendor")
@@ -467,7 +467,7 @@ run_full_scan() {
         done <<<"$npus"
     fi
     local networks=$(detect_network)
-    if [[ "$networks" != "NONE" && -n $networks ]]; then
+    if [[ $networks != "NONE" && -n $networks ]]; then
         while IFS= read -r net; do
             IFS='|' read -r type vendor model driver <<<"$net"
             local pkgs=$(get_network_packages "$type" "$vendor")
@@ -477,20 +477,20 @@ run_full_scan() {
         done <<<"$networks"
     fi
     local audio=$(detect_audio)
-    if [[ "$audio" != "NONE" && -n $audio ]]; then
+    if [[ $audio != "NONE" && -n $audio ]]; then
         while IFS= read -r dev; do
             IFS='|' read -r type model driver <<<"$dev"
             results+="AUDIO||${model}|${driver}||\n"
         done <<<"$audio"
     fi
     local bt=$(detect_bluetooth)
-    if [[ "$bt" != "NONE" && -n $bt ]]; then
+    if [[ $bt != "NONE" && -n $bt ]]; then
         local bt_pkgs="bluez bluez-utils"
         local bt_missing=$(_get_missing "$bt_pkgs")
         results+="BT||Bluetooth Device||${bt_pkgs}|${bt_missing}\n"
     fi
     local others=$(detect_other)
-    if [[ "$others" != "NONE" && -n $others ]]; then
+    if [[ $others != "NONE" && -n $others ]]; then
         while IFS= read -r other; do
             IFS='|' read -r type model driver <<<"$other"
             local pkgs=$(get_other_packages "$type")
@@ -518,7 +518,7 @@ run_full_install() {
         [[ -z $line ]] && continue
         IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
         case "$type" in
-            GPU|CPU|NPU|NET|BT|FW|OTHER)
+            GPU | CPU | NPU | NET | BT | FW | OTHER)
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
         esac
@@ -543,7 +543,7 @@ run_full_install_confirmed() {
                 gpu_vendors_found+=("$vendor")
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
-            CPU|NPU|NET|BT|FW|OTHER)
+            CPU | NPU | NET | BT | FW | OTHER)
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
         esac
@@ -571,13 +571,13 @@ run_full_install_confirmed() {
                     ;;
             esac
         done
-        
+
         generate_hypr_env
-        
+
         if echo "$unique_missing" | grep -qE "nvidia-open-dkms|nvidia"; then
             configure_mkinitcpio_nvidia
         fi
-        
+
         if echo "$unique_missing" | grep -qE "dkms|nvidia|cuda|rocm"; then
             echo "INITRAMFS_UPDATE_NEEDED"
         fi
@@ -641,7 +641,7 @@ _detect_bootloader() {
         local entry=$(ls /boot/loader/entries/*.conf 2>/dev/null | head -1)
         echo "systemd-boot|${entry}|options|systemctl reboot"
     elif [[ -f /boot/refind_linux.conf ]]; then
-        echo "refind|/boot/refind_linux.conf|\"Boot with standard options\"|refind-install"
+        echo 'refind|/boot/refind_linux.conf|"Boot with standard options"|refind-install'
     else
         echo "unknown|||"
     fi
@@ -667,7 +667,7 @@ _get_kernel_params() {
     elif [[ $bl_type == "systemd-boot" && -n $bl_file ]]; then
         grep "^options " "$bl_file" | sed 's/^options //'
     elif [[ $bl_type == "refind" && -f $bl_file ]]; then
-        grep "^\"" "$bl_file" | head -1 | sed 's/^[^"]*"\([^"]*\)".*/\1/'
+        grep '^"' "$bl_file" | head -1 | sed 's/^[^"]*"\([^"]*\)".*/\1/'
     fi
 }
 
@@ -863,7 +863,7 @@ _setup_hybrid_amd() {
 
 _get_gpu_status() {
     local gpus=$(detect_gpus)
-    if [[ "$gpus" == "NONE" || -z $gpus ]]; then
+    if [[ $gpus == "NONE" || -z $gpus ]]; then
         echo "NO_GPU"
         return 1
     fi
@@ -939,19 +939,19 @@ _fwupd_status() {
 
 generate_hypr_env() {
     local force_vendor="$1"
-    local env_file="$HOME/.cache/retro/env.conf"
+    local env_file="$RETRO_CONFIG/env.conf"
     mkdir -p "$(dirname "$env_file")"
-    
+
     local has_nvidia=false
     local has_amd=false
     local has_intel=false
     local is_hybrid=false
-    
-    if [[ -z "$force_vendor" ]]; then
+
+    if [[ -z $force_vendor ]]; then
         local gpus=$(detect_gpus)
-        if [[ "$gpus" != "NONE" && -n "$gpus" ]]; then
+        if [[ $gpus != "NONE" && -n $gpus ]]; then
             while IFS= read -r line; do
-                [[ -z "$line" ]] && continue
+                [[ -z $line ]] && continue
                 IFS='|' read -r pci_id vendor_id vendor model driver <<<"$line"
                 case "$vendor" in
                     nvidia) has_nvidia=true ;;
@@ -960,7 +960,7 @@ generate_hypr_env() {
                 esac
             done <<<"$gpus"
         fi
-        
+
         if $has_nvidia && $has_intel; then
             is_hybrid=true
         fi
@@ -971,8 +971,8 @@ generate_hypr_env() {
             intel) has_intel=true ;;
         esac
     fi
-    
-    cat > "$env_file" << 'ENDOFENV'
+
+    cat >"$env_file" <<'ENDOFENV'
 ###################################
 ### RETRO ENVIRONMENT VARIABLES ###
 ###################################
@@ -982,7 +982,7 @@ generate_hypr_env() {
 ENDOFENV
 
     if $is_hybrid; then
-        cat >> "$env_file" << 'ENDOFENV'
+        cat >>"$env_file" <<'ENDOFENV'
 # Intel + NVIDIA Hybrid
 env = LIBVA_DRIVER_NAME,iHD
 env = __GLX_VENDOR_LIBRARY_NAME,nvidia
@@ -991,7 +991,7 @@ env = GBM_BACKEND,nvidia-drm
 ENDOFENV
         echo "result=success|type=hybrid"
     elif $has_nvidia; then
-        cat >> "$env_file" << 'ENDOFENV'
+        cat >>"$env_file" <<'ENDOFENV'
 # NVIDIA GPU
 env = GBM_BACKEND,nvidia-drm
 env = LIBVA_DRIVER_NAME,nvidia
@@ -1001,7 +1001,7 @@ env = NVD_BACKEND,direct
 ENDOFENV
         echo "result=success|type=nvidia"
     elif $has_amd; then
-        cat >> "$env_file" << 'ENDOFENV'
+        cat >>"$env_file" <<'ENDOFENV'
 # AMD GPU
 env = LIBVA_DRIVER_NAME,radeonsi
 env = VDPAU_DRIVER,radeonsi
@@ -1010,7 +1010,7 @@ env = mesa_glthread,true
 ENDOFENV
         echo "result=success|type=amd"
     elif $has_intel; then
-        cat >> "$env_file" << 'ENDOFENV'
+        cat >>"$env_file" <<'ENDOFENV'
 # Intel GPU
 env = LIBVA_DRIVER_NAME,iHD
 env = VDPAU_DRIVER,va_gl
@@ -1019,7 +1019,7 @@ env = mesa_glthread,true
 ENDOFENV
         echo "result=success|type=intel"
     else
-        cat >> "$env_file" << 'ENDOFENV'
+        cat >>"$env_file" <<'ENDOFENV'
 # No GPU detected - using default settings
 env = LIBVA_DRIVER_NAME,iHD
 env = mesa_glthread,true
@@ -1027,27 +1027,27 @@ env = mesa_glthread,true
 ENDOFENV
         echo "result=warn|no_gpu_detected"
     fi
-    
+
     echo "$env_file"
 }
 
 configure_mkinitcpio_nvidia() {
     local mkinit_conf="/etc/mkinitcpio.conf"
     local backup="${mkinit_conf}.bak.$(date +%Y%m%d%H%M%S)"
-    
-    if [[ ! -f "$mkinit_conf" ]]; then
+
+    if [[ ! -f $mkinit_conf ]]; then
         echo "result=error|reason=mkinit_conf_not_found"
         return 1
     fi
-    
+
     if ! _is_pkg_installed "nvidia-open-dkms" && ! _is_pkg_installed "nvidia"; then
         echo "result=skipped|reason=nvidia_not_installed"
         return 0
     fi
-    
+
     sudo cp "$mkinit_conf" "$backup"
     echo "result=backup_created|backup=$backup"
-    
+
     if grep -q "^MODULES=" "$mkinit_conf"; then
         if ! grep "^MODULES=" "$mkinit_conf" | grep -q "nvidia"; then
             sudo sed -i 's|^MODULES=\(.*\)|MODULES=\1 nvidia nvidia_drm nvidia_modeset|' "$mkinit_conf"
@@ -1055,19 +1055,19 @@ configure_mkinitcpio_nvidia() {
     else
         echo 'MODULES="nvidia nvidia_drm nvidia_modeset"' | sudo tee -a "$mkinit_conf" >/dev/null
     fi
-    
+
     if command -v mkinitcpio >/dev/null 2>&1; then
         sudo mkinitcpio -P 2>&1 | head -20
         echo "result=initramfs_regenerated"
     fi
-    
+
     echo "result=success|action=mkinit_configured"
 }
 
 show_hypr_env() {
-    local env_file="$HOME/.cache/retro/env.conf"
-    
-    if [[ -f "$env_file" ]]; then
+    local env_file="$RETRO_CONFIG/env.conf"
+
+    if [[ -f $env_file ]]; then
         echo "result=success|path=$env_file"
     else
         echo "result=error|reason=env_file_not_found"
@@ -1076,32 +1076,32 @@ show_hypr_env() {
 }
 
 case "$1" in
-    "--scan")              run_full_scan ;;
-    "--install")           run_full_install ;;
+    "--scan") run_full_scan ;;
+    "--install") run_full_install ;;
     "--install-confirmed") run_full_install_confirmed ;;
-    "--verify")            verify_install "$2" ;;
-    "--info")              show_device_info "$2" ;;
-    "--services")          get_service_hints ;;
-    "--sys-ai-env")        sys_check_ai_env ;;
-    "--kernel-warn")       _kernel_warnings ;;
-    "--bootloader")        _detect_bootloader ;;
-    "--switch")            _switch_driver "$2" ;;
-    "--modules")           _list_module_params "${@:2}" ;;
-    "--modules-set")       _set_module_param "$2" "$3" "$4" ;;
-    "--conflicts")         _check_driver_conflicts ;;
-    "--dual-gpu")          _detect_dual_gpu ;;
-    "--optimus")           _setup_optimus ;;
-    "--hybrid-amd")        _setup_hybrid_amd ;;
-    "--gpu-status")        _get_gpu_status ;;
-    "--device-id")         _get_intel_gpu_device_id ;;
-    "--current-driver")    _get_current_driver ;;
-    "--profile")           get_profile_packages "$2" ;;
-    "--firmware-scan")      _fwupd_scan ;;
-    "--firmware-install")   _fwupd_install ;;
-    "--firmware-status")    _fwupd_status ;;
-    "--hypr")             generate_hypr_env "$2" ;;
-    "--hypr-env")          generate_hypr_env "$2" ;;
-    "--hypr-show")         show_hypr_env ;;
-    "--hypr-env-show")     show_hypr_env ;;
-    "--mkinit")            configure_mkinitcpio_nvidia ;;
+    "--verify") verify_install "$2" ;;
+    "--info") show_device_info "$2" ;;
+    "--services") get_service_hints ;;
+    "--sys-ai-env") sys_check_ai_env ;;
+    "--kernel-warn") _kernel_warnings ;;
+    "--bootloader") _detect_bootloader ;;
+    "--switch") _switch_driver "$2" ;;
+    "--modules") _list_module_params "${@:2}" ;;
+    "--modules-set") _set_module_param "$2" "$3" "$4" ;;
+    "--conflicts") _check_driver_conflicts ;;
+    "--dual-gpu") _detect_dual_gpu ;;
+    "--optimus") _setup_optimus ;;
+    "--hybrid-amd") _setup_hybrid_amd ;;
+    "--gpu-status") _get_gpu_status ;;
+    "--device-id") _get_intel_gpu_device_id ;;
+    "--current-driver") _get_current_driver ;;
+    "--profile") get_profile_packages "$2" ;;
+    "--firmware-scan") _fwupd_scan ;;
+    "--firmware-install") _fwupd_install ;;
+    "--firmware-status") _fwupd_status ;;
+    "--hypr") generate_hypr_env "$2" ;;
+    "--hypr-env") generate_hypr_env "$2" ;;
+    "--hypr-show") show_hypr_env ;;
+    "--hypr-env-show") show_hypr_env ;;
+    "--mkinit") configure_mkinitcpio_nvidia ;;
 esac

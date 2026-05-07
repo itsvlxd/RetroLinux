@@ -34,7 +34,7 @@ remove_retro_command() {
     for shell_conf in "${files_to_clean[@]}"; do
         [[ ! -f $shell_conf ]] && continue
 
-        if grep -q "RETRO_DIR\|RETRO_CACHE\|# Retro Linux PATH" "$shell_conf"; then
+        if grep -q "RETRO_DIR\|RETRO_CONFIG\|# Retro Linux PATH" "$shell_conf"; then
             rx_log "info" "Cleaning up $(basename "$shell_conf")..."
 
             # Remove the PATH patch (the header + the next line)
@@ -42,8 +42,8 @@ remove_retro_command() {
 
             # Remove individual exports
             sed -i '/export RETRO_DIR=/d' "$shell_conf"
-            # Remove RETRO_CACHE as well
-            sed -i '/export RETRO_CACHE=/d' "$shell_conf"
+            # Remove RETRO_CONFIG as well
+            sed -i '/export RETRO_CONFIG=/d' "$shell_conf"
 
             rx_log "success" "Sanitized $(basename "$shell_conf")"
         fi

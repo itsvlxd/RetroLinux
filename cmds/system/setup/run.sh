@@ -1,14 +1,21 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/fs.sh"
+source "$RETRO_DIR/lib/git.sh"
 source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/lib/pkg.sh"
+source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/colors.sh"
+source "$RETRO_DIR/lib/module.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 RETRO_COMPLETE="$HOME/.retro"
 
 run_postinstall() {
     rx_logo
     rx_log "info" "Running post-install setup..."
+
+    sudo -v
 
     source "$HOME/.retro_install"
 
@@ -34,4 +41,3 @@ run_postinstall() {
     touch "$RETRO_COMPLETE"
     rx_log "success" "Post-install complete!"
 }
-

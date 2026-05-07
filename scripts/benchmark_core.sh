@@ -90,7 +90,7 @@ run_ram() {
 }
 
 run_disk() {
-    local test_file="$HOME/.cache/retro/bench_test.img"
+    local test_file="$RETRO_CONFIG/bench_test.img"
     mkdir -p "$HOME/.cache/retro"
 
     dd if=/dev/zero of="$test_file" bs=100M count=10 oflag=direct status=progress 2>&1 | tail -n 1 | awk '{print $(NF-1), $NF}' >/tmp/retro_write
@@ -130,7 +130,7 @@ hud_set_preset() {
 
     local valid=false
     for p in "${valid_presets[@]}"; do
-        [[ "$preset" == "$p" ]] && valid=true && break
+        [[ $preset == "$p" ]] && valid=true && break
     done
 
     if [[ $valid == "false" ]]; then
@@ -142,11 +142,11 @@ hud_set_preset() {
 
         if [[ "$config_dir/${preset}.conf" -ef "$config_dir/MangoHud.conf" ]]; then
             sed -i '/^toggle_hud=/d' "$config_dir/MangoHud.conf"
-            echo "toggle_hud=F11" >> "$config_dir/MangoHud.conf"
+            echo "toggle_hud=F11" >>"$config_dir/MangoHud.conf"
         else
             cp "$config_dir/${preset}.conf" "$config_dir/MangoHud.conf"
             sed -i '/^toggle_hud=/d' "$config_dir/MangoHud.conf"
-            echo "toggle_hud=F11" >> "$config_dir/MangoHud.conf"
+            echo "toggle_hud=F11" >>"$config_dir/MangoHud.conf"
         fi
 
         return 0

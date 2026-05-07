@@ -3,8 +3,8 @@
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/battery.sh"
 
-WALL_DIR="$HOME/.cache/retro/wallpapers"
-FRAME_CACHE="$HOME/.cache/retro/wallpaper_frames"
+WALL_DIR="$RETRO_CONFIG/wallpapers"
+FRAME_CACHE="$RETRO_CONFIG/wallpaper_frames"
 REPO_WALLS="$RETRO_DIR/wallpapers"
 
 mkdir -p "$FRAME_CACHE"
@@ -300,8 +300,8 @@ launch_picker() {
 
     local alpha=$(get_opacity_hex "0.9")
     local alpha_alt=$(get_opacity_hex "0.6")
-    local base_bg=$(grep "background:" ~/.cache/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
-    local base_bg_alt=$(grep "background-alt:" ~/.cache/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
+    local base_bg=$(grep "background:" ~/.config/retrp/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
+    local base_bg_alt=$(grep "background-alt:" ~/.config/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
 
     : ${base_bg:="1A1B26"}
     : ${base_bg_alt:="24283B"}
