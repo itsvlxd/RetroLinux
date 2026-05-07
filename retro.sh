@@ -1,6 +1,7 @@
 #!/bin/bash
 
 if [[ -z $RETRO_DIR ]]; then
+    # TODO: make it static to /opt
     export RETRO_DIR="$(dirname "$(readlink -f "$0")")"
 else
     export RETRO_DIR="$RETRO_DIR"
@@ -63,6 +64,7 @@ if [ -d "$RETRO_DIR/cmds" ]; then
     shopt -s globstar
     for f in "$RETRO_DIR/cmds"/**/*.sh; do
         [[ -f $f ]] || continue
+        [[ $f == */setup/*.sh ]] && continue
         source "$f"
     done
     shopt -u globstar

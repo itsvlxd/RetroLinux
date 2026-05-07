@@ -18,16 +18,16 @@ rx_post_install_packages() {
         rsync
         expect
         neovim
-        magick
         fprintd
         udisks2
         usbutils
         net-tools
         inetutils
+        memtest86+
         base-devel
+        imagemagick
         pacman-contrib
         networkmanager
-        memtest86+
     )
 
     arch-chroot /mnt pacman -S --noconfirm --needed "${packages[@]}" 2>&1
@@ -44,3 +44,4 @@ rx_post_install_packages() {
 if [[ ${BASH_SOURCE[0]} == "${0}" ]]; then
     rx_post_install_packages "$@"
 fi
+

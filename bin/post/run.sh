@@ -17,10 +17,9 @@ rx_discover_scripts() {
     local priority_scripts=(
         "packages.sh"
         "network.sh"
-        "aur.sh"
-        "ssh.sh"
         "clone.sh"
-        "install-modules.sh")
+        "state.sh"
+        "modules.sh")
     local sorted_scripts=()
     local remaining_scripts=()
 
