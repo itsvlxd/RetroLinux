@@ -5,9 +5,9 @@ source "$RETRO_DIR/lib/help.sh"
 rx_module_status() {
     local mod_name="$1"
     local mod_dir="$RETRO_DIR/modules/$mod_name"
-    local targets_file="$mod_dir/targets.json"
+    local props_file="$mod_dir/properties.json"
 
-    [[ ! -f $targets_file ]] && return 255
+    [[ ! -f $props_file ]] && return 255
 
     IFS='|' read -r repo_src system_dest <<<"$(get_module_paths "$mod_name")"
 
@@ -32,6 +32,15 @@ rx_module_status() {
     return 2
 }
 
+get_module_info() {
+    local mod_name="$1"
+    local field="$2"
+    local mod_dir="$RETRO_DIR/modules/$mod_name"
+    local props_file="$mod_dir/properties.json"
+
+    rx_get_json "$props_file" "$field" "" 2>/dev/null
+}
+
 cmd_list_modules() {
     local modules_dir="$RETRO_DIR/modules"
 
@@ -53,8 +62,39 @@ cmd_list_modules() {
             2) status_text="${GRAY}󰄱 Available${RESET}" ;;
         esac
 
-        local mod_bytes=$(du -sb "$mod_path" | awk '{print $1}')
-        local mod_size=$(rx_format_size "$mod_bytes")
+        local mod_type=$(get_module_info "$mod_name" "type")
+        local mod_access=$(get_module_info "$mod_name" "access")
+        local mod_title=$(get_module_info "$mod_name" "title")
+
+        [[ -z $mod_title ]] && mod_title="$mod_name"
+
+        local type_icon=""
+        local type_color=""
+        case "$mod_type" in
+            core)
+                type_icon="󰘽"
+                type_color="${ERROR}"
+                ;;
+            extra)
+                type_icon="󰌆"
+                type_color="${SUCCESS}"
+                ;;
+            *)
+                type_icon="󰅟"
+                type_color="${GRAY}"
+                ;;
+        esac
+
+        local access_icon=""
+        case "$mod_access" in
+            root) access_icon="󰌉" ;;
+            user) access_icon="󰀇" ;;
+        esac
+
+        local lock_icon=""
+        if [[ $mod_type == "core" ]]; then
+            lock_icon=" 󰏌"
+        fi
 
         local match="${mod_name,,}"
         local icon="󰅟 "
@@ -66,10 +106,17 @@ cmd_list_modules() {
             *matugen*) icon="󰏘 " ;;
         esac
 
-        printf " ${PINK}%b ${RESET}%-12s %b ${GRAY}%+12s${RESET}\n" "$icon" "$mod_name:" "$status_text" "$mod_size"
+        printf " ${PINK}%b${RESET} %b%b%b\n" \
+            "$icon" \
+            "$mod_title:   " \
+            "$status_text" \
+            "${GRAY}$lock_icon${RESET}"
     done
 
     rx_table_separator
     rx_table_spacer
+    printf " ${GRAY}%s${RESET}\n" "Legend: 󰘽 core (locked) 󰌆 extra  󰌉 root 󰀇 user"
+    rx_table_spacer
 }
 register_command "MODULES" "-ls|--list" "List all available and installed modules" "cmd_list_modules"
+
