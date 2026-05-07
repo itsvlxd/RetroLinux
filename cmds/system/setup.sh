@@ -1,67 +1,18 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
-
-source "$RETRO_DIR/cmds/system/setup/directories.sh"
-source "$RETRO_DIR/cmds/system/setup/fingerprint.sh"
-source "$RETRO_DIR/cmds/system/setup/filemanager.sh"
-source "$RETRO_DIR/cmds/system/setup/wallpapers.sh"
-source "$RETRO_DIR/cmds/system/setup/variables.sh"
-source "$RETRO_DIR/cmds/system/setup/auto-save.sh"
-source "$RETRO_DIR/cmds/system/setup/bitwarden.sh"
-source "$RETRO_DIR/cmds/system/setup/editor.sh"
-source "$RETRO_DIR/cmds/system/setup/pacman.sh"
-source "$RETRO_DIR/cmds/system/setup/system.sh"
-source "$RETRO_DIR/cmds/system/setup/font.sh"
-source "$RETRO_DIR/cmds/system/setup/power.sh"
-source "$RETRO_DIR/cmds/system/setup/driver.sh"
-
-# TODO: Improve installing logs
-# TODO: If a module path already exists warn the user first
-# that we detected a different config then the retro one
-# and bypass SKIP_PROMPT and ask the user if he would like
-# to install the specific module but still ensure him that
-# before installing we backup their local config
-#
-# TODO: add to automatically create cache/themes/windowrules.conf
+source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/lib/colors.sh"
 
 cmd_setup() {
-    rx_logo
-    rx_log "info" "Setting up Retro Linux..."
+    RETRO_INSTALL="$HOME/.retro_install"
+    RETRO_COMPLETE="$HOME/.retro"
 
-    setup_system
-    setup_editors
+    [[ -f $RETRO_COMPLETE ]] && exit 0
 
-    SKIP_PROMPT=true
+    [[ ! -f $RETRO_INSTALL ]] && exit 1
 
-    execute_logic "install" "retro"
-    run_task "install"
-
-    rx_default_directories
-
-    rx_vars_defaults "$2"
-    rx_setup_drivers
-
-    setup_file_manager
-
-    rx_optimize_cpu
-    rx_optimize_pacman
-    rx_bootstrap_pkg_manager
-
-    rx_setup_session_service
-    rx_setup_wallpapers
-
-    rx_setup_fonts "$2"
-    rx_setup_bitwarden
-    rx_setup_fingerprint
-
-    rx_log "success" "Setup complete!"
-
-    mkdir -p /etc/retro
-    touch /etc/retro/setup_complete
-
-    sleep 1
-    exec $SHELL
+    exec kitty -e bash -c "source $RETRO_INSTALL && source $RETRO_DIR/cmds/system/setup/run.sh && run_postinstall"
 }
 
-register_command "SYSTEM" "-s|--setup" "Install dependencies and CLI" "cmd_setup"
+register_command "SYSTEM" "-s|--setup" "Run post-install setup" "cmd_setup"

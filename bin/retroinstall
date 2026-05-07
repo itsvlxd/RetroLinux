@@ -36,9 +36,15 @@ SETUP_SCRIPTS=(
     "disk.sh"
     "luks.sh"
     "kernel.sh"
+    "boot.sh"
     "bluetooth.sh"
+    "fingerprint.sh"
     "print.sh"
     "ssh.sh"
+    "aur.sh"
+    "editor.sh"
+    "filemanager.sh"
+    "browser.sh"
     "network.sh"
     "config.sh"
 )
@@ -64,6 +70,18 @@ else
     KERNEL_SELECTION=""
     BLUETOOTH_ENABLED=""
     PRINT_SERVICE_ENABLED=""
+    GRUB_THEME_CHOICE=""
+    BOOT_VIDEO_GRUB=""
+    GRUB_OS_PROBER=""
+    SSH_ENABLED=""
+    SSH_PORT=""
+    SSH_PASSWORD_LOGIN=""
+    SSH_KEY_LOGIN=""
+    SSH_ROOT_LOGIN=""
+    AUR_HELPER=""
+    EDITOR_CHOICE=""
+    FILEMANAGER_CHOICE=""
+    FINGERPRINT_ENABLED=""
     NETWORK_TYPE=""
     WIFI_SSID=""
     RX_SKIP_STEP=""
@@ -160,6 +178,29 @@ rx_install_system() {
         print_info="Enabled"
     fi
 
+    local ssh_info="Disabled"
+    if [[ $SSH_ENABLED == "true" ]]; then
+        ssh_info="Port ${SSH_PORT:-22}"
+        local ssh_flags=""
+        [[ $SSH_PASSWORD_LOGIN == "true" ]] && ssh_flags="${ssh_flags} pwd"
+        [[ $SSH_KEY_LOGIN == "true" ]] && ssh_flags="${ssh_flags} key"
+        [[ $SSH_ROOT_LOGIN == "true" ]] && ssh_flags="${ssh_flags} root"
+        ssh_info="${ssh_info}${ssh_flags}"
+    fi
+
+    local aur_info="${AUR_HELPER:-yay}"
+
+    local editor_info="${EDITOR_CHOICE:-nano}"
+
+    local filemanager_info="${FILEMANAGER_CHOICE:-thunar}"
+
+    local browser_info="${BROWSER_CHOICE:-zen-browser-bin}"
+
+    local boot_info="GRUB ${GRUB_THEME_CHOICE:-retropunk} ${BOOT_VIDEO_GRUB:-1920x1080}"
+    if [[ $GRUB_OS_PROBER == "true" ]]; then
+        boot_info="$boot_info + OS Prober"
+    fi
+
     local sudo_info="Yes"
     if [[ $USER_SUDO == "false" ]]; then
         sudo_info="No"
@@ -173,8 +214,29 @@ rx_install_system() {
         mirror_info="$mirror_info + custom"
     fi
 
-    echo -e "Field,Value\nUsername,${USER_NAME:-unknown}\nUser Password,${user_pw_dots}\nRoot Password,${root_pw_dots}\nHostname,${USER_HOSTNAME:-unknown}\nSudo Access,${sudo_info}\nKeyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")\nLanguage,$(rx_locale_to_lang_name "${SYS_LANG:-en_US}")\nMirrors,${mirror_info}\nTimezone,${USER_TIMEZONE:-unknown}\nDisk,/dev/${disk_name} (${disk_size})\nLUKS Encryption,${luks_info} (${luks_pw_dots:-none})\nKernel,${KERNEL_SELECTION:-linux}\nBluetooth,${bt_info}\nPrinting,${print_info}\nNetwork,${network_info}\nCompression,zstd (BTRFS)" |
-        gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
+    local table_data="Username,${USER_NAME:-unknown}
+User Password,${user_pw_dots}
+Root Password,${root_pw_dots}
+Hostname,${USER_HOSTNAME:-unknown}
+Sudo Access,${sudo_info}
+Keyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")
+Language,$(rx_locale_to_lang_name "${SYS_LANG:-en_US}")
+Mirrors,${mirror_info}
+Timezone,${USER_TIMEZONE:-unknown}
+Disk,/dev/${disk_name} (${disk_size})
+LUKS Encryption,${luks_info} (${luks_pw_dots:-none})
+Kernel,${KERNEL_SELECTION:-linux}
+Bootloader,${boot_info}
+Bluetooth,${bt_info}
+Printing,${print_info}
+SSH,${ssh_info}
+AUR Helper,${aur_info}
+Editor,${editor_info}
+File Manager,${filemanager_info}
+Browser,${browser_info}
+Network,${network_info}"
+
+    echo "$table_data" | gum table -s "," -c "Field,Value" -p | sed "s/^/${PADDING_LEFT_SPACES}/"
     echo
 
     if gum confirm --affirmative "Install now" --negative "Go back" "Ready to Install" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
@@ -208,17 +270,12 @@ rx_install_system() {
         gum confirm --affirmative "Retry" --negative "Exit" --padding "$GUM_CONFIRM_PADDING" && exec /opt/retrolinux/bin/retroinstall || exit 1
     fi
 
-    # Run post-installation scripts
     rx_clear_logo
     echo
-    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Running post-installation configuration..."
+    gum style --foreground 7 "Running post-installation..." --padding "1 0 1 $PADDING_LEFT"
     echo
 
-    if [[ -f /opt/retrolinux/bin/post/run.sh ]]; then
-        bash /opt/retrolinux/bin/post/run.sh
-    else
-        gum style --foreground 3 "Post-installation scripts not found, skipping..." --padding "1 0 1 $PADDING_LEFT"
-    fi
+    bash /opt/retrolinux/bin/post/run.sh
 
     rx_clear_logo
     echo
@@ -240,4 +297,3 @@ else
     cat user_credentials.json
     rm user_configuration.json user_credentials.json
 fi
-
