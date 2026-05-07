@@ -10,15 +10,16 @@ setup_config() {
         sleep 2
     fi
 
-    rx_step "Writing configuration..."
-
     if [[ -z $DISK_SELECTED ]]; then
-        gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error: No disk selected"
-        gum style --padding "0 0 0 $PADDING_LEFT" "Please go back and select a disk"
-        echo
-        rx_retry_or_exit "No disk selected" || rx_abort
-        return 1
+        gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Selecting disk..."
+        if ! rx_restore_disk_selection; then
+            gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Disk selection required"
+            rx_retry_or_exit "Disk selection required" || rx_abort
+            return 1
+        fi
     fi
+
+    rx_step "Writing configuration..."
 
     local disk_size
     local retry=0

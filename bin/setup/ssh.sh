@@ -2,15 +2,11 @@
 
 source "$RETRO_INSTALL/lib/setup_lib.sh"
 
-# TODO: add rx_clear logo after every step and the step including to fix the white space also display
-# ssh in the summary panel at the end
-
 setup_ssh() {
     rx_load_state
-
+    rx_clear_logo
     rx_step "Let's setup SSH access..."
 
-    echo
     if ! gum confirm --affirmative "Yes, enable SSH" --negative "No, skip SSH" "SSH Service" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_ENABLED="false"
         rx_save_state
@@ -18,6 +14,9 @@ setup_ssh() {
     fi
 
     SSH_ENABLED="true"
+
+    rx_clear_logo
+    rx_step "Let's setup SSH access..."
 
     local ssh_port
     ssh_port=$(gum input --placeholder "SSH port (default: 22)" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Port> " --value "22" --padding "$GUM_INPUT_PADDING") || {
@@ -37,21 +36,27 @@ setup_ssh() {
 
     SSH_PORT="$ssh_port"
 
-    echo
+    rx_clear_logo
+    rx_step "Let's setup SSH access..."
+
     if gum confirm --affirmative "Yes, enable password login" --negative "No, disable password" "Password Authentication" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_PASSWORD_LOGIN="true"
     else
         SSH_PASSWORD_LOGIN="false"
     fi
 
-    echo
+    rx_clear_logo
+    rx_step "Let's setup SSH access..."
+
     if gum confirm --affirmative "Yes, enable SSH keys" --negative "No, disable keys" "Public Key Authentication" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_KEY_LOGIN="true"
     else
         SSH_KEY_LOGIN="false"
     fi
 
-    echo
+    rx_clear_logo
+    rx_step "Let's setup SSH access..."
+
     if gum confirm --affirmative "Yes, allow root login" --negative "No, disable root" "Root Login" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_ROOT_LOGIN="true"
     else

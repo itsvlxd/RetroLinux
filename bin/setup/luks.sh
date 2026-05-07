@@ -35,7 +35,6 @@ setup_luks() {
             fi
         done
 
-        echo
         gum style --padding "0 0 0 $PADDING_LEFT" "Select LUKS key derivation iteration time:"
         gum style --padding "0 0 0 $PADDING_LEFT" "Higher values = more security but slower boot"
         echo
@@ -101,4 +100,3 @@ setup_luks() {
 if ! setup_luks; then
     rx_setup_fail "LUKS"
 fi
-
