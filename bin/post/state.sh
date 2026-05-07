@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export RETRO_STATE="/mnt/tmp/retroinstall_state"
+export RETRO_STATE="/tmp/retroinstall_state"
 source /opt/retrolinux/bin/lib/setup_lib.sh
 
 rx_post_save_state() {
@@ -25,6 +25,9 @@ SSH_PORT=${SSH_PORT:-22}
 SSH_PASSWORD_LOGIN=${SSH_PASSWORD_LOGIN:-false}
 SSH_KEY_LOGIN=${SSH_KEY_LOGIN:-true}
 SSH_ROOT_LOGIN=${SSH_ROOT_LOGIN:-false}
+NETWORK_TYPE=${NETWORK_TYPE:-}
+WIFI_SSID=${WIFI_SSID:-}
+WIFI_PASSWORD=${WIFI_PASSWORD:-}
 EOF
         arch-chroot /mnt chown "1000:1000" "$home_dir/.retro_install"
         gum style --foreground 2 "State saved to ${home_dir}/.retro_install"

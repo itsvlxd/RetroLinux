@@ -148,6 +148,7 @@ rx_select_wifi_network() {
         password=$(gum input --placeholder "WiFi Password" --prompt.foreground="#ff79c6" --password --prompt "Password> " --padding "$GUM_INPUT_PADDING")
         echo
         [[ -z $password ]] && return 1
+        WIFI_PASSWORD="$password"
     fi
 
     local iface
