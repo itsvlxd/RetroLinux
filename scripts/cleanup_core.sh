@@ -20,11 +20,11 @@ get_log_size() {
 }
 
 get_cache_size() {
-    local cache_dir="$HOME/.cache"
+    local cache_dir="$HOME/.config"
     local total=0
-    if [[ -d "$cache_dir" ]]; then
+    if [[ -d $cache_dir ]]; then
         for d in "$cache_dir"/*/; do
-            [[ -d "$d" && "$(basename "$d")" != "retro" && "$(basename "$d")" != ".retroweb" ]] && total=$(($(du -sb "$d" 2>/dev/null | cut -f1) + total))
+            [[ -d $d && "$(basename "$d")" != "retro" && "$(basename "$d")" != ".retroweb" ]] && total=$(($(du -sb "$d" 2>/dev/null | cut -f1) + total))
         done
         if [[ $total -gt 1073741824 ]]; then
             echo "$((total / 1073741824))G"
@@ -63,7 +63,7 @@ clean_caches() {
     local before=""
     local result="failed"
 
-    if [[ -d "$cache_dir" ]]; then
+    if [[ -d $cache_dir ]]; then
         before=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
         find "$cache_dir" -mindepth 1 -maxdepth 1 -not -name "retro" -not -name ".retroweb" -exec rm -rf {} + 2>/dev/null
         result="success"
@@ -73,16 +73,16 @@ clean_caches() {
 }
 
 clean_thumbnails() {
-    local thumb_dir="$HOME/.cache/thumbnails"
+    local thumb_dir="$HOME/.config/thumbnails"
     local thumb_dir_alt="$HOME/.thumbnails"
     local before=""
     local result="none"
 
-    if [[ -d "$thumb_dir" ]]; then
+    if [[ -d $thumb_dir ]]; then
         before=$(du -sh "$thumb_dir" 2>/dev/null | cut -f1)
         rm -rf "$thumb_dir"/* 2>/dev/null
         result="success"
-    elif [[ -d "$thumb_dir_alt" ]]; then
+    elif [[ -d $thumb_dir_alt ]]; then
         before=$(du -sh "$thumb_dir_alt" 2>/dev/null | cut -f1)
         rm -rf "$thumb_dir_alt"/* 2>/dev/null
         result="success"
@@ -135,13 +135,13 @@ clean_orphans() {
     if command -v yay >/dev/null 2>&1; then
         yay -Y --devel --save 2>/dev/null
         orphans=$(yay -Qdtq 2>/dev/null | wc -l)
-        if [[ "$orphans" -gt 0 ]]; then
+        if [[ $orphans -gt 0 ]]; then
             yay -Rs $(yay -Qdtq) --noconfirm 2>/dev/null
             result="removed"
         fi
     elif command -v pacman >/dev/null 2>&1; then
         orphans=$(pacman -Qdtq 2>/dev/null | wc -l)
-        if [[ "$orphans" -gt 0 ]]; then
+        if [[ $orphans -gt 0 ]]; then
             sudo pacman -Rs $(pacman -Qdtq) --noconfirm 2>/dev/null
             result="removed"
         fi
@@ -155,7 +155,7 @@ clean_temp() {
     local total_cleaned=0
 
     for dir in "${temp_dirs[@]}"; do
-        if [[ -d "$dir" ]]; then
+        if [[ -d $dir ]]; then
             local before_num=$(du -sh "$dir" 2>/dev/null | grep -oP '\d+' | head -1)
             find "$dir" -type f -atime +7 -delete 2>/dev/null
             local after_num=$(du -sh "$dir" 2>/dev/null | grep -oP '\d+' | head -1)
@@ -187,3 +187,4 @@ case "$1" in
     "--clean-temp") clean_temp ;;
     "--clean-all") clean_all ;;
 esac
+

@@ -1,0 +1,8 @@
+{
+    "title": "Matugen",
+    "description": "Material Design color generator that creates complete color palettes and schemes for wallpaper and theme customization from specified base colors.",
+    "type": "core",
+    "access": "user",
+    "config": "./files",
+    "install": "~/.config/matugen"
+}

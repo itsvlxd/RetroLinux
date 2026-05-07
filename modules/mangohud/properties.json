@@ -1,0 +1,8 @@
+{
+    "title": "MangoHud",
+    "description": "Gaming overlay that displays FPS, GPU/CPU/RAM usage, and other system statistics while gaming, with customizable appearance and layout options.",
+    "type": "core",
+    "access": "user",
+    "config": "./files",
+    "install": "~/.config/mangohud"
+}
