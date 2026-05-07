@@ -189,7 +189,7 @@ eq_list_remote_profiles() {
 
 download_eq_preset() {
     local repo="$1"
-    local cache_dir="$RETRO_CACHE/audio/eq"
+    local cache_dir="$RETRO_CONFIG/audio/eq"
     local dest_dir="$HOME/.local/share/easyeffects/output"
     mkdir -p "$cache_dir"
     mkdir -p "$dest_dir"

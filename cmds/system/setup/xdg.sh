@@ -4,6 +4,7 @@ source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 
 setup_xdg() {
+    sudo -v
     rx_log "info" "Configuring XDG directories..."
     local xdg_packages=(xdg-user-dirs xdg-utils shared-mime-info desktop-file-utils)
     for pkg in "${xdg_packages[@]}"; do

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OUTPUT_RASI="$HOME/.cache/retro/themes/variables.rasi"
+OUTPUT_RASI="$RETRO_CONFIG/themes/variables.rasi"
 TEMP_FILE=$(mktemp)
 
 mkdir -p "$(dirname "$OUTPUT_RASI")"

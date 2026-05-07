@@ -8,7 +8,7 @@ EMOJI=$(get_var "RETRO_FONT_EMOJI" "Apple Color Emoji")
 SIZE=$(get_var "KITTY_FONT_SIZE" "9.5")
 PADDING=$(get_var "KITTY_PADDING" "5")
 
-THEME_FILE="$HOME/.cache/retro/themes/kitty-colors.conf"
+THEME_FILE="$HOME/.config/retro/themes/kitty-colors.conf"
 
 apply_settings() {
     local target=$1
@@ -35,4 +35,3 @@ for sock in /tmp/kitty-*; do
 done
 
 apply_settings "" 2>/dev/null
-

@@ -4,6 +4,7 @@ source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 
 setup_editor() {
+    sudo -v
     rx_log "info" "Configuring default text editor..."
     local target_editor="${EDITOR_CHOICE:-nvim}"
     command -v "$target_editor" &>/dev/null || sudo pacman -S --noconfirm "$target_editor" 2>&1 | tail -3

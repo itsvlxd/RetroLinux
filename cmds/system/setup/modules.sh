@@ -3,6 +3,8 @@
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 
+# TODO: remake the modules some to be level root level user
+
 setup_modules() {
     rx_log "info" "Installing RetroLinux modules..."
     local root_modules=("retro" "grub" "plymouth")
@@ -15,3 +17,4 @@ setup_modules() {
     done
     rx_log "success" "Module installation complete"
 }
+

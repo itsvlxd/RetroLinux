@@ -6,7 +6,7 @@
 # or even better i think I should make a variable array
 # of apps that should have opacity
 
-OUTPUT="$HOME/.cache/retro/themes/variables.conf"
+OUTPUT="$HOME/.config/retro/themes/variables.conf"
 TEMP_FILE=$(mktemp)
 
 mkdir -p "$(dirname "$OUTPUT")"

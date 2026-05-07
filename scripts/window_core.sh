@@ -2,7 +2,7 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 
-RULES_FILE="$RETRO_CACHE/themes/windowrules.conf"
+RULES_FILE="$RETRO_CONFIG/themes/windowrules.conf"
 
 mkdir -p "$(dirname "$RULES_FILE")"
 

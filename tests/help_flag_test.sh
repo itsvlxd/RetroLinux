@@ -7,7 +7,7 @@ else
     export RETRO_DIR="$RETRO_DIR"
 fi
 
-export RETRO_CACHE="${RETRO_CACHE:-$HOME/.cache/retro}"
+export RETRO_CONFIG="${RETRO_CONFIG:-$HOME/.cache/retro}"
 export SKIP_PROMPT=true
 
 MISSING=()

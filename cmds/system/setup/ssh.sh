@@ -5,7 +5,8 @@ source "$RETRO_DIR/lib/colors.sh"
 
 setup_ssh() {
     [[ "$SSH_ENABLED" != "true" ]] && return 0
-    
+
+    sudo -v
     rx_log "info" "Configuring SSH..."
     
     command -v ssh &>/dev/null || sudo pacman -S --noconfirm openssh 2>&1 | tail -3

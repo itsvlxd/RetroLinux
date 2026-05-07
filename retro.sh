@@ -7,13 +7,13 @@ else
     export RETRO_DIR="$RETRO_DIR"
 fi
 
-if [[ -z $RETRO_CACHE ]]; then
-    export RETRO_CACHE="$HOME/.cache/retro"
+if [[ -z $RETRO_CONFIG ]]; then
+    export RETRO_CONFIG="$HOME/.config/retro"
 else
-    export RETRO_CACHE="$RETRO_CACHE"
+    export RETRO_CONFIG="$RETRO_CONFIG"
 fi
 
-mkdir -p $RETRO_CACHE
+mkdir -p $RETRO_CONFIG
 
 declare -a CMDS_HELP
 declare -A CMDS_EXEC

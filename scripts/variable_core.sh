@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VARS_DIR="$RETRO_CACHE"
+VARS_DIR="$RETRO_CONFIG"
 VARS_FILE="$VARS_DIR/variables.sh"
 
 [[ ! -d $VARS_DIR ]] && mkdir -p "$VARS_DIR"

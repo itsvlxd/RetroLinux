@@ -56,7 +56,7 @@ cmd_clipboard() {
     local alpha=$(get_opacity_hex "0.9")
     local alpha_alt=$(get_opacity_hex "0.6")
 
-    local color_file="$HOME/.cache/retro/themes/rofi-colors.rasi"
+    local color_file="$RETRO_CONFIG/themes/rofi-colors.rasi"
     local base_bg=$(grep "background:" "$color_file" 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
     local base_bg_alt=$(grep "background-alt:" "$color_file" 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
     local highlight_color=$(grep "highlight:" "$color_file" 2>/dev/null | awk '{print $2}' | sed 's/[;]//g')
@@ -103,7 +103,10 @@ cmd_clipboard() {
 
     case "$action" in
         "wipe" | "clear")
-            rx_confirm "Clear all clipboard history (including images)?" "N" || { rx_log "info" "Wipe cancelled."; return 0; }
+            rx_confirm "Clear all clipboard history (including images)?" "N" || {
+                rx_log "info" "Wipe cancelled."
+                return 0
+            }
             cliphist wipe && rx_log "success" "Clipboard database wiped clean."
             ;;
 

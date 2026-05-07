@@ -7,7 +7,7 @@ FONT=$(get_var "KITTY_FONT" "JetBrainsMono Nerd Font")
 EMOJI=$(get_var "RETRO_FONT_EMOJI" "Apple Color Emoji")
 SIZE=$(get_var "KITTY_FONT_SIZE" "9.5")
 PADDING=$(get_var "KITTY_PADDING" "5")
-THEME="$HOME/.cache/retro/themes/kitty-colors.conf"
+THEME="$HOME/.config/retro/themes/kitty-colors.conf"
 
 exec kitty \
     --directory "${RETRO_CWD:-$HOME}" \
@@ -21,4 +21,3 @@ exec kitty \
     -o "allow_remote_control=yes" \
     -o "listen_on=unix:/tmp/kitty-{kitty_pid}" \
     "$@"
-

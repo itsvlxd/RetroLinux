@@ -1,5 +1,5 @@
-@import                          "~/.cache/retro/themes/rofi-colors.rasi"
-@import                          "~/.cache/retro/themes/variables.rasi"
+@import                          "~/.config/retro/themes/rofi-colors.rasi"
+@import                          "~/.config/retro/themes/variables.rasi"
 
 configuration {
     show-icons:                  true;

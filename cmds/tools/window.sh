@@ -194,7 +194,7 @@ cmd_wm() {
             ;;
 
         "edit")
-            local rules_file="$RETRO_CACHE/themes/windowrules.conf"
+            local rules_file="$RETRO_CONFIG/themes/windowrules.conf"
             local editor="${EDITOR:-${RETRO_EDITOR:-nano}}"
 
             if [[ ! -f $rules_file ]]; then

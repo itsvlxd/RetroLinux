@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CACHE_FILE="$RETRO_CACHE/test_cache.json"
+CACHE_FILE="$RETRO_CONFIG/test_cache.json"
 
 run_test_core() {
     local action="$1"

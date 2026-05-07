@@ -4,6 +4,7 @@ source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 
 setup_aur() {
+    sudo -v
     local aur_helper="${AUR_HELPER:-yay}"
     if command -v "$aur_helper" &>/dev/null; then
         rx_log "info" "$aur_helper already installed"
