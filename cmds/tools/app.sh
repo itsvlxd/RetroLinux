@@ -10,8 +10,7 @@ is_tui() {
 get_scripts_path() {
     local mod_path="$1"
     [[ ! -d $mod_path ]] && return 1
-    local config_rel=$(grep -o '"files"\s*:\s*"[^"]*"' "$mod_path/targets.json" 2>/dev/null | cut -d'"' -f4)
-    [[ -z $config_rel ]] && config_rel=$(rx_get_json "$mod_path/targets.json" "config" "files" 2>/dev/null)
+    local config_rel=$(rx_get_json "$mod_path/properties.json" "config" "files" 2>/dev/null)
     local config_dir="${config_rel#./}"
     echo "${mod_path}/${config_dir}/scripts"
 }
