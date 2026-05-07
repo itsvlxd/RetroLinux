@@ -15,6 +15,8 @@ source "$RETRO_INSTALL/lib/disk.sh"
 source "$RETRO_INSTALL/lib/crypto.sh"
 
 rx_set_retro_colors
+rx_load_state
+rx_clear_logo
 
 rx_setup_fail() {
     local step_name="${1:-Setup}"
