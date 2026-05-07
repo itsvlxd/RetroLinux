@@ -1,0 +1,8 @@
+{
+    "title": "GRUB Themes",
+    "description": "Custom GRUB bootloader themes that replace the default Arch Linux look with RetroLinux-styled themes including icons, fonts, and background images.",
+    "type": "core",
+    "access": "root",
+    "config": "files",
+    "install": "/boot/grub/themes"
+}

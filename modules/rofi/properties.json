@@ -1,0 +1,8 @@
+{
+    "title": "Rofi",
+    "description": "Window switcher, run launcher, and dmenu replacement that provides a modern and customizable interface for quickly accessing applications and performing actions.",
+    "type": "core",
+    "access": "user",
+    "config": "./files",
+    "install": "~/.config/rofi"
+}

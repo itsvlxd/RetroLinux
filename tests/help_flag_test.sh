@@ -7,19 +7,19 @@ else
     export RETRO_DIR="$RETRO_DIR"
 fi
 
-export RETRO_CONFIG="${RETRO_CONFIG:-$HOME/.cache/retro}"
+export RETRO_CONFIG="${RETRO_CONFIG:-$HOME/.config/retro}"
 export SKIP_PROMPT=true
 
 MISSING=()
 
 CMDS_FILES=()
 while IFS= read -r -d '' file; do
-    [[ -f "$file" ]] || continue
+    [[ -f $file ]] || continue
     CMDS_FILES+=("$file")
 done < <(find "$RETRO_DIR/cmds" -name "*.sh" -type f -print0 2>/dev/null)
 
 for file in "${CMDS_FILES[@]}"; do
-    [[ "$file" == *"clipboard/"* ]] && continue
+    [[ $file == *"clipboard/"* ]] && continue
     name=$(basename "$file" .sh)
     output=$("$RETRO_DIR/retro.sh" "$name" --help 2>&1)
     if echo "$output" | grep -qE "(help|Usage|command)"; then
@@ -39,3 +39,4 @@ else
     echo "PASS: All commands have help text"
     exit 0
 fi
+

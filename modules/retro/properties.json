@@ -1,0 +1,9 @@
+{
+    "title": "Retro Framework",
+    "description": "The main ricing framework that provides CLI tools, automation scripts, and module management for RetroLinux, including integration with Hyprland and system utilities.",
+    "type": "core",
+    "access": "user",
+    "config": "./files",
+    "install": "/opt/retrolinux"
+}
+

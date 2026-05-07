@@ -91,7 +91,7 @@ run_ram() {
 
 run_disk() {
     local test_file="$RETRO_CONFIG/bench_test.img"
-    mkdir -p "$HOME/.cache/retro"
+    mkdir -p "$HOME/.config/retro"
 
     dd if=/dev/zero of="$test_file" bs=100M count=10 oflag=direct status=progress 2>&1 | tail -n 1 | awk '{print $(NF-1), $NF}' >/tmp/retro_write
     sudo sysctl -w vm.drop_caches=3 >/dev/null 2>&1
