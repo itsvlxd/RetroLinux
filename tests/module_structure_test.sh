@@ -1,10 +1,15 @@
 #!/bin/bash
-# Description: Verify modules have required files
+# Description: Verify modules have required files and valid JSON schema
 
 if [[ -z $RETRO_DIR ]]; then
     export RETRO_DIR="$(dirname "$(readlink -f "$0")")"
 else
     export RETRO_DIR="$RETRO_DIR"
+fi
+
+if ! command -v jq &>/dev/null; then
+    echo "ERROR: 'jq' is required for schema validation. Please install it."
+    exit 1
 fi
 
 MISSING=()
@@ -16,27 +21,42 @@ done < <(find "$RETRO_DIR/modules" -mindepth 1 -maxdepth 1 -type d -print0 2>/de
 
 for mod_dir in "${MODULES_DIRS[@]}"; do
     mod_name=$(basename "$mod_dir")
+    json_file="$mod_dir/properties.json"
 
-    has_install=false
-    [[ -f "$mod_dir/install.sh" ]] && has_install=true
-
-    if [[ ! -f "$mod_dir/packages.sh" ]]; then
-        [[ $has_install == true ]] && continue
-        MISSING+=("$mod_name: missing packages.sh")
-    fi
-    if [[ ! -f "$mod_dir/properties.json" ]]; then
-        [[ $has_install == true ]] && continue
+    if [[ ! -f $json_file ]]; then
         MISSING+=("$mod_name: missing properties.json")
+        continue
+    fi
+
+    schema_errors=$(jq -r '
+        [
+            if .title == null or (.title | type != "string") then "missing/invalid title" else empty end,
+            if .description == null or (.description | type != "string") then "missing/invalid description" else empty end,
+            if .type == null or (.type | type != "string") then "missing/invalid type" else empty end,
+            if .access == null or (.access | type != "string") then "missing/invalid access" else empty end,
+            if .defaults == null or (.defaults | type != "boolean") then "missing/invalid defaults (must be true/false)" else empty end,
+            if .config == null or (.config | type != "string") then "missing/invalid config path" else empty end,
+            if .install == null or (.install | type != "string") then "missing/invalid install path" else empty end
+        ] | join(", ")
+    ' "$json_file")
+
+    if [[ -n $schema_errors && $schema_errors != "" ]]; then
+        MISSING+=("$mod_name JSON schema: $schema_errors")
+    fi
+
+    if [[ ! -f "$mod_dir/packages.sh" && ! -f "$mod_dir/install.sh" ]]; then
+        MISSING+=("$mod_name: missing packages.sh or install.sh")
     fi
 done
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
-    echo "FAIL: ${#MISSING[@]} modules missing required files"
+    echo -e "\e[31mFAIL: ${#MISSING[@]} schema/structure issues found\e[0m"
     for m in "${MISSING[@]}"; do
-        echo "ERROR: $m"
+        echo -e "  \e[33m[!] $m\e[0m"
     done
     exit 1
 else
-    echo "PASS: All modules have required structure"
+    echo -e "\e[32mPASS: All modules adhere to the RetroLinux schema\e[0m"
     exit 0
 fi
+
