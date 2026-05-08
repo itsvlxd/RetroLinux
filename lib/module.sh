@@ -31,6 +31,14 @@ get_module_access() {
     rx_get_json "$json_file" "access" "user" 2>/dev/null
 }
 
+get_module_defaults() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    rx_get_json "$json_file" "defaults" "false" 2>/dev/null
+}
+
 is_core_module() {
     local name="$1"
     local mod_type=$(get_module_type "$name")
@@ -73,6 +81,18 @@ run_task() {
             execute_logic "$type" "$module"
         fi
     fi
+}
+
+run_default_task() {
+    local type="$1"
+    local name="$2"
+
+    case "$type" in
+        "install") rx_default_install "$name" ;;
+        "pull") rx_default_pull "$name" ;;
+        "mirror") rx_default_mirror "$name" ;;
+        "uninstall") rx_default_uninstall "$name" ;;
+    esac
 }
 
 execute_logic() {
@@ -137,7 +157,7 @@ execute_logic() {
             local sync_pkgs=true
 
             if [[ $SKIP_PROMPT != "true" ]]; then
-                echo -ne " ${PINK}󱖫${RESET} Install dependencies for ${PINK}$name${RESET}? [Y/n]: "
+                echo -ne " ${PINK}󱖫${RESET} Install dependencies for ${PINK}$name${RESET}? ${PINK}[Y/n]${RESET}: "
 
                 read -r pkg_opt
 
@@ -148,16 +168,18 @@ execute_logic() {
         fi
     fi
 
-    local run_func=""
+    local use_defaults=$(get_module_defaults "$name")
+
     if [[ -f $script ]]; then
+        rx_log "info" "Running custom ${type} script for $name..."
         (cd "$mod_path" && source "./${type}.sh")
+
+        if [[ $use_defaults == "true" ]]; then
+            rx_log "info" "Applying default ${type} logic for $name..."
+            run_default_task "$type" "$name"
+        fi
     else
-        case "$type" in
-            "install") rx_default_install "$name" ;;
-            "pull") rx_default_pull "$name" ;;
-            "mirror") rx_default_mirror "$name" ;;
-            "uninstall") rx_default_uninstall "$name" ;;
-        esac
+        run_default_task "$type" "$name"
     fi
 
     [[ -f $post_hook ]] && (cd "$mod_path" && bash "./post.sh" "$type")
