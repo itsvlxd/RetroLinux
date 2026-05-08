@@ -3,6 +3,8 @@
     "description": "Fast system information tool that displays detailed hardware and software specifications in a visually appealing CLI format, similar to neofetch but faster.",
     "type": "extra",
     "access": "user",
+    "defaults": false,
     "config": "./files",
     "install": "~/.config/fastfetch"
 }
+
