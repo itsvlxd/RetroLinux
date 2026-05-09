@@ -117,7 +117,6 @@ _build_help() {
     rx_help_usage "./build.sh <command> [options]"
     rx_help_commands "Available commands"
     rx_help_cmd "build, b" "Build the full ISO (default)"
-    rx_help_cmd "--plymouth, -p" "Generate Plymouth splashscreen only"
     rx_help_cmd "--clean, -c" "Clean build artifacts"
     rx_help_cmd "--docker, -d" "Build and push Docker image to registry"
     rx_help_cmd "--repo, -r" "Include full repo in ISO at /opt/retrolinux"
@@ -127,7 +126,6 @@ _build_help() {
     rx_help_examples
     rx_help_example "./build.sh" "Build ISO with prompts"
     rx_help_example "./build.sh --yes" "Build ISO, skip prompts"
-    rx_help_example "./build.sh --plymouth" "Generate Plymouth splashscreen only"
     rx_help_example "./build.sh --clean" "Clean artifacts"
     rx_help_example "./build.sh --docker" "Build and push Docker image only"
     rx_help_example "./build.sh --force" "Force rebuild even if unchanged"
@@ -572,10 +570,6 @@ _iso_main() {
                 skip_prompt="true"
                 shift
                 ;;
-            -p | --plymouth)
-                command="plymouth"
-                shift
-                ;;
             -c | --clean)
                 do_clean="true"
                 shift
@@ -607,9 +601,6 @@ _iso_main() {
     fi
 
     case "$command" in
-        plymouth)
-            _generate_splashscreen
-            ;;
         docker)
             _docker_check || exit 1
             _build_docker_image || exit 1
