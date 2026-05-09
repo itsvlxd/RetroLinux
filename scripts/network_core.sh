@@ -1,7 +1,7 @@
 #!/bin/bash
 
 get_wifi_interfaces() {
-    ip link show | grep -E "^[0-9]+: wlan[0-9]+" | awk -F': ' '{print $2}'
+    ip link show | grep -E "^[0-9]+: w(l|lo|lp)[a-z0-9]+" | awk -F': ' '{print $2}'
 }
 
 get_ethernet_interfaces() {
@@ -13,19 +13,19 @@ get_all_interfaces() {
 }
 
 wifi_on() {
-    local iface="${1:-wlan0}"
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
     ip link set "$iface" up 2>/dev/null
     echo "result=success|iface=$iface|action=up"
 }
 
 wifi_off() {
-    local iface="${1:-wlan0}"
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
     ip link set "$iface" down 2>/dev/null
     echo "result=success|iface=$iface|action=down"
 }
 
 wifi_list() {
-    local iface="${1:-wlan0}"
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
 
     if ! ip link show "$iface" >/dev/null 2>&1; then
         echo "result=error|reason=interface_not_found|iface=$iface"
@@ -49,7 +49,7 @@ wifi_list() {
 wifi_connect() {
     local ssid="$1"
     local password="$2"
-    local iface="${3:-wlan0}"
+    local iface="${3:-$(get_wifi_interfaces | head -1)}"
 
     if [[ -z $ssid ]]; then
         echo "result=error|reason=ssid_required"
@@ -62,20 +62,43 @@ wifi_connect() {
     fi
 
     ip link set "$iface" up 2>/dev/null
+    sleep 1
 
-    local current_ssid
-    current_ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
-    if [[ $current_ssid == "$ssid" ]]; then
+    local connected_ssid
+    connected_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
+    if [[ "$connected_ssid" == "$ssid" ]]; then
         echo "result=already_connected|ssid=$ssid"
         return 0
     fi
 
-    local is_iwd_active=false
-    if systemctl is-active --quiet iwd 2>/dev/null; then
-        is_iwd_active=true
+    local nmcli_result
+    if [[ -n $password ]]; then
+        nmcli_result=$(nmcli device wifi connect "$ssid" password "$password" ifname "$iface" 2>&1)
+    else
+        nmcli_result=$(nmcli device wifi connect "$ssid" ifname "$iface" 2>&1)
     fi
 
-    if [[ $is_iwd_active == "true" ]]; then
+    local count=0
+    while [[ $count -lt 10 ]]; do
+        connected_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
+        [[ "$connected_ssid" == "$ssid" ]] && break
+        sleep 1
+        ((count++))
+    done
+
+    if [[ "$connected_ssid" == "$ssid" ]]; then
+        echo "result=success|method=nmcli|ssid=$ssid"
+        
+        nmcli connection modify "$ssid" connection.interface-name "" 2>/dev/null
+        nmcli connection modify "$ssid" 802-11-wireless.cloned-mac-address "random" 2>/dev/null
+        nmcli connection up "$ssid" 2>/dev/null
+        
+        return 0
+    fi
+
+    if command -v iwd >/dev/null 2>&1 && systemctl is-active --quiet iwd 2>/dev/null; then
+        rx_log "warn" "nmcli failed, trying iwd fallback..."
+
         if [[ -n $password ]]; then
             echo "connect $ssid
 $password" | iwd station "$iface" 2>/dev/null
@@ -83,56 +106,32 @@ $password" | iwd station "$iface" 2>/dev/null
             iwd station "$iface" connect "$ssid" 2>/dev/null
         fi
 
-        local count=0
+        count=0
         while [[ $count -lt 15 ]]; do
-            current_ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
-            [[ $current_ssid == "$ssid" ]] && break
+            connected_ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
+            [[ "$connected_ssid" == "$ssid" ]] && break
             sleep 1
             ((count++))
         done
 
-        if [[ $current_ssid == "$ssid" ]]; then
+        if [[ "$connected_ssid" == "$ssid" ]]; then
             echo "result=success|method=iwd|ssid=$ssid"
             return 0
         fi
     fi
 
-    local existing=$(nmcli -t -f SSID device wifi list ifname "$iface" 2>/dev/null | grep "^$ssid$")
-
-    if [[ -n $existing ]]; then
-        local is_connected=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
-        if [[ $is_connected == "$ssid" ]]; then
-            echo "result=already_connected|ssid=$ssid"
-            return 0
-        fi
-    fi
-
-    if [[ -n $password ]]; then
-        nmcli device wifi connect "$ssid" password "$password" ifname "$iface" >/dev/null 2>&1
-    else
-        nmcli device wifi connect "$ssid" ifname "$iface" >/dev/null 2>&1
-    fi
-
-    sleep 3
-
-    local connected_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
-
-    if [[ $connected_ssid == "$ssid" ]]; then
-        echo "result=success|method=nmcli|ssid=$ssid"
-    else
-        echo "result=error|reason=connection_failed|ssid=$ssid"
-        return 1
-    fi
+    echo "result=error|reason=connection_failed|ssid=$ssid"
+    return 1
 }
 
 wifi_disconnect() {
-    local iface="${1:-wlan0}"
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
     nmcli device disconnect "$iface" >/dev/null 2>&1
     echo "result=success|iface=$iface"
 }
 
 wifi_status() {
-    local iface="${1:-wlan0}"
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
 
     if ! ip link show "$iface" >/dev/null 2>&1; then
         echo "result=error|reason=interface_not_found|iface=$iface"
@@ -150,9 +149,11 @@ wifi_status() {
     local dns=$(echo "$conn_info" | grep "IP4.DNS\[1\]:" | sed 's/IP4.DNS\[1\]://')
 
     if [[ -z $ssid || $ssid == "--" ]]; then
-        ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
-        ipaddr=$(ip addr show "$iface" 2>/dev/null | grep -oP "inet \K[\d.]+")
-        gateway=$(ip route show default dev "$iface" 2>/dev/null | grep -oP "via \K[\d.]+")
+        if command -v iwd >/dev/null 2>&1; then
+            ssid=$(iwd station "$iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
+            ipaddr=$(ip addr show "$iface" 2>/dev/null | grep -oP "inet \K[\d.]+")
+            gateway=$(ip route show default dev "$iface" 2>/dev/null | grep -oP "via \K[\d.]+")
+        fi
     fi
 
     echo "ssid=${ssid:-none}|ip=$ipaddr|gateway=$gateway|dns=$dns"
@@ -198,7 +199,9 @@ network_status() {
         local wifi_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$wifi_iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
 
         if [[ -z $wifi_ssid || $wifi_ssid == "--" ]]; then
-            wifi_ssid=$(iwd station "$wifi_iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
+            if command -v iwd >/dev/null 2>&1; then
+                wifi_ssid=$(iwd station "$wifi_iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
+            fi
         fi
 
         echo "wifi_state=${wifi_state:-down}|wifi_ssid=${wifi_ssid:-none}"
@@ -385,6 +388,58 @@ check_internet() {
     ping -c 1 -W 3 1.1.1.1 &>/dev/null
 }
 
+wifi_autoconnect() {
+    local wifi_iface
+    wifi_iface=$(get_wifi_interfaces | head -1)
+    
+    [[ -z $wifi_iface ]] && return 1
+    
+    local conn_name
+    conn_name=$(nmcli -t -f NAME,DEVICE connection show active 2>/dev/null | grep -v "^lo" | head -1 | cut -d: -f1)
+    
+    if [[ -n $conn_name ]]; then
+        echo "result=already_connected|connection=$conn_name"
+        return 0
+    fi
+    
+    local saved_con
+    saved_con=$(nmcli -t -f connection.id connection show 2>/dev/null | head -1 | cut -d: -f2)
+    
+    if [[ -n $saved_con ]]; then
+        nmcli connection up "$saved_con" 2>/dev/null
+        sleep 2
+        
+        if ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+            echo "result=autoconnect|connection=$saved_con"
+            return 0
+        fi
+    fi
+    
+    local available_iface
+    available_iface=$(get_wifi_interfaces | head -1)
+    if [[ -n $available_iface ]]; then
+        ip link set "$available_iface" up 2>/dev/null
+        sleep 1
+        
+        local saved_con
+        saved_con=$(nmcli -t -f connection.id connection show 2>/dev/null | head -1 | cut -d: -f2)
+        
+        if [[ -n $saved_con ]]; then
+            nmcli device wifi connect "$saved_con" ifname "$available_iface" 2>/dev/null
+            sleep 3
+            
+            if ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+                nmcli connection modify "$saved_con" connection.interface-name "" 2>/dev/null
+                echo "result=reconnected|connection=$saved_con"
+                return 0
+            fi
+        fi
+    fi
+    
+    echo "result=no_connection"
+    return 1
+}
+
 case "$1" in
     "--wifi-on") wifi_on "$2" ;;
     "--wifi-off") wifi_off "$2" ;;
@@ -392,6 +447,7 @@ case "$1" in
     "--wifi-connect") wifi_connect "$2" "$3" "$4" ;;
     "--wifi-disconnect") wifi_disconnect "$2" ;;
     "--wifi-status") wifi_status "$2" ;;
+    "--wifi-autoconnect") wifi_autoconnect ;;
     "--ethernet-status") ethernet_status "$2" ;;
     "--network-status") network_status ;;
     "--manual-ip") manual_ip "$2" "$3" "$4" ;;
@@ -403,4 +459,3 @@ case "$1" in
     "--interface-info") interface_info "$2" ;;
     "--check-internet") check_internet && echo "result=online" || echo "result=offline" ;;
 esac
-
