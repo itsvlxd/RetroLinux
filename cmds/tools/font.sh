@@ -310,11 +310,9 @@ cmd_font() {
                 cmd_font "install" "ttf-apple-emoji"
 
                 local installed_fonts=$(bash "$font_core" --list-installed)
-                local main_match=$(echo "$installed_fonts" | grep -i "inter" | head -1)
-                local nerd_match=$(echo "$installed_fonts" | grep -i "jetbrains" | head -1)
 
-                [[ -n $main_match ]] && set_var "RETRO_FONT_MAIN" "$main_match"
-                [[ -n $nerd_match ]] && set_var "RETRO_FONT_NERD" "$nerd_match"
+                set_var "RETRO_FONT_MAIN" "Inter"
+                set_var "RETRO_FONT_NERD" "JetBrainsMono Nerd Font"
                 set_var "RETRO_FONT_EMOJI" "Apple Color Emoji"
 
                 bash "$font_core" --sync
