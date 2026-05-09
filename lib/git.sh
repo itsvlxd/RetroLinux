@@ -27,3 +27,9 @@ rx_git_latest_tag() {
     tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 2>/dev/null)
     echo "${tag:-}"
 }
+
+rx_git_reset_hard() {
+    rx_log "info" "Performing hard reset..."
+    sudo git -C "$RETRO_DIR" reset --hard
+    rx_log "success" "Git reset --hard completed"
+}
