@@ -33,3 +33,8 @@ rx_git_reset_hard() {
     sudo git -C "$RETRO_DIR" reset --hard
     rx_log "success" "Git reset --hard completed"
 }
+
+rx_git_fix_owner() {
+    sudo chown -R "$(whoami):$(id -gn)" "$RETRO_DIR"
+    rx_log "success" "Fixed ownership: $RETRO_DIR"
+}
