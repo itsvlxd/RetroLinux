@@ -15,6 +15,7 @@ rx_post_save_state() {
 
     if [[ -n $username && -n $home_dir ]]; then
         arch-chroot /mnt tee "$home_dir/.retro_install" >/dev/null <<EOF
+export INSTALL_TYPE=${INSTALL_TYPE:-complete}
 export FILEMANAGER_CHOICE=${FILEMANAGER_CHOICE:-thunar}
 export EDITOR_CHOICE=${EDITOR_CHOICE:-nvim}
 export BROWSER_CHOICE=${BROWSER_CHOICE:-firefox}
