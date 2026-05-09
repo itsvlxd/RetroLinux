@@ -8,21 +8,11 @@ source "$RETRO_DIR/lib/git.sh"
 
 cmd_update() {
     local target="${1:-existing}"
-    local type_filter=""
-    local access_filter=""
     local force_reset=""
 
     shift
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -t | --type)
-                type_filter="$2"
-                shift 2
-                ;;
-            -a | --access)
-                access_filter="$2"
-                shift 2
-                ;;
             --hard-reset)
                 force_reset="true"
                 shift
@@ -137,6 +127,7 @@ cmd_update() {
 
         rx_log "success" "Git pull successful"
 
+<<<<<<< HEAD
         [[ -n "$type_filter" ]] && export MODULE_TYPE_FILTER="$type_filter"
         [[ -n "$access_filter" ]] && export MODULE_ACCESS_FILTER="$access_filter"
         
@@ -150,6 +141,10 @@ cmd_update() {
         if [[ $access_filter == "user" || $access_filter == "all" || -z "$access_filter" ]]; then
             cmd_install "existing" -a user
         fi
+=======
+        sudo $RETRO_DIR/retro.sh -i $target -a root -y
+        $RETRO_DIR/retro.sh -i $target -a user -y
+>>>>>>> a3c7ded (chore(update): remove unused arguments)
     else
         rx_log "error" "Git pull failed. Check your connection or conflicts."
         return 1
