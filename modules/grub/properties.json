@@ -4,6 +4,7 @@
     "type": "core",
     "access": "root",
     "defaults": false,
+    "mode": "all",
     "config": "files",
     "install": "/boot/grub/themes"
 }

@@ -19,11 +19,23 @@ rx_pkg_install() {
 
     rx_log "info" "Installing missing packages: ${PINK}${missing_pkgs[*]}${RESET}"
 
+    local helper
+    helper=$(get_var "PKG_HELPER" "yay")
+
     local install_cmd=""
-    if command -v yay >/dev/null; then
-        install_cmd="yay -S --needed --noconfirm"
+    if command -v "$helper" >/dev/null 2>&1; then
+        install_cmd="$helper -S --needed --noconfirm"
     else
-        install_cmd="pacman -S --needed --noconfirm"
+        if [[ $sudo_run == "true" ]]; then
+            install_cmd="sudo pacman -S --needed --noconfirm"
+        else
+            if ! command -v pacman >/dev/null 2>&1; then
+                rx_log "error" "No package manager available"
+                return 1
+            fi
+            rx_log "warn" "Using pacman (no AUR helper)"
+            install_cmd="sudo pacman -S --needed --noconfirm"
+        fi
     fi
 
     if [[ $sudo_run == "true" ]]; then
@@ -32,3 +44,4 @@ rx_pkg_install() {
         $install_cmd "${missing_pkgs[@]}"
     fi
 }
+

@@ -3,8 +3,8 @@
     "description": "Boot splash theme system that displays a graphical animation during the system boot process, replacing the default console output with styled visuals.",
     "type": "core",
     "access": "root",
-    "defaults": true,
+    "defaults": false,
+    "mode": "all",
     "config": "./files",
     "install": "/usr/share/plymouth/themes"
 }
-

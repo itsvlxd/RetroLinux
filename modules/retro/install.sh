@@ -2,7 +2,7 @@
 
 source "$RETRO_DIR/cmds/tools/power.sh"
 
-RETRO_CONFIG="$HOME/./config/retro"
+RETRO_CONFIG="$HOME/.config/retro"
 source_bin="$RETRO_DIR/retro.sh"
 bin_dir="/usr/local/bin"
 cmd_name="retro"

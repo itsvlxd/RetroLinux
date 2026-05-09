@@ -39,6 +39,14 @@ get_module_defaults() {
     rx_get_json "$json_file" "defaults" "false" 2>/dev/null
 }
 
+get_module_mode() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    rx_get_json "$json_file" "mode" "all" 2>/dev/null
+}
+
 is_core_module() {
     local name="$1"
     local mod_type=$(get_module_type "$name")
@@ -86,11 +94,26 @@ run_task() {
 run_default_task() {
     local type="$1"
     local name="$2"
+    local mode=$(get_module_mode "$name")
 
     case "$type" in
-        "install") rx_default_install "$name" ;;
+        "install")
+            if [[ $mode == "mirror" ]]; then
+                rx_log "warn" "$name is set to 'mirror' mode. Overriding to mirror (copying files)..."
+                rx_default_mirror "$name"
+            else
+                rx_default_install "$name"
+            fi
+            ;;
+        "mirror")
+            if [[ $mode == "install" ]]; then
+                rx_log "warn" "$name is set to 'install' mode. Overriding to install (symlinking files)..."
+                rx_default_install "$name"
+            else
+                rx_default_mirror "$name"
+            fi
+            ;;
         "pull") rx_default_pull "$name" ;;
-        "mirror") rx_default_mirror "$name" ;;
         "uninstall") rx_default_uninstall "$name" ;;
     esac
 }
@@ -164,7 +187,7 @@ execute_logic() {
                 [[ $pkg_opt =~ ^[Nn]$ ]] && sync_pkgs=false
             fi
 
-            [[ $sync_pkgs == "true" ]] && rx_pkg_install "$mod_path/packages.sh" "$SUDO_RUN"
+            [[ $sync_pkgs == "true" ]] && rx_pkg_install "$mod_path/packages.sh"
         fi
     fi
 

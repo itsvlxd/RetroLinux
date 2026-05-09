@@ -5,6 +5,7 @@ git
 sed
 grep
 rsync
+unzip
 expect
 fprintd
 udisks2

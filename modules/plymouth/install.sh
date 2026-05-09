@@ -17,7 +17,7 @@ install_plymouth_themes() {
         if [[ -d $theme ]]; then
             local theme_name=$(basename "$theme")
             rx_log "info" "Installing theme: ${PINK}$theme_name${RESET}"
-            cp -rf "$theme" "$themes_dir/"
+            rsync -a "$theme/" "$themes_dir/$theme_name/"
         fi
     done
     
@@ -42,8 +42,7 @@ Theme=$theme_name
 ShowDelay=0
 EOF
             
-            rm -f /usr/share/plymouth/themes/default.plymouth
-            ln -s $theme_name/$theme_name.plymouth /usr/share/plymouth/themes/default.plymouth
+            ln -sf "$theme_name/$theme_name.plymouth" /usr/share/plymouth/themes/default.plymouth
             
             rx_log "success" "Plymouth theme configured via fallback method"
         fi

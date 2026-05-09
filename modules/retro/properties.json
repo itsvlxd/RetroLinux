@@ -4,7 +4,7 @@
     "type": "core",
     "access": "user",
     "defaults": true,
-    "mode": "all/",
+    "mode": "mirror",
     "config": "./files",
     "install": "~/.config/retro"
 }
