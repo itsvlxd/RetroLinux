@@ -17,6 +17,7 @@ rx_discover_scripts() {
     local priority_scripts=(
         "packages.sh"
         "network.sh"
+        "aur.sh"
         "clone.sh"
         "state.sh"
         "modules.sh")

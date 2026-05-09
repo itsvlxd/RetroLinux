@@ -16,6 +16,7 @@ rx_post_install_packages() {
         gum
         grep
         rsync
+        unzip
         expect
         neovim
         fprintd
@@ -28,9 +29,16 @@ rx_post_install_packages() {
         imagemagick
         pacman-contrib
         networkmanager
+
+        inter-font
+        ttf-jetbrains-mono-nerd
+
+        "${KERNEL_SELECTION}-headers"
     )
 
     arch-chroot /mnt pacman -S --noconfirm --needed "${packages[@]}" 2>&1
+
+    arch-chroot /mnt fc-cache -f 2>&1
 
     if [[ $? -eq 0 ]]; then
         gum style --foreground 5 "Essential packages installed"
@@ -44,4 +52,3 @@ rx_post_install_packages() {
 if [[ ${BASH_SOURCE[0]} == "${0}" ]]; then
     rx_post_install_packages "$@"
 fi
-
