@@ -1,7 +1,6 @@
 #!/bin/bash
 
 if [[ -z $RETRO_DIR ]]; then
-    # TODO: make it static to /opt
     export RETRO_DIR="$(dirname "$(readlink -f "$0")")"
 else
     export RETRO_DIR="$RETRO_DIR"
@@ -93,7 +92,7 @@ if [[ -z $CMD || $CMD == "-h" || $CMD == "--help" ]]; then
     exit 0
 fi
 
-if [[ $CMD == "-i" && "${CLEAN_ARGS[1]}" == "--help" ]]; then
+if [[ $CMD == "-i" && ${CLEAN_ARGS[1]} == "--help" ]]; then
     if command -v show_install_help >/dev/null; then
         show_install_help
     else
