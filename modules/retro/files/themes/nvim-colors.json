@@ -1,0 +1,27 @@
+{
+    "wallpaper": "/home/vlad/.config/retro/wallpaper_frames/car-in-neon-gas-station.mp4.png",
+    "alpha": "100",
+    "special": {
+        "background": "#17111a",
+        "foreground": "#ffffff",
+        "cursor": "#ffffff"
+    },
+    "colors": {
+        "color0": "#0f0f12",
+        "color1": "#6b3586",
+        "color2": "#b051dd",
+        "color3": "#9948c0",
+        "color4": "#fcebff",
+        "color5": "#a83be9",
+        "color6": "#b051dd",
+        "color7": "#ffffff",
+        "color8": "#542c69",
+        "color9": "#542c69",
+        "color10": "#b051dd",
+        "color11": "#6b3586",
+        "color12": "#f5d9ff",
+        "color13": "#a83be9",
+        "color14": "#542374",
+        "color15": "#ffffff"
+    }
+}

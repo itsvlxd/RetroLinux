@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# TODO: remove the echos of boot and ramdisk
-
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
 
@@ -68,6 +66,9 @@ update_grub_config() {
             if ! grep -q "splash" "$grub_defaults"; then
                 $SUDO_CMD sed -i 's/\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 splash"/' "$grub_defaults"
             fi
+            if ! grep -q "net.ifnames=0" "$grub_defaults"; then
+                $SUDO_CMD sed -i 's/\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 net.ifnames=0"/' "$grub_defaults"
+            fi
         fi
 
         if [[ ${GRUB_OS_PROBER:-false} == "true" ]]; then
@@ -123,6 +124,19 @@ GRUB_SETTINGS
         fi
 
         rm -f "$temp_cfg"
+    fi
+}
+
+remove_grub_echo_messages() {
+    local grub_cfg="/boot/grub/grub.cfg"
+    
+    if [[ -f $grub_cfg ]]; then
+        rx_log "info" "Removing GRUB loading messages..."
+        
+        $SUDO_CMD sed -i "/echo.*Loading Linux linux/d" "$grub_cfg"
+        $SUDO_CMD sed -i "/echo.*Loading initial ramdisk/d" "$grub_cfg"
+        
+        rx_log "success" "GRUB loading messages removed"
     fi
 }
 
@@ -303,6 +317,7 @@ regenerate_grub() {
             patch_grub_cfg
             patch_grub_menu_entries
             add_shutdown_reboot_entries
+            remove_grub_echo_messages
             rx_log "success" "GRUB configuration regenerated and patched"
         else
             rx_log "warn" "GRUB configuration regeneration had issues"

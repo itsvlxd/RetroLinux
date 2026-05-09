@@ -61,21 +61,21 @@ rx_mirror_install() {
     local repo_data_path="$1"
     local system_path="$2"
 
-    if [[ -e $system_path && ! -L $system_path ]]; then
-        return 0
-    fi
-
     rx_log "info" "Installing physical copies to $system_path"
 
     [[ -L $system_path ]] && unlink "$system_path"
 
     mkdir -p "$(dirname "$system_path")"
 
-    if [[ -d $repo_data_path ]]; then
-        mkdir -p "$system_path"
+    if [[ -d $system_path ]]; then
         rsync -a --delete "$repo_data_path/" "$system_path/"
     else
-        rsync -a "$repo_data_path" "$system_path"
+        if [[ -d $repo_data_path ]]; then
+            mkdir -p "$system_path"
+            rsync -a --delete "$repo_data_path/" "$system_path/"
+        else
+            rsync -a "$repo_data_path" "$system_path"
+        fi
     fi
 
     rx_sanitize "$system_path"

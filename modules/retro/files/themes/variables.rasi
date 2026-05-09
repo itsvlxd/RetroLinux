@@ -1,0 +1,10 @@
+/**
+ * RETRO AUTO-GENERATED VARIABLES
+ **/
+
+* {
+    rofi-font:          "JetBrainsMono Nerd Font 9.5";
+    rofi-border:        2px solid;
+    rofi-radius:        10px;
+    rofi-padding:       5px;
+}

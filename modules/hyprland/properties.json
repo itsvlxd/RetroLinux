@@ -4,6 +4,7 @@
     "type": "core",
     "access": "user",
     "defaults": false,
+    "mode": "all",
     "config": "./files",
     "install": "~/.config/hypr"
 }
