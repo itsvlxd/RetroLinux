@@ -97,7 +97,7 @@ wifi_connect() {
     fi
 
     if command -v iwd >/dev/null 2>&1 && systemctl is-active --quiet iwd 2>/dev/null; then
-        rx_log "warn" "nmcli failed, trying iwd fallback..."
+        echo "warn|nmcli failed, trying iwd fallback..."
 
         if [[ -n $password ]]; then
             echo "connect $ssid
