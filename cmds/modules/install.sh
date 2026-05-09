@@ -26,6 +26,7 @@ cmd_install() {
                 ;;
             -y | --yes)
                 skip_prompt="true"
+                export SKIP_PROMPT=true
                 shift
                 ;;
             *)
