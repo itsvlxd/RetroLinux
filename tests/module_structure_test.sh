@@ -30,13 +30,13 @@ for mod_dir in "${MODULES_DIRS[@]}"; do
 
     schema_errors=$(jq -r '
         [
-            if .title == null or (.title | type != "string") then "missing/invalid title" else empty end,
-            if .description == null or (.description | type != "string") then "missing/invalid description" else empty end,
-            if .type == null or (.type | type != "string") then "missing/invalid type" else empty end,
-            if .access == null or (.access | type != "string") then "missing/invalid access" else empty end,
-            if .defaults == null or (.defaults | type != "boolean") then "missing/invalid defaults (must be true/false)" else empty end,
-            if .config == null or (.config | type != "string") then "missing/invalid config path" else empty end,
-            if .install == null or (.install | type != "string") then "missing/invalid install path" else empty end
+            if .title == null or (.title | type != "string") then "missing title" else empty end,
+            if .type == null or (.type | IN("core", "extra") | not) then "invalid type" else empty end,
+            if .access == null or (.access | IN("user", "root") | not) then "invalid access" else empty end,
+            if .defaults == null or (.defaults | type != "boolean") then "invalid defaults" else empty end,
+            if .mode == null or (.mode | IN("all", "install", "mirror") | not) then "invalid mode (must be all/install/mirror)" else empty end,
+            if .config == null or (.config | type != "string") then "invalid config path" else empty end,
+            if .install == null or (.install | type != "string") then "invalid install path" else empty end
         ] | join(", ")
     ' "$json_file")
 
