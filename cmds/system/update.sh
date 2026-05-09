@@ -144,7 +144,12 @@ cmd_update() {
 =======
         sudo $RETRO_DIR/retro.sh -i $target -a root -y
         $RETRO_DIR/retro.sh -i $target -a user -y
+<<<<<<< HEAD
 >>>>>>> a3c7ded (chore(update): remove unused arguments)
+=======
+        
+        rx_log "success" "Update finished"
+>>>>>>> 2217686 (chore(update): add sucess log at the end for update finished)
     else
         rx_log "error" "Git pull failed. Check your connection or conflicts."
         return 1
