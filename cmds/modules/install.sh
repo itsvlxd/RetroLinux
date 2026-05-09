@@ -62,11 +62,13 @@ show_install_help() {
     rx_help_examples
     rx_help_example "retro -i hyprland -y" "Install single module"
     rx_help_example "retro -i all -y" "Install all modules"
+    rx_help_example "retro -i existing -y" "Install only currently installed modules"
     rx_help_example "retro -i all -t core -y" "Install core modules only"
     rx_help_example "retro -i all -t extra -y" "Install extra modules only"
     rx_help_example "retro -i all -a user -y" "Install user-space modules"
     rx_help_example "retro -i all -a root -y" "Install system modules (requires sudo)"
-    rx_help_example "retro -i all -t core -a user -y" "Install core user modules"
+    rx_help_example "retro -i existing -a user -y" "Reinstall only installed user modules"
+    rx_help_example "retro -i existing -a root -y" "Reinstall only installed root modules"
     rx_help_spacer
 }
 

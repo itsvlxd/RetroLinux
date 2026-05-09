@@ -3,8 +3,32 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/logo.sh"
 
+# TODO: refactor the update workflow
+
 cmd_update() {
-    local target="$1"
+    local target="${1:-existing}"
+    local type_filter=""
+    local access_filter=""
+
+    shift
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -t | --type)
+                type_filter="$2"
+                shift 2
+                ;;
+            -a | --access)
+                access_filter="$2"
+                shift 2
+                ;;
+            -i | --install)
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
 
     rx_logo
 
@@ -24,7 +48,7 @@ cmd_update() {
             local commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
 
             if [[ -n $commits ]]; then
-            rx_table_header "󰜘" "Changelog"
+                rx_table_header "󰜘" "Changelog"
 
                 local feat="" fix="" refactor="" style="" docs="" chore="" other=""
 
@@ -100,17 +124,18 @@ cmd_update() {
 
         rx_log "success" "Git pull successful"
 
-        if [[ $SKIP_PROMPT != true ]]; then
-            rx_log "info" "Would you like to update all modules? ${PINK}[y/N]${RESET}"
-            read -r confirm
-            if [[ $confirm =~ ^[Yy]$ ]]; then
-                SKIP_PROMPT=true
-                cmd_install "$target"
-            else
-                rx_log "info" "Skipping module updates."
-            fi
-        else
-            cmd_install "$target"
+        [[ -n "$type_filter" ]] && export MODULE_TYPE_FILTER="$type_filter"
+        [[ -n "$access_filter" ]] && export MODULE_ACCESS_FILTER="$access_filter"
+        
+        local install_flags="-y"
+        [[ -n "$type_filter" ]] && install_flags+=" -t $type_filter"
+        [[ -n "$access_filter" ]] && install_flags+=" -a $access_filter"
+        
+        if [[ $access_filter == "root" || $access_filter == "all" ]]; then
+            cmd_install "existing" -a root
+        fi
+        if [[ $access_filter == "user" || $access_filter == "all" || -z "$access_filter" ]]; then
+            cmd_install "existing" -a user
         fi
     else
         rx_log "error" "Git pull failed. Check your connection or conflicts."

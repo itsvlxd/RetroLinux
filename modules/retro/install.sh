@@ -16,6 +16,9 @@ if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
     sudo ln -sf "$source_bin" "$target"
     sudo chmod +x "$target"
     rx_log "success" "The ${PINK}${cmd_name}${RESET} command is now global."
+
+sudo chmod -R 755 "$RETRO_DIR"
+sudo git config --global --add safe.directory "$RETRO_DIR"
 fi
 
 patch_env() {

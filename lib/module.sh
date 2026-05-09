@@ -1,7 +1,31 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/helpers.sh"
+
 MODULE_TYPE_FILTER=""
 MODULE_ACCESS_FILTER=""
+
+get_installed_modules() {
+    local access="$1"
+    
+    for dir in "$RETRO_DIR"/modules/*/; do
+        [[ -d $dir ]] || continue
+        local mod_name=$(basename "$dir")
+        
+        rx_module_status "$mod_name"
+        local status_code=$?
+        
+        [[ $status_code -eq 2 ]] && continue
+        
+        local mod_access=$(get_module_access "$mod_name")
+        
+        if [[ -n $access ]]; then
+            [[ "$mod_access" == "$access" ]] && echo "$mod_name"
+        else
+            echo "$mod_name"
+        fi
+    done
+}
 
 get_module_paths() {
     local name="$1"
@@ -82,6 +106,14 @@ run_task() {
 
             filter_module "$mod_name" && execute_logic "$type" "$mod_name"
         done
+    elif [[ $module == "existing" ]]; then
+        local access_filter=""
+        [[ -n $MODULE_ACCESS_FILTER && $MODULE_ACCESS_FILTER != "all" ]] && access_filter="$MODULE_ACCESS_FILTER"
+        
+        while IFS= read -r installed_mod; do
+            [[ -z $installed_mod ]] && continue
+            filter_module "$installed_mod" && execute_logic "$type" "$installed_mod"
+        done < <(get_installed_modules "$access_filter")
     else
         if [[ -d "$RETRO_DIR/modules/$module" ]]; then
             filter_module "$module" && execute_logic "$type" "$module"
