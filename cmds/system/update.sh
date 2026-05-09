@@ -43,6 +43,8 @@ cmd_update() {
         return 1
     fi
 
+    rx_git_fix_owner
+
     if [[ $force_reset == "true" ]]; then
         rx_confirm "Perform git reset --hard to discard local changes?" "N" || return 0
         rx_git_reset_hard

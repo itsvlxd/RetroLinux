@@ -10,6 +10,16 @@ target="$bin_dir/$cmd_name"
 
 cmd_power "permissions"
 
+<<<<<<< HEAD
+=======
+retro_fix_permissions() {
+    rx_log "info" "Fixing RetroLinux permissions..."
+    sudo chmod -R 755 "$RETRO_DIR"
+    git config --global --add safe.directory "$RETRO_DIR"
+    rx_log "success" "Permissions and git safe.directory configured"
+}
+
+>>>>>>> 545af8d (fix(update): fix git directory owner permission)
 if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
     rx_log "info" "Installing ${PINK}${cmd_name}${RESET} to ${bin_dir}..."
     [[ ! -d $bin_dir ]] && sudo mkdir -p "$bin_dir"
