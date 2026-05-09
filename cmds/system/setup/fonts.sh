@@ -6,10 +6,7 @@ source "$RETRO_DIR/lib/colors.sh"
 setup_fonts() {
     rx_log "info" "Configuring fonts..."
 
-    source "$RETRO_DIR/lib/helpers.sh"
-    source "$RETRO_DIR/cmds/tools/font.sh"
-
-    cmd_font "setup" -y
+    $RETRO_DIR/retro.sh font "setup" -y
 
     rx_log "success" "Fonts configured"
 }
