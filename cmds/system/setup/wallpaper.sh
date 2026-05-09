@@ -8,8 +8,10 @@ source "$RETRO_DIR/cmds/tools/wallpaper.sh"
 
 VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
-CACHE_WALLS="$HOME/.cache/retro/wallpapers"
+CONFIG_WALLS="$HOME/.config/retro/wallpapers"
 SOURCE_WALLS="$RETRO_DIR/wallpapers"
+
+mkdir -p "$CONFIG_WALLS"
 
 setup_wallpaper() {
     rx_log "info" "Configuring wallpapers..."
@@ -21,7 +23,7 @@ setup_wallpaper() {
     fi
 
     local needs_update="false"
-    if [[ ! -d $CACHE_WALLS ]]; then
+    if [[ ! -d $CONFIG_WALLS ]]; then
         needs_update="true"
     else
         for src_theme in "$SOURCE_WALLS"/*/; do
@@ -31,7 +33,7 @@ setup_wallpaper() {
             for src_file in "$src_theme"/*; do
                 [[ -e $src_file ]] || continue
                 local filename=$(basename "$src_file")
-                if [[ ! -e "$CACHE_WALLS/$theme_name/$filename" ]]; then
+                if [[ ! -e "$CONFIG_WALLS/$theme_name/$filename" ]]; then
                     needs_update="true"
                     break 2
                 fi
@@ -41,8 +43,8 @@ setup_wallpaper() {
 
     if [[ $needs_update == "true" ]]; then
         rx_log "info" "Syncing new wallpaper assets..."
-        mkdir -p "$CACHE_WALLS"
-        cp -rn "$SOURCE_WALLS"/* "$CACHE_WALLS/"
+        mkdir -p "$CONFIG_WALLS"
+        cp -rn "$SOURCE_WALLS"/* "$CONFIG_WALLS/"
     fi
 
     local current_theme=$(bash "$VAR_SCRIPT" --get "RETRO_THEME")
@@ -86,8 +88,8 @@ setup_wallpaper() {
 
             local def_wall="${default_walls[$selected_theme]}"
 
-            if [[ -z $def_wall || ! -f "$CACHE_WALLS/$selected_theme/$def_wall" ]]; then
-                def_wall=$(ls -1 "$CACHE_WALLS/$selected_theme" | grep -vE '\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$' | head -n 1)
+            if [[ -z $def_wall || ! -f "$CONFIG_WALLS/$selected_theme/$def_wall" ]]; then
+                def_wall=$(ls -1 "$CONFIG_WALLS/$selected_theme" | grep -vE '\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$' | head -n 1)
             fi
 
             if [[ -n $def_wall ]]; then
