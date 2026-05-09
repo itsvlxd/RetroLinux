@@ -69,11 +69,18 @@ slideshow_next() {
     local target_dir=$(get_theme_dir)
     local current=$(get_var "WALL_CURRENT")
 
-    local next_wall=$(find "$target_dir" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null |
+    local next_wall
+    while IFS= read -r wall; do
+        [[ -z $wall ]] && continue
+        if check_wallpaper_resolution "$wall"; then
+            next_wall="$wall"
+            break
+        fi
+    done < <(find "$target_dir" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null |
         grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" |
         grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" |
         grep -vF "$current" |
-        shuf -n 1)
+        shuf)
 
     if [[ -n $next_wall ]]; then
         set_wallpaper "$next_wall"
@@ -82,13 +89,18 @@ slideshow_next() {
 
 optimize_wallpapers() {
     local res_map=$(get_var "WALL_RES_MAP")
+    
     if [[ -z $res_map || $res_map == "null" ]]; then
-        return 0
+        local mon_res
+        mon_res=$(get_monitor_resolutions)
+        res_map="default|$mon_res"
     fi
-
+    
     local target_res=$(echo "$res_map" | tr ',' '\n' | cut -d'|' -f2 | head -n 1)
     local target_w="${target_res%x*}"
     local target_h="${target_res#*x}"
+    
+    [[ -z $target_w || -z $target_h ]] && return 0
 
     local theme=$(get_var "RETRO_THEME" "retro")
 
@@ -117,7 +129,12 @@ optimize_wallpapers() {
             continue
         fi
 
-        if ((src_w > target_w || src_h > target_h)); then
+        if [[ $src_w -eq $target_w && $src_h -eq $target_h ]]; then
+            if [[ ! -L $opt_file || $(readlink "$opt_file") != "$src_file" ]]; then
+                rm -f "$opt_file"
+                ln -sf "$src_file" "$opt_file"
+            fi
+        else
 
             local cached_res=""
             if [[ -f $opt_file && ! -L $opt_file ]]; then
@@ -136,15 +153,106 @@ optimize_wallpapers() {
                     magick "$src_file" -resize "${target_w}x${target_h}^" -gravity center -extent "${target_w}x${target_h}" "$opt_file"
                 fi
             fi
-        else
-            if [[ ! -L $opt_file || $(readlink "$opt_file") != "$src_file" ]]; then
-                rm -f "$opt_file"
-                ln -sf "$src_file" "$opt_file"
-            fi
         fi
     done
 
     restore_wallpaper
+}
+
+get_monitor_resolutions() {
+    local res_map=$(get_var "WALL_RES_MAP")
+    
+    if [[ -n $res_map && $res_map != "null" ]]; then
+        echo "$res_map" | tr ',' '\n' | cut -d'|' -f2
+        return 0
+    fi
+    
+    if command -v hyprctl >/dev/null 2>&1; then
+        hyprctl monitors -j | jq -r '.[] | "\(.description)|\(.x)\((.width/.scale)|0floor)x\((.height/.scale)|0floor)"' 2>/dev/null | cut -d'|' -f2
+        return 0
+    fi
+    
+    local primary
+    primary=$(cat /sys/class/drm/card0-HDMI-A-1/modes 2>/dev/null | head -1)
+    if [[ -n $primary ]]; then
+        echo "$primary"
+        return 0
+    fi
+    
+    echo "1920x1080"
+}
+
+get_image_resolution() {
+    local file="$1"
+    [[ -z $file || ! -f $file ]] && return 1
+    
+    local ext="${file##*.}"
+    
+    if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
+        ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$file" 2>/dev/null
+    else
+        magick "$file" -format "%wx%h" info:
+    fi
+}
+
+check_wallpaper_resolution() {
+    local file="$1"
+    [[ -z $file || ! -f $file ]] && return 1
+    
+    local file_res
+    file_res=$(get_image_resolution "$file")
+    [[ -z $file_res ]] && return 1
+    
+    local file_w="${file_res%x*}"
+    local file_h="${file_res#*x}"
+    
+    while IFS= read -r mon_res; do
+        [[ -z $mon_res ]] && continue
+        local mon_w="${mon_res%x*}"
+        local mon_h="${mon_res#*x}"
+        
+        if [[ $file_w -eq $mon_w && $file_h -eq $mon_h ]]; then
+            return 0
+        fi
+    done < <(get_monitor_resolutions)
+    
+    return 1
+}
+
+list_wallpapers_with_resolution() {
+    local target_dir=$(get_theme_dir)
+    local show_all="${1:-false}"
+    
+    local valid_count=0
+    local invalid_count=0
+    
+    for f in "$target_dir"/*; do
+        [[ -d $f ]] && continue
+        [[ -f $f || -L $f ]] || continue
+        
+        local filename=$(basename "$f")
+        
+        if [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]]; then
+            continue
+        fi
+        
+        local file_res
+        file_res=$(get_image_resolution "$f")
+        
+        local status="MATCH"
+        if ! check_wallpaper_resolution "$f"; then
+            status="MISMATCH"
+            ((invalid_count++))
+        else
+            ((valid_count++))
+        fi
+        
+        if [[ $show_all == "true" || $status == "MISMATCH" ]]; then
+            echo "$status|$filename|${file_res:-unknown}"
+        fi
+    done
+    
+    echo "valid=$valid_count|invalid=$invalid_count"
 }
 
 set_wallpaper() {
@@ -328,6 +436,19 @@ case "$1" in
     "--add") add_wallpaper "$2" ;;
     "--slideshow-next") slideshow_next ;;
     "--optimize") optimize_wallpapers ;;
+    "--check-resolution")
+        if [[ -n $2 ]]; then
+            if check_wallpaper_resolution "$2"; then
+                echo "result=match|file=$2"
+            else
+                local res
+                res=$(get_image_resolution "$2")
+                echo "result=mismatch|file=$2|resolution=${res:-unknown}"
+            fi
+        else
+            list_wallpapers_with_resolution "${2:-true}"
+        fi
+        ;;
     "--cache")
         rm -rf "$FRAME_CACHE"
         mkdir -p "$FRAME_CACHE"
@@ -345,7 +466,11 @@ case "$1" in
     "--static") static_wallpaper "$2" ;;
     "--list")
         target_dir=$(get_theme_dir)
-        ls -1 "$target_dir"
+        if [[ "${2:-}" == "--with-resolution" || "${2:-}" == "-r" ]]; then
+            list_wallpapers_with_resolution true
+        else
+            ls -1 "$target_dir"
+        fi
         ;;
     "--picker") launch_picker ;;
 esac
