@@ -181,7 +181,7 @@ cmd_wallpaper() {
                 else
                     new_map="${new_map},${entry}"
                 fi
-                rx_log "success" "monitor capped at ${PINK}${user_res}${RESET}."
+                rx_log "success" "Wallpapers resolution have been capped at ${PINK}${user_res}${RESET}."
             fi
 
             bash "$var_script" --set "WALL_RES_MAP" "$new_map"
@@ -194,12 +194,12 @@ cmd_wallpaper() {
             ;;
 
         "optimize")
-            local res_map=$(bash "$var_script" --get "WALL_RES_MAP")
+            #local res_map=$(bash "$var_script" --get "WALL_RES_MAP")
 
-            if [[ -z $res_map || $res_map == "null" ]]; then
-                rx_log "error" "No custom monitor resolutions are set. Run '${PINK}retro wallpaper res${RESET}' first."
-                return 1
-            fi
+            #if [[ -z $res_map || $res_map == "null" ]]; then
+            #    rx_log "error" "No custom monitor resolutions are set. Run '${PINK}retro wallpaper res${RESET}' first."
+            #    return 1
+            #fi
 
             rx_log "info" "Scanning repository for missing optimized video feeds..."
             bash "$wall_script" --optimize
