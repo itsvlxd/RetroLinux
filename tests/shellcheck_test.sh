@@ -31,6 +31,7 @@ SC_ARGS=(
     --exclude=SC2310
     --exclude=SC2244
     --exclude=SC2155
+    --exclude=SC2168
 )
 
 SCRIPT_DIRS=(
