@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/logo.sh"
+source "$RETRO_DIR/lib/git.sh"
 
 # TODO: refactor the update workflow
 
@@ -9,6 +10,7 @@ cmd_update() {
     local target="${1:-existing}"
     local type_filter=""
     local access_filter=""
+    local force_reset=""
 
     shift
     while [[ $# -gt 0 ]]; do
@@ -20,6 +22,10 @@ cmd_update() {
             -a | --access)
                 access_filter="$2"
                 shift 2
+                ;;
+            --hard-reset)
+                force_reset="true"
+                shift
                 ;;
             -i | --install)
                 shift
@@ -35,6 +41,11 @@ cmd_update() {
     if [[ ! -d "$RETRO_DIR/.git" ]]; then
         rx_log "error" "Not a git repository: $RETRO_DIR"
         return 1
+    fi
+
+    if [[ $force_reset == "true" ]]; then
+        rx_confirm "Perform git reset --hard to discard local changes?" "N" || return 0
+        rx_git_reset_hard
     fi
 
     local old_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
