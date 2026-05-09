@@ -60,7 +60,7 @@ Ukraine
 United Kingdom
 United States'
 
-    gum style --padding "0 0 0 $PADDING_LEFT" "Select your mirror regions (space to select multiple):"
+    gum style --padding "0 0 0 $PADDING_LEFT" "Select your mirror regions:"
     gum style --padding "0 0 0 $PADDING_LEFT" "Leave empty for auto-detection"
     echo
 
@@ -104,4 +104,3 @@ United States'
 if ! setup_mirrors; then
     rx_setup_fail "Mirrors"
 fi
-

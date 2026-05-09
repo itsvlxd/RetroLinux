@@ -7,33 +7,42 @@ setup_luks() {
     rx_step "Let's setup disk encryption..."
 
     if gum confirm --affirmative "Yes, enable encryption" --negative "No, skip encryption" "LUKS Encryption" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
-        # shellcheck disable=SC2034
         LUKS_ENABLED="true"
 
-        while true; do
-            local password
-            password=$(gum input --placeholder "Create a LUKS encryption password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "LUKS Password> " --padding "$GUM_INPUT_PADDING") || {
-                rx_step_error "2" "LUKS password input failed"
-                rx_retry_or_exit "LUKS password is required" || rx_abort
-                return 1
-            }
-            local password_confirmation
-            password_confirmation=$(gum input --placeholder "Confirm LUKS password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
-                rx_step_error "2" "LUKS password confirmation failed"
-                rx_retry_or_exit "Password confirmation is required" || rx_abort
-                return 1
-            }
+        local use_same_password="false"
 
-            if [[ -n $password && $password == "$password_confirmation" ]]; then
-                # shellcheck disable=SC2034
-                LUKS_PASSWORD="$password"
-                break
-            elif [[ -z $password ]]; then
-                rx_notice "Password cannot be empty" 1
-            else
-                rx_notice "Passwords do not match" 1
+        if [[ -n $USER_PASSWORD ]]; then
+            if gum confirm --affirmative "Yes, use same password" --negative "No, enter different password" "Would you like to configure LUKS with the same password used for ${USER_NAME}?" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+                LUKS_PASSWORD="$USER_PASSWORD"
+                use_same_password="true"
             fi
-        done
+        fi
+
+        if [[ $use_same_password != "true" ]]; then
+            while true; do
+                local password
+                password=$(gum input --placeholder "Create a LUKS encryption password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "LUKS Password> " --padding "$GUM_INPUT_PADDING") || {
+                    rx_step_error "2" "LUKS password input failed"
+                    rx_retry_or_exit "LUKS password is required" || rx_abort
+                    return 1
+                }
+                local password_confirmation
+                password_confirmation=$(gum input --placeholder "Confirm LUKS password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
+                    rx_step_error "2" "LUKS password confirmation failed"
+                    rx_retry_or_exit "Password confirmation is required" || rx_abort
+                    return 1
+                }
+
+                if [[ -n $password && $password == "$password_confirmation" ]]; then
+                    LUKS_PASSWORD="$password"
+                    break
+                elif [[ -z $password ]]; then
+                    rx_notice "Password cannot be empty" 1
+                else
+                    rx_notice "Passwords do not match" 1
+                fi
+            done
+        fi
 
         gum style --padding "0 0 0 $PADDING_LEFT" "Select LUKS key derivation iteration time:"
         gum style --padding "0 0 0 $PADDING_LEFT" "Higher values = more security but slower boot"
@@ -85,11 +94,8 @@ setup_luks() {
             *) LUKS_ITER_TIME=5000 ;;
         esac
     else
-        # shellcheck disable=SC2034
         LUKS_ENABLED="false"
-        # shellcheck disable=SC2034
         LUKS_PASSWORD=""
-        # shellcheck disable=SC2034
         LUKS_ITER_TIME=""
     fi
 
@@ -100,3 +106,4 @@ setup_luks() {
 if ! setup_luks; then
     rx_setup_fail "LUKS"
 fi
+

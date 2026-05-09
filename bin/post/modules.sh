@@ -21,13 +21,27 @@ rx_post_install_modules() {
         return 1
     fi
 
+    rx_load_state
+    local install_type="${INSTALL_TYPE:-complete}"
+
+    local type_flag=""
+    if [[ "$install_type" == "minimal" ]]; then
+        type_flag="-t core"
+        gum style "Installing minimal set (core modules only)..."
+    else
+        type_flag="-t all"
+        gum style "Installing complete set (all modules)..."
+    fi
+
+    echo
+
     gum style "Installing root modules..."
 
-    arch-chroot /mnt /opt/retrolinux/retro.sh -i all -a root -y 2>&1
+    arch-chroot /mnt /opt/retrolinux/retro.sh -i all -a root $type_flag -y 2>&1
 
     gum style "Installing user modules..."
 
-    arch-chroot /mnt su - "$username" -c "/opt/retrolinux/retro.sh -i all -a user -y" 2>&1
+    arch-chroot /mnt su - "$username" -c "/opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
 
     gum style --foreground 2 "Module installation complete"
     echo

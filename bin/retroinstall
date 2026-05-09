@@ -26,9 +26,11 @@ rx_set_retro_colors
 rx_setup_traps
 
 SETUP_SCRIPTS=(
+    "install.sh"
     "user.sh"
     "root.sh"
     "hostname.sh"
+    "display.sh"
     "keyboard.sh"
     "locale.sh"
     "mirrors.sh"
@@ -68,6 +70,9 @@ else
     LUKS_PASSWORD=""
     LUKS_ITER_TIME=""
     KERNEL_SELECTION=""
+    INSTALL_TYPE=""
+    DISPLAY_RES_X=""
+    DISPLAY_RES_Y=""
     BLUETOOTH_ENABLED=""
     PRINT_SERVICE_ENABLED=""
     GRUB_THEME_CHOICE=""
@@ -201,6 +206,11 @@ rx_install_system() {
         boot_info="$boot_info + OS Prober"
     fi
 
+    local display_info="${BOOT_VIDEO_GRUB:-1920x1080}"
+    if [[ -n $DISPLAY_ASPECT_RATIO ]]; then
+        display_info="$display_info (${DISPLAY_ASPECT_RATIO})"
+    fi
+
     local sudo_info="Yes"
     if [[ $USER_SUDO == "false" ]]; then
         sudo_info="No"
@@ -214,10 +224,12 @@ rx_install_system() {
         mirror_info="$mirror_info + custom"
     fi
 
-    local table_data="Username,${USER_NAME:-unknown}
+    local table_data="Install Type,${INSTALL_TYPE^}
+Username,${USER_NAME:-unknown}
 User Password,${user_pw_dots}
 Root Password,${root_pw_dots}
 Hostname,${USER_HOSTNAME:-unknown}
+Display,${display_info}
 Sudo Access,${sudo_info}
 Keyboard,$(rx_keyboard_display_name "${KEYBOARD:-us}")
 Language,$(rx_locale_to_lang_name "${SYS_LANG:-en_US}")
@@ -287,6 +299,9 @@ Network,${network_info}"
 
     reboot
 }
+
+# TODO: add a --clear arg which deleted /tmp/retroinstall_state if it exists
+# and also make sure u reset the wifi card in case of any glitches
 
 if [[ $1 != "dry" ]]; then
     rx_install_system
