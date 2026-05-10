@@ -30,6 +30,10 @@ awww-bin
 mpvpaper
 imagemagick
 
+# Backups
+timeshift
+timeshift-autosnap
+
 # Benchmark
 sysbench
 glmark2
