@@ -82,11 +82,6 @@ cmd_install() {
     [[ -n $type_filter ]] && rx_log "info" "Filtered by type: ${PINK}$type_filter${RESET}"
     [[ -n $access_filter ]] && rx_log "info" "Filtered by access: ${PINK}$access_filter${RESET}"
 
-    if [[ $access_filter == "root" && $EUID -ne 0 ]]; then
-        rx_log "error" "Root access required. Please run the previous command with sudo"
-        return 1
-    fi
-
     run_task "install" "$target"
 }
 
