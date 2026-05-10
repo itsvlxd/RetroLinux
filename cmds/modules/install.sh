@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/module.sh"
 
 cmd_install() {
     local target="${1}"
@@ -40,7 +41,43 @@ cmd_install() {
     [[ -n $type_filter ]] && export MODULE_TYPE_FILTER="$type_filter"
     [[ -n $access_filter ]] && export MODULE_ACCESS_FILTER="$access_filter"
 
-    rx_log "info" "Starting installation for: ${PINK}${target}${RESET}"
+    local modules_msg=""
+    if [[ $target == "all" || $target == "existing" ]]; then
+        local mods=()
+        local access_filt=""
+        [[ -n $access_filter && $access_filter != "all" ]] && access_filt="$access_filter"
+
+        if [[ $target == "existing" ]]; then
+            while IFS= read -r m; do
+                [[ -z $m ]] && continue
+                filter_module "$m" && mods+=("$m")
+            done < <(get_installed_modules "$access_filt")
+        else
+            for dir in "$RETRO_DIR"/modules/*/; do
+                [[ -d $dir ]] || continue
+                local m=$(basename "$dir")
+                filter_module "$m" && mods+=("$m")
+            done
+        fi
+
+        if [[ ${#mods[@]} -gt 0 ]]; then
+            local first=true
+            for m in "${mods[@]}"; do
+                if [[ $first == "true" ]]; then
+                    modules_msg="${PINK}${m}${RESET}"
+                    first=false
+                else
+                    modules_msg+=", ${PINK}${m}${RESET}"
+                fi
+            done
+        fi
+    fi
+
+    if [[ -n $modules_msg ]]; then
+        rx_log "info" "Installing: $modules_msg"
+    else
+        rx_log "info" "Starting installation for: ${PINK}${target}${RESET}"
+    fi
 
     [[ -n $type_filter ]] && rx_log "info" "Filtered by type: ${PINK}$type_filter${RESET}"
     [[ -n $access_filter ]] && rx_log "info" "Filtered by access: ${PINK}$access_filter${RESET}"
