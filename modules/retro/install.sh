@@ -11,7 +11,25 @@ target="$bin_dir/$cmd_name"
 cmd_power "permissions"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+setup_cronie() {
+    rx_log "info" "Checking cronie service..."
+    
+    if systemctl is-active cronie.service &>/dev/null; then
+        rx_log "info" "Cronie service is running"
+    else
+        rx_log "info" "Enabling cronie service..."
+        sudo systemctl enable cronie.service
+        sudo systemctl start cronie.service
+        rx_log "success" "Cronie service enabled and started"
+    fi
+}
+
+setup_cronie
+
+>>>>>>> c46ae86 (feat(retro): add cronie service check)
 retro_fix_permissions() {
     rx_log "info" "Fixing RetroLinux permissions..."
     sudo chmod -R 755 "$RETRO_DIR"

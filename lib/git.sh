@@ -30,7 +30,9 @@ rx_git_latest_tag() {
 
 rx_git_reset_hard() {
     rx_log "info" "Performing hard reset..."
+
     sudo git -C "$RETRO_DIR" reset --hard
+
     rx_log "success" "Git reset --hard completed"
 }
 
@@ -38,9 +40,9 @@ rx_git_fix_owner() {
     local current_owner
     current_owner=$(stat -c '%U:%G' "$RETRO_DIR/.git" 2>/dev/null)
     local current_user_group="$(whoami):$(id -gn)"
-    
-    [[ "$current_owner" == "$current_user_group" ]] && return 0
-    
+
+    [[ $current_owner == "$current_user_group" ]] && return 0
+
     rx_log "info" "Fixing ownership from $current_owner to $current_user_group..."
     sudo chown -R "$(whoami):$(id -gn)" "$RETRO_DIR"
     rx_log "success" "Fixed ownership: $RETRO_DIR"
