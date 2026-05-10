@@ -82,7 +82,10 @@ cmd_fingerprint() {
             ;;
 
         "uninstall")
-            rx_confirm "Disable biometric auth and wipe all hardware prints?" "N" || { rx_log "info" "Uninstall cancelled."; return 0; }
+            rx_confirm "Disable biometric auth and wipe all hardware prints?" "N" || {
+                rx_log "info" "Uninstall cancelled."
+                return 0
+            }
 
             remove_pam_auth
 
@@ -145,4 +148,8 @@ cmd_fingerprint() {
     esac
 }
 
-register_command "TOOLS" "fingerprint" "Biometric security management" "cmd_fingerprint"
+has_fingerprint_hw=$(fprintd-list "$USER" 2>&1 | grep -q "found" && echo "yes" || echo "no")
+
+if [[ $has_fingerprint_hw == "yes" ]]; then
+    register_command "TOOLS" "fingerprint" "Biometric security management" "cmd_fingerprint"
+fi
