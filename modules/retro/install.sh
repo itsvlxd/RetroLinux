@@ -10,13 +10,9 @@ target="$bin_dir/$cmd_name"
 
 cmd_power "permissions"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
 setup_cronie() {
     rx_log "info" "Checking cronie service..."
-    
+
     if systemctl is-active cronie.service &>/dev/null; then
         rx_log "info" "Cronie service is running"
     else
@@ -27,9 +23,6 @@ setup_cronie() {
     fi
 }
 
-setup_cronie
-
->>>>>>> c46ae86 (feat(retro): add cronie service check)
 retro_fix_permissions() {
     rx_log "info" "Fixing RetroLinux permissions..."
     find "$RETRO_DIR" -name "*.sh" -type f -exec sudo chmod 755 {} \;
@@ -37,16 +30,16 @@ retro_fix_permissions() {
     rx_log "success" "Permissions and git safe.directory configured"
 }
 
->>>>>>> 545af8d (fix(update): fix git directory owner permission)
+setup_cronie
+retro_fix_permissions
+
 if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
     rx_log "info" "Installing ${PINK}${cmd_name}${RESET} to ${bin_dir}..."
     [[ ! -d $bin_dir ]] && sudo mkdir -p "$bin_dir"
     sudo ln -sf "$source_bin" "$target"
     sudo chmod +x "$target"
     rx_log "success" "The ${PINK}${cmd_name}${RESET} command is now global."
-
-sudo chmod -R 755 "$RETRO_DIR"
-sudo git config --global --add safe.directory "$RETRO_DIR"
+    sudo git config --global --add safe.directory "$RETRO_DIR"
 fi
 
 patch_env() {

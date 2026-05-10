@@ -29,11 +29,13 @@ rx_git_latest_tag() {
 }
 
 rx_git_reset_hard() {
-    rx_log "info" "Performing hard reset..."
+    rx_log "info" "Syncing with remote and performing hard reset..."
 
-    sudo git -C "$RETRO_DIR" reset --hard
+    git -C "$RETRO_DIR" fetch origin $(rx_git_branch)
 
-    rx_log "success" "Git reset --hard completed"
+    git -C "$RETRO_DIR" reset --hard "origin/$(rx_git_branch)"
+
+    rx_log "success" "Git sync and hard reset completed"
 }
 
 rx_git_fix_owner() {
