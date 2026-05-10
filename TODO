@@ -1,0 +1,29 @@
+### 󰍹 Display & Input
+* **`display` (or `monitor`)**: You have `window` for layer rules, but you need a tool for physical screens. Managing refresh rates (144hz/240hz), resolutions, fractional scaling, and multi-monitor positioning. Crucial for Wayland/Hyprland setups.
+* **`input`**: A centralized way to manage keyboard layouts, repeat delays, mouse acceleration profiles, and touchpad gestures (swipe to switch workspaces, etc.).
+
+### 󰸉 Aesthetics & Ricing
+* **`theme`**: You currently have `font` and `wallpaper`, but ricers need a global switch. This tool would manage GTK/Qt themes, cursor themes, icon packs, and potentially generate dynamic color schemes (like Pywal) based on the current wallpaper.
+
+### 󰊗 Gaming & Performance
+* **`gaming`**: Since "Gamers" are a core demographic, this is a must-have. A unified tool to toggle Feral Gamemode, manage MangoHud configs, clear out old Proton prefixes, or force the CPU governor into maximum performance mode.
+* **`gpu`**: If you want to separate it from `driver`, a dedicated tool to handle Nvidia Optimus (hybrid graphics), switch between integrated/dedicated graphics, or manage undervolting/overclocking profiles.
+
+### 󰋊 System & Storage
+* **`disk` (or `storage`)**: You have `cleanup` and `timeshift`, but you need something to handle physical storage. Checking SMART health statuses, mounting external/secondary drives, or managing BTRFS quotas and subvolumes.
+* **`session`**: A dedicated command to handle the lifecycle of the desktop environment. Locking the screen, logging out gracefully, suspending, or triggering the Hyprland exit sequence.
+
+also make a tool to handle XDG stuff
+
+In the variables tool or something add missing command which adds the missing variables
+
+# TODO: Please store the type of install the user want as a RETRO_INSTALL variable
+based on that, if minimal -t core or complete -t all
+
+# TODO: grub-btrfs implementation cool shit
+
+# TODO: If a module path already exists warn the user first
+# that we detected a different config then the retro one
+# and bypass SKIP_PROMPT and ask the user if he would like
+# to install the specific module but still ensure him that
+# before installing we backup their local config
