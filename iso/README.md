@@ -11,15 +11,14 @@ This directory contains everything needed to build the **RetroLinux Live ISO**. 
 **What you get:**
 - Bootable ISO with GRUB + Syslinux (UEFI + BIOS)
 - Custom "retropunk" purple/pink theme
-- Plymouth splash screen
 - Pre-configured `retroinstall` TUI installer
-- 135 pre-installed packages (base, tools, recovery utilities)
+- Pre-installed packages (base, tools, recovery utilities)
 
 </p>
 
 ---
 
-## Quick Build 🚀
+## Quick Build
 
 ```bash
 cd iso/
@@ -30,15 +29,15 @@ cd iso/
 
 ---
 
-## Build Options ⚙️
+## Build Options
 
 | Flag | Description |
 |------|-------------|
-| `./build.sh` | Standard build with prompts |
+| `./build.sh build` | Build ISO (default) |
 | `./build.sh --yes` | Skip all prompts (CI/CD) |
 | `./build.sh --force` | Force rebuild even if unchanged |
 | `./build.sh --clean` | Clean build artifacts only |
-| `./build.sh --plymouth` | Generate Plymouth splash only |
+| `./build.sh --repo` | Include full repo in ISO |
 | `./build.sh --docker` | Build and push Docker image to GHCR |
 
 **Requirements:**
@@ -53,20 +52,20 @@ cd iso/
 
 ---
 
-## Build Output 📦
+## Build Output
 
 After a successful build:
 
 ```
 iso/out/
-├── retrolinux-2026.04.27-x86_64.iso    # Bootable ISO
+├── retrolinux-2026.04.27-x86_64.iso      # Bootable ISO
 ├── kernel-version.txt                    # Kernel version (e.g., 6.19.14)
 └── .build-checksum                       # SHA256 of packages for incremental builds
 ```
 
 ---
 
-## Profile Details 📋
+## Profile Details
 
 ### profiledef.sh
 Defines ISO metadata:
@@ -89,7 +88,7 @@ Defines ISO metadata:
 ### airootfs/
 Live ISO root filesystem. Key files:
 - `root/.automated_script.sh` - Launches `retroinstall` on first boot
-- `root/.zlogin` - Runs Plymouth quit and automated_script
+- `root/.zlogin` - Runs automated_script
 - `opt/retrolinux/bin/retroinstall` - Main installer entry point
 
 ### Boot Themes
@@ -103,7 +102,7 @@ Live ISO root filesystem. Key files:
 
 ---
 
-## Docker Build Environment 🐳
+## Docker Build Environment
 
 **Dockerfile** builds `retrolinux-build:latest` image:
 
@@ -125,7 +124,7 @@ docker pull ghcr.io/itsvlxd/retrolinux-build:latest
 
 ---
 
-## Local Build Example 🖥️
+## Local Build Example
 
 ```bash
 # Clone the repo
@@ -141,26 +140,25 @@ sudo ./build.sh --yes
 
 ---
 
-## How the ISO Works 💿
+## How the ISO Works
 
 **Boot sequence:**
 
 ```
 1. BIOS/UEFI loads GRUB or Syslinux
 2. GRUB shows "retropunk" themed menu
-3. Kernel boots with: quiet splash
-4. Plymouth splash screen shows
-5. User logs in (auto-login as root)
-6. .zlogin runs .automated_script.sh
-7. retroinstall TUI wizard starts
-8. User completes 14 setup steps
-9. archinstall runs silently
-10. Reboot into installed RetroLinux
+3. Kernel boots
+4. User logs in (auto-login as root)
+5. .automated_script.sh runs
+6. retroinstall TUI wizard starts
+7. User completes 23 setup steps
+8. archinstall runs silently
+9. Reboot into installed RetroLinux
 ```
 
 ---
 
-## For Developers 👨‍💻
+## For Developers
 
 ### Incremental Builds
 The build script checks SHA256 of `packages.x86_64` before rebuilding. If unchanged, skips rebuild. Use `--force` to override.
@@ -177,7 +175,7 @@ The installer is at `profile/airootfs/opt/retrolinux/bin/`. This gets rsynced fr
 
 ---
 
-## Troubleshooting 🔧
+## Troubleshooting
 
 **Build fails with permission error:**
 ```bash
