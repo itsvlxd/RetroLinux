@@ -32,7 +32,7 @@ setup_cronie
 >>>>>>> c46ae86 (feat(retro): add cronie service check)
 retro_fix_permissions() {
     rx_log "info" "Fixing RetroLinux permissions..."
-    sudo chmod -R 755 "$RETRO_DIR"
+    find "$RETRO_DIR" -name "*.sh" -type f -exec sudo chmod 755 {} \;
     git config --global --add safe.directory "$RETRO_DIR"
     rx_log "success" "Permissions and git safe.directory configured"
 }
