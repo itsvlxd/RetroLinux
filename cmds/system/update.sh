@@ -112,35 +112,9 @@ cmd_update() {
 
         rx_log "success" "Git pull successful"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        [[ -n "$type_filter" ]] && export MODULE_TYPE_FILTER="$type_filter"
-        [[ -n "$access_filter" ]] && export MODULE_ACCESS_FILTER="$access_filter"
-        
-        local install_flags="-y"
-        [[ -n "$type_filter" ]] && install_flags+=" -t $type_filter"
-        [[ -n "$access_filter" ]] && install_flags+=" -a $access_filter"
-        
-        if [[ $access_filter == "root" || $access_filter == "all" ]]; then
-            cmd_install "existing" -a root
-        fi
-        if [[ $access_filter == "user" || $access_filter == "all" || -z "$access_filter" ]]; then
-            cmd_install "existing" -a user
-        fi
-=======
-        sudo $RETRO_DIR/retro.sh -i $target -a root -y
-        $RETRO_DIR/retro.sh -i $target -a user -y
-<<<<<<< HEAD
->>>>>>> a3c7ded (chore(update): remove unused arguments)
-=======
-        
-=======
-=======
         rx_log "info" "Adding missing variables"
         $RETRO_DIR/retro.sh variable update
 
->>>>>>> 797cdaf (feat(update): add missing variables update step on update)
         local install_type=$($RETRO_DIR/retro.sh variable get RETRO_INSTALL 2>/dev/null || echo "complete")
         local retro_ricing=$($RETRO_DIR/retro.sh variable get RETRO_RICING 2>/dev/null || echo "false")
         local type_filter="-t all"
@@ -151,12 +125,10 @@ cmd_update() {
 
         rx_log "info" "Install type: $install_type ($type_filter)"
 
-        sudo $RETRO_DIR/retro.sh $install_mode $target -a root $type_filter -y
+        $RETRO_DIR/retro.sh $install_mode $target -a root $type_filter -y
         $RETRO_DIR/retro.sh $install_mode $target -a user $type_filter -y
 
->>>>>>> 8c2014e (feat(variables): add retro ricing option to the update)
         rx_log "success" "Update finished"
->>>>>>> 2217686 (chore(update): add sucess log at the end for update finished)
     else
         pull_failed="true"
 
