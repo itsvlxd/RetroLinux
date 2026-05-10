@@ -286,4 +286,6 @@ cmd_timeshift() {
     esac
 }
 
-register_command "TOOLS" "timeshift" "Timeshift backup manager" "cmd_timeshift"
+if command -v timeshift &>/dev/null; then
+    register_command "TOOLS" "timeshift" "Timeshift backup manager" "cmd_timeshift"
+fi
