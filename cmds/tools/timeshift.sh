@@ -105,7 +105,10 @@ cmd_timeshift() {
 
             rx_log "warn" "This will restore snapshot: ${PINK}$snapshot${RESET}"
             rx_log "warn" "The system will reboot after restore"
-            rx_yesno "Continue?" || { rx_log "info" "Aborted."; return 0; }
+            rx_yesno "Continue?" || {
+                rx_log "info" "Aborted."
+                return 0
+            }
 
             bash "$ts_script" --restore "$snapshot"
             ;;
@@ -115,7 +118,10 @@ cmd_timeshift() {
             [[ -z $snapshot ]] && rx_log "info" "Usage: retro timeshift delete <snapshot-name>" && return 1
 
             rx_log "warn" "This will delete snapshot: ${PINK}$snapshot${RESET}"
-            rx_yesno "Continue?" || { rx_log "info" "Aborted."; return 0; }
+            rx_yesno "Continue?" || {
+                rx_log "info" "Aborted."
+                return 0
+            }
 
             local result=$(bash "$ts_script" --delete "$snapshot")
 
@@ -194,8 +200,11 @@ cmd_timeshift() {
         "setup")
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
-                rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || { rx_log "info" "Aborted."; return 0; }
-                
+                rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || {
+                    rx_log "info" "Aborted."
+                    return 0
+                }
+
                 local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
                 : ${pkg_helper:="yay"}
                 if command -v "$pkg_helper" >/dev/null 2>&1; then
@@ -220,24 +229,20 @@ cmd_timeshift() {
 
             rx_help_header "󰕰" "Timeshift Setup"
             rx_log "info" "This will configure Timeshift for system backups"
-            echo ""
 
-            rx_log "info" "Select backup schedule: [daily/weekly/monthly/disabled] "
-            read -r schedule
-            : ${schedule:="daily"}
-
-            rx_log "info" "Setting up ${PINK}$schedule${RESET} schedule..."
-            bash "$ts_script" --schedule "$schedule"
+            sudo $RETRO_DIR/cmds/tools/timeshift.sh "gui"
 
             rx_log "success" "Timeshift setup complete"
-            echo ""
             ;;
 
         "gui")
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
-                rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || { rx_log "info" "Aborted."; return 0; }
-                
+                rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || {
+                    rx_log "info" "Aborted."
+                    return 0
+                }
+
                 local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
                 : ${pkg_helper:="yay"}
                 if command -v "$pkg_helper" >/dev/null 2>&1; then
