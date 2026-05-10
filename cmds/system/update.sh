@@ -114,6 +114,7 @@ cmd_update() {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         [[ -n "$type_filter" ]] && export MODULE_TYPE_FILTER="$type_filter"
         [[ -n "$access_filter" ]] && export MODULE_ACCESS_FILTER="$access_filter"
         
@@ -135,6 +136,11 @@ cmd_update() {
 =======
         
 =======
+=======
+        rx_log "info" "Adding missing variables"
+        $RETRO_DIR/retro.sh variable update
+
+>>>>>>> 797cdaf (feat(update): add missing variables update step on update)
         local install_type=$($RETRO_DIR/retro.sh variable get RETRO_INSTALL 2>/dev/null || echo "complete")
         local retro_ricing=$($RETRO_DIR/retro.sh variable get RETRO_RICING 2>/dev/null || echo "false")
         local type_filter="-t all"
