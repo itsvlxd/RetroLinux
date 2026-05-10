@@ -57,6 +57,7 @@ else
     KEYBOARD="us"
     SYS_LANG="en_US"
     SYS_ENC="UTF-8"
+    INSTALL_TYPE="complete"
     USER_NAME=""
     USER_PASSWORD=""
     USER_HOSTNAME=""
@@ -70,7 +71,6 @@ else
     LUKS_PASSWORD=""
     LUKS_ITER_TIME=""
     KERNEL_SELECTION=""
-    INSTALL_TYPE=""
     DISPLAY_RES_X=""
     DISPLAY_RES_Y=""
     BLUETOOTH_ENABLED=""
@@ -187,10 +187,10 @@ rx_install_system() {
     if [[ $SSH_ENABLED == "true" ]]; then
         ssh_info="Port ${SSH_PORT:-22}"
         local ssh_flags=""
-        [[ $SSH_PASSWORD_LOGIN == "true" ]] && ssh_flags="${ssh_flags} pwd"
+        [[ $SSH_PASSWORD_LOGIN == "true" ]] && ssh_flags="${ssh_flags}pwd"
         [[ $SSH_KEY_LOGIN == "true" ]] && ssh_flags="${ssh_flags} key"
         [[ $SSH_ROOT_LOGIN == "true" ]] && ssh_flags="${ssh_flags} root"
-        ssh_info="${ssh_info}${ssh_flags}"
+        ssh_info="Enabled (${ssh_info}) (${ssh_flags})"
     fi
 
     local aur_info="${AUR_HELPER:-yay}"
