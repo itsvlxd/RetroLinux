@@ -132,28 +132,6 @@ _build_help() {
     rx_help_example "./build.sh --repo" "Build ISO with full repo included"
 }
 
-_generate_splashscreen() {
-    local theme_dir="$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux"
-    local splash_png="${theme_dir}/logo.png"
-    local source_logo="$RETRO_DIR/assets/logo-palm-wide-transparent-bg.png"
-
-    mkdir -p "$theme_dir"
-
-    if [[ ! -f $source_logo ]]; then
-        rx_log "error" "Source logo not found: ${source_logo}"
-        return 1
-    fi
-
-    rx_log "info" "Generating Plymouth splashscreen..."
-    magick "$source_logo" -resize 60% "$splash_png"
-
-    local size_bytes=$(stat -c%s "$splash_png")
-    local size_kb=$(awk "BEGIN {printf \"%.2f\", $size_bytes / 1024}")
-
-    rx_log "success" "Splashscreen generated: ${splash_png}"
-    rx_log "info" "Size: ${size_kb} KB"
-}
-
 _docker_check() {
     rx_log "info" "Checking Docker..."
 
@@ -382,14 +360,6 @@ _docker_build() {
             "$PROFILE_DIR/grub/themes/"
     fi
 
-    rx_log "info" "Copying Plymouth theme from modules..."
-    if [[ -d "$RETRO_DIR/modules/plymouth/files" ]]; then
-        mkdir -p "$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux"
-        rsync -av --delete \
-            "$RETRO_DIR/modules/plymouth/files/retrolinux/" \
-            "$PROFILE_DIR/airootfs/usr/share/plymouth/themes/retrolinux/"
-    fi
-
     rx_log "info" "Copying RetroLinux to airootfs..."
     mkdir -p "$PROFILE_DIR/airootfs/opt/retrolinux"
     rsync -av --delete \
@@ -613,7 +583,7 @@ _iso_main() {
 }
 
 if [[ ${BASH_SOURCE[0]} != "${0}" ]]; then
-    export -f _iso_main _docker_check _docker_build _build_docker_image _push_docker_image _pull_docker_image _init_and_update_cache _init_pkg_cache_volume _cleanup_build _generate_splashscreen _build_help _clean_all _check_deps _calculate_build_checksum _should_skip_build _save_build_checksum
+    export -f _iso_main _docker_check _docker_build _build_docker_image _push_docker_image _pull_docker_image _init_and_update_cache _init_pkg_cache_volume _cleanup_build _build_help _clean_all _check_deps _calculate_build_checksum _should_skip_build _save_build_checksum
 else
     _iso_main "$@"
 fi
