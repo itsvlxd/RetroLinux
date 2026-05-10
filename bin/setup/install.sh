@@ -7,15 +7,6 @@ setup_install() {
     rx_clear_logo
     rx_step "Selecting installation type..."
 
-    if [[ -n $INSTALL_TYPE ]]; then
-        if [[ $INSTALL_TYPE == "minimal" ]]; then
-            gum style --foreground 2 "Minimal installation (core modules only)"
-        else
-            gum style --foreground 2 "Complete installation (all modules)"
-        fi
-        return 0
-    fi
-
     if gum confirm --affirmative "Complete install" --negative "Minimal install" "Select Installation Type" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         INSTALL_TYPE="complete"
     else
