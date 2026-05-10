@@ -4,27 +4,9 @@ source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/git.sh"
 
-# TODO: refactor the update workflow
-
 cmd_update() {
     local target="${1:-existing}"
-    local force_reset=""
-
-    shift
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --hard-reset)
-                force_reset="true"
-                shift
-                ;;
-            -i | --install)
-                shift
-                ;;
-            *)
-                shift
-                ;;
-        esac
-    done
+    local pull_failed="false"
 
     rx_logo
 
@@ -35,8 +17,11 @@ cmd_update() {
 
     rx_git_fix_owner
 
-    if [[ $force_reset == "true" ]]; then
-        rx_confirm "Perform git reset --hard to discard local changes?" "N" || return 0
+    local has_changes=$(git -C "$RETRO_DIR" status --porcelain 2>/dev/null)
+    local pull_failed="false"
+
+    if [[ -n $has_changes ]]; then
+        rx_confirm "Uncommitted changes detected. Reset --hard to discard?" "N" || return 0
         rx_git_reset_hard
     fi
 
@@ -128,6 +113,7 @@ cmd_update() {
         rx_log "success" "Git pull successful"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         [[ -n "$type_filter" ]] && export MODULE_TYPE_FILTER="$type_filter"
         [[ -n "$access_filter" ]] && export MODULE_ACCESS_FILTER="$access_filter"
         
@@ -148,9 +134,31 @@ cmd_update() {
 >>>>>>> a3c7ded (chore(update): remove unused arguments)
 =======
         
+=======
+        local install_type=$($RETRO_DIR/retro.sh variable get RETRO_INSTALL 2>/dev/null || echo "complete")
+        local retro_ricing=$($RETRO_DIR/retro.sh variable get RETRO_RICING 2>/dev/null || echo "false")
+        local type_filter="-t all"
+        [[ $install_type == "minimal" ]] && type_filter="-t core"
+
+        local install_mode="-i"
+        [[ $retro_ricing == "true" ]] && install_mode="-m"
+
+        rx_log "info" "Install type: $install_type ($type_filter)"
+
+        sudo $RETRO_DIR/retro.sh $install_mode $target -a root $type_filter -y
+        $RETRO_DIR/retro.sh $install_mode $target -a user $type_filter -y
+
+>>>>>>> 8c2014e (feat(variables): add retro ricing option to the update)
         rx_log "success" "Update finished"
 >>>>>>> 2217686 (chore(update): add sucess log at the end for update finished)
     else
+        pull_failed="true"
+
+        if [[ -n $has_changes ]]; then
+            rx_confirm "Git pull failed. Reset --hard to resolve conflicts?" "N" || return 1
+            rx_git_reset_hard
+        fi
+
         rx_log "error" "Git pull failed. Check your connection or conflicts."
         return 1
     fi
