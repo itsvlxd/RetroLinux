@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/cmds/system/setup/variables.sh"
 
 cmd_var() {
@@ -162,6 +163,98 @@ cmd_var() {
             rx_table_spacer
             ;;
 
+        "update")
+            local defaults_file="$RETRO_DIR/modules/retro/files/variables.sh"
+            [[ ! -f $defaults_file ]] && rx_log "error" "Defaults file not found: $defaults_file" && return 1
+
+            source "$defaults_file"
+
+            local vardir="${RETRO_CONFIG:-$HOME/.config/retro}"
+            local varsfile="$vardir/variables.sh"
+            [[ ! -d $vardir ]] && mkdir -p "$vardir"
+
+            local added_vars=()
+            local skip_patterns="^(KITTY_(WINDOW_ID|PID|INSTALLATION_DIR|LISTEN_ON|PUBLIC_KEY)|NOTIFY_SOCKET|BAT_PATH)"
+
+            for default_var in "${!RETRO_@}" "${!KITTY_@}" "${!ROFI_@}" "${!BAT_@}" "${!PWR_@}" "${!WALL_@}" "${!CLIP_@}" "${!NOTIFY_@}"; do
+                [[ $default_var != RETRO_* && $default_var != KITTY_* && $default_var != ROFI_* && $default_var != BAT_* && $default_var != PWR_* && $default_var != WALL_* && $default_var != CLIP_* && $default_var != NOTIFY_* ]] && continue
+
+                [[ $default_var == RETRO_DIR || $default_var == RETRO_CONFIG || $default_var == RETRO_CACHE || $default_var == RETRO_STATE ]] && continue
+
+                [[ $default_var =~ $skip_patterns ]] && continue
+
+                local default_val="${!default_var}"
+
+                if ! grep -q "^export $default_var=" "$varsfile" 2>/dev/null; then
+                    set_var "$default_var" "$default_val"
+                    added_vars+=("$default_var")
+                fi
+            done
+
+            if [[ ${#added_vars[@]} -gt 0 ]]; then
+                rx_log "success" "Added ${#added_vars[@]} variables:"
+                for var in "${added_vars[@]}"; do
+                    val=$(grep "^export $var=" "$varsfile" | sed 's/.*="\([^"]*\)".*/\1/')
+                    rx_log "info" "$var: $PINK$val$RESET"
+                done
+            else
+                rx_log "info" "No new variables to add"
+            fi
+            ;;
+
+        "prune")
+            local defaults_file="$RETRO_DIR/modules/retro/files/variables.sh"
+            [[ ! -f $defaults_file ]] && rx_log "error" "Defaults file not found: $defaults_file" && return 1
+
+            source "$defaults_file"
+
+            local default_keys=()
+            for default_var in "${!RETRO_@}" "${!KITTY_@}" "${!ROFI_@}" "${!BAT_@}" "${!PWR_@}" "${!WALL_@}" "${!CLIP_@}" "${!NOTIFY_@}"; do
+                [[ $default_var != RETRO_* && $default_var != KITTY_* && $default_var != ROFI_* && $default_var != BAT_* && $default_var != PWR_* && $default_var != WALL_* && $default_var != CLIP_* && $default_var != NOTIFY_* ]] && continue
+
+                [[ $default_var == RETRO_DIR || $default_var == RETRO_CONFIG || $default_var == RETRO_CACHE || $default_var == RETRO_STATE ]] && continue
+
+                default_keys+=("$default_var")
+            done
+
+            local vardir="${RETRO_CONFIG:-$HOME/.config/retro}"
+            local varsfile="$vardir/variables.sh"
+
+            if [[ ! -f $varsfile ]]; then
+                rx_log "info" "No local variables to prune"
+                return 0
+            fi
+
+            local removed_vars=()
+            local local_vars=$(bash "$var_script" --list 2>/dev/null)
+
+            while IFS='=' read -r key v; do
+                [[ -z $key ]] && continue
+
+                local is_default=false
+                for dk in "${default_keys[@]}"; do
+                    [[ $key == "$dk" ]] && {
+                        is_default=true
+                        break
+                    }
+                done
+
+                if [[ $is_default == false ]]; then
+                    bash "$var_script" --del "$key"
+                    removed_vars+=("$key")
+                fi
+            done <<<"$local_vars"
+
+            if [[ ${#removed_vars[@]} -gt 0 ]]; then
+                rx_log "success" "Removed ${#removed_vars[@]} variables:"
+                for var in "${removed_vars[@]}"; do
+                    rx_log "info" "  $var"
+                done
+            else
+                rx_log "info" "No obsolete variables to remove"
+            fi
+            ;;
+
         *)
             rx_help_usage "retro variable <command>"
             rx_help_commands "Available commands"
@@ -174,6 +267,8 @@ cmd_var() {
             rx_help_cmd "edit" "Open variables file in editor"
             rx_help_cmd "list" "List all variables"
             rx_help_cmd "reset" "Reset all variables to defaults"
+            rx_help_cmd "update" "Add missing default variables"
+            rx_help_cmd "prune" "Remove obsolete variables"
             rx_help_examples
             rx_help_example "retro variable get RETRO_WALLPAPER" "Get a variable value"
             rx_help_example 'retro variable set RETRO_THEME "retro"' "Set a variable value"
