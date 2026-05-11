@@ -503,10 +503,6 @@ bt_remove_device() {
     bluetoothctl remove "$mac" >/dev/null 2>&1
 }
 
-# TODO: ploish the messages and on cancel just disconnect the device
-# also add hte icon path
-# also add support for accepting or rejecting files
-
 bt_send_file() {
     local mac="$1"
     local file_path="$2"
@@ -514,7 +510,9 @@ bt_send_file() {
     [[ ! -f $file_path ]] && echo "ERR_FILE_NOT_FOUND" && return 1
 
     local file_name=$(basename "$file_path")
-    local file_size=$(du -h "$file_path" 2>/dev/null | awk '{print $1}')
+
+    local total_bytes=$(stat -c%s "$file_path")
+    local file_size=$(du -h "$file_path" | awk '{print $1}')
 
     local device_name=$(bluetoothctl info "$mac" | grep "Name:" | cut -d' ' -f2-)
     [[ -z $device_name ]] && device_name="Unknown Device"
@@ -528,10 +526,22 @@ bt_send_file() {
 
     local log_file="/tmp/.bt_send_${notif_id}.log"
     local cancel_flag="/tmp/.bt_send_${notif_id}_cancel"
+    local result_file="/tmp/.bt_send_${notif_id}_result.txt"
     rm -f "$log_file" "$cancel_flag"
 
     stdbuf -oL bt-obex -p "$mac" "$file_path" >"$log_file" 2>&1 &
     local obex_pid=$!
+
+    _format_bytes() {
+        local b=${1:-0}
+        if ((b < 1024)); then
+            echo "${b}B"
+        elif ((b < 1048576)); then
+            echo "$((b / 1024))K"
+        else
+            echo "$((b / 1048576))M"
+        fi
+    }
 
     _send_notif_with_cancel() {
         local pct="$1"
@@ -553,6 +563,7 @@ bt_send_file() {
     _send_notif_with_cancel 0 "Waiting for device to accept... ($file_size)" &
 
     (
+        local result_file="/tmp/.bt_send_${notif_id}_result.txt"
         local last_pct=-1
         local send_start=$(date +%s)
 
@@ -565,8 +576,8 @@ bt_send_file() {
                 bt_disconnect "$mac"
 
                 notify-send -r "$notif_id" -a "RetroTransfer" -i "$icon_path" -u normal \
-                    -i dialog-warning-symbolic \
                     "Transfer Aborted" "Connection to <b>$device_name</b> severed."
+                echo "ERR|cancelled" >"$result_file"
                 rm -f "$log_file" "$cancel_flag"
                 return
             fi
@@ -576,7 +587,11 @@ bt_send_file() {
 
             if ((pct > last_pct && pct > 0)); then
                 last_pct=$pct
-                _send_notif_with_cancel "$pct" "Progress: <b>${pct}%</b> ($file_size)" &
+
+                local cur_bytes=$((total_bytes * pct / 100))
+                local cur_human=$(_format_bytes "$cur_bytes")
+
+                _send_notif_with_cancel "$pct" "Progress: <b>${pct}%</b> ($cur_human / $file_size)" &
             fi
         done
 
@@ -587,10 +602,11 @@ bt_send_file() {
             notify-send -r "$notif_id" -a "RetroTransfer" -u normal \
                 -i "$icon_path" \
                 "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed}s."
-        elif [[ ! -f $cancel_flag ]]; then
-            notify-send -r "$notif_id" -a "RetroTransfer" -i "$icon_path" -u normal \
-                -i dialog-error-symbolic \
-                "Transfer Failed" "<b>$device_name</b> rejected the request or timed out."
+            echo "OK|$elapsed" >"$result_file"
+        else
+            notify-send -r "$notif_id" -a "RetroTransfer" -u normal -i "$icon_path" \
+                "Transfer Failed" "<b>$device_name</b> rejected the request."
+            echo "ERR|rejected" >"$result_file"
         fi
 
         rm -f "$log_file" "$cancel_flag"
