@@ -3,7 +3,7 @@
 BT_ADAPTER_PATH="/sys/class/bluetooth/hci0"
 
 has_bluetooth() {
-    [[ -d "$BT_ADAPTER_PATH" ]] && echo "true" || echo "false"
+    [[ -d $BT_ADAPTER_PATH ]] && echo "true" || echo "false"
 }
 
 get_bt_connected_devices() {
@@ -112,7 +112,7 @@ is_bt_device_gamepad() {
     local icon_val
     icon_val=$(bluetoothctl info "$mac" 2>/dev/null | grep "Icon:" | awk '{print $2}' | xargs)
 
-    if [[ "$icon_val" == *"gamepad"* || "$icon_val" == *"input-gaming"* || "$icon_val" == *"joystick"* ]]; then
+    if [[ $icon_val == *"gamepad"* || $icon_val == *"input-gaming"* || $icon_val == *"joystick"* ]]; then
         echo "true"
         return
     fi
@@ -133,16 +133,16 @@ is_bt_device_gamepad() {
 
 declare -A BT_DEVICE_TYPE_ICONS
 BT_DEVICE_TYPE_ICONS=(
-    ["phone"]="󰏊"
-    ["computer"]=" PC"
-    ["audio"]="󰍺"
-    ["audio+input"]="󰋎"
-    ["controller"]=""
-    ["input-keyboard"]=""
-    ["input-mouse"]=""
-    ["input-audio"]=""
-    ["input"]="󰎽"
-    ["other"]="󰦔"
+    ["phone"]=" "
+    ["computer"]="󰍹 "
+    ["audio"]="󰋋 "
+    ["audio+input"]="󰋎 "
+    ["controller"]="󰖺 "
+    ["input-keyboard"]="󰌌 "
+    ["input-mouse"]="󰍽 "
+    ["input-audio"]=" "
+    ["input"]="󰕓 "
+    ["other"]="󰦔 "
 )
 
 declare -A BT_DEVICE_TYPE_LABELS
@@ -211,7 +211,7 @@ get_bt_audio_codec() {
         *msbc*) echo "MSBC" ;;
         *cvsd*) echo "CVSD" ;;
         *ldac*) echo "LDAC" ;;
-        *aptx_hd*|*aptx-hd*) echo "aptX HD" ;;
+        *aptx_hd* | *aptx-hd*) echo "aptX HD" ;;
         *aptx*) echo "aptX" ;;
         *aac*) echo "AAC" ;;
         *opus*) echo "Opus" ;;
@@ -231,7 +231,7 @@ get_bt_codec_from_profile() {
         *msbc*) echo "MSBC" ;;
         *cvsd*) echo "CVSD" ;;
         *ldac*) echo "LDAC" ;;
-        *aptx_hd*|*aptx-hd*) echo "aptX HD" ;;
+        *aptx_hd* | *aptx-hd*) echo "aptX HD" ;;
         *aptx*) echo "aptX" ;;
         *aac*) echo "AAC" ;;
         *opus*) echo "Opus" ;;
@@ -248,7 +248,7 @@ get_bt_profile_display_name() {
     case "$profile" in
         *a2dp-sink*aac*) echo "High Fidelity Playback (A2DP Sink, codec AAC)" ;;
         *a2dp-sink*ldac*) echo "High Fidelity Playback (A2DP Sink, codec LDAC)" ;;
-        *a2dp-sink*aptx_hd*|*a2dp-sink*aptx-hd*) echo "High Fidelity Playback (A2DP Sink, codec aptX HD)" ;;
+        *a2dp-sink*aptx_hd* | *a2dp-sink*aptx-hd*) echo "High Fidelity Playback (A2DP Sink, codec aptX HD)" ;;
         *a2dp-sink*aptx*) echo "High Fidelity Playback (A2DP Sink, codec aptX)" ;;
         *a2dp-sink*opus*) echo "High Fidelity Playback (A2DP Sink, codec Opus)" ;;
         *a2dp-sink*sbc_xq*) echo "High Fidelity Playback (A2DP Sink, codec SBC-XQ)" ;;
@@ -323,3 +323,4 @@ get_bt_nearby_devices() {
         fi
     done
 }
+
