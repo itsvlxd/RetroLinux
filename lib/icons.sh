@@ -9,7 +9,8 @@ rx_get_icon() {
 
     case "$name" in
         *"xbox"*"wireless"*) icon_path="$icon_dir/xbox_wireless_controller.png" ;;
-        *"nothing"*"headphone") icon_path="$icon_dir/nothing_headphone_1.png" ;;
+        *"nothing"*"headphone"*"1"*) icon_path="$icon_dir/nothing_headphone_1.png" ;;
+        *"nothing"*"phone"*"2"*) icon_path="$icon_dir/nothing_phone_2.png" ;;
         *"nothing"*"ear") icon_path="$icon_dir/nothing_ear.png" ;;
         *"at"*"over"*"ear"*) icon_path="$icon_dir/at_over_ear.png" ;;
         *) icon_path="bluetooth" ;;

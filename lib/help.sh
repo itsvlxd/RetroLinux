@@ -1,9 +1,5 @@
 #!/bin/bash
 
-DEFAULT_HELP_WIDTH=24
-DEFAULT_EXAMPLE_WIDTH=35
-DEFAULT_TABLE_WIDTH=36
-
 rx_help_usage() {
     local usage="$1"
     rx_log "info" "Usage: $usage"
@@ -18,13 +14,15 @@ rx_help_commands() {
 rx_help_cmd() {
     local cmd="$1"
     local desc="$2"
-    printf " ${PINK}%-${DEFAULT_HELP_WIDTH}s${GRAY}- ${RESET}%s\n" "$cmd" "$desc"
+    local width="${3:-26}"
+    printf " ${PINK}%-${width}s${GRAY}- ${RESET}%s\n" "$cmd" "$desc"
 }
 
 rx_help_example() {
     local cmd="$1"
     local desc="$2"
-    printf " ${GRAY}%-${DEFAULT_EXAMPLE_WIDTH}s${RESET} %s\n" "$cmd" "$desc"
+    local width="${3:-26}"
+    printf " ${GRAY}%-${width}s${RESET} %s\n" "$cmd" "$desc"
 }
 
 rx_help_spacer() {
@@ -79,7 +77,7 @@ rx_table_separator() {
 rx_table_header() {
     local icon="$1"
     local title="$2"
-    echo -e "\n ${PINK}$icon  ${title}${RESET}"
+    echo -e "\n ${PINK}$icon ${title}${RESET}"
     rx_table_separator
 }
 
@@ -88,7 +86,7 @@ rx_table_row() {
     local label="$2"
     local value="$3"
     local value_color="${4:-$PINK}"
-    local width="${5:-$DEFAULT_TABLE_WIDTH}"
+    local width="${5:-26}"
     printf " ${PINK}${icon}${RESET} %-${width}s ${value_color}%s${RESET}\n" "$label" "$value"
 }
 

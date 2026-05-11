@@ -30,6 +30,12 @@ retro_fix_permissions() {
     rx_log "success" "Permissions and git safe.directory configured"
 }
 
+if command -v gsettings >/dev/null 2>&1; then
+    if [[ $(gsettings get org.blueman.general notification-daemon 2>/dev/null) == "true" ]]; then
+        gsettings set org.blueman.general notification-daemon false
+    fi
+fi
+
 setup_cronie
 retro_fix_permissions
 
@@ -48,7 +54,13 @@ patch_env() {
     local var_val="$3"
 
     if [[ -f $file ]]; then
-        if ! grep -q "export $var_name=" "$file"; then
+        if grep -q "export $var_name=" "$file"; then
+            local current_val=$(grep "export $var_name=" "$file" | sed 's/.*export '"$var_name"'="\(.*\)"/\1/')
+            if [[ "$current_val" != "$var_val" ]]; then
+                sed -i "s|export $var_name=\".*\"|export $var_name=\"$var_val\"|" "$file"
+                rx_log "success" "Updated $var_name in $(basename "$file")"
+            fi
+        else
             echo "export $var_name=\"$var_val\"" >>"$file"
             rx_log "success" "Added $var_name to $(basename "$file")"
         fi

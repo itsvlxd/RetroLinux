@@ -16,6 +16,12 @@ base-devel
 pacman-contrib
 xdg-desktop-portal-gtk
 
+# Bluetooth
+bluez
+bluez-libs
+bluez-obex
+bluez-tools
+
 # Audio
 wireplumber
 easyeffects
