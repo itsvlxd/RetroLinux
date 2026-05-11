@@ -140,22 +140,29 @@ on_bluetooth_connected() {
     local mac="$2"
 
     local icon_path=$(rx_get_icon "$name")
+    local category
+    category=$(
+        source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
+        get_device_category "$mac" 2>/dev/null || echo "other"
+    )
 
     (
         local ACTION=$(notify-send -a "retro_bluetooth_con_$mac" -u normal -i "$icon_path" -t 10000 \
             "Connection Established" \
-            "<b>$name</b> ($mac) has been connected successfully." \
+            "<b>$name</b> ($mac) connected.\nType: ${category}" \
             -A "disconnect=Disconnect" \
             -A "forget=Forget Device")
 
         case "$ACTION" in
             "disconnect")
                 rx_log "info" "User requested disconnect for $name ($mac)."
-                bluetoothctl disconnect "$mac" >/dev/null 2>&1
+                source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
+                bt_disconnect "$mac"
                 ;;
             "forget")
                 rx_log "info" "User requested to forget device: $name."
-                bluetoothctl remove "$mac" >/dev/null 2>&1
+                source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
+                bt_remove_device "$mac"
                 notify-send -u low -i "edit-delete" "Device Forgotten" "$name has been removed from trusted devices."
                 ;;
         esac
@@ -167,7 +174,7 @@ on_bluetooth_disconnected() {
     local mac="$2"
     local icon_path=$(rx_get_icon "$name")
 
-    notify-send -a "retro_bluetooth_dis_$mac" -u normal -i "$icon_path" -t 5000 \
+    notify-send -a "retro_bluetooth_con_$mac" -u normal -i "$icon_path" -t 5000 \
         "Connection Severed" \
         "<b>$name</b> ($mac) is no longer active."
 }
@@ -178,7 +185,7 @@ on_bluetooth_pairing_request() {
 
     local icon_path=$(rx_get_icon "$name")
 
-    local ACTION=$(notify-send -a "retro_bluetooth_pair_$mac" -u critical -i "$icon_path" -w \
+    local ACTION=$(notify-send -a "retro_bluetooth_con_$mac" -u critical -i "$icon_path" -w \
         "Bluetooth Pairing Request" \
         "Device <b>$name</b> sent a bluetooth pairing request.\nAddress: $mac" \
         -A "pair=Pair" \
@@ -189,33 +196,21 @@ on_bluetooth_pairing_request() {
             local current_locks=$(get_var "BT_PAIRING_IN_PROGRESS")
             set_var "BT_PAIRING_IN_PROGRESS" "$current_locks|$mac"
 
-            rx_log "info" "Engaging Expect-based handshake for $name..."
+            rx_log "info" "Starting bt-agent for $name..."
 
             (
-                expect <<DONE
-                    set timeout 20
-                    spawn bluetoothctl
-                    expect "agent on"
-                    send "agent on\r"
-                    expect "default-agent"
-                    send "default-agent\r"
-                    expect "trust"
-                    send "trust $mac\r"
-                    expect "connect"
-                    send "connect $mac\r"
-                    
-                    # This is the magic part: it WAITS for the prompt
-                    expect "Accept pairing (yes/no):"
-                    send "yes\r"
-                    
-                    expect "Paired: yes"
-                    send "exit\r"
-                    expect eof
-DONE
+                source "$RETRO_DIR/scripts/bluetooth_core.sh"
+                local result
+                result=$(bt_pair_with_agent "$mac" "$name")
+
                 local new_locks=$(get_var "BT_PAIRING_IN_PROGRESS" | sed "s/|$mac//g")
                 set_var "BT_PAIRING_IN_PROGRESS" "$new_locks"
 
-                rx_log "success" "Handshake complete for $name."
+                if [[ $result == OK* ]]; then
+                    rx_log "success" "Pairing complete for $name."
+                else
+                    rx_log "error" "Pairing failed for $name (${result})."
+                fi
             ) &
             ;;
 
@@ -229,6 +224,37 @@ DONE
             rx_log "info" "Added $mac to ignore list."
             ;;
     esac
+}
+
+on_bluetooth_file_received() {
+    local sender="$1"
+    local _sender_mac="$2"
+    local file_name="$3"
+    local file_path="$4"
+    local file_size="$5"
+
+    [[ -z $file_name ]] && return
+
+    local icon_path
+    icon_path=$(rx_get_icon "$sender")
+
+    (
+        local ACTION=$(notify-send -a "retro_bt_file_$file_name" -u normal -i "$icon_path" -w \
+            "Bluetooth File Received" \
+            "<b>$sender</b> sent <b>$file_name</b> (${file_size})\nLocation: $file_path" \
+            -A "open=Open File" \
+            -A "open-dir=Show in Folder" \
+            -A "ignore=Ignore")
+
+        case "$ACTION" in
+            "open")
+                xdg-open "$file_path" >/dev/null 2>&1 &
+                ;;
+            "open-dir")
+                xdg-open "$(dirname "$file_path")" >/dev/null 2>&1 &
+                ;;
+        esac
+    ) &
 }
 
 on_pkg_updates_available() {
