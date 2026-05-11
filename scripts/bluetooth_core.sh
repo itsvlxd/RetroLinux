@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/icons.sh"
+
 get_bt_status() {
     local bt_info=$(bluetoothctl show)
     local radio_on=$(echo "$bt_info" | grep -i "Powered:" | awk '{print $2}' | xargs)
@@ -126,7 +128,7 @@ is_device_gamepad() {
     local icon_val
     icon_val=$(bluetoothctl info "$mac" 2>/dev/null | grep "Icon:" | awk '{print $2}' | xargs)
 
-    if [[ "$icon_val" == *"gamepad"* || "$icon_val" == *"input-gaming"* || "$icon_val" == *"joystick"* ]]; then
+    if [[ $icon_val == *"gamepad"* || $icon_val == *"input-gaming"* || $icon_val == *"joystick"* ]]; then
         echo "true"
         return
     fi
@@ -176,13 +178,13 @@ get_device_category() {
 decode_type_icon() {
     local type="$1"
     case "$type" in
-        phone)        echo "pho" ;;
-        computer)     echo "pc" ;;
-        audio)        echo "aud" ;;
-        audio+input)  echo "aud+in" ;;
-        controller)   echo "ctrl" ;;
-        input)        echo "in" ;;
-        *)            echo "unk" ;;
+        phone) echo "pho" ;;
+        computer) echo "pc" ;;
+        audio) echo "aud" ;;
+        audio+input) echo "aud+in" ;;
+        controller) echo "ctrl" ;;
+        input) echo "in" ;;
+        *) echo "unk" ;;
     esac
 }
 
@@ -203,8 +205,8 @@ get_bt_device_class_decoded() {
         case $minor in
             4) echo "Wearable Headset" ;;
             5) echo "Hands-free" ;;
-            6|10) echo "Headphones" ;;
-            7|13) echo "HiFi Audio" ;;
+            6 | 10) echo "Headphones" ;;
+            7 | 13) echo "HiFi Audio" ;;
             8) echo "Microphone" ;;
             9) echo "Loudspeaker" ;;
             11) echo "Portable Audio" ;;
@@ -307,7 +309,7 @@ get_audio_codec() {
         *msbc*) echo "MSBC" ;;
         *cvsd*) echo "CVSD" ;;
         *ldac*) echo "LDAC" ;;
-        *aptx_hd*|*aptx-hd*) echo "aptX HD" ;;
+        *aptx_hd* | *aptx-hd*) echo "aptX HD" ;;
         *aptx*) echo "aptX" ;;
         *aac*) echo "AAC" ;;
         *opus*) echo "Opus" ;;
@@ -331,7 +333,7 @@ profile_display_name() {
     case "$profile" in
         *a2dp-sink*aac*) echo "High Fidelity Playback (A2DP Sink, codec AAC)" ;;
         *a2dp-sink*ldac*) echo "High Fidelity Playback (A2DP Sink, codec LDAC)" ;;
-        *a2dp-sink*aptx_hd*|*a2dp-sink*aptx-hd*) echo "High Fidelity Playback (A2DP Sink, codec aptX HD)" ;;
+        *a2dp-sink*aptx_hd* | *a2dp-sink*aptx-hd*) echo "High Fidelity Playback (A2DP Sink, codec aptX HD)" ;;
         *a2dp-sink*aptx*) echo "High Fidelity Playback (A2DP Sink, codec aptX)" ;;
         *a2dp-sink*opus*) echo "High Fidelity Playback (A2DP Sink, codec Opus)" ;;
         *a2dp-sink*sbc_xq*) echo "High Fidelity Playback (A2DP Sink, codec SBC-XQ)" ;;
@@ -373,7 +375,7 @@ get_profile_info() {
             [[ -z $profile ]] && continue
             local name is_active=0
             name=$(profile_display_name "$profile")
-            [[ "$profile" == "$active_profile" ]] && is_active=1
+            [[ $profile == "$active_profile" ]] && is_active=1
             echo "PROFILE|$profile|$is_active|$name"
         done
     fi
@@ -406,20 +408,20 @@ normalize_profile() {
     local codec="$2"
 
     case "$profile" in
-        a2dp|a2dp-sink)
+        a2dp | a2dp-sink)
             case "$codec" in
-                aac|AAC) echo "a2dp-sink" ;;
-                ldac|LDAC) echo "a2dp-sink-ldac" ;;
-                aptx|aptX) echo "a2dp-sink-aptx" ;;
-                sbc-xq|SBC-XQ|sbc_xq) echo "a2dp-sink-sbc_xq" ;;
-                sbc|SBC) echo "a2dp-sink-sbc" ;;
+                aac | AAC) echo "a2dp-sink" ;;
+                ldac | LDAC) echo "a2dp-sink-ldac" ;;
+                aptx | aptX) echo "a2dp-sink-aptx" ;;
+                sbc-xq | SBC-XQ | sbc_xq) echo "a2dp-sink-sbc_xq" ;;
+                sbc | SBC) echo "a2dp-sink-sbc" ;;
                 *) echo "a2dp-sink" ;;
             esac
             ;;
-        headset|hfp|hsp)
+        headset | hfp | hsp)
             case "$codec" in
-                msbc|MSBC) echo "headset-head-unit" ;;
-                cvsd|CVSD) echo "headset-head-unit-cvsd" ;;
+                msbc | MSBC) echo "headset-head-unit" ;;
+                cvsd | CVSD) echo "headset-head-unit-cvsd" ;;
                 *) echo "headset-head-unit" ;;
             esac
             ;;
@@ -501,44 +503,109 @@ bt_remove_device() {
     bluetoothctl remove "$mac" >/dev/null 2>&1
 }
 
+# TODO: ploish the messages and on cancel just disconnect the device
+# also add hte icon path
+# also add support for accepting or rejecting files
+
 bt_send_file() {
     local mac="$1"
     local file_path="$2"
     [[ -z $mac || -z $file_path ]] && echo "ERR_MISSING_ARGS" && return 1
-    [[ ! -f "$file_path" ]] && echo "ERR_FILE_NOT_FOUND" && return 1
-    if ! command -v bt-obex >/dev/null 2>&1; then
-        echo "ERR_NO_BT_OBEX"
-        return 1
-    fi
+    [[ ! -f $file_path ]] && echo "ERR_FILE_NOT_FOUND" && return 1
 
-    rm -f /tmp/.bt_send_log.txt
+    local file_name=$(basename "$file_path")
+    local file_size=$(du -h "$file_path" 2>/dev/null | awk '{print $1}')
 
-    bt-obex -p "$mac" "$file_path" >/tmp/.bt_send_log.txt 2>&1 &
+    local device_name=$(bluetoothctl info "$mac" | grep "Name:" | cut -d' ' -f2-)
+    [[ -z $device_name ]] && device_name="Unknown Device"
+
+    local icon_path=$(rx_get_icon "$device_name")
+    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
+
+    local mac_clean=$(echo "$mac" | tr -d ':')
+    local notif_id=$((0x$mac_clean % 1000000))
+    [[ $notif_id -lt 10000 ]] && notif_id=$((notif_id + 10000))
+
+    local log_file="/tmp/.bt_send_${notif_id}.log"
+    local cancel_flag="/tmp/.bt_send_${notif_id}_cancel"
+    rm -f "$log_file" "$cancel_flag"
+
+    stdbuf -oL bt-obex -p "$mac" "$file_path" >"$log_file" 2>&1 &
     local obex_pid=$!
-    local start_time=$SECONDS
 
-    while kill -0 "$obex_pid" 2>/dev/null; do
-        sleep 0.3
-        local elapsed=$((SECONDS - start_time))
-        if [[ $elapsed -gt 150 ]]; then
-            kill "$obex_pid" 2>/dev/null
-            echo "ERR_SEND_FAILED|timeout after 150s"
-            return 1
+    _send_notif_with_cancel() {
+        local pct="$1"
+        local status_msg="$2"
+        local ACTION
+
+        ACTION=$(notify-send -r "$notif_id" -a "RetroTransfer" \
+            -i "$icon_path" \
+            -t 20000 \
+            -h string:x-canonical-private-synchronous:bt-transfer \
+            -h int:value:"$pct" \
+            -A "cancel=Cancel Transfer" \
+            "Sending: $file_name" \
+            "To: <b>$device_name</b> ($mac)\n$status_msg")
+
+        [[ $ACTION == "cancel" ]] && touch "$cancel_flag"
+    }
+
+    _send_notif_with_cancel 0 "Waiting for device to accept... ($file_size)" &
+
+    (
+        local last_pct=-1
+        local send_start=$(date +%s)
+
+        while kill -0 "$obex_pid" 2>/dev/null; do
+            sleep 1
+
+            if [[ -f $cancel_flag ]]; then
+                kill "$obex_pid" 2>/dev/null
+                source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
+                bt_disconnect "$mac"
+
+                notify-send -r "$notif_id" -a "RetroTransfer" -i "$icon_path" -u normal \
+                    -i dialog-warning-symbolic \
+                    "Transfer Aborted" "Connection to <b>$device_name</b> severed."
+                rm -f "$log_file" "$cancel_flag"
+                return
+            fi
+
+            local pct=$(LC_ALL=C tr -dc '[:print:]\n' <"$log_file" 2>/dev/null | grep -oP '\d+(?=%$)' | tail -1)
+            pct=${pct:-0}
+
+            if ((pct > last_pct && pct > 0)); then
+                last_pct=$pct
+                _send_notif_with_cancel "$pct" "Progress: <b>${pct}%</b> ($file_size)" &
+            fi
+        done
+
+        wait "$obex_pid"
+        local elapsed=$(($(date +%s) - send_start))
+
+        if grep -qi "Completed" "$log_file"; then
+            notify-send -r "$notif_id" -a "RetroTransfer" -u normal \
+                -i "$icon_path" \
+                "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed}s."
+        elif [[ ! -f $cancel_flag ]]; then
+            notify-send -r "$notif_id" -a "RetroTransfer" -i "$icon_path" -u normal \
+                -i dialog-error-symbolic \
+                "Transfer Failed" "<b>$device_name</b> rejected the request or timed out."
         fi
-    done
 
-    wait "$obex_pid" 2>/dev/null
+        rm -f "$log_file" "$cancel_flag"
+    ) &
 
-    local log_content
-    log_content=$(cat /tmp/.bt_send_log.txt 2>/dev/null)
+    echo "OK|$file_path"
+}
 
-    echo "$log_content" | grep -qi "Completed" && echo "OK|$file_path" && return 0
-
-    local err_msg
-    err_msg=$(echo "$log_content" | grep -iE "Failed|Error|failed" | grep -v "GLib\|g_atomic" | tail -1 | xargs | cut -c1-100)
-    [[ -z $err_msg ]] && err_msg="transfer failed"
-    echo "ERR_SEND_FAILED|$err_msg"
-    return 1
+bt_cancel_send() {
+    local mac="$1"
+    [[ -z $mac ]] && return 1
+    local mac_clean=$(echo "$mac" | tr -d ':')
+    local notif_id=$((0x$mac_clean % 1000000))
+    [[ $notif_id -lt 10000 ]] && notif_id=$((notif_id + 10000))
+    touch "/tmp/.bt_send_${notif_id}_cancel"
 }
 
 rx_handle_profile_set() {
@@ -602,5 +669,8 @@ case "$1" in
         ;;
     "--send")
         bt_send_file "$2" "$3"
+        ;;
+    "--cancel-send")
+        bt_cancel_send "$2"
         ;;
 esac
