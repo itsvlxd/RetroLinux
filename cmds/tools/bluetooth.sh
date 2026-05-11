@@ -134,13 +134,40 @@ cmd_bluetooth() {
         can_send=$(bash "$bt_script" --can-send "$mac")
         [[ $can_send != "true" ]] && rx_log "error" "Device does not support file reception (not a phone or PC)." && return 1
 
-        local result
-        result=$(bash "$bt_script" --send "$mac" "$file_path" 2>&1)
-        if [[ $result == OK* ]]; then
-            rx_log "success" "File sent successfully."
-        else
-            rx_log "error" "Failed to send file (${result})."
-        fi
+        local mac_clean=$(echo "$mac" | tr -d ':')
+        local notif_id=$((0x$mac_clean % 1000000))
+        [[ $notif_id -lt 10000 ]] && notif_id=$((notif_id + 10000))
+        local result_file="/tmp/.bt_send_${notif_id}_result.txt"
+        rm -f "$result_file"
+
+        bash "$bt_script" --send "$mac" "$file_path" >/dev/null 2>&1 &
+        local start_time=$SECONDS
+
+        while true; do
+            if [[ -f $result_file ]]; then
+                local result
+                result=$(cat "$result_file")
+                rm -f "$result_file"
+
+                if [[ $result == OK* ]]; then
+                    local elapsed
+                    elapsed=$(echo "$result" | cut -d'|' -f2)
+                    rx_log "success" "File sent successfully in ${elapsed}s."
+                else
+                    local err
+                    err=$(echo "$result" | cut -d'|' -f2)
+                    rx_log "error" "Failed to send file (${err})."
+                fi
+                break
+            fi
+
+            sleep 0.5
+            local elapsed=$((SECONDS - start_time))
+            if [[ $elapsed -gt 180 ]]; then
+                rx_log "error" "Transfer timed out."
+                break
+            fi
+        done
     }
 
     case "$action" in

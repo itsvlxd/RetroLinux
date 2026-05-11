@@ -140,16 +140,11 @@ on_bluetooth_connected() {
     local mac="$2"
 
     local icon_path=$(rx_get_icon "$name")
-    local category
-    category=$(
-        source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
-        get_device_category "$mac" 2>/dev/null || echo "other"
-    )
 
     (
         local ACTION=$(notify-send -a "retro_bluetooth_con_$mac" -u normal -i "$icon_path" -t 10000 \
             "Connection Established" \
-            "<b>$name</b> ($mac) connected.\nType: ${category}" \
+            "<b>$name</b> ($mac) has been connected successfully." \
             -A "disconnect=Disconnect" \
             -A "forget=Forget Device")
 
