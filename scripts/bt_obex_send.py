@@ -5,7 +5,8 @@ import os
 import dbus
 from gi.repository import GLib
 
-os.environ['DBUS_SESSION_BUS_ADDRESS'] = 'unix:path=/run/user/1000/bus'
+uid = os.getuid()
+os.environ['DBUS_SESSION_BUS_ADDRESS'] = f'unix:path=/run/user/{uid}/bus'
 
 def send_file(mac, file_path):
     if not os.path.exists(file_path):
