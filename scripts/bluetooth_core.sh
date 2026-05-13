@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/icons.sh"
 
 get_bt_status() {
@@ -442,8 +443,6 @@ bt_pair_with_agent() {
     local agent_pid=$!
     sleep 0.5
 
-    bluetoothctl trust "$mac" >/dev/null 2>&1
-
     if [[ $is_paired != "yes" ]]; then
         bluetoothctl pair "$mac" >/dev/null 2>&1
         local pair_result=$?
@@ -633,6 +632,70 @@ rx_handle_profile_set() {
     set_audio_profile "$mac" "$normalized"
 }
 
+bt_obex_receive_start() {
+    if ! systemctl --user is-active --quiet obex 2>/dev/null; then
+        systemctl --user start obex 2>/dev/null
+        sleep 1
+    fi
+
+    local pid_file="/tmp/.bt_obex_receive.pid"
+    if [[ -f $pid_file ]] && kill -0 "$(cat "$pid_file" 2>/dev/null)" 2>/dev/null; then
+        echo "OK|already_running"
+        return
+    fi
+
+    local script_dir="$RETRO_DIR/scripts"
+    nohup env \
+        DISPLAY="$DISPLAY" \
+        DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+        XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+        RETRO_DIR="$RETRO_DIR" \
+        python3 "$script_dir/bt_obex_receive.py" "$script_dir/bt_obex_ask.sh" \
+        >/tmp/.bt_obex_receive.log 2>&1 &
+    local pid=$!
+    echo "$pid" > "$pid_file"
+
+    sleep 1
+    if kill -0 "$pid" 2>/dev/null; then
+        set_var "BT_RECEIVE_ENABLED" "true"
+        echo "OK|$pid"
+    else
+        local err
+        err=$(cat /tmp/.bt_obex_receive.log 2>/dev/null | head -1)
+        [[ -z $err ]] && err="start_failed"
+        rm -f "$pid_file"
+        echo "ERR|$err"
+    fi
+}
+
+bt_obex_receive_stop() {
+    local pid_file="/tmp/.bt_obex_receive.pid"
+
+    if [[ -f $pid_file ]]; then
+        local pid
+        pid=$(cat "$pid_file" 2>/dev/null)
+        [[ -n $pid ]] && kill "$pid" 2>/dev/null
+        rm -f "$pid_file"
+    fi
+
+    rm -f /tmp/.bt_obex_receive.log
+    set_var "BT_RECEIVE_ENABLED" "false"
+    echo "OK|stopped"
+}
+
+bt_obex_receive_status() {
+    local pid_file="/tmp/.bt_obex_receive.pid"
+    local dl_dir
+    dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
+    [[ -z $dl_dir ]] && dl_dir="$HOME/Downloads"
+
+    if [[ -f $pid_file ]] && kill -0 "$(cat "$pid_file" 2>/dev/null)" 2>/dev/null; then
+        echo "running|${dl_dir}"
+    else
+        echo "stopped|${dl_dir}"
+    fi
+}
+
 rx_handle_can_send() {
     local mac="$1"
     [[ -z $mac ]] && echo "false" && return
@@ -688,5 +751,24 @@ case "$1" in
         ;;
     "--cancel-send")
         bt_cancel_send "$2"
+        ;;
+    "--receive-start")
+        bt_obex_receive_start
+        ;;
+    "--receive-stop")
+        bt_obex_receive_stop
+        ;;
+    "--receive-status")
+        bt_obex_receive_status
+        ;;
+    "--trust")
+        local mac=$2
+        [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+        bluetoothctl trust "$mac" >/dev/null 2>&1 && echo "OK|trusted" || echo "ERR|trust_failed"
+        ;;
+    "--untrust")
+        local mac=$2
+        [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+        bluetoothctl untrust "$mac" >/dev/null 2>&1 && echo "OK|untrusted" || echo "ERR|untrust_failed"
         ;;
 esac

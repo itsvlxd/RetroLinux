@@ -44,8 +44,13 @@ cmd_bluetooth() {
                     conn_color="$MUTE"
                 fi
 
-                printf " ${type_color}%s${RESET} %s ${GRAY}(%s)${RESET} ${conn_color}%s${RESET}" \
-                    "$icon" "${name:0:32}" "$mac" "$conn_status"
+                local trust_badge=""
+                if bluetoothctl info "$mac" 2>/dev/null | grep -q "Trusted: yes"; then
+                    trust_badge=" ${SUCCESS}[trusted]${RESET}"
+                fi
+
+                printf " ${type_color}%s${RESET} %s ${GRAY}(%s)${RESET} ${conn_color}%s${RESET}%s\n" \
+                    "$icon" "${name:0:32}" "$mac" "$conn_status" "$trust_badge"
 
                 if [[ $connected == "yes" ]]; then
                     local device_card=$(get_bt_audio_card "$mac")
@@ -75,7 +80,7 @@ cmd_bluetooth() {
 
                 local icon type_color
                 icon=$(get_bt_device_type_icon "$device_type")
-                [[ $device_type == "phone" || $device_type == "computer" || $device_type == "audio" || $device_type == "audio+input" || $device_type == "controller" ]] && type_color="$PINK" || type_color="$MUTE"
+                [[ $device_type == "phone" || $device_type == "computer" || $device_type == "audio" || $device_type == "audio+input" || $device_type == "controller" ]] && type_color="$PINK" || type_color="$PINK"
 
                 printf " ${type_color}%s${RESET} %s ${MUTE}(%s)${RESET} ${type_color}[%s]${RESET} ${MUTE}[PAIRABLE]${RESET}\n" \
                     "$icon" "${name:0:32}" "$mac" "$(get_bt_device_type_label "$device_type")"
@@ -97,14 +102,11 @@ cmd_bluetooth() {
 
         local rx_status rx_dir
         local rx_raw=$(bash "$bt_script" --receive-status)
+        IFS='|' read -r rx_status rx_dir <<<"$rx_raw"
+        [[ -z $rx_dir ]] && rx_dir="$HOME/Downloads"
+        [[ $rx_status == "running" ]] && rx_status="${SUCCESS}YES${RESET}" || rx_status="${MUTE}NO${RESET}"
 
-        if [[ $rx_raw == "stopped" ]]; then
-            rx_status="NO" rx_dir="$HOME/Downloads"
-        else
-            rx_status="" rx_dir=$(echo "$rx_raw" | cut -d'|' -f2)
-        fi
-
-        rx_table_row "󱃚" "Receive:" "${rx_status}" "$PINK" "20"
+        rx_table_row "󱃚" "Receive:" "$rx_status" "$PINK" "20"
         rx_table_row_gray "󰁞" "Download Folder:" "${rx_dir:0:40}" "20"
         rx_table_row_gray "󰂱" "Adapter:" "$chip" "20"
         rx_table_row_gray "󰄀" "Stack Version:" "Bluetooth $ver" "20"
@@ -240,6 +242,49 @@ cmd_bluetooth() {
         "discoverable")
             [[ $(bash "$bt_script" --toggle-discovery) == "on" ]] && rx_log "success" "Visible for 3 mins." || rx_log "info" "Hidden."
             ;;
+        "trust")
+            [[ -z $2 ]] && rx_log "error" "Usage: retro bluetooth trust <mac>" && return 1
+            local mac=$(_normalize_mac "$2")
+            local res
+            res=$(bash "$bt_script" --trust "$mac")
+            if [[ $res == OK* ]]; then
+                rx_log "success" "Device ${PINK}$mac${RESET} is now trusted (auto-accepts files)."
+            else
+                rx_log "error" "Failed to trust device."
+            fi
+            ;;
+        "untrust")
+            [[ -z $2 ]] && rx_log "error" "Usage: retro bluetooth untrust <mac>" && return 1
+            local mac=$(_normalize_mac "$2")
+            local res
+            res=$(bash "$bt_script" --untrust "$mac")
+            if [[ $res == OK* ]]; then
+                rx_log "info" "Device ${PINK}$mac${RESET} no longer trusted (prompts for each file)."
+            else
+                rx_log "error" "Failed to untrust device."
+            fi
+            ;;
+        "receive")
+            shift
+            local sub="${1,,}"
+            if [[ $sub == "on" ]]; then
+                local res
+                res=$(bash "$bt_script" --receive-start)
+                if [[ $res == OK* ]]; then
+                    rx_log "success" "OBEX receiver started."
+                else
+                    rx_log "error" "Failed to start receiver (${res#ERR|})."
+                fi
+            elif [[ $sub == "off" ]]; then
+                bash "$bt_script" --receive-stop >/dev/null 2>&1
+                rx_log "info" "OBEX receiver stopped."
+            else
+                local status
+                status=$(bash "$bt_script" --receive-status)
+                IFS='|' read -r st dir <<<"$status"
+                [[ $st == "running" ]] && rx_log "info" "Receiver active. Download dir: ${PINK}$dir${RESET}" || rx_log "info" "Receiver inactive."
+            fi
+            ;;
         *)
             rx_help_usage "retro bluetooth <command>"
             rx_help_commands "Available commands"
@@ -252,8 +297,10 @@ cmd_bluetooth() {
             rx_help_cmd "connect <mac>" "Connect to a device"
             rx_help_cmd "disconnect <mac>" "Disconnect a device"
             rx_help_cmd "forget <mac>" "Remove a paired device"
+            rx_help_cmd "trust <mac>" "Mark device as trusted (auto-accept files)"
+            rx_help_cmd "untrust <mac>" "Remove trust (prompts on each file)"
             rx_help_cmd "discoverable" "Toggle visibility mode"
-            rx_help_cmd "receive [on|off|set-dir]" "Manage file reception"
+            rx_help_cmd "receive [on|off]" "Manage file reception"
             rx_help_spacer
             ;;
     esac
