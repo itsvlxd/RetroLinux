@@ -601,7 +601,7 @@ bt_send_file() {
         if grep -qi "Completed" "$log_file"; then
             notify-send -r "$notif_id" -a "RetroTransfer" -u normal \
                 -i "$icon_path" \
-                "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed}s."
+                "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed} seconds."
             echo "OK|$elapsed" >"$result_file"
         else
             notify-send -r "$notif_id" -a "RetroTransfer" -u normal -i "$icon_path" \

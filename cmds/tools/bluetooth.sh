@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/bluetooth.sh"
+source "$RETRO_DIR/lib/icons.sh"
 
 cmd_bluetooth() {
     [[ $(has_bluetooth) != "true" ]] && rx_log "error" "No bluetooth adapter detected" && return 1
@@ -93,6 +94,18 @@ cmd_bluetooth() {
         rx_table_row "󰈐" "Power Mode:" "${pwr_mode} (Radio: ${pwr_stat^^})" "$mode_color" "20"
         rx_table_row "󰈐" "Discoverable:" "${disc^^}" "$PINK" "20"
         rx_table_row "󰈐" "Pairable:" "${pair^^}" "$PINK" "20"
+
+        local rx_status rx_dir
+        local rx_raw=$(bash "$bt_script" --receive-status)
+
+        if [[ $rx_raw == "stopped" ]]; then
+            rx_status="NO" rx_dir="$HOME/Downloads"
+        else
+            rx_status="" rx_dir=$(echo "$rx_raw" | cut -d'|' -f2)
+        fi
+
+        rx_table_row "󱃚" "Receive:" "${rx_status}" "$PINK" "20"
+        rx_table_row_gray "󰁞" "Download Folder:" "${rx_dir:0:40}" "20"
         rx_table_row_gray "󰂱" "Adapter:" "$chip" "20"
         rx_table_row_gray "󰄀" "Stack Version:" "Bluetooth $ver" "20"
         rx_table_row "󰂲" "Active Conns:" "$conns Device(s)" "$PINK" "20"
@@ -240,6 +253,7 @@ cmd_bluetooth() {
             rx_help_cmd "disconnect <mac>" "Disconnect a device"
             rx_help_cmd "forget <mac>" "Remove a paired device"
             rx_help_cmd "discoverable" "Toggle visibility mode"
+            rx_help_cmd "receive [on|off|set-dir]" "Manage file reception"
             rx_help_spacer
             ;;
     esac
