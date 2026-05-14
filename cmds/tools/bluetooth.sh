@@ -91,12 +91,20 @@ cmd_bluetooth() {
 
     _bt_status() {
         local stats=$(bash "$bt_script" --status)
-        IFS='|' read -r pwr_stat pwr_mode disc pair chip ver conns <<<"$stats"
+
+        IFS='|' read -r radio_on pwr_mode disc pair chip ver conns adapter <<<"$stats"
+
         local mode_color="$PINK"
-        [[ $pwr_mode == "SAVER" ]] && mode_color="$MUTE"
+        [[ $pwr_mode == "SAVER" ]] && mode_color="$SUCCESS"
+        [[ $pwr_mode == "OFFLINE" ]] && mode_color="$ERROR"
+
+        local radio_label="${MUTE}OFF${RESET}"
+        [[ $radio_on == "yes" ]] && radio_label="${PINK}ON${RESET}"
 
         rx_table_header "󰂯" "Bluetooth Status"
-        rx_table_row "󰈐" "Power Mode:" "${pwr_mode} (Radio: ${pwr_stat^^})" "$mode_color" "20"
+
+        rx_table_row "󰂳" "Radio Power:" "$radio_label" "$PINK" "20"
+        rx_table_row "󰈐" "Power Mode:" "${pwr_mode}" "$mode_color" "20"
         rx_table_row "󰈐" "Discoverable:" "${disc^^}" "$PINK" "20"
         rx_table_row "󰈐" "Pairable:" "${pair^^}" "$PINK" "20"
 
@@ -104,13 +112,15 @@ cmd_bluetooth() {
         local rx_raw=$(bash "$bt_script" --receive-status)
         IFS='|' read -r rx_status rx_dir <<<"$rx_raw"
         [[ -z $rx_dir ]] && rx_dir="$HOME/Downloads"
-        [[ $rx_status == "running" ]] && rx_status="${SUCCESS}YES${RESET}" || rx_status="${MUTE}NO${RESET}"
+        [[ $rx_status == "running" ]] && rx_status="${SUCCESS}ACTIVE${RESET}" || rx_status="${MUTE}INACTIVE${RESET}"
 
-        rx_table_row "󱃚" "Receive:" "$rx_status" "$PINK" "20"
+        rx_table_row "󱃚" "Receive Agent:" "$rx_status" "$PINK" "20"
         rx_table_row_gray "󰁞" "Download Folder:" "${rx_dir:0:40}" "20"
-        rx_table_row_gray "󰂱" "Adapter:" "$chip" "20"
+
+        rx_table_row_gray "󰂱" "Adapter Chip:" "$chip" "20"
         rx_table_row_gray "󰄀" "Stack Version:" "Bluetooth $ver" "20"
-        rx_table_row "󰂲" "Active Conns:" "$conns Device(s)" "$PINK" "20"
+        rx_table_row "󰂲" "Active Conns:" "${conns:-0} Device(s)" "$PINK" "20"
+
         rx_table_separator && rx_table_spacer
     }
 
@@ -185,7 +195,42 @@ cmd_bluetooth() {
         done
     }
 
+    _bt_restore() {
+        local recv_state
+        recv_state=$(get_var "BT_RECEIVE_ACTIVE")
+        if [[ $recv_state == "true" ]]; then
+            local res
+            res=$(bash "$bt_script" --receive-restart)
+            if [[ $res == OK* ]]; then
+                rx_log "success" "OBEX receiver restored."
+            else
+                rx_log "warn" "Failed to restore receiver (${res#ERR|})."
+            fi
+        else
+            bash "$bt_script" --receive-stop >/dev/null 2>&1
+        fi
+    }
+
     case "$action" in
+        "on")
+            local res=$(bash "$bt_script" --power-on)
+            if [[ $res == OK* ]]; then
+                rx_log "success" "Bluetooth radio powered ${PINK}ON${RESET}."
+            else
+                rx_log "error" "Hardware failure: Could not power on Bluetooth."
+            fi
+            ;;
+
+        "off")
+            bash "$bt_script" --receive-stop >/dev/null 2>&1
+
+            local res=$(bash "$bt_script" --power-off)
+            if [[ $res == OK* ]]; then
+                rx_log "info" "Bluetooth radio powered ${GRAY}OFF${RESET}."
+            else
+                rx_log "error" "Failed to disable radio."
+            fi
+            ;;
         "scan")
             if [[ ${2,,} == "on" ]]; then
                 bash "$bt_script" --scan-on
@@ -219,6 +264,38 @@ cmd_bluetooth() {
         "send")
             shift
             _bt_send "$@"
+            ;;
+        "receive")
+            shift
+            local sub="${1,,}"
+            if [[ $sub == "start" ]]; then
+                local res
+                res=$(bash "$bt_script" --receive-start)
+                if [[ $res == OK* ]]; then
+                    rx_log "success" "OBEX receiver started."
+                else
+                    rx_log "error" "Failed to start receiver (${res#ERR|})."
+                fi
+            elif [[ $sub == "restart" ]]; then
+                local res
+                res=$(bash "$bt_script" --receive-restart)
+                if [[ $res == OK* ]]; then
+                    rx_log "success" "OBEX receiver restarted."
+                else
+                    rx_log "error" "Failed to restart receiver (${res#ERR|})."
+                fi
+            elif [[ $sub == "stop" ]]; then
+                bash "$bt_script" --receive-stop >/dev/null 2>&1
+                rx_log "info" "OBEX receiver stopped."
+            else
+                local status
+                status=$(bash "$bt_script" --receive-status)
+                IFS='|' read -r st dir <<<"$status"
+                [[ $st == "running" ]] && rx_log "info" "Receiver active. Download dir: ${PINK}$dir${RESET}" || rx_log "info" "Receiver inactive."
+            fi
+            ;;
+        "restore")
+            _bt_restore
             ;;
         "connect")
             [[ -z $2 ]] && rx_log "error" "Provide a Device MAC address." && return 1
@@ -264,30 +341,10 @@ cmd_bluetooth() {
                 rx_log "error" "Failed to untrust device."
             fi
             ;;
-        "receive")
-            shift
-            local sub="${1,,}"
-            if [[ $sub == "on" ]]; then
-                local res
-                res=$(bash "$bt_script" --receive-start)
-                if [[ $res == OK* ]]; then
-                    rx_log "success" "OBEX receiver started."
-                else
-                    rx_log "error" "Failed to start receiver (${res#ERR|})."
-                fi
-            elif [[ $sub == "off" ]]; then
-                bash "$bt_script" --receive-stop >/dev/null 2>&1
-                rx_log "info" "OBEX receiver stopped."
-            else
-                local status
-                status=$(bash "$bt_script" --receive-status)
-                IFS='|' read -r st dir <<<"$status"
-                [[ $st == "running" ]] && rx_log "info" "Receiver active. Download dir: ${PINK}$dir${RESET}" || rx_log "info" "Receiver inactive."
-            fi
-            ;;
         *)
             rx_help_usage "retro bluetooth <command>"
             rx_help_commands "Available commands"
+            rx_help_cmd "on / off" "Enable or disable Bluetooth radio"
             rx_help_cmd "status" "Show adapter and connection info"
             rx_help_cmd "scan [on|off]" "Toggle device discovery"
             rx_help_cmd "list" "List paired devices with type"
@@ -300,7 +357,14 @@ cmd_bluetooth() {
             rx_help_cmd "trust <mac>" "Mark device as trusted (auto-accept files)"
             rx_help_cmd "untrust <mac>" "Remove trust (prompts on each file)"
             rx_help_cmd "discoverable" "Toggle visibility mode"
-            rx_help_cmd "receive [on|off]" "Manage file reception"
+            rx_help_cmd "receive [start|restart|stop]" "Manage file reception agent"
+            rx_help_cmd "restore" "Restore saved Bluetooth state"
+            rx_help_spacer
+            rx_help_examples "Examples"
+            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF" "Show available audio profiles"
+            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF a2dp-sink ldac" "Switch to LDAC codec"
+            rx_help_example "retro bluetooth send AA:BB:CC:DD:EE:FF ~/photo.jpg" "Send a file to your phone"
+            rx_help_example "retro bluetooth receive restart" "Restart the receive agent"
             rx_help_spacer
             ;;
     esac

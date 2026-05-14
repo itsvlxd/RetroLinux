@@ -4,7 +4,7 @@
     "type": "extra",
     "access": "user",
     "defaults": true,
-    "mode": "install",
+    "mode": "mirror",
     "config": "./files",
     "install": "~/.config/btop"
 }

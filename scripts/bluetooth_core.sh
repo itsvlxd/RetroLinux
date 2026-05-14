@@ -3,34 +3,71 @@
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/icons.sh"
 
+bt_power_on() {
+    if command -v rfkill >/dev/null 2>&1; then
+        rfkill unblock bluetooth
+    fi
+
+    if bluetoothctl power on >/dev/null 2>&1; then
+        echo "OK|on"
+    else
+        echo "ERR|power_on_failed"
+    fi
+}
+
+bt_power_off() {
+    if bluetoothctl power off >/dev/null 2>&1; then
+        echo "OK|off"
+    else
+        echo "ERR|power_off_failed"
+    fi
+}
+
 get_bt_status() {
+    local controller_mac=$(bluetoothctl show | grep "Controller" | awk '{print $2}')
+
+    local adapter="unknown"
+    if [[ -n $controller_mac ]]; then
+        for d in /sys/class/bluetooth/hci*; do
+            if [[ -d $d ]] && grep -qi "$controller_mac" "$d/address" 2>/dev/null; then
+                adapter=$(basename "$d")
+                break
+            fi
+        done
+    fi
+
+    [[ $adapter == "unknown" && -d /sys/class/bluetooth/hci0 ]] && adapter="hci0"
+
     local bt_info=$(bluetoothctl show)
     local radio_on=$(echo "$bt_info" | grep -i "Powered:" | awk '{print $2}' | xargs)
     local disc=$(echo "$bt_info" | grep -i "Discoverable:" | awk '{print $2}' | xargs)
     local pair=$(echo "$bt_info" | grep -i "Pairable:" | awk '{print $2}' | xargs)
 
-    local hci_path="/sys/class/bluetooth/hci0/device/power"
-    local pwr_ctrl=$(cat "$hci_path/control" 2>/dev/null || echo "on")
-    local pwr_stat=$(cat "$hci_path/runtime_status" 2>/dev/null || echo "active")
+    local hw_mode="OFFLINE"
+    if [[ $adapter != "unknown" ]]; then
+        local hci_path="/sys/class/bluetooth/$adapter/device/power"
+        local pwr_ctrl=$(cat "$hci_path/control" 2>/dev/null || echo "on")
+        local pwr_stat=$(cat "$hci_path/runtime_status" 2>/dev/null || echo "active")
 
-    local hw_mode="NORMAL"
-    [[ $pwr_ctrl == "auto" || $pwr_stat == "suspended" ]] && hw_mode="SAVER"
-
-    local chip_name="Intel Meteor Lake BT"
-    if [[ -f "/sys/class/bluetooth/hci0/device/uevent" ]]; then
-        chip_name="Intel Wireless Bluetooth"
+        hw_mode="NORMAL"
+        [[ $pwr_ctrl == "auto" || $pwr_stat == "suspended" ]] && hw_mode="SAVER"
     fi
 
-    local ver="5.4"
+    local chip_name="Unknown Adapter"
+    if [[ $adapter != "unknown" ]]; then
+        chip_name=$(lsusb -d $(cat /sys/class/bluetooth/$adapter/device/uevent | grep "PRODUCT" | cut -d= -f2 | tr '/' ':') 2>/dev/null | cut -d' ' -f7-)
+        [[ -z $chip_name ]] && chip_name="Bluetooth Adapter ($adapter)"
+    fi
+
+    local ver="5.x"
     if command -v btmgmt >/dev/null 2>&1; then
-        local lmp
-        lmp=$(timeout 3 btmgmt info 2>/dev/null | grep -i "ver" | awk '{print $4}' | head -n 1)
-        case "$lmp" in 13) ver="5.4" ;; 12) ver="5.3" ;; 11) ver="5.2" ;; esac
+        local lmp=$(timeout 2 btmgmt info 2>/dev/null | grep -i "ver" | awk '{print $4}' | head -n 1)
+        case "$lmp" in 13) ver="5.4" ;; 12) ver="5.3" ;; 11) ver="5.2" ;; 10) ver="5.1" ;; 9) ver="5.0" ;; esac
     fi
 
     local conns=$(bluetoothctl devices Connected | wc -l)
 
-    echo "${radio_on:-no}|${hw_mode}|${disc:-no}|${pair:-no}|${chip_name}|${ver}|${conns}"
+    echo "${radio_on:-no}|${hw_mode}|${disc:-no}|${pair:-no}|${chip_name}|${ver}|${conns}|${adapter}"
 }
 
 get_nearby() {
@@ -502,6 +539,223 @@ bt_remove_device() {
     bluetoothctl remove "$mac" >/dev/null 2>&1
 }
 
+_rx_notif_id() {
+    local mac="$1"
+    [[ -z $mac || $mac == "Unknown" || ! $mac =~ ^[0-9A-Fa-f:]+$ ]] && echo "48923" && return
+    local mac_clean=$(echo "$mac" | tr -d ':')
+    local notif_id=$((0x$mac_clean % 1000000))
+    [[ $notif_id -lt 10000 ]] && notif_id=$((notif_id + 10000))
+    echo "$notif_id"
+}
+
+_rx_device_name() {
+    local mac="$1"
+    [[ -z $mac || $mac == "Unknown" || ! $mac =~ ^[0-9A-Fa-f:]+$ ]] && echo "Unknown Device" && return
+    local name
+    name=$(bluetoothctl info "$mac" 2>/dev/null | grep "Name:" | cut -d' ' -f2-)
+    [[ -z $name ]] && name="Unknown Device"
+    echo "$name"
+}
+
+bt_obex_ask() {
+    local filename="$1"
+    local size="$2"
+    local source="$3"
+
+    local device_name
+    device_name=$(_rx_device_name "$source")
+
+    local icon_path=$(rx_get_icon "$device_name")
+    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
+
+    local human_size
+    human_size=$(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "${size} bytes")
+
+    local action
+    action=$(
+        notify-send \
+            --wait \
+            -r 48923 \
+            -u critical \
+            -i "$icon_path" \
+            -a "RetroLink" \
+            -A "accept=Accept" \
+            -A "deny=Deny" \
+            "Incoming Bluetooth File" \
+            "From: <b>${device_name}</b> (${source})\nFile: $filename ($human_size)"
+    )
+
+    if [[ $action == "accept" ]]; then
+        exit 0
+    else
+        exit 1
+    fi
+}
+
+bt_obex_notify_progress() {
+    local source="$1"
+    local filename="$2"
+    local pct="$3"
+    local transferred="$4"
+    local total="$5"
+
+    [[ -z $source || -z $filename || -z $pct ]] && return 1
+
+    local device_name
+    device_name=$(_rx_device_name "$source")
+
+    local icon_path
+    icon_path=$(rx_get_icon "$device_name")
+    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
+
+    local notif_id
+    notif_id=$(_rx_notif_id "$source")
+
+    local cancel_flag="/tmp/.bt_receive_${notif_id}_cancel"
+
+    local cur_human total_human
+    if command -v numfmt >/dev/null 2>&1; then
+        cur_human=$(numfmt --to=iec-i --suffix=B "$transferred" 2>/dev/null || echo "${transferred}B")
+        total_human=$(numfmt --to=iec-i --suffix=B "$total" 2>/dev/null || echo "${total}B")
+    else
+        cur_human="${transferred}B"
+        total_human="${total}B"
+    fi
+
+    (
+        local action
+        action=$(notify-send \
+            -r "$notif_id" \
+            -a "RetroTransfer" \
+            -i "$icon_path" \
+            -t 20000 \
+            -h "string:x-canonical-private-synchronous:bt-transfer" \
+            -h "int:value:${pct}" \
+            -A "cancel=Cancel Transfer" \
+            "Receiving: ${filename}" \
+            "From: <b>${device_name}</b> (${source})\nProgress: <b>${pct}%</b> (${cur_human} / ${total_human})")
+
+        [[ $action == "cancel" ]] && touch "$cancel_flag"
+    ) &
+}
+
+bt_obex_receive_cancel_monitor() {
+    local source="$1"
+    local filename="$2"
+    local total="$3"
+
+    local device_name
+    device_name=$(_rx_device_name "$source")
+
+    local icon_path
+    icon_path=$(rx_get_icon "$device_name")
+    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
+
+    local notif_id
+    notif_id=$(_rx_notif_id "$source")
+
+    local cancel_flag="/tmp/.bt_receive_${notif_id}_cancel"
+    rm -f "$cancel_flag"
+
+    local action
+    action=$(notify-send \
+        --wait \
+        -r "$notif_id" \
+        -a "RetroTransfer" \
+        -i "$icon_path" \
+        -t 60000 \
+        -h "string:x-canonical-private-synchronous:bt-transfer" \
+        -A "cancel=Cancel Transfer" \
+        "Receiving: ${filename}" \
+        "From: <b>${device_name}</b> (${source})\nTap Cancel to abort.")
+
+    [[ $action == "cancel" ]] && touch "$cancel_flag"
+}
+
+bt_obex_notify_done() {
+    local source="$1"
+    local filename="$2"
+    local status="$3"
+    local elapsed="$4"
+
+    [[ -z $source || -z $filename || -z $status ]] && return 1
+
+    local device_name
+    device_name=$(_rx_device_name "$source")
+
+    local icon_path
+    icon_path=$(rx_get_icon "$device_name")
+    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
+
+    local notif_id
+    notif_id=$(_rx_notif_id "$source")
+
+    local cancel_flag="/tmp/.bt_receive_${notif_id}_cancel"
+    rm -f "$cancel_flag"
+
+    if [[ $status == "complete" ]]; then
+        notify-send \
+            -r "$notif_id" \
+            -a "RetroTransfer" \
+            -i "$icon_path" \
+            -u normal \
+            "Transfer Complete" \
+            "<b>${filename}</b> received from <b>${device_name}</b> in ${elapsed} seconds."
+    elif [[ $status == "cancelled" ]]; then
+        notify-send \
+            -r "$notif_id" \
+            -a "RetroTransfer" \
+            -i "$icon_path" \
+            -u normal \
+            "Transfer Aborted" \
+            "Connection to <b>${device_name}</b> severed."
+    else
+        notify-send \
+            -r "$notif_id" \
+            -a "RetroTransfer" \
+            -i "$icon_path" \
+            -u normal \
+            "Transfer Failed" \
+            "Receiving <b>${filename}</b> from <b>${device_name}</b> was interrupted."
+    fi
+}
+
+bt_obex_send_cancel_monitor() {
+    local mac="$1"
+    local filename="$2"
+    local total="$3"
+    local file_size="$4"
+
+    local device_name
+    device_name=$(bluetoothctl info "$mac" 2>/dev/null | grep "Name:" | cut -d' ' -f2-)
+    [[ -z $device_name ]] && device_name="Unknown Device"
+
+    local icon_path
+    icon_path=$(rx_get_icon "$device_name")
+    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
+
+    local mac_clean=$(echo "$mac" | tr -d ':')
+    local notif_id=$((0x$mac_clean % 1000000))
+    [[ $notif_id -lt 10000 ]] && notif_id=$((notif_id + 10000))
+
+    local cancel_flag="/tmp/.bt_send_${notif_id}_cancel"
+    rm -f "$cancel_flag"
+
+    local action
+    action=$(notify-send \
+        --wait \
+        -r "$notif_id" \
+        -a "RetroTransfer" \
+        -i "$icon_path" \
+        -t 120000 \
+        -h "string:x-canonical-private-synchronous:bt-transfer" \
+        -A "cancel=Cancel Transfer" \
+        "Sending: ${filename}" \
+        "To: <b>${device_name}</b> (${mac})\nWaiting for device to accept... ($file_size)")
+
+    [[ $action == "cancel" ]] && touch "$cancel_flag"
+}
+
 bt_send_file() {
     local mac="$1"
     local file_path="$2"
@@ -509,7 +763,6 @@ bt_send_file() {
     [[ ! -f $file_path ]] && echo "ERR_FILE_NOT_FOUND" && return 1
 
     local file_name=$(basename "$file_path")
-
     local total_bytes=$(stat -c%s "$file_path")
     local file_size=$(du -h "$file_path" | awk '{print $1}')
 
@@ -526,10 +779,18 @@ bt_send_file() {
     local log_file="/tmp/.bt_send_${notif_id}.log"
     local cancel_flag="/tmp/.bt_send_${notif_id}_cancel"
     local result_file="/tmp/.bt_send_${notif_id}_result.txt"
-    rm -f "$log_file" "$cancel_flag"
+    rm -f "$log_file" "$cancel_flag" "$result_file"
 
     stdbuf -oL bt-obex -p "$mac" "$file_path" >"$log_file" 2>&1 &
     local obex_pid=$!
+
+    (
+        export DISPLAY="$DISPLAY"
+        export DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"
+        export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
+        export RETRO_DIR="$RETRO_DIR"
+        bash "$RETRO_DIR/scripts/bluetooth_core.sh" --obex-send-cancel-monitor "$mac" "$file_name" "$total_bytes" "$file_size" </dev/null >/dev/null 2>&1 &
+    )
 
     _format_bytes() {
         local b=${1:-0}
@@ -550,8 +811,8 @@ bt_send_file() {
         ACTION=$(notify-send -r "$notif_id" -a "RetroTransfer" \
             -i "$icon_path" \
             -t 20000 \
-            -h string:x-canonical-private-synchronous:bt-transfer \
-            -h int:value:"$pct" \
+            -h "string:x-canonical-private-synchronous:bt-transfer" \
+            -h "int:value:$pct" \
             -A "cancel=Cancel Transfer" \
             "Sending: $file_name" \
             "To: <b>$device_name</b> ($mac)\n$status_msg")
@@ -633,31 +894,41 @@ rx_handle_profile_set() {
 }
 
 bt_obex_receive_start() {
-    if ! systemctl --user is-active --quiet obex 2>/dev/null; then
-        systemctl --user start obex 2>/dev/null
-        sleep 1
-    fi
-
     local pid_file="/tmp/.bt_obex_receive.pid"
     if [[ -f $pid_file ]] && kill -0 "$(cat "$pid_file" 2>/dev/null)" 2>/dev/null; then
-        echo "OK|already_running"
-        return
+        echo "OK|already_running|$(cat "$pid_file")"
+        return 0
     fi
 
     local script_dir="$RETRO_DIR/scripts"
+
+    pkill -f 'bt_obex_receive.py' 2>/dev/null
+    sleep 0.5
+
+    systemctl --user restart obex 2>/dev/null
+    sleep 1.5
+
+    pid_file="/tmp/.bt_obex_receive.pid"
+    if [[ -f $pid_file ]]; then
+        local old_pid
+        old_pid=$(cat "$pid_file" 2>/dev/null)
+        [[ -n $old_pid ]] && kill "$old_pid" 2>/dev/null
+        rm -f "$pid_file"
+    fi
+
     nohup env \
         DISPLAY="$DISPLAY" \
         DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
         XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
         RETRO_DIR="$RETRO_DIR" \
-        python3 "$script_dir/bt_obex_receive.py" "$script_dir/bt_obex_ask.sh" \
+        python3 "$script_dir/bt_obex_receive.py" "$RETRO_DIR/scripts/bluetooth_core.sh" \
         >/tmp/.bt_obex_receive.log 2>&1 &
     local pid=$!
-    echo "$pid" > "$pid_file"
+    echo "$pid" >"$pid_file"
 
-    sleep 1
+    sleep 2
     if kill -0 "$pid" 2>/dev/null; then
-        set_var "BT_RECEIVE_ENABLED" "true"
+        set_var "BT_RECEIVE_ACTIVE" "true"
         echo "OK|$pid"
     else
         local err
@@ -670,17 +941,23 @@ bt_obex_receive_start() {
 
 bt_obex_receive_stop() {
     local pid_file="/tmp/.bt_obex_receive.pid"
-
-    if [[ -f $pid_file ]]; then
-        local pid
-        pid=$(cat "$pid_file" 2>/dev/null)
-        [[ -n $pid ]] && kill "$pid" 2>/dev/null
+    if [[ ! -f $pid_file ]] || ! kill -0 "$(cat "$pid_file" 2>/dev/null)" 2>/dev/null; then
         rm -f "$pid_file"
+        set_var "BT_RECEIVE_ACTIVE" "false"
+        echo "OK|already_stopped"
+        return 0
     fi
 
+    pkill -f 'bt_obex_receive.py' 2>/dev/null
     rm -f /tmp/.bt_obex_receive.log
-    set_var "BT_RECEIVE_ENABLED" "false"
+    set_var "BT_RECEIVE_ACTIVE" "false"
     echo "OK|stopped"
+}
+
+bt_obex_receive_restart() {
+    bt_obex_receive_stop >/dev/null 2>&1
+    sleep 1
+    bt_obex_receive_start
 }
 
 bt_obex_receive_status() {
@@ -706,6 +983,8 @@ rx_handle_can_send() {
 }
 
 case "$1" in
+    "--power-on") bt_power_on ;;
+    "--power-off") bt_power_off ;;
     "--status") get_bt_status ;;
     "--toggle-discovery") toggle_discovery ;;
     "--scan-on")
@@ -755,20 +1034,38 @@ case "$1" in
     "--receive-start")
         bt_obex_receive_start
         ;;
+    "--receive-restart")
+        bt_obex_receive_restart
+        ;;
     "--receive-stop")
         bt_obex_receive_stop
         ;;
     "--receive-status")
         bt_obex_receive_status
         ;;
+    "--obex-ask")
+        bt_obex_ask "$2" "$3" "$4"
+        ;;
+    "--obex-notify-progress")
+        bt_obex_notify_progress "$2" "$3" "$4" "$5" "$6"
+        ;;
+    "--obex-notify-done")
+        bt_obex_notify_done "$2" "$3" "$4" "$5"
+        ;;
+    "--obex-receive-cancel-monitor")
+        bt_obex_receive_cancel_monitor "$2" "$3" "$4"
+        ;;
+    "--obex-send-cancel-monitor")
+        bt_obex_send_cancel_monitor "$2" "$3" "$4" "$5"
+        ;;
     "--trust")
-        local mac=$2
-        [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+        mac=$2
+        [[ -z $mac ]] && echo "ERR_NO_MAC" && exit 1
         bluetoothctl trust "$mac" >/dev/null 2>&1 && echo "OK|trusted" || echo "ERR|trust_failed"
         ;;
     "--untrust")
-        local mac=$2
-        [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+        mac=$2
+        [[ -z $mac ]] && echo "ERR_NO_MAC" && exit 1
         bluetoothctl untrust "$mac" >/dev/null 2>&1 && echo "OK|untrusted" || echo "ERR|untrust_failed"
         ;;
 esac
