@@ -1,5 +1,7 @@
 #!/bin/bash
 
+: "${RETRO_CONFIG:=$HOME/.config/retro}"
+
 _VARS_FILE="$RETRO_CONFIG/variables.sh"
 
 declare -A _RETRO_VARS_CACHE
@@ -11,7 +13,7 @@ _rx_parse_vars_file() {
     [[ $current_mtime -eq $_VARS_FILE_MTIME ]] && return
     _VARS_FILE_MTIME=$current_mtime
     _RETRO_VARS_CACHE=()
-    if [[ -f "$_VARS_FILE" ]]; then
+    if [[ -f $_VARS_FILE ]]; then
         while IFS= read -r line; do
             if [[ $line =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=(.*) ]]; then
                 local key="${BASH_REMATCH[1]}"
@@ -22,7 +24,7 @@ _rx_parse_vars_file() {
                 val="${val%\'}"
                 _RETRO_VARS_CACHE["$key"]="$val"
             fi
-        done < "$_VARS_FILE"
+        done <"$_VARS_FILE"
     fi
 }
 
@@ -30,7 +32,7 @@ get_var() {
     local key="$1"
     local default="${2:-}"
     _rx_parse_vars_file
-    if [[ -n "${_RETRO_VARS_CACHE[$key]+isset}" ]]; then
+    if [[ -n ${_RETRO_VARS_CACHE[$key]+isset} ]]; then
         echo "${_RETRO_VARS_CACHE[$key]}"
     else
         echo "$default"
@@ -42,8 +44,8 @@ set_var() {
     local value="$2"
     [[ -z $key ]] && return 1
     _RETRO_VARS_CACHE["$key"]="$value"
-    [[ ! -d "$RETRO_CONFIG" ]] && mkdir -p "$RETRO_CONFIG"
-    [[ ! -f "$_VARS_FILE" ]] && touch "$_VARS_FILE"
+    [[ ! -d $RETRO_CONFIG ]] && mkdir -p "$RETRO_CONFIG"
+    [[ ! -f $_VARS_FILE ]] && touch "$_VARS_FILE"
     if grep -q "^export $key=" "$_VARS_FILE" 2>/dev/null; then
         sed -i "s@^export $key=.*@export $key=\"$value\"@" "$_VARS_FILE"
     else
