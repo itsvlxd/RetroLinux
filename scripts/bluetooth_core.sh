@@ -592,6 +592,16 @@ bt_obex_ask() {
     fi
 }
 
+_bt_dismiss_notif() {
+    local id="$1"
+    [[ -z $id || $id -eq 0 ]] && return
+    gdbus call --session \
+        --dest org.freedesktop.Notifications \
+        --object-path /org/freedesktop/Notifications \
+        --method org.freedesktop.Notifications.CloseNotification \
+        "$id" >/dev/null 2>&1
+}
+
 bt_obex_notify_progress() {
     local source="$1"
     local filename="$2"
@@ -692,6 +702,8 @@ bt_obex_notify_done() {
 
     local cancel_flag="/tmp/.bt_receive_${notif_id}_cancel"
     rm -f "$cancel_flag"
+
+    _bt_dismiss_notif "$notif_id"
 
     if [[ $status == "complete" ]]; then
         notify-send \
@@ -835,6 +847,7 @@ bt_send_file() {
                 source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
                 bt_disconnect "$mac"
 
+                _bt_dismiss_notif "$notif_id"
                 notify-send -r "$notif_id" -a "RetroTransfer" -i "$icon_path" -u normal \
                     "Transfer Aborted" "Connection to <b>$device_name</b> severed."
                 echo "ERR|cancelled" >"$result_file"
@@ -859,11 +872,13 @@ bt_send_file() {
         local elapsed=$(($(date +%s) - send_start))
 
         if grep -qi "Completed" "$log_file"; then
+            _bt_dismiss_notif "$notif_id"
             notify-send -r "$notif_id" -a "RetroTransfer" -u normal \
                 -i "$icon_path" \
                 "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed} seconds."
             echo "OK|$elapsed" >"$result_file"
         else
+            _bt_dismiss_notif "$notif_id"
             notify-send -r "$notif_id" -a "RetroTransfer" -u normal -i "$icon_path" \
                 "Transfer Failed" "<b>$device_name</b> rejected the request."
             echo "ERR|rejected" >"$result_file"
@@ -893,6 +908,93 @@ rx_handle_profile_set() {
     set_audio_profile "$mac" "$normalized"
 }
 
+bt_obex_ensure_download_dir() {
+    local dl_dir
+    dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
+    if [[ -n $dl_dir ]]; then
+        echo "$dl_dir"
+        return 0
+    fi
+
+    local result_file="/tmp/.bt_zenity_dir_$$"
+    rm -f "$result_file"
+
+    zenity --file-selection --directory --title="Select Download Folder" >"$result_file" 2>/dev/null &
+    local zenity_pid=$!
+
+    local tries=0
+    local addr=""
+    while [[ $tries -lt 20 && -z $addr ]]; do
+        sleep 0.05
+        addr=$(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class == "xdg-desktop-portal-gtk") | .address' | head -1)
+        ((tries++))
+    done
+
+    if [[ -n $addr ]]; then
+        hyprctl dispatch setfloating "address:$addr" 2>/dev/null
+        hyprctl dispatch centerwindow "address:$addr" 2>/dev/null
+    fi
+
+    wait $zenity_pid
+    local dir_path
+    dir_path=$(cat "$result_file" 2>/dev/null)
+    rm -f "$result_file"
+
+    if [[ -z $dir_path ]]; then
+        dir_path="$HOME/Downloads"
+        mkdir -p "$dir_path"
+    fi
+
+    set_var "BT_DOWNLOAD_DIR" "$dir_path"
+    echo "$dir_path"
+}
+
+bt_obex_move_received_file() {
+    local filename="$1"
+    local source="$2"
+
+    local dl_dir
+    dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
+    [[ -z $dl_dir ]] && return 1
+
+    local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}"
+    local cache_file="$cache_dir/$filename"
+
+    if [[ -f $cache_file ]]; then
+        mv "$cache_file" "$dl_dir/" 2>/dev/null && {
+            xdg-open "$dl_dir/$filename" >/dev/null 2>&1 &
+            return 0
+        }
+    fi
+
+    local found
+    found=$(find "$cache_dir" -maxdepth 2 -name "$filename" -newer /tmp/.bt_obex_receive.pid 2>/dev/null | head -1)
+    if [[ -n $found ]]; then
+        mv "$found" "$dl_dir/" 2>/dev/null && {
+            xdg-open "$dl_dir/$filename" >/dev/null 2>&1 &
+            return 0
+        }
+    fi
+
+    return 1
+}
+
+bt_obex_restart_with_root() {
+    local dl_dir
+    dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
+    [[ -z $dl_dir ]] && return 1
+
+    sleep 1
+
+    pkill obexd 2>/dev/null
+    sleep 0.5
+
+    nohup /usr/lib/bluetooth/obexd --root="$dl_dir" >/dev/null 2>&1 &
+    sleep 1.5
+
+    bt_obex_receive_restart
+}
+
 bt_obex_receive_start() {
     local pid_file="/tmp/.bt_obex_receive.pid"
     if [[ -f $pid_file ]] && kill -0 "$(cat "$pid_file" 2>/dev/null)" 2>/dev/null; then
@@ -905,7 +1007,17 @@ bt_obex_receive_start() {
     pkill -f 'bt_obex_receive.py' 2>/dev/null
     sleep 0.5
 
-    systemctl --user restart obex 2>/dev/null
+    local dl_dir
+    dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
+
+    pkill obexd 2>/dev/null
+    sleep 0.5
+
+    if [[ -n $dl_dir ]]; then
+        nohup /usr/lib/bluetooth/obexd --root="$dl_dir" >/dev/null 2>&1 &
+    else
+        nohup /usr/lib/bluetooth/obexd >/dev/null 2>&1 &
+    fi
     sleep 1.5
 
     pid_file="/tmp/.bt_obex_receive.pid"
@@ -1042,6 +1154,12 @@ case "$1" in
         ;;
     "--receive-status")
         bt_obex_receive_status
+        ;;
+    "--obex-ensure-download-dir")
+        bt_obex_ensure_download_dir
+        ;;
+    "--obex-move-and-restart")
+        bt_obex_move_received_file "$2" "$3" && bt_obex_restart_with_root
         ;;
     "--obex-ask")
         bt_obex_ask "$2" "$3" "$4"
