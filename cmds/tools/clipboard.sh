@@ -6,7 +6,6 @@ source "$RETRO_DIR/lib/helpers.sh"
 cmd_clipboard() {
     local action="${1,,}"
     local selection="$2"
-    local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
     if [[ $action == "history" ]]; then
         if [[ -z $selection ]]; then
@@ -50,8 +49,8 @@ cmd_clipboard() {
     local theme_file="$HOME/.config/rofi/themes/clipboard.rasi"
     local gallery_theme="$HOME/.config/rofi/themes/gallery.rasi"
 
-    local CLIP_BITWARDEN=$(bash "$var_script" --get "CLIP_BITWARDEN" 2>/dev/null || echo "false")
-    local CLIP_WARDEN_DESTRUCT=$(bash "$var_script" --get "CLIP_WARDEN_DESTRUCT" 2>/dev/null || echo "15")
+    local CLIP_BITWARDEN=$(get_var "CLIP_BITWARDEN" "false")
+    local CLIP_WARDEN_DESTRUCT=$(get_var "CLIP_WARDEN_DESTRUCT" "15")
 
     local alpha=$(get_opacity_hex "0.9")
     local alpha_alt=$(get_opacity_hex "0.6")

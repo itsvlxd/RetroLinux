@@ -1,10 +1,10 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 cmd_wallpaper() {
     local wall_script="$RETRO_DIR/scripts/wallpaper_core.sh"
-    local var_script="$RETRO_DIR/scripts/variable_core.sh"
     local wall_dir="$RETRO_CONFIG/wallpapers"
     local action="${1,,}"
     local value="$2"
@@ -41,7 +41,7 @@ cmd_wallpaper() {
             ;;
 
         "slideshow")
-            local current_state=$(bash "$var_script" --get "WALL_SLIDESHOW_ACTIVE")
+            local current_state=$(get_var "WALL_SLIDESHOW_ACTIVE")
             local new_state="true"
 
             case "$value" in
@@ -50,10 +50,10 @@ cmd_wallpaper() {
                 "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
             esac
 
-            bash "$var_script" --set "WALL_SLIDESHOW_ACTIVE" "$new_state"
+            set_var "WALL_SLIDESHOW_ACTIVE" "$new_state"
 
             if [[ -n $options ]]; then
-                bash "$var_script" --set "WALL_SLIDESHOW_INTERVAL" "$options"
+                set_var "WALL_SLIDESHOW_INTERVAL" "$options"
                 rx_log "info" "Slideshow interval set to: $options"
             fi
 
@@ -63,7 +63,7 @@ cmd_wallpaper() {
             ;;
 
         "static")
-            local current_state=$(bash "$var_script" --get "WALL_STATIC_FORCED")
+            local current_state=$(get_var "WALL_STATIC_FORCED")
             local new_state=""
 
             case "$value" in
@@ -72,7 +72,7 @@ cmd_wallpaper() {
                 "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
             esac
 
-            bash "$var_script" --set "WALL_STATIC_FORCED" "$new_state"
+            set_var "WALL_STATIC_FORCED" "$new_state"
 
             local status_text="${PINK}ENABLED${RESET}"
             [[ $new_state == "false" ]] && status_text="${MUTE}DISABLED${RESET}"
@@ -83,7 +83,7 @@ cmd_wallpaper() {
             ;;
 
         "list")
-            local theme=$(bash "$var_script" --get "RETRO_THEME")
+            local theme=$(get_var "RETRO_THEME")
             [[ -z $theme || $theme == "null" ]] && theme="retro"
 
             local target_dir="$wall_dir/$theme"
@@ -121,7 +121,7 @@ cmd_wallpaper() {
             local current_w=$(echo "$mon_info" | jq -r '.width')
             local current_h=$(echo "$mon_info" | jq -r '.height')
 
-            local res_map=$(bash "$var_script" --get "WALL_RES_MAP")
+            local res_map=$(get_var "WALL_RES_MAP")
             local custom_res=""
 
             if [[ -n $res_map && $res_map != "null" ]]; then
@@ -152,7 +152,7 @@ cmd_wallpaper() {
                 fi
             fi
 
-            local res_map=$(bash "$var_script" --get "WALL_RES_MAP")
+            local res_map=$(get_var "WALL_RES_MAP")
 
             local new_map=""
             if [[ -n $res_map && $res_map != "null" ]]; then
@@ -184,7 +184,7 @@ cmd_wallpaper() {
                 rx_log "success" "Wallpapers resolution have been capped at ${PINK}${user_res}${RESET}."
             fi
 
-            bash "$var_script" --set "WALL_RES_MAP" "$new_map"
+            set_var "WALL_RES_MAP" "$new_map"
 
             rx_log "info" "Analyzing repository and generating optimized video feeds..."
             bash "$wall_script" --optimize
@@ -194,7 +194,7 @@ cmd_wallpaper() {
             ;;
 
         "optimize")
-            #local res_map=$(bash "$var_script" --get "WALL_RES_MAP")
+            #local res_map=$(get_var "WALL_RES_MAP")
 
             #if [[ -z $res_map || $res_map == "null" ]]; then
             #    rx_log "error" "No custom monitor resolutions are set. Run '${PINK}retro wallpaper res${RESET}' first."
@@ -207,9 +207,9 @@ cmd_wallpaper() {
             ;;
 
         "status")
-            local current_wall=$(bash "$var_script" --get "WALL_CURRENT")
-            local engine=$(bash "$var_script" --get "CLR_ENGINE")
-            local theme=$(bash "$var_script" --get "RETRO_THEME")
+            local current_wall=$(get_var "WALL_CURRENT")
+            local engine=$(get_var "CLR_ENGINE")
+            local theme=$(get_var "RETRO_THEME")
 
             : ${current_wall:="None"}
             : ${engine:="matugen"}

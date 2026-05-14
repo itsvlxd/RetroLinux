@@ -1,6 +1,9 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/variable.sh"
+
+# TODO: add priority for some device and fallback in easyeffects
 
 cmd_audio() {
     local audio_core="$RETRO_DIR/scripts/audio_core.sh"
@@ -337,7 +340,10 @@ cmd_audio() {
                         local count=$(ls -1 "$eq_dir" 2>/dev/null | wc -l)
                         if ((count > 0)); then
                             rx_log "warn" "This will delete all ${count} EQ profiles from $eq_dir"
-                            rx_confirm "Confirm?" "N" || { rx_log "info" "Cancelled"; return 0; }
+                            rx_confirm "Confirm?" "N" || {
+                                rx_log "info" "Cancelled"
+                                return 0
+                            }
                             rm -f "$eq_dir"/*
                             rx_log "success" "All EQ profiles deleted"
                         else

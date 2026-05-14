@@ -62,7 +62,7 @@ cmd_power() {
 
         "list")
             local current_pwr=$(bash "$pwr_script" --get)
-            local prev_pwr=$(bash "$VAR_SCRIPT" --get "PWR_PREVIOUS")
+            local prev_pwr=$(get_var "PWR_PREVIOUS")
             local source_mode="AC"
 
             [[ $(bash "$pwr_script" --source) == "true" ]] && source_mode="BAT"
@@ -138,12 +138,12 @@ cmd_power() {
 
             rx_yesno "Apply these power settings?" || { rx_log "info" "Optimization cancelled. Nothing changed."; return 0; }
 
-            bash "$VAR_SCRIPT" --set "PWR_AC_SAVER" "$ac_s"
-            bash "$VAR_SCRIPT" --set "PWR_AC_BALANCED" "$ac_b"
-            bash "$VAR_SCRIPT" --set "PWR_AC_PERFORMANCE" "$ac_p"
-            bash "$VAR_SCRIPT" --set "PWR_BAT_SAVER" "$bat_s"
-            bash "$VAR_SCRIPT" --set "PWR_BAT_BALANCED" "$bat_b"
-            bash "$VAR_SCRIPT" --set "PWR_BAT_PERFORMANCE" "$bat_p"
+            set_var "PWR_AC_SAVER" "$ac_s"
+            set_var "PWR_AC_BALANCED" "$ac_b"
+            set_var "PWR_AC_PERFORMANCE" "$ac_p"
+            set_var "PWR_BAT_SAVER" "$bat_s"
+            set_var "PWR_BAT_BALANCED" "$bat_b"
+            set_var "PWR_BAT_PERFORMANCE" "$bat_p"
 
             rx_log "success" "Done! Power limits are now set for ${PINK}$c_name${RESET}."
             bash "$pwr_script" --restore

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 is_tui() {
     local cmd="$1"
@@ -20,7 +21,6 @@ cmd_apps() {
     local action="$2"
     shift 2
     local extra_args="$@"
-    local var_script="$RETRO_DIR/scripts/variable_core.sh"
 
     if [[ $app_name == "list" || -z $app_name ]]; then
         if [[ -z $app_name ]]; then
@@ -37,7 +37,7 @@ cmd_apps() {
 
         rx_log "info" "Available Applications:"
 
-        local raw_vars=$(bash "$var_script" --list 2>/dev/null)
+        local raw_vars=$(cat "$RETRO_CONFIG/variables.sh" 2>/dev/null)
         local v_apps=$(echo "$raw_vars" | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); print tolower($1)}')
         local suppression_list=$(echo "$raw_vars" | awk -F'"' '/RETRO_.*_CMD/ {print tolower($2)}')
         local m_apps=$(ls -1 "$RETRO_DIR/modules" 2>/dev/null | grep -v "^retro$")
@@ -69,7 +69,7 @@ cmd_apps() {
     if [[ $app_name == "all" ]]; then
         [[ -z $action ]] && rx_log "error" "An action [open|refresh|close] must be specified for 'all'." && return 1
         rx_log "info" "Executing '${action}' for all valid modules..."
-        local all_apps=$(echo -e "$(bash "$var_script" --list 2>/dev/null | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); print tolower($1)}')\n$(ls -1 "$RETRO_DIR/modules" 2>/dev/null | grep -v '^retro$')" | sort -u)
+        local all_apps=$(echo -e "$(cat "$RETRO_CONFIG/variables.sh" 2>/dev/null | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); print tolower($1)}')\n$(ls -1 "$RETRO_DIR/modules" 2>/dev/null | grep -v '^retro$')" | sort -u)
         for a in $all_apps; do cmd_apps "$a" "$action" $extra_args 2>/dev/null; done
         return 0
     fi

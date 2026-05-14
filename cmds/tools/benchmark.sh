@@ -1,17 +1,17 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 cmd_benchmark() {
-    local VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
     local bench_script="$RETRO_DIR/scripts/benchmark_core.sh"
     local action="${1,,}"
     local silent_tables="${2,,}"
 
-    mark_run() { bash "$VAR_SCRIPT" --set "BENCH_LAST_RUN" "$(date +'%b %d, %H:%M')"; }
+    mark_run() { set_var "BENCH_LAST_RUN" "$(date +'%b %d, %H:%M')"; }
 
     sync_mangohud() {
-        local s_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_STATE")
+        local s_hud=$(get_var "MANGOHUD_STATE")
         : ${s_hud:="on"}
         local config_file="$HOME/.config/MangoHud/MangoHud.conf"
 
@@ -47,14 +47,14 @@ cmd_benchmark() {
                     fi
                     ;;
                 "auto")
-                    local current_auto=$(bash "$VAR_SCRIPT" --get "MANGOHUD_AUTO")
+                    local current_auto=$(get_var "MANGOHUD_AUTO")
                     if [[ $current_auto == "on" ]]; then
-                        bash "$VAR_SCRIPT" --set "MANGOHUD_AUTO" "off"
+                        set_var "MANGOHUD_AUTO" "off"
                         hyprctl keyword env MANGOHUD,0 >/dev/null
                         hyprctl keyword env ENABLE_FGMOD,0 >/dev/null 2>&1
                         rx_log "success" "Global MangoHud: ${GRAY}DISABLED${RESET}"
                     else
-                        bash "$VAR_SCRIPT" --set "MANGOHUD_AUTO" "on"
+                        set_var "MANGOHUD_AUTO" "on"
                         hyprctl keyword env MANGOHUD,1 >/dev/null
                         hyprctl keyword env ENABLE_FGMOD,1 >/dev/null 2>&1
                         rx_log "success" "Global MangoHud: ${PINK}ENABLED${RESET} (Applies to new apps)"
@@ -77,9 +77,9 @@ cmd_benchmark() {
                     nohup env MANGOHUD=1 vkcube >/dev/null 2>&1 &
                     ;;
                 "on" | "off")
-                    bash "$VAR_SCRIPT" --set "MANGOHUD_STATE" "$hud_cmd"
+                    set_var "MANGOHUD_STATE" "$hud_cmd"
                     sync_mangohud
-                    local p_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_PROFILE")
+                    local p_hud=$(get_var "MANGOHUD_PROFILE")
                     : ${p_hud:="advanced"}
                     local target_conf="$HOME/.config/MangoHud/${p_hud}.conf"
                     local current_key="Not set"
@@ -96,7 +96,7 @@ cmd_benchmark() {
                     fi
                     ;;
                 "load")
-                    local current_auto=$(bash "$VAR_SCRIPT" --get "MANGOHUD_AUTO")
+                    local current_auto=$(get_var "MANGOHUD_AUTO")
                     if [[ $current_auto == "on" ]]; then
                         hyprctl keyword env MANGOHUD,1 >/dev/null 2>&1
                         hyprctl keyword env ENABLE_FGMOD,1 >/dev/null 2>&1
@@ -107,11 +107,11 @@ cmd_benchmark() {
                     return 0
                     ;;
                 "status")
-                    local p_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_PROFILE")
+                    local p_hud=$(get_var "MANGOHUD_PROFILE")
                     : ${p_hud:="advanced"}
-                    local s_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_STATE")
+                    local s_hud=$(get_var "MANGOHUD_STATE")
                     : ${s_hud:="on"}
-                    local a_hud=$(bash "$VAR_SCRIPT" --get "MANGOHUD_AUTO")
+                    local a_hud=$(get_var "MANGOHUD_AUTO")
                     : ${a_hud:="off"}
                     local target_conf="$HOME/.config/MangoHud/${p_hud}.conf"
                     local current_key="Not set"
@@ -146,7 +146,7 @@ cmd_benchmark() {
                         return 1
                     fi
 
-                    local current_prof=$(bash "$VAR_SCRIPT" --get "MANGOHUD_PROFILE")
+                    local current_prof=$(get_var "MANGOHUD_PROFILE")
                     : ${current_prof:="advanced"}
                     local target_conf="$HOME/.config/MangoHud/${current_prof}.conf"
                     if [[ -f "$target_conf" ]]; then
@@ -190,17 +190,17 @@ cmd_benchmark() {
             IFS='|' read -r d_model d_type <<<"$d_hw"
             local n_hw=$(bash "$bench_script" --hw-net)
 
-            local s_cpu=$(bash "$VAR_SCRIPT" --get "BENCH_CPU")
+            local s_cpu=$(get_var "BENCH_CPU")
             : ${s_cpu:="Not Tested"}
-            local s_gpu=$(bash "$VAR_SCRIPT" --get "BENCH_GPU")
+            local s_gpu=$(get_var "BENCH_GPU")
             : ${s_gpu:="Not Tested"}
-            local s_ram=$(bash "$VAR_SCRIPT" --get "BENCH_RAM")
+            local s_ram=$(get_var "BENCH_RAM")
             : ${s_ram:="Not Tested"}
-            local s_dsk=$(bash "$VAR_SCRIPT" --get "BENCH_DISK")
+            local s_dsk=$(get_var "BENCH_DISK")
             : ${s_dsk:="Not Tested"}
-            local s_net=$(bash "$VAR_SCRIPT" --get "BENCH_NET")
+            local s_net=$(get_var "BENCH_NET")
             : ${s_net:="Not Tested"}
-            local last_run=$(bash "$VAR_SCRIPT" --get "BENCH_LAST_RUN")
+            local last_run=$(get_var "BENCH_LAST_RUN")
             : ${last_run:="Never"}
 
             echo -e "${PINK}"
@@ -232,7 +232,7 @@ EOF
             local raw_score=$(bash "$bench_script" --cpu)
             IFS='|' read -r score min avg max <<<"$raw_score"
 
-            bash "$VAR_SCRIPT" --set "BENCH_CPU" "${score%.*} Events/sec"
+            set_var "BENCH_CPU" "${score%.*} Events/sec"
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
@@ -257,7 +257,7 @@ EOF
             local score=$(bash "$bench_script" --gpu)
             [[ $score == "Missing_VKMark" ]] && rx_log "error" "Install vkmark: sudo pacman -S vkmark" && return 1
 
-            bash "$VAR_SCRIPT" --set "BENCH_GPU" "$score (VKMark)"
+            set_var "BENCH_GPU" "$score (VKMark)"
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
@@ -278,7 +278,7 @@ EOF
             local raw_score=$(bash "$bench_script" --ram)
             IFS='|' read -r score min avg max <<<"$raw_score"
 
-            bash "$VAR_SCRIPT" --set "BENCH_RAM" "${score} MiB/sec"
+            set_var "BENCH_RAM" "${score} MiB/sec"
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
@@ -302,7 +302,7 @@ EOF
             local score=$(bash "$bench_script" --disk)
             IFS='|' read -r w_spd r_spd <<<"$score"
 
-            bash "$VAR_SCRIPT" --set "BENCH_DISK" "󰈈 $r_spd 󰏫 $w_spd"
+            set_var "BENCH_DISK" "󰈈 $r_spd 󰏫 $w_spd"
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then
@@ -322,7 +322,7 @@ EOF
             [[ $score == "Missing_Speedtest" ]] && rx_log "error" "Install speedtest-cli: sudo pacman -S speedtest-cli" && return 1
 
             IFS='|' read -r ping down up <<<"$score"
-            bash "$VAR_SCRIPT" --set "BENCH_NET" "󰇚 $down 󰕒 $up 󰾆 $ping"
+            set_var "BENCH_NET" "󰇚 $down 󰕒 $up 󰾆 $ping"
             mark_run
 
             if [[ $silent_tables != "silent" ]]; then

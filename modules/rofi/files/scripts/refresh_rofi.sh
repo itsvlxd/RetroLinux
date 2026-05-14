@@ -5,9 +5,19 @@ TEMP_FILE=$(mktemp)
 
 mkdir -p "$(dirname "$OUTPUT_RASI")"
 
+_vars_file="${RETRO_CONFIG:-$HOME/.config/retro}/variables.sh"
+
 get_val() {
-    local val=$(retro variable get "$1" 2>/dev/null)
-    echo "${val:-$2}"
+    local key="$1"
+    local default="$2"
+    if [[ -f "$_vars_file" ]]; then
+        local val=$(grep -m 1 "^export $key=" "$_vars_file" 2>/dev/null | sed 's/^export [^=]*="//; s/"$//')
+        if [[ -n $val ]]; then
+            echo "$val"
+            return
+        fi
+    fi
+    echo "$default"
 }
 
 FONT=$(get_val "ROFI_FONT" "JetBrains Mono Nerd Font")

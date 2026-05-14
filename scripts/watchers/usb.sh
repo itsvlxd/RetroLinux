@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+
 MOUNT_ROOT="$HOME/Mounts"
 
 check_usb_state() {

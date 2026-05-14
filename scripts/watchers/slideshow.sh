@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+
 check_slideshow() {
     local slideshow_active
     slideshow_active=$(get_var "WALL_SLIDESHOW_ACTIVE" "false")
