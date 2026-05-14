@@ -170,7 +170,7 @@ on_bluetooth_disconnected() {
     local icon_path=$(rx_get_icon "$name")
 
     notify-send -a "retro_bluetooth_con_$mac" -u normal -i "$icon_path" -t 5000 \
-        "Connection Severed" \
+        "Connection Closed" \
         "<b>$name</b> ($mac) is no longer active."
 }
 
@@ -219,37 +219,6 @@ on_bluetooth_pairing_request() {
             rx_log "info" "Added $mac to ignore list."
             ;;
     esac
-}
-
-on_bluetooth_file_received() {
-    local sender="$1"
-    local _sender_mac="$2"
-    local file_name="$3"
-    local file_path="$4"
-    local file_size="$5"
-
-    [[ -z $file_name ]] && return
-
-    local icon_path
-    icon_path=$(rx_get_icon "$sender")
-
-    (
-        local ACTION=$(notify-send -a "retro_bt_file_$file_name" -u normal -i "$icon_path" -w \
-            "Bluetooth File Received" \
-            "<b>$sender</b> sent <b>$file_name</b> (${file_size})\nLocation: $file_path" \
-            -A "open=Open File" \
-            -A "open-dir=Show in Folder" \
-            -A "ignore=Ignore")
-
-        case "$ACTION" in
-            "open")
-                xdg-open "$file_path" >/dev/null 2>&1 &
-                ;;
-            "open-dir")
-                xdg-open "$(dirname "$file_path")" >/dev/null 2>&1 &
-                ;;
-        esac
-    ) &
 }
 
 on_pkg_updates_available() {
