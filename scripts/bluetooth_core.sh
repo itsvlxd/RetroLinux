@@ -1004,7 +1004,7 @@ bt_obex_receive_start() {
 
     local script_dir="$RETRO_DIR/scripts"
 
-    pkill -f 'bt_obex_receive.py' 2>/dev/null
+    pkill -f 'bluetooth_receive.py' 2>/dev/null
     sleep 0.5
 
     local dl_dir
@@ -1033,7 +1033,7 @@ bt_obex_receive_start() {
         DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
         XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
         RETRO_DIR="$RETRO_DIR" \
-        python3 "$script_dir/bt_obex_receive.py" "$RETRO_DIR/scripts/bluetooth_core.sh" \
+        python3 "$script_dir/python/bluetooth_receive.py" "$RETRO_DIR/scripts/bluetooth_core.sh" \
         >/tmp/.bt_obex_receive.log 2>&1 &
     local pid=$!
     echo "$pid" >"$pid_file"
@@ -1060,7 +1060,7 @@ bt_obex_receive_stop() {
         return 0
     fi
 
-    pkill -f 'bt_obex_receive.py' 2>/dev/null
+    pkill -f 'bluetooth_receive.py' 2>/dev/null
     rm -f /tmp/.bt_obex_receive.log
     set_var "BT_RECEIVE_ACTIVE" "false"
     echo "OK|stopped"
