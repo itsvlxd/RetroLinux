@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/variable.sh"
 
 handle_kitty_padding() {
     local pid="$1"

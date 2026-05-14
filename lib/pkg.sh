@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+
 rx_pkg_install() {
     local list_file="$1"
     local sudo_run="${2:-false}"

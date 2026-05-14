@@ -4,12 +4,11 @@ source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 
 cmd_bw() {
-    local var_script="$RETRO_DIR/scripts/variable_core.sh"
     local action="${1,,}"
     local val1="$2"
     local val2="$3"
 
-    local is_enabled=$(bash "$var_script" --get "CLIP_BITWARDEN")
+    local is_enabled=$(get_var "CLIP_BITWARDEN")
     [[ $is_enabled != "true" && $action != "setup" ]] && return 0
 
     case "$action" in
@@ -42,9 +41,9 @@ cmd_bw() {
             local vault_url=$(rbw config show | grep "base_url" | awk -F'"' '{print $4}')
             local identity_url=$(rbw config show | grep "identity_url" | awk -F'"' '{print $4}')
 
-            local sync_rate=$(bash "$var_script" --get "CLIP_WARDEN_SYNC")
-            local lock_timer=$(bash "$var_script" --get "CLIP_WARDEN_TIMEOUT")
-            local wipe_timer=$(bash "$var_script" --get "CLIP_WARDEN_DESTRUCT")
+            local sync_rate=$(get_var "CLIP_WARDEN_SYNC")
+            local lock_timer=$(get_var "CLIP_WARDEN_TIMEOUT")
+            local wipe_timer=$(get_var "CLIP_WARDEN_DESTRUCT")
 
             local encoded_url=$(echo "$vault_url" | sed 's/:/%3A/g; s/\//%2F/g')
             local db_path="$HOME/.cache/rbw/${encoded_url}:${email}.json"
@@ -142,7 +141,7 @@ cmd_bw() {
 
             if [[ -n $pass ]]; then
                 echo "$pass" | wl-copy
-                local ttl=$(bash "$var_script" --get "CLIP_WARDEN_DESTRUCT")
+                local ttl=$(get_var "CLIP_WARDEN_DESTRUCT")
                 : ${ttl:=15}
 
                 rx_log "success" "Password copied to buffer."
@@ -194,8 +193,8 @@ cmd_bw() {
             rx_confirm "Confirm reset?" "N" || { rx_log "info" "Aborted."; return 0; }
 
             rbw purge
-            bash "$var_script" --del "CLIP_BITWARDEN"
-            bash "$var_script" --del "CLIP_WARDEN_SERVER"
+            set_var "CLIP_BITWARDEN"
+            set_var "CLIP_WARDEN_SERVER"
 
             rbw stop-agent
             rm -rf ~/.cache/rbw
@@ -250,12 +249,12 @@ cmd_bw() {
             esac
 
             local current_vault=$(rbw config show | grep "base_url" | awk -F'"' '{print $4}')
-            bash "$var_script" --set "CLIP_WARDEN_SERVER" "$current_vault"
+            set_var "CLIP_WARDEN_SERVER" "$current_vault"
 
             rx_log "info" "Launching registration. Please follow the terminal prompts:"
 
             if rbw register; then
-                bash "$var_script" --set "CLIP_BITWARDEN" "true"
+                set_var "CLIP_BITWARDEN" "true"
 
                 if [[ "$SKIP_PROMPT" == "true" ]]; then
                     local val_sync=1800
@@ -274,10 +273,10 @@ cmd_bw() {
                     local val_destruct=${input_destruct:-30}
                 fi
                 rbw config set sync_interval "$val_sync"
-                bash "$var_script" --set "CLIP_WARDEN_SYNC" "$val_sync"
+                set_var "CLIP_WARDEN_SYNC" "$val_sync"
                 rbw config set lock_timeout "$val_timeout"
-                bash "$var_script" --set "CLIP_WARDEN_TIMEOUT" "$val_timeout"
-                bash "$var_script" --set "CLIP_WARDEN_DESTRUCT" "$val_destruct"
+                set_var "CLIP_WARDEN_TIMEOUT" "$val_timeout"
+                set_var "CLIP_WARDEN_DESTRUCT" "$val_destruct"
 
                 rx_log "success" "Bitwarden integration and security policies enabled!"
             else
@@ -306,6 +305,6 @@ cmd_bw() {
     esac
 }
 
-if [[ $(bash "$RETRO_DIR/scripts/variable_core.sh" --get "CLIP_BITWARDEN") == "true" ]]; then
+if [[ $(get_var "CLIP_BITWARDEN") == "true" ]]; then
     register_command "TOOLS" "bitwarden" "Secure Bitwarden vault management utility" "cmd_bw"
 fi

@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/variable.sh"
 
 cmd_battery() {
     [[ $(has_battery) != "true" ]] && rx_log "error" "No battery detected" && return 1

@@ -138,7 +138,13 @@ hud_set_preset() {
     fi
 
     if [[ -f "$config_dir/${preset}.conf" ]]; then
-        bash "$RETRO_DIR/scripts/variable_core.sh" --set "MANGOHUD_PROFILE" "$preset"
+        local vars_file="$RETRO_CONFIG/variables.sh"
+        mkdir -p "$RETRO_CONFIG"
+        if grep -q "^export MANGOHUD_PROFILE=" "$vars_file" 2>/dev/null; then
+            sed -i "s@^export MANGOHUD_PROFILE=.*@export MANGOHUD_PROFILE=\"$preset\"@" "$vars_file"
+        else
+            echo "export MANGOHUD_PROFILE=\"$preset\"" >>"$vars_file"
+        fi
 
         if [[ "$config_dir/${preset}.conf" -ef "$config_dir/MangoHud.conf" ]]; then
             sed -i '/^toggle_hud=/d' "$config_dir/MangoHud.conf"

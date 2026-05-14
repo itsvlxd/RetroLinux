@@ -106,12 +106,22 @@ cmd_var() {
 
             ${EDITOR:-nano} "$var_file"
 
+            reload_vars
+
             rx_log "success" "Finished editing variables."
             ;;
 
         "reset")
             rm -rf "$RETRO_CONFIG/variables.sh"
             rx_vars_defaults "-f"
+            reload_vars
+            rx_log "success" "Variables reset to defaults."
+            ;;
+
+        "reset")
+            rm -rf "$RETRO_CONFIG/variables.sh"
+            rx_vars_defaults "-f"
+            reload_vars
             rx_log "success" "Variables reset to defaults."
             ;;
 

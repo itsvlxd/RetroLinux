@@ -3,6 +3,7 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/bluetooth.sh"
 source "$RETRO_DIR/lib/icons.sh"
+source "$RETRO_DIR/lib/variable.sh"
 
 cmd_bluetooth() {
     [[ $(has_bluetooth) != "true" ]] && rx_log "error" "No bluetooth adapter detected" && return 1

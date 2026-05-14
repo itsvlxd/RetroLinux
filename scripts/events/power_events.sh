@@ -5,7 +5,6 @@ source "$RETRO_DIR/lib/battery.sh"
 
 PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
 BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
-VAR_CORE="$RETRO_DIR/scripts/variable_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 
 on_power_disconnect() {

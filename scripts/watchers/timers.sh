@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+
 check_package_updates() {
     local helper
     helper=$(get_var "PKG_HELPER" "yay")

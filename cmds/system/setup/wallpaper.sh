@@ -3,10 +3,10 @@
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 source "$RETRO_DIR/cmds/tools/wallpaper.sh"
 
-VAR_SCRIPT="$RETRO_DIR/scripts/variable_core.sh"
 WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 CONFIG_WALLS="$HOME/.config/retro/wallpapers"
 SOURCE_WALLS="$RETRO_DIR/wallpapers"
@@ -47,7 +47,7 @@ setup_wallpaper() {
         cp -rn "$SOURCE_WALLS"/* "$CONFIG_WALLS/"
     fi
 
-    local current_theme=$(bash "$VAR_SCRIPT" --get "RETRO_THEME")
+    local current_theme=$(get_var "RETRO_THEME")
     if [[ -z $current_theme || $current_theme == "null" ]]; then
         rx_log "info" "Choose a default aesthetic for your desktop:"
 
@@ -78,7 +78,7 @@ setup_wallpaper() {
                 rx_log "error" "Invalid choice. Falling back to Retro."
             fi
 
-            bash "$VAR_SCRIPT" --set "RETRO_THEME" "$selected_theme"
+            set_var "RETRO_THEME" "$selected_theme"
             rx_log "success" "Theme mapped to: ${PINK}${display_names[$theme_choice]}${RESET}"
 
             declare -A default_walls=(
@@ -102,7 +102,7 @@ setup_wallpaper() {
         rx_log "info" "Generating missing wallpaper caches..."
         bash "$WALL_CORE" --cache
 
-        local res_map=$(bash "$VAR_SCRIPT" --get "WALL_RES_MAP")
+        local res_map=$(get_var "WALL_RES_MAP")
         if [[ -z $res_map || $res_map == "null" ]]; then
             rx_help_spacer
             rx_log "info" "Let's optimize your video wallpapers to save CPU overhead."

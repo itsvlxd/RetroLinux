@@ -1,11 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/log.sh"
-
-VAR_CORE="$RETRO_DIR/scripts/variable_core.sh"
-
-get_var() { bash "$VAR_CORE" --get "$1"; }
-set_var() { bash "$VAR_CORE" --set "$1" "$2"; }
+source "$RETRO_DIR/lib/variable.sh"
 
 rx_format_time() {
     local T=$1
@@ -51,7 +47,7 @@ rx_format_string() {
 }
 
 get_opacity_hex() {
-    local base_opacity=$(retro variable get RETRO_OPACITY 2>/dev/null || echo "1.0")
+    local base_opacity=$(get_var "RETRO_OPACITY" "1.0")
 
     [[ $base_opacity == "1.0" ]] && {
         echo "FF"
@@ -102,8 +98,8 @@ check_dep() {
     local pkgs="$2"
 
     if ! command -v "$cmd" >/dev/null 2>&1; then
-        local helper=$(bash "$VAR_SCRIPT" --get "PKG_HELPER")
-        : ${helper:="yay"}
+        local helper=$(get_var "PKG_HELPER")
+        : "${helper:="yay"}"
         rx_log "error" "Missing required dependency: ${PINK}$cmd${RESET}"
         rx_confirm "Would you like to install [${GRAY}$pkgs${RESET}] using $helper?" "N" || { rx_log "info" "Dependency required. Aborting."; return 1; }
         

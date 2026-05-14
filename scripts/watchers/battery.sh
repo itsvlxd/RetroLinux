@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+source "$RETRO_DIR/lib/battery.sh"
+
 check_battery_state() {
     local current_bat_stat
     current_bat_stat=$(get_bat_status)

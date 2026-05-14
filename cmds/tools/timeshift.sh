@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 cmd_timeshift() {
     local ts_script="$RETRO_DIR/scripts/timeshift_core.sh"
@@ -205,7 +206,7 @@ cmd_timeshift() {
                     return 0
                 }
 
-                local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
+                local pkg_helper=$(get_var "PKG_HELPER")
                 : ${pkg_helper:="yay"}
                 if command -v "$pkg_helper" >/dev/null 2>&1; then
                     $pkg_helper -S --needed --noconfirm timeshift 2>&1
@@ -243,7 +244,7 @@ cmd_timeshift() {
                     return 0
                 }
 
-                local pkg_helper=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get PKG_HELPER 2>/dev/null)
+                local pkg_helper=$(get_var "PKG_HELPER")
                 : ${pkg_helper:="yay"}
                 if command -v "$pkg_helper" >/dev/null 2>&1; then
                     $pkg_helper -S --needed --noconfirm timeshift 2>&1
