@@ -196,18 +196,41 @@ cmd_bluetooth() {
     }
 
     _bt_restore() {
+        local radio_state
+        radio_state=$(get_var "BT_RADIO_POWER")
         local recv_state
         recv_state=$(get_var "BT_RECEIVE_ACTIVE")
-        if [[ $recv_state == "true" ]]; then
+
+        if [[ $radio_state == "true" ]]; then
             local res
-            res=$(bash "$bt_script" --receive-restart)
+            res=$(bash "$bt_script" --power-on)
             if [[ $res == OK* ]]; then
-                rx_log "success" "OBEX receiver restored."
-            else
-                rx_log "warn" "Failed to restore receiver (${res#ERR|})."
+                rx_log "success" "Bluetooth radio restored to ${PINK}ON${RESET}."
             fi
-        else
+            sleep 1
+
+            if [[ $recv_state == "true" ]]; then
+                res=$(bash "$bt_script" --receive-restart)
+                if [[ $res == OK* ]]; then
+                    rx_log "success" "OBEX receiver restored."
+                else
+                    rx_log "warn" "Failed to restore receiver (${res#ERR|})."
+                fi
+            fi
+        elif [[ $radio_state == "false" ]]; then
             bash "$bt_script" --receive-stop >/dev/null 2>&1
+            bash "$bt_script" --power-off >/dev/null 2>&1
+            rx_log "info" "Bluetooth radio restored to ${GRAY}OFF${RESET}."
+        else
+            if [[ $recv_state == "true" ]]; then
+                local res
+                res=$(bash "$bt_script" --receive-restart)
+                if [[ $res == OK* ]]; then
+                    rx_log "success" "OBEX receiver restored."
+                else
+                    rx_log "warn" "Failed to restore receiver (${res#ERR|})."
+                fi
+            fi
         fi
     }
 
@@ -215,6 +238,7 @@ cmd_bluetooth() {
         "on")
             local res=$(bash "$bt_script" --power-on)
             if [[ $res == OK* ]]; then
+                set_var "BT_RADIO_POWER" "true"
                 rx_log "success" "Bluetooth radio powered ${PINK}ON${RESET}."
             else
                 rx_log "error" "Hardware failure: Could not power on Bluetooth."
@@ -226,6 +250,7 @@ cmd_bluetooth() {
 
             local res=$(bash "$bt_script" --power-off)
             if [[ $res == OK* ]]; then
+                set_var "BT_RADIO_POWER" "false"
                 rx_log "info" "Bluetooth radio powered ${GRAY}OFF${RESET}."
             else
                 rx_log "error" "Failed to disable radio."

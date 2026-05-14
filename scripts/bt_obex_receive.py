@@ -79,6 +79,7 @@ class ObexAgent(dbus.service.Object):
 
         result_event = threading.Event()
         result_box   = [False]
+        needs_move   = [False]
 
         def _ask():
             if self.dry_run:
@@ -88,7 +89,19 @@ class ObexAgent(dbus.service.Object):
                     [self.shell_script, "--obex-ask", filename, str(size), source],
                     env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ""), "DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")}
                 )
-                result_box[0] = (rc == 0)
+                if rc == 0:
+                    result_box[0] = True
+                    result = subprocess.run(
+                        [self.shell_script, "--obex-ensure-download-dir"],
+                        capture_output=True, text=True,
+                        env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ""), "DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")}
+                    )
+                    dl_dir = result.stdout.strip()
+                    if dl_dir:
+                        log.info("Download directory set to: %s", dl_dir)
+                    needs_move[0] = True
+                else:
+                    result_box[0] = False
             result_event.set()
 
         threading.Thread(target=_ask, daemon=True).start()
@@ -145,6 +158,12 @@ class ObexAgent(dbus.service.Object):
                     final_status = "cancelled" if self._cancelled.get(transfer_path) else status
                     subprocess.run([self.shell_script, "--obex-notify-done", source, filename, final_status, str(elapsed)])
                     self._remove_receiver(transfer_path)
+                    if status == "complete" and needs_move[0]:
+                        log.info("First transfer complete, moving file and restarting with new root")
+                        subprocess.Popen([self.shell_script, "--obex-move-and-restart", filename, source],
+                                         env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ""),
+                                              "DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")},
+                                         start_new_session=True)
             if "Transferred" in changed:
                 t = int(changed["Transferred"])
                 pct = int((t / total_size * 100) if total_size > 0 else 0)
