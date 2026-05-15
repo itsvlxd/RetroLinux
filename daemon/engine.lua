@@ -1,5 +1,5 @@
 local Watcher = require("watcher")
-local Log = require("log_core")
+local Log = require("log")
 
 local Engine = {}
 Engine.__index = Engine
@@ -13,6 +13,7 @@ function Engine.new(daemon_dir)
     self.watchers = {}
     self.watcher_next_run = {}
     self.watcher_co = {}
+    self.event_handlers = {}
     self.event_count = 0
     self.crash_count = 0
     self.max_crashes = 3
@@ -60,80 +61,76 @@ function Engine:load_watchers()
     end
 end
 
+function Engine:load_event_handlers()
+    self.event_handlers = {}
+    local event_files = {}
+    local ls = io.popen("ls -1 '" .. self.events_dir .. "'/*.lua 2>/dev/null")
+    if ls then
+        for file in ls:lines() do
+            table.insert(event_files, file)
+        end
+        ls:close()
+    end
+
+    for _, file in ipairs(event_files) do
+        local ok, mod = pcall(dofile, file)
+        if ok and mod and type(mod) == "table" then
+            for event_name, handler in pairs(mod) do
+                if type(handler) == "function" then
+                    if not self.event_handlers[event_name] then
+                        self.event_handlers[event_name] = {}
+                    end
+                    table.insert(self.event_handlers[event_name], {
+                        module = file:match("([^/]+)%.lua$"),
+                        handler = handler,
+                    })
+                end
+            end
+        end
+    end
+end
+
 function Engine:emit(event_name, ...)
     self.event_count = self.event_count + 1
+
+    local handlers = self.event_handlers[event_name]
+    if not handlers then return end
+
     local args = {...}
-    local arg_str = ""
-    for i, arg in ipairs(args) do
-        local escaped = tostring(arg):gsub("'", "'\\''")
-        arg_str = arg_str .. " '" .. escaped .. "'"
-    end
-
-    local ls = io.popen("ls -1 '" .. self.events_dir .. "'/*.sh 2>/dev/null")
-    if not ls then return end
-
-    local hooks = {}
-    for file in ls:lines() do
-        table.insert(hooks, file)
-    end
-    ls:close()
-
-    local init_file = self.events_dir .. "/_init.sh"
-    local init_prefix = ""
-    if io.open(init_file, "r") then
-        init_prefix = "source '" .. init_file .. "' 2>/dev/null; "
-    end
-
-    for _, hook in ipairs(hooks) do
-        if hook:match("/_init%.sh$") then goto continue end
-        local simple_cmd = string.format(
-            "(%s source '%s' 2>/dev/null; declare -f '%s' >/dev/null 2>&1 && '%s'%s) &",
-            init_prefix,
-            hook,
-            event_name,
-            event_name,
-            arg_str
-        )
-        os.execute(simple_cmd)
-        ::continue::
+    for _, h in ipairs(handlers) do
+        local ok, err = pcall(function()
+            h.handler(table.unpack(args))
+        end)
+        if not ok then
+            local log_path = "/tmp/retro_engine.log"
+            local f = io.open(log_path, "a")
+            if f then
+                f:write(string.format("[%s] Event handler %s.%s failed: %s\n",
+                    os.date("%H:%M:%S"), h.module, event_name, tostring(err)))
+                f:close()
+            end
+        end
     end
 end
 
 function Engine:emit_sync(event_name, ...)
+    local handlers = self.event_handlers[event_name]
+    if not handlers then return end
+
     local args = {...}
-    local arg_str = ""
-    for i, arg in ipairs(args) do
-        local escaped = tostring(arg):gsub("'", "'\\''")
-        arg_str = arg_str .. " '" .. escaped .. "'"
-    end
-
-    local ls = io.popen("ls -1 '" .. self.events_dir .. "'/*.sh 2>/dev/null")
-    if not ls then return end
-
-    local hooks = {}
-    for file in ls:lines() do
-        table.insert(hooks, file)
-    end
-    ls:close()
-
-    local init_file = self.events_dir .. "/_init.sh"
-    local init_prefix = ""
-    if io.open(init_file, "r") then
-        init_prefix = "source '" .. init_file .. "' 2>/dev/null; "
-    end
-
-    for _, hook in ipairs(hooks) do
-        if hook:match("/_init%.sh$") then goto continue end
-        local cmd = string.format(
-            "%s source '%s' 2>/dev/null; declare -f '%s' >/dev/null 2>&1 && '%s'%s",
-            init_prefix,
-            hook,
-            event_name,
-            event_name,
-            arg_str
-        )
-        os.execute("bash -c '" .. cmd .. "'")
-        ::continue::
+    for _, h in ipairs(handlers) do
+        local ok, err = pcall(function()
+            h.handler(table.unpack(args))
+        end)
+        if not ok then
+            local log_path = "/tmp/retro_engine.log"
+            local f = io.open(log_path, "a")
+            if f then
+                f:write(string.format("[%s] Sync event handler %s.%s failed: %s\n",
+                    os.date("%H:%M:%S"), h.module, event_name, tostring(err)))
+                f:close()
+            end
+        end
     end
 end
 
@@ -170,6 +167,7 @@ end
 
 function Engine:run_loop()
     self:load_watchers()
+    self:load_event_handlers()
 
     if #self.watchers == 0 then
         return
