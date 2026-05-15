@@ -1,6 +1,6 @@
 return {
     name = "power",
-    interval = 5,
+    interval = 1,
     enabled = function()
         return true
     end,
@@ -23,12 +23,14 @@ return {
         end
 
         local last_on_battery = nil
+        local last_pwr_profile = nil
         local function is_on_battery()
             local status = Watcher.read_sys(bat_path .. "/status")
             return status == "Discharging"
         end
 
         last_on_battery = is_on_battery()
+        last_pwr_profile = Watcher.get_var("PWR_CURRENT", "")
         log("Initial state: " .. (last_on_battery and "on battery" or "on AC"))
 
         while true do
@@ -46,6 +48,15 @@ return {
                     engine:emit("on_power_connect", tostring(cap))
                 end
                 last_on_battery = current
+                Watcher.reload_vars()
+                last_pwr_profile = Watcher.get_var("PWR_CURRENT", "")
+            end
+
+            local current_pwr = Watcher.get_var("PWR_CURRENT", "")
+            if current_pwr ~= last_pwr_profile then
+                log("Power profile changed: " .. current_pwr)
+                engine:emit("on_power_profile_changed", current_pwr)
+                last_pwr_profile = current_pwr
             end
 
             coroutine.yield()

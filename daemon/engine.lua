@@ -1,4 +1,5 @@
 local Watcher = require("watcher")
+local Log = require("log_core")
 
 local Engine = {}
 Engine.__index = Engine
@@ -31,13 +32,14 @@ function Engine:load_watchers()
     for _, file in ipairs(watcher_files) do
         local name = file:match("([^/]+)%.lua$")
         if name then
-            local ok, mod = pcall(require, name)
+            local ok, mod = pcall(dofile, file)
             if ok and mod and type(mod.start) == "function" then
                 local enabled = true
                 if mod.enabled and type(mod.enabled) == "function" then
                     enabled = mod.enabled()
                 end
                 if enabled then
+                    Log.register(name)
                     table.insert(self.watchers, {
                         name = name,
                         module = mod,
@@ -76,15 +78,24 @@ function Engine:emit(event_name, ...)
     end
     ls:close()
 
+    local init_file = self.events_dir .. "/_init.sh"
+    local init_prefix = ""
+    if io.open(init_file, "r") then
+        init_prefix = "source '" .. init_file .. "' 2>/dev/null; "
+    end
+
     for _, hook in ipairs(hooks) do
+        if hook:match("/_init%.sh$") then goto continue end
         local simple_cmd = string.format(
-            "(source '%s' 2>/dev/null; declare -f '%s' >/dev/null 2>&1 && '%s'%s) &",
+            "(%s source '%s' 2>/dev/null; declare -f '%s' >/dev/null 2>&1 && '%s'%s) &",
+            init_prefix,
             hook,
             event_name,
             event_name,
             arg_str
         )
         os.execute(simple_cmd)
+        ::continue::
     end
 end
 
@@ -105,15 +116,24 @@ function Engine:emit_sync(event_name, ...)
     end
     ls:close()
 
+    local init_file = self.events_dir .. "/_init.sh"
+    local init_prefix = ""
+    if io.open(init_file, "r") then
+        init_prefix = "source '" .. init_file .. "' 2>/dev/null; "
+    end
+
     for _, hook in ipairs(hooks) do
+        if hook:match("/_init%.sh$") then goto continue end
         local cmd = string.format(
-            "source '%s' 2>/dev/null; declare -f '%s' >/dev/null 2>&1 && '%s'%s",
+            "%s source '%s' 2>/dev/null; declare -f '%s' >/dev/null 2>&1 && '%s'%s",
+            init_prefix,
             hook,
             event_name,
             event_name,
             arg_str
         )
         os.execute("bash -c '" .. cmd .. "'")
+        ::continue::
     end
 end
 
