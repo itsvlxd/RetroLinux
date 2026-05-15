@@ -42,20 +42,24 @@ cmd_apps() {
         local m_apps=$(ls -1 "$RETRO_DIR/modules" 2>/dev/null | grep -v "^retro$")
 
         local term_val=$(get_var "RETRO_TERMINAL_CMD" "kitty")
+        local fm_val=$(get_var "RETRO_FILEMANAGER_CMD" "nemo")
+        local editor_val=$(get_var "RETRO_EDITOR_CMD" "nvim")
 
         for a in $(echo -e "$v_apps\n$m_apps" | sort -u); do
             [[ $a == "terminal" ]] && continue
+            [[ $a == "filemanager" ]] && continue
+            [[ $a == "editor" ]] && continue
+            [[ $a == "$term_val" ]] && continue
+            [[ $a == "$fm_val" ]] && continue
+            [[ $a == "$editor_val" ]] && continue
 
             local has_var=false
             local has_scripts=false
             [[ $raw_vars == *"RETRO_${a^^}_CMD="* ]] && has_var=true
 
-            local mod_to_check="$a"
-            [[ $a == "terminal" ]] && mod_to_check="$term_val"
-
-            local m_path="$RETRO_DIR/modules/$mod_to_check"
+            local m_path="$RETRO_DIR/modules/$a"
             local s_dir=$(get_scripts_path "$m_path")
-            [[ -f "$s_dir/open_${mod_to_check}.sh" || -f "$s_dir/refresh_${mod_to_check}.sh" || -f "$s_dir/close_${mod_to_check}.sh" ]] && has_scripts=true
+            [[ -f "$s_dir/open_${a}.sh" || -f "$s_dir/refresh_${a}.sh" || -f "$s_dir/close_${a}.sh" ]] && has_scripts=true
 
             ($has_var || $has_scripts) && echo -e "  ${PINK}󰄾${RESET} $a"
         done
@@ -63,8 +67,22 @@ cmd_apps() {
         local term_mod="$term_val"
         local term_path="$RETRO_DIR/modules/$term_mod"
         local term_sdir=$(get_scripts_path "$term_path")
-        if [[ -f "$term_sdir/open_${term_mod}.sh" || -f "$term_sdir/refresh_${term_mod}.sh" || -f "$term_sdir/close_${term_mod}.sh" ]]; then
+        if [[ -f "$term_sdir/open_${term_mod}.sh" || -f "$term_sdir/refresh_${term_mod}.sh" || -f "$term_sdir/close_${term_mod}.sh" || -n "$(command -v "$term_mod" 2>/dev/null)" ]]; then
             echo -e "  ${PINK}󰄾${RESET} terminal"
+        fi
+
+        local fm_mod="$fm_val"
+        local fm_path="$RETRO_DIR/modules/$fm_mod"
+        local fm_sdir=$(get_scripts_path "$fm_path")
+        if [[ -f "$fm_sdir/open_${fm_mod}.sh" || -f "$fm_sdir/refresh_${fm_mod}.sh" || -f "$fm_sdir/close_${fm_mod}.sh" || -n "$(command -v "$fm_mod" 2>/dev/null)" ]]; then
+            echo -e "  ${PINK}󰄾${RESET} filemanager"
+        fi
+
+        local editor_mod="$editor_val"
+        local editor_path="$RETRO_DIR/modules/$editor_mod"
+        local editor_sdir=$(get_scripts_path "$editor_path")
+        if [[ -f "$editor_sdir/open_${editor_mod}.sh" || -f "$editor_sdir/refresh_${editor_mod}.sh" || -f "$editor_sdir/close_${editor_mod}.sh" || -n "$(command -v "$editor_mod" 2>/dev/null)" ]]; then
+            echo -e "  ${PINK}󰄾${RESET} editor"
         fi
 
         return 0
@@ -73,9 +91,15 @@ cmd_apps() {
     if [[ $app_name == "all" ]]; then
         [[ -z $action ]] && rx_log "error" "An action [open|refresh|close] must be specified for 'all'." && return 1
         rx_log "info" "Executing '${action}' for all valid modules..."
+        local term_val=$(get_var "RETRO_TERMINAL_CMD" "kitty")
+        local fm_val=$(get_var "RETRO_FILEMANAGER_CMD" "nemo")
+        local editor_val=$(get_var "RETRO_EDITOR_CMD" "nvim")
         for mod_dir in "$RETRO_DIR/modules"/*/; do
             local mod_name=$(basename "$mod_dir")
             [[ $mod_name == "retro" ]] && continue
+            [[ $mod_name == "$term_val" ]] && continue
+            [[ $mod_name == "$fm_val" ]] && continue
+            [[ $mod_name == "$editor_val" ]] && continue
             local s_dir="$mod_dir/files/scripts"
             local script="$s_dir/${action}_${mod_name}.sh"
             if [[ -f "$script" ]]; then
@@ -89,9 +113,13 @@ cmd_apps() {
     local var_key="RETRO_${app_name^^}_CMD"
     local target_cmd=$(get_var "$var_key")
     local term=$(get_var "RETRO_TERMINAL_CMD" "kitty")
+    local fm=$(get_var "RETRO_FILEMANAGER_CMD" "nemo")
+    local editor=$(get_var "RETRO_EDITOR_CMD" "nvim")
 
     local mod_name="$app_name"
     [[ $app_name == "terminal" ]] && mod_name="$term"
+    [[ $app_name == "filemanager" ]] && mod_name="$fm"
+    [[ $app_name == "editor" ]] && mod_name="$editor"
 
     local mod_path="$RETRO_DIR/modules/$mod_name"
     local s_dir=$(get_scripts_path "$mod_path")
@@ -121,11 +149,31 @@ cmd_apps() {
         fi
 
         if [[ $app_name == "terminal" ]]; then
-            local open_term_script="$RETRO_DIR/modules/kitty/files/scripts/open_kitty.sh"
+            local open_term_script="$RETRO_DIR/modules/$term/files/scripts/open_${term}.sh"
             if [[ -n $extra_args ]]; then
                 (setsid bash "$open_term_script" -- bash -c "$extra_args; exec bash" >/dev/null 2>&1 &)
             else
                 (setsid bash "$open_term_script" >/dev/null 2>&1 &)
+            fi
+            return 0
+        fi
+
+        if [[ $app_name == "filemanager" ]]; then
+            local open_fm_script="$RETRO_DIR/modules/$fm/files/scripts/open_${fm}.sh"
+            if [[ -f $open_fm_script ]]; then
+                (setsid bash "$open_fm_script" $extra_args >/dev/null 2>&1 &)
+            else
+                (setsid $fm $extra_args >/dev/null 2>&1 &)
+            fi
+            return 0
+        fi
+
+        if [[ $app_name == "editor" ]]; then
+            local open_editor_script="$RETRO_DIR/modules/$editor/files/scripts/open_${editor}.sh"
+            if [[ -f $open_editor_script ]]; then
+                (setsid bash "$open_editor_script" $extra_args >/dev/null 2>&1 &)
+            else
+                (setsid $editor $extra_args >/dev/null 2>&1 &)
             fi
             return 0
         fi
