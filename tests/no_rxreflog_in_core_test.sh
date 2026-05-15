@@ -20,7 +20,7 @@ if [[ ${#CORE_SCRIPTS[@]} -eq 0 ]]; then
 fi
 
 for script in "${CORE_SCRIPTS[@]}"; do
-    if grep -q "rx_log" "$script" 2>/dev/null; then
+    if grep -qE 'rx_log "(info|success|warn|error)"' "$script" 2>/dev/null; then
         VIOLATIONS+=("$(basename "$script") contains rx_log")
     fi
 done

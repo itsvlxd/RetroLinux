@@ -121,7 +121,6 @@ set_saver() {
     if [[ $val == "true" ]]; then
         set_var "BAT_SAVER_FORCED" "true"
         set_var "BAT_SAVER_ACTIVE" "true"
-        rx_log "info" "Battery saver enabled"
         return 0
 
     elif [[ $val == "false" ]]; then
@@ -131,7 +130,6 @@ set_saver() {
         else
             set_var "BAT_SAVER_FORCED" "false"
         fi
-        rx_log "info" "Battery saver disabled"
         return 0
 
     elif [[ $val =~ ^[0-9]+$ ]]; then
