@@ -1,7 +1,21 @@
 #!/bin/bash
 
-BAT_PATH=$(find /sys/class/power_supply/ -name "BAT*" -type l 2>/dev/null | head -n 1)
-AC_PATH=$(find /sys/class/power_supply/ \( -name "AC*" -o -name "ADP*" \) -type l 2>/dev/null | head -n 1)
+_rx_init_bat_paths() {
+    local cache_file="/tmp/retro_bat_paths"
+    if [[ -f $cache_file ]]; then
+        source "$cache_file"
+        return
+    fi
+
+    BAT_PATH=$(find /sys/class/power_supply/ -name "BAT*" -type l 2>/dev/null | head -n 1)
+    AC_PATH=$(find /sys/class/power_supply/ \( -name "AC*" -o -name "ADP*" \) -type l 2>/dev/null | head -n 1)
+
+    mkdir -p /tmp
+    echo "BAT_PATH='$BAT_PATH'" > "$cache_file"
+    echo "AC_PATH='$AC_PATH'" >> "$cache_file"
+}
+
+_rx_init_bat_paths
 
 has_battery() {
     [[ -n "$BAT_PATH" && -d "$BAT_PATH" ]] && echo "true" || echo "false"
