@@ -39,16 +39,12 @@ cmd_apps() {
 
         local raw_vars=$(cat "$RETRO_CONFIG/variables.sh" 2>/dev/null)
         local v_apps=$(echo "$raw_vars" | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); print tolower($1)}')
-        local suppression_list=$(echo "$raw_vars" | awk -F'"' '/RETRO_.*_CMD/ {print tolower($2)}')
         local m_apps=$(ls -1 "$RETRO_DIR/modules" 2>/dev/null | grep -v "^retro$")
 
-        local sup_flat=" ${suppression_list//$'\n'/ } "
         local term_val=$(get_var "RETRO_TERMINAL_CMD" "kitty")
 
         for a in $(echo -e "$v_apps\n$m_apps" | sort -u); do
-            if [[ ! " $v_apps " =~ " $a " ]] && [[ $sup_flat =~ " $a " ]]; then
-                continue
-            fi
+            [[ $a == "terminal" ]] && continue
 
             local has_var=false
             local has_scripts=false
@@ -63,14 +59,30 @@ cmd_apps() {
 
             ($has_var || $has_scripts) && echo -e "  ${PINK}󰄾${RESET} $a"
         done
+
+        local term_mod="$term_val"
+        local term_path="$RETRO_DIR/modules/$term_mod"
+        local term_sdir=$(get_scripts_path "$term_path")
+        if [[ -f "$term_sdir/open_${term_mod}.sh" || -f "$term_sdir/refresh_${term_mod}.sh" || -f "$term_sdir/close_${term_mod}.sh" ]]; then
+            echo -e "  ${PINK}󰄾${RESET} terminal"
+        fi
+
         return 0
     fi
 
     if [[ $app_name == "all" ]]; then
         [[ -z $action ]] && rx_log "error" "An action [open|refresh|close] must be specified for 'all'." && return 1
         rx_log "info" "Executing '${action}' for all valid modules..."
-        local all_apps=$(echo -e "$(cat "$RETRO_CONFIG/variables.sh" 2>/dev/null | awk -F'=' '/RETRO_.*_CMD/ {gsub(/^RETRO_|_CMD$/, "", $1); print tolower($1)}')\n$(ls -1 "$RETRO_DIR/modules" 2>/dev/null | grep -v '^retro$')" | sort -u)
-        for a in $all_apps; do cmd_apps "$a" "$action" $extra_args 2>/dev/null; done
+        for mod_dir in "$RETRO_DIR/modules"/*/; do
+            local mod_name=$(basename "$mod_dir")
+            [[ $mod_name == "retro" ]] && continue
+            local s_dir="$mod_dir/files/scripts"
+            local script="$s_dir/${action}_${mod_name}.sh"
+            if [[ -f "$script" ]]; then
+                rx_log "info" "Running ${action} for ${mod_name}..."
+                (cd "$mod_dir" && bash "$script" >/dev/null 2>&1 &)
+            fi
+        done
         return 0
     fi
 
