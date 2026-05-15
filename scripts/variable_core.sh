@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "variable"
+
 VARS_DIR="$RETRO_CONFIG"
 VARS_FILE="$VARS_DIR/variables.sh"
 

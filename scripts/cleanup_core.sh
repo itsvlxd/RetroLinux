@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "cleanup"
+
 get_disk_usage() {
     local path="${1:-/}"
     df -h "$path" 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}'

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "service"
+
 list_services() {
     local filter="${1:-all}"
     local unit_type="${2:-service}"

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "audio"
+
 get_default_sink() {
     wpctl status 2>/dev/null | grep -A5 "Sinks:" | grep "\*" | grep -oE "[0-9]+\." | head -1 | tr -d '.'
 }

@@ -2,6 +2,8 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/icons.sh"
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "bluetooth"
 
 bt_power_on() {
     if command -v rfkill >/dev/null 2>&1; then

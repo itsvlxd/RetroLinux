@@ -2,9 +2,13 @@
 
 source "$RETRO_DIR/lib/battery.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/scripts/battery_core.sh"
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "power"
 
 CPU_VENDOR=$(grep -m 1 'vendor_id' /proc/cpuinfo | awk '{print $3}')
 BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
+RAPL_LOADED_FILE="/tmp/retro_rapl_loaded"
 
 readonly INTEL_DB=(
     "Ultra 9 185H|25,45,95|15,25,45" "Ultra 7 155H|15,28,65|10,18,35" "Ultra 5 125H|12,25,50|8,15,28"
@@ -57,11 +61,12 @@ get_pwr_var() {
 sync_hardware_power() {
     local state="$1"
 
-    if command -v powerprofilesctl >/dev/null 2>&1; then
+    local current_ppd=$(powerprofilesctl get 2>/dev/null)
+    if [[ -n $current_ppd ]]; then
         local ppd_state="balanced"
         [[ $state == "performance" ]] && ppd_state="performance"
         [[ $state == "saver" ]] && ppd_state="power-saver"
-        powerprofilesctl set "$ppd_state" 2>/dev/null
+        [[ $current_ppd != "$ppd_state" ]] && powerprofilesctl set "$ppd_state" 2>/dev/null
     fi
 
     local wifi_pm="off"
@@ -91,34 +96,38 @@ sync_hardware_power() {
         vm_writeback="1500"
     fi
 
-    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-        [[ -f $gov ]] && echo "$cpu_gov" >"$gov" 2>/dev/null
-    done
+    echo "$cpu_gov" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1
 
-    if [[ -w /proc/sys/kernel/nmi_watchdog ]]; then
-        echo "$nmi_watchdog" >/proc/sys/kernel/nmi_watchdog 2>/dev/null
-    fi
+    (
+        if [[ -w /proc/sys/kernel/nmi_watchdog ]]; then
+            echo "$nmi_watchdog" >/proc/sys/kernel/nmi_watchdog 2>/dev/null
+        fi
 
-    if [[ -w /proc/sys/vm/dirty_writeback_centisecs ]]; then
-        echo "$vm_writeback" >/proc/sys/vm/dirty_writeback_centisecs 2>/dev/null
-    fi
+        if [[ -w /proc/sys/vm/dirty_writeback_centisecs ]]; then
+            echo "$vm_writeback" >/proc/sys/vm/dirty_writeback_centisecs 2>/dev/null
+        fi
 
-    local wl_iface=$(iw dev 2>/dev/null | awk '$1=="Interface"{print $2}')
-    if [[ -n $wl_iface ]]; then
-        iw dev "$wl_iface" set power_save "$wifi_pm" 2>/dev/null
-    fi
+        if [[ -f /sys/module/snd_hda_intel/parameters/power_save ]]; then
+            echo "$audio_sleep" >/sys/module/snd_hda_intel/parameters/power_save 2>/dev/null
+        fi
+    ) &
 
-    for bt in /sys/class/bluetooth/hci*/device/power/control; do
-        [[ -f $bt ]] && echo "$bt_pm" >"$bt" 2>/dev/null
-    done
+    (
+        local wl_iface=$(iw dev 2>/dev/null | awk '$1=="Interface"{print $2}')
+        if [[ -n $wl_iface ]]; then
+            iw dev "$wl_iface" set power_save "$wifi_pm" 2>/dev/null
+        fi
 
-    for usb in /sys/bus/usb/devices/*/power/control; do
-        [[ -w $usb ]] && echo "$usb_pm" >"$usb" 2>/dev/null
-    done
+        for bt in /sys/class/bluetooth/hci*/device/power/control; do
+            [[ -f $bt ]] && echo "$bt_pm" >"$bt" 2>/dev/null
+        done
 
-    if [[ -f /sys/module/snd_hda_intel/parameters/power_save ]]; then
-        echo "$audio_sleep" >/sys/module/snd_hda_intel/parameters/power_save 2>/dev/null
-    fi
+        for usb in /sys/bus/usb/devices/*/power/control; do
+            [[ -w $usb ]] && echo "$usb_pm" >"$usb" 2>/dev/null
+        done
+    ) &
+
+    wait
 }
 
 set_profile() {
@@ -131,19 +140,23 @@ set_profile() {
     fi
     set_var "PWR_CURRENT" "$profile"
 
+    rx_log "info" "Power profile set to: ${profile^^}"
+
     local watts=$(get_pwr_var "$profile")
     local microwatts=$((watts * 1000000))
 
     sync_hardware_power "$profile"
 
-    if [[ ! -d /sys/class/powercap/intel-rapl:0 ]]; then
+    if [[ ! -d /sys/class/powercap/intel-rapl:0 && ! -f $RAPL_LOADED_FILE ]]; then
         sudo modprobe intel_rapl_msr 2>/dev/null
         sudo modprobe intel_rapl_common 2>/dev/null
+        [[ -d /sys/class/powercap/intel-rapl:0 ]] && touch "$RAPL_LOADED_FILE"
     fi
 
     if [[ $CPU_VENDOR == "GenuineIntel" ]]; then
-        if [[ ! -d /sys/class/powercap/intel-rapl:0 ]]; then
+        if [[ ! -d /sys/class/powercap/intel-rapl:0 && ! -f $RAPL_LOADED_FILE ]]; then
             sudo modprobe intel_rapl_msr 2>/dev/null
+            [[ -d /sys/class/powercap/intel-rapl:0 ]] && touch "$RAPL_LOADED_FILE"
         fi
 
         case "$profile" in
@@ -190,7 +203,9 @@ set_profile() {
                     echo "3000000" >/sys/class/powercap/intel-rapl:0:1/constraint_0_power_limit_uw 2>/dev/null
                 fi
 
-                bash "$BAT_CORE" --saver "true"
+                set_var "BAT_SAVER_FORCED" "true"
+                set_var "BAT_SAVER_ACTIVE" "true"
+                sync_hyprland_power "true"
                 ;;
         esac
     elif [[ $CPU_VENDOR == "AuthenticAMD" ]]; then
