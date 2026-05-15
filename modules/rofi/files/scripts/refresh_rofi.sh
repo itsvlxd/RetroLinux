@@ -1,30 +1,17 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+
 OUTPUT_RASI="$RETRO_CONFIG/themes/variables.rasi"
 TEMP_FILE=$(mktemp)
 
 mkdir -p "$(dirname "$OUTPUT_RASI")"
 
-_vars_file="${RETRO_CONFIG:-$HOME/.config/retro}/variables.sh"
-
-get_val() {
-    local key="$1"
-    local default="$2"
-    if [[ -f "$_vars_file" ]]; then
-        local val=$(grep -m 1 "^export $key=" "$_vars_file" 2>/dev/null | sed 's/^export [^=]*="//; s/"$//')
-        if [[ -n $val ]]; then
-            echo "$val"
-            return
-        fi
-    fi
-    echo "$default"
-}
-
-FONT=$(get_val "ROFI_FONT" "JetBrains Mono Nerd Font")
-FONT_SIZE=$(get_val "ROFI_FONT_SIZE" "9.5")
-ROUNDING=$(get_val "ROFI_ROUNDING" "10")
-PADDING=$(get_val "ROFI_PADDING" "5")
-BORDER=$(get_val "ROFI_BORDER_SIZE" "2")
+FONT=$(get_var "ROFI_FONT" "JetBrains Mono Nerd Font")
+FONT_SIZE=$(get_var "ROFI_FONT_SIZE" "9.5")
+ROUNDING=$(get_var "ROFI_ROUNDING" "10")
+PADDING=$(get_var "ROFI_PADDING" "5")
+BORDER=$(get_var "ROFI_BORDER_SIZE" "2")
 
 cat <<EOF >"$TEMP_FILE"
 /**

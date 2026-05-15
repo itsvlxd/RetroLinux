@@ -1,33 +1,20 @@
 #!/bin/bash
 
+source "$RETRO_DIR/lib/variable.sh"
+
 OUTPUT="$HOME/.config/retro/themes/variables.conf"
 TEMP_FILE=$(mktemp)
 
 mkdir -p "$(dirname "$OUTPUT")"
 
-_vars_file="${RETRO_CONFIG:-$HOME/.config/retro}/variables.sh"
-
-get_val() {
-    local key="$1"
-    local default="$2"
-    if [[ -f "$_vars_file" ]]; then
-        local val=$(grep -m 1 "^export $key=" "$_vars_file" 2>/dev/null | sed 's/^export [^=]*="//; s/"$//')
-        if [[ -n $val ]]; then
-            echo "$val"
-            return
-        fi
-    fi
-    echo "$default"
-}
-
-BORDER=$(get_val "RETRO_BORDER_SIZE" "2")
-ROUNDING=$(get_val "RETRO_ROUNDING" "10")
-SHADOW=$(get_val "RETRO_SHADOW" "true")
-BLUR=$(get_val "RETRO_BLUR" "true")
-GAP_IN=$(get_val "RETRO_GAP_IN" "5")
-GAP_OUT=$(get_val "RETRO_GAP_OUT" "20")
-TRANS=$(get_val "RETRO_OPACITY" "1.0")
-INACTIVE_TRANS=$(get_val "RETRO_INACTIVE_OPACITY" "0.8")
+BORDER=$(get_var "RETRO_BORDER_SIZE" "2")
+ROUNDING=$(get_var "RETRO_ROUNDING" "10")
+SHADOW=$(get_var "RETRO_SHADOW" "true")
+BLUR=$(get_var "RETRO_BLUR" "true")
+GAP_IN=$(get_var "RETRO_GAP_IN" "5")
+GAP_OUT=$(get_var "RETRO_GAP_OUT" "20")
+TRANS=$(get_var "RETRO_OPACITY" "1.0")
+INACTIVE_TRANS=$(get_var "RETRO_INACTIVE_OPACITY" "0.8")
 
 cat <<EOF >"$TEMP_FILE"
 ##########################################
@@ -49,7 +36,7 @@ EOF
 if mv "$TEMP_FILE" "$OUTPUT"; then
     chmod 644 "$OUTPUT"
 
-    hyprctl reload 2>/dev/null
+    #hyprctl reload 2>/dev/null
 else
     rm -f "$TEMP_FILE"
     exit 1
