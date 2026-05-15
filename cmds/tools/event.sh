@@ -67,18 +67,6 @@ cmd_event() {
             lua "$daemon_script" status
             ;;
 
-        "log")
-            if [[ -z $value ]]; then
-                lua "$daemon_script" log
-            elif [[ $value == "true" || $value == "false" ]]; then
-                lua "$daemon_script" log "$value"
-            elif [[ $value == "limit" ]]; then
-                lua "$daemon_script" log limit "$3" "$4"
-            else
-                lua "$daemon_script" log "$value" "$3"
-            fi
-            ;;
-
         *)
             rx_help_usage "retro event <command>"
             rx_help_commands "Available commands"
@@ -88,16 +76,9 @@ cmd_event() {
             rx_help_cmd "stop" "Stop the event daemon"
             rx_help_cmd "restart" "Restart the event daemon"
             rx_help_cmd "status" "Show daemon status"
-            rx_help_cmd "log <name>" "View watcher logs"
-            rx_help_cmd "log true/false" "Enable/disable all logs"
-            rx_help_cmd "log limit <n>" "Set log line cap"
             rx_help_examples
             rx_help_example "retro event status" "Check if daemon is running"
             rx_help_example "retro event list" "Show all loaded hooks"
-            rx_help_example "retro event log usb" "View USB watcher logs"
-            rx_help_example "retro event log true" "Enable log generation"
-            rx_help_example "retro event log false" "Disable log generation"
-            rx_help_example "retro event log limit 200" "Set log cap to 200 lines"
             rx_help_spacer
             ;;
     esac

@@ -1,9 +1,5 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/icons.sh"
-source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/cmds/tools/app.sh"
-
 on_power_disconnect() {
     local cap="$1"
     notify-send -u normal -i battery-caution \

@@ -1,36 +1,28 @@
 #!/bin/bash
 
-source "$RETRO_DIR/lib/helpers.sh"
-source "$RETRO_DIR/lib/battery.sh"
-
-PWR_CORE="$RETRO_DIR/scripts/power_core.sh"
-BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
-WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
-
 on_power_disconnect() {
     local cap="$1"
 
     if [[ $(get_var "BAT_SAVER_ON_PWR_DIS") == "true" && $(get_var "BAT_SAVER_ACTIVE") != "true" ]]; then
-        #bash "$BAT_CORE" --saver "true"
-        bash "$PWR_CORE" --set "saver"
+        bash "$PWR_CORE" --set "saver" &
     fi
 
     if [[ $(get_var "WALL_STATIC_ON_BAT") == "true" ]]; then
-        bash "$WALL_CORE" --restore
+        bash "$WALL_CORE" --restore true &
     fi
 
     set_var "BAT_DISCONNECT_TIME" "$(date +%s)"
 }
 
 on_power_connect() {
-    bash "$PWR_CORE" --restore-prev
+    bash "$PWR_CORE" --restore-prev &
 
     if [[ $(get_var "BAT_SAVER_ON_PWR_DIS") == "true" && $(get_var "BAT_SAVER_ACTIVE") == "true" ]]; then
-        bash "$BAT_CORE" --saver "false"
+        bash "$BAT_CORE" --saver "false" &
     fi
 
     if [[ $(get_var "WALL_STATIC_ON_BAT") == "true" ]]; then
-        bash "$WALL_CORE" --restore
+        bash "$WALL_CORE" --restore true &
     fi
 
     local start=$(get_var "BAT_DISCONNECT_TIME")
@@ -51,8 +43,11 @@ on_power_profile_changed() {
 
     if [[ $current_pwr != "saver" && $(get_var "BAT_SAVER_ACTIVE") == "true" ]]; then
         bash "$BAT_CORE" --saver "false"
+        sync_hyprland_power "false"
     elif [[ $current_pwr == "saver" && $(get_var "BAT_SAVER_ACTIVE") != "true" ]]; then
         bash "$BAT_CORE" --saver "true"
+        sync_hyprland_power "true"
     fi
-}
 
+    bash "$WALL_CORE" --restore true
+}
