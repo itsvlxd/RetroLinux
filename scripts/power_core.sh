@@ -140,8 +140,6 @@ set_profile() {
     fi
     set_var "PWR_CURRENT" "$profile"
 
-    rx_log "info" "Power profile set to: ${profile^^}"
-
     local watts=$(get_pwr_var "$profile")
     local microwatts=$((watts * 1000000))
 
