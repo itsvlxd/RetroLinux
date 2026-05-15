@@ -3,85 +3,80 @@
 source "$RETRO_DIR/lib/help.sh"
 
 cmd_event() {
-    local event_script="$RETRO_DIR/scripts/event_core.sh"
-    local hook_dir="$RETRO_DIR/scripts/events"
+    local daemon_script="$RETRO_DIR/daemon/event_daemon.lua"
     local action="${1,,}"
     local value="$2"
-    local args="${@:3}"
+    local rest="${@:3}"
+
+    if ! command -v lua &>/dev/null; then
+        rx_log "error" "Lua runtime not found. Install with: sudo pacman -S lua"
+        return 1
+    fi
+
+    export RETRO_DIR
+    export RETRO_CONFIG
 
     case "$action" in
         "trigger")
             [[ -z $value ]] && rx_log "error" "Please provide an event name to trigger." && return 1
-
-            rx_log "info" "Firing event: ${PINK}$value${RESET} $args"
-
-            bash "$event_script" --trigger "$value" $args
+            rx_log "info" "Firing event: ${PINK}$value${RESET} $rest"
+            lua "$daemon_script" trigger "$value" $rest
             ;;
 
         "list")
-            rx_table_header "󱐋" "Event Modules"
-
-            local watcher_dir="$RETRO_DIR/scripts/watchers"
-
-            local watcher_scripts=$(ls "$watcher_dir"/*.sh 2>/dev/null)
-            for w in $watcher_scripts; do
-                local name=$(basename "$w")
-                local func_count=$(grep -c "^start_watcher_" "$w")
-                rx_table_list_single "󱐋" "$name [$func_count watcher]" "$GRAY"
-            done
-
-            local hooks=$(ls "$hook_dir"/*.sh 2>/dev/null)
-            for h in $hooks; do
-                local name=$(basename "$h")
-                local func_count=$(grep -c "^[a-zA-Z0-9_]*()" "$h")
-                rx_table_list_single "󱐋" "$name [$func_count hooks]" "$GRAY"
-            done
-
-            if [[ -z $watcher_scripts && -z $hooks ]]; then
-                rx_table_simple "󰓅" "(No modules found)" "$MUTE"
-            fi
-            rx_table_separator
-            rx_table_spacer
+            lua "$daemon_script" list
             ;;
 
         "start")
-            rx_log "info" "Starting the event worker..."
+            rx_log "info" "Starting the event daemon..."
 
-            if pgrep -f "event_core.sh --loop" >/dev/null; then
-                rx_log "error" "The worker is already running."
+            local pid_file="/tmp/retro_event_daemon.pid"
+            if [[ -f $pid_file ]]; then
+                local old_pid=$(cat "$pid_file")
+                if kill -0 "$old_pid" 2>/dev/null; then
+                    rx_log "error" "The daemon is already running (PID: $old_pid)."
+                    return 0
+                else
+                    rm -f "$pid_file"
+                fi
+            fi
+
+            nohup lua "$daemon_script" loop >/dev/null 2>&1 &
+            local daemon_pid=$!
+            sleep 0.3
+            if kill -0 "$daemon_pid" 2>/dev/null; then
+                echo "$daemon_pid" > "$pid_file"
+                rx_log "success" "Event daemon started in the background."
             else
-                nohup bash "$event_script" --loop >/dev/null 2>&1 &
-                rx_log "success" "Event worker started in the background."
+                rx_log "error" "Daemon failed to start."
+                return 1
             fi
             ;;
 
         "stop")
-            rx_log "info" "Stopping the event worker..."
-            pkill -f "event_core.sh --loop" && rx_log "success" "Worker stopped." || rx_log "error" "No active worker found."
+            lua "$daemon_script" stop
             ;;
 
         "restart")
-            cmd_event "stop"
+            lua "$daemon_script" stop >/dev/null 2>&1
             sleep 0.5
             cmd_event "start"
             ;;
 
         "status")
-            local pids=$(pgrep -f "event_core.sh --loop" | grep -v "$$" | xargs)
-            rx_table_header "󱐋" "Event Worker Status"
-            if [[ -n $pids ]]; then
-                local pid=$(echo "$pids" | awk '{print $1}')
-                local uptime=$(ps -o etime= -p "$pid" 2>/dev/null | xargs)
+            lua "$daemon_script" status
+            ;;
 
-                rx_table_row "󱐋" "State:" "ACTIVE (PID: $pid)" "$SUCCESS" "14"
-                rx_table_row "󱎫" "Uptime:" "$uptime" "$PINK" "14"
+        "log")
+            if [[ -z $value ]]; then
+                lua "$daemon_script" log
+            elif [[ $value == "true" || $value == "false" ]]; then
+                lua "$daemon_script" log "$value"
+            elif [[ $value == "limit" ]]; then
+                lua "$daemon_script" log limit "$3" "$4"
             else
-                rx_table_row "󱐋" "State:" "INACTIVE" "$ERROR" "14"
-                rx_table_row "󱎫" "Uptime:" "N/A" "$MUTE" "14"
+                lua "$daemon_script" log "$value" "$3"
             fi
-            rx_table_row "󰓅" "Path:" "$event_script" "$GRAY" "14"
-            rx_table_separator
-            rx_table_spacer
             ;;
 
         *)
@@ -89,14 +84,20 @@ cmd_event() {
             rx_help_commands "Available commands"
             rx_help_cmd "trigger <event>" "Fire a system event"
             rx_help_cmd "list" "List all event hooks"
-            rx_help_cmd "start" "Start the event worker daemon"
-            rx_help_cmd "stop" "Stop the event worker daemon"
-            rx_help_cmd "restart" "Restart the event worker daemon"
-            rx_help_cmd "status" "Show event worker status"
+            rx_help_cmd "start" "Start the event daemon"
+            rx_help_cmd "stop" "Stop the event daemon"
+            rx_help_cmd "restart" "Restart the event daemon"
+            rx_help_cmd "status" "Show daemon status"
+            rx_help_cmd "log <name>" "View watcher logs"
+            rx_help_cmd "log true/false" "Enable/disable all logs"
+            rx_help_cmd "log limit <n>" "Set log line cap"
             rx_help_examples
             rx_help_example "retro event status" "Check if daemon is running"
             rx_help_example "retro event list" "Show all loaded hooks"
-            rx_help_example "retro event trigger battery_low" "Fire specific event"
+            rx_help_example "retro event log usb" "View USB watcher logs"
+            rx_help_example "retro event log true" "Enable log generation"
+            rx_help_example "retro event log false" "Disable log generation"
+            rx_help_example "retro event log limit 200" "Set log cap to 200 lines"
             rx_help_spacer
             ;;
     esac

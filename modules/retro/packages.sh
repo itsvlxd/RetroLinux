@@ -2,6 +2,7 @@
 bc
 jq
 git
+lua
 sed
 grep
 rsync
