@@ -2,6 +2,8 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "wallpaper"
 
 WALL_DIR="$RETRO_CONFIG/wallpapers"
 FRAME_CACHE="$RETRO_CONFIG/wallpaper_frames"
@@ -257,6 +259,7 @@ list_wallpapers_with_resolution() {
 
 set_wallpaper() {
     local input_path="$1"
+    local quick="${2:-false}"
     local wall_path=""
     local theme_dir=$(get_theme_dir)
 
@@ -292,13 +295,22 @@ set_wallpaper() {
     if ! pgrep -x "awww-daemon" >/dev/null; then
         is_first_load=true
         nohup awww-daemon >/dev/null 2>&1 &
-        while ! awww query >/dev/null 2>&1; do sleep 0.05; done
+        local delay=0.1
+        for i in $(seq 1 30); do
+            sleep "$delay" 2>/dev/null || sleep 1
+            awww query >/dev/null 2>&1 && break
+            delay=$(awk "BEGIN {printf \"%.2f\", $delay * 1.5}")
+        done
     fi
 
     local static_source="$wall_path"
     [[ $is_video == "true" ]] && static_source=$(generate_cache "$wall_path")
 
-    if [[ $is_first_load == "true" ]]; then
+    local current_wall=$(get_var "WALL_CURRENT")
+    local is_same_wall=false
+    [[ "$current_wall" == "$wall_path" ]] && is_same_wall=true
+
+    if [[ $is_first_load == "true" || $quick == "true" ]]; then
         awww img "$static_source" --transition-type none
     else
         local rand_x=$((RANDOM % 1920))
@@ -313,22 +325,39 @@ set_wallpaper() {
     (
         pkill mpvpaper
 
-        COLOR=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info:)
-        if [ "$(echo "$COLOR < 1.0" | bc)" -eq 1 ]; then
-            matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
-        else
-            matugen image -b wal "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
+        if [[ $is_same_wall == "false" ]]; then
+            local color_cache="$FRAME_CACHE/${filename}.colors"
+            local scheme_type=""
+
+            if [[ -f $color_cache ]]; then
+                scheme_type=$(cat "$color_cache")
+            else
+                COLOR=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info:)
+                if [ "$(echo "$COLOR < 1.0" | bc)" -eq 1 ]; then
+                    scheme_type="monochrome"
+                else
+                    scheme_type="vibrant"
+                fi
+                echo "$scheme_type" > "$color_cache"
+            fi
+
+            if [[ $scheme_type == "monochrome" ]]; then
+                matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
+            else
+                matugen image -b wal "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
+            fi
+
+            "$RETRO_DIR/retro.sh" app all refresh
         fi
 
         if [[ $is_video == "true" && $should_be_static == "false" ]]; then
-            [[ $is_first_load == "false" ]] && sleep 2.2
+            if [[ $is_first_load == "false" && $quick == "false" ]]; then
+                sleep 2.2
+            fi
 
             local res_map=$(get_var "WALL_RES_MAP")
 
-            hyprctl monitors -j | jq -c '.[]' | while read -r mon; do
-                local m_name=$(echo "$mon" | jq -r '.name')
-                local m_desc=$(echo "$mon" | jq -r '.description')
-
+            hyprctl monitors -j | jq -r '.[] | "\(.name)|\(.description)"' | while IFS='|' read -r m_name m_desc; do
                 local custom_res=""
                 if [[ -n $res_map ]]; then
                     custom_res=$(echo "$res_map" | tr ',' '\n' | grep -F "$m_desc|" | cut -d'|' -f2)
@@ -355,9 +384,10 @@ set_wallpaper() {
 }
 
 restore_wallpaper() {
+    local quick="${1:-false}"
     local last_wall=$(get_var "WALL_CURRENT")
     if [[ -n $last_wall && -f $last_wall ]]; then
-        set_wallpaper "$last_wall"
+        set_wallpaper "$last_wall" "$quick"
     else
         return 1
     fi
@@ -408,7 +438,7 @@ launch_picker() {
 
     local alpha=$(get_opacity_hex "0.9")
     local alpha_alt=$(get_opacity_hex "0.6")
-    local base_bg=$(grep "background:" ~/.config/retrp/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
+    local base_bg=$(grep "background:" ~/.config/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
     local base_bg_alt=$(grep "background-alt:" ~/.config/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
 
     : ${base_bg:="1A1B26"}
@@ -462,7 +492,18 @@ case "$1" in
             done
         fi
         ;;
-    "--restore") restore_wallpaper ;;
+    "--precache-all")
+        mkdir -p "$FRAME_CACHE"
+        local target_dir=$(get_theme_dir)
+        for f in "$target_dir"/*; do
+            [[ -f $f || -L $f ]] || continue
+            local ext="${f##*.}"
+            if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
+                generate_cache "$f" >/dev/null
+            fi
+        done
+        ;;
+    "--restore") restore_wallpaper "${2:-false}" ;;
     "--static") static_wallpaper "$2" ;;
     "--list")
         target_dir=$(get_theme_dir)

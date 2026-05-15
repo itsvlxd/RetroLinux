@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "timeshift"
+
 _check_timeshift() {
     if ! command -v timeshift >/dev/null 2>&1; then
         echo "ERROR:not_installed"

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "test"
+
 CACHE_FILE="$RETRO_CONFIG/test_cache.json"
 
 run_test_core() {

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "benchmark"
+
 get_hw() {
     case "$1" in
         "cpu")

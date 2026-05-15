@@ -1,6 +1,8 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "font"
 
 rx_generate_conf() {
     local main=$(get_var "RETRO_FONT_MAIN")

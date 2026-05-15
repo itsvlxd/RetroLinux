@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "driver"
+
 RETRO_DIR="${RETRO_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
 source "$RETRO_DIR/lib/colors.sh"
 
