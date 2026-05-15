@@ -40,4 +40,13 @@ function Log.success(message) Log.log("success", message) end
 function Log.warn(message) Log.log("warn", message) end
 function Log.error(message) Log.log("error", message) end
 
+function Log.register(name)
+    local log_path = "/tmp/retro_watcher_" .. name .. ".log"
+    local f = io.open(log_path, "r")
+    if not f then
+        f = io.open(log_path, "w")
+        if f then f:close() end
+    end
+end
+
 return Log
