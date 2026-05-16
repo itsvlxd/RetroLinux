@@ -178,6 +178,19 @@ cmd_log_clear() {
 cmd_log_enable() {
     local id="$1"
 
+    if [[ $id == "all" ]]; then
+        local entries=()
+        _rx_log_scan_files entries
+        local count=0
+        for entry in "${entries[@]}"; do
+            IFS='|' read -r eid _ _ _ _ <<<"$entry"
+            rx_log_enable "$eid"
+            count=$((count + 1))
+        done
+        rx_log "success" "Enabled $count log(s)"
+        return
+    fi
+
     if [[ -z $id ]]; then
         rx_log "error" "Log identifier required"
         rx_log "info" "Usage: retro log enable <identifier>"
@@ -233,7 +246,7 @@ cmd_log_help() {
     rx_help_cmd "list" "List all registered log sources"
     rx_help_cmd "<name> [lines]" "View last N lines of a log (default: 30)"
     rx_help_cmd "open <name>" "Stream log in real-time (tail -f)"
-    rx_help_cmd "enable <name>" "Enable logging for a source"
+    rx_help_cmd "enable <name|all>" "Enable logging for a source or all"
     rx_help_cmd "disable <name|all>" "Disable logging for a source or all"
     rx_help_cmd "clear <name|all>" "Clear a log file or all"
     rx_help_examples
@@ -243,6 +256,7 @@ cmd_log_help() {
     rx_help_example "retro log disable power" "Stop logging power events"
     rx_help_example "retro log disable all" "Stop logging all sources"
     rx_help_example "retro log enable power" "Resume logging power events"
+    rx_help_example "retro log enable all" "Resume logging all sources"
     rx_help_example "retro log clear power" "Clear power log"
     rx_help_example "retro log clear all" "Clear all logs"
     rx_help_spacer
