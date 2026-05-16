@@ -2,6 +2,8 @@ local Watcher = require("watcher")
 local Notify = require("notify")
 local Bluetooth = require("bluetooth")
 
+local log = function(msg) Watcher.log("notifications", msg) end
+
 local Events = {}
 
 function Events.on_power_disconnect(cap)
@@ -80,8 +82,8 @@ function Events.on_usb_disconnected(dev_name, mount_root)
 end
 
 function Events.on_bluetooth_connected(name, mac)
-    local category = Bluetooth.get_device_category(mac)
-    local icon = Bluetooth.get_category_icon(category)
+    local icon = Bluetooth.get_device_icon_path(name)
+    log("Notification: bluetooth_connected | name=" .. (name or "nil") .. " | mac=" .. (mac or "nil") .. " | icon=" .. (icon or "nil"))
     local action = Notify.bluetooth_connected(name, mac, icon)
 
     if action == "disconnect" then
@@ -93,14 +95,14 @@ function Events.on_bluetooth_connected(name, mac)
 end
 
 function Events.on_bluetooth_disconnected(name, mac)
-    local category = Bluetooth.get_device_category(mac)
-    local icon = Bluetooth.get_category_icon(category)
+    local icon = Bluetooth.get_device_icon_path(name)
+    log("Notification: bluetooth_disconnected | name=" .. (name or "nil") .. " | mac=" .. (mac or "nil"))
     Notify.bluetooth_disconnected(name, mac, icon)
 end
 
 function Events.on_bluetooth_pairing_request(name, mac)
-    local category = Bluetooth.get_device_category(mac)
-    local icon = Bluetooth.get_category_icon(category)
+    local icon = Bluetooth.get_device_icon_path(name)
+    log("Notification: bluetooth_pairing_request | name=" .. (name or "nil") .. " | mac=" .. (mac or "nil"))
     local action = Notify.bluetooth_pairing_request(name, mac, icon)
 
     if action == "pair" then
