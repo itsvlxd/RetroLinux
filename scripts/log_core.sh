@@ -13,56 +13,15 @@ rx_log_register() {
     [[ ! -f $log_file ]] && touch "$log_file"
 }
 
-rx_log() {
+rx_log_file() {
     local level="${1^^}"
     local message="$2"
-    local icon=""
-    local color=""
-
-    case "${level}" in
-        "INFO")
-            icon=" "
-            color="$PINK"
-            ;;
-        "SUCCESS")
-            icon=" "
-            color="$SUCCESS"
-            ;;
-        "WARN")
-            icon=" "
-            color="$WARN"
-            ;;
-        "ERROR")
-            icon="󰅙 "
-            color="$ERROR"
-            ;;
-        *)
-            icon="󰀦 "
-            color="$RESET"
-            ;;
-    esac
-
-    local stripped_msg
-    stripped_msg="$(echo "$message" | sed 's/'$'\033''\[[0-9;]*m//g')"
-
-    local is_prompt=false
-    if [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]:[[:space:]]* ]] ||
-        [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]$ ]] ||
-        [[ $stripped_msg =~ \[Default: ]]; then
-        is_prompt=true
-    fi
-
-    local ts
-    ts="$(date '+%Y-%m-%d %H:%M:%S')"
-
-    if [[ $is_prompt == true ]]; then
-        printf "${color}[${icon}${level}]${RESET} ${message}"
-    else
-        printf "${color}[${icon}${level}]${RESET} ${message}\n"
-    fi
 
     local clean_msg
     clean_msg="$(echo "$message" | sed 's/'$'\033''\[[0-9;]*m//g')"
+
+    local ts
+    ts="$(date '+%Y-%m-%d %H:%M:%S')"
 
     for id in "${!_RX_LOG_REGISTERED[@]}"; do
         local log_file="$RETRO_LOG_DIR/${id}.log"
