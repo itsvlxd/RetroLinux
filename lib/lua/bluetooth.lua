@@ -28,10 +28,11 @@ end
 function Bluetooth.get_device_name(mac)
     if not mac or mac == "" then return "Unknown" end
     local info = run_cmd("bluetoothctl info " .. mac .. " 2>/dev/null")
-    local name = info:match("Name:%s*(.+)")
+    local name = info:match("Name:%s*([^\n]+)")
     if not name then
-        name = info:match("Alias:%s*(.+)")
+        name = info:match("Alias:%s*([^\n]+)")
     end
+    if name then name = name:gsub("^%s*(.-)%s*$", "%1") end
     return name or "Unknown Device"
 end
 
@@ -51,7 +52,7 @@ function Bluetooth.get_device_uuids(mac)
     if not mac or mac == "" then return {} end
     local info = run_cmd("bluetoothctl info " .. mac .. " 2>/dev/null")
     local uuids = {}
-    for uuid in info:gmatch("UUID:%s*%(([^)]+)%)") do
+    for uuid in info:gmatch("UUID:.- %(([%x%-]+)%)") do
         table.insert(uuids, uuid:lower())
     end
     return uuids
@@ -74,7 +75,9 @@ end
 function Bluetooth.get_device_icon(mac)
     if not mac or mac == "" then return "" end
     local info = run_cmd("bluetoothctl info " .. mac .. " 2>/dev/null")
-    return info:match("Icon:%s*(%S+)") or ""
+    local icon = info:match("Icon:%s*([^\n]+)")
+    if icon then icon = icon:gsub("^%s*(.-)%s*$", "%1") end
+    return icon or ""
 end
 
 function Bluetooth.is_audio_capable(mac)
@@ -267,6 +270,30 @@ function Bluetooth.get_nearby_devices()
         end
     end
     return devices
+end
+
+function Bluetooth.get_device_icon_path(name)
+    if not name or name == "" then return "bluetooth-active" end
+    local retro_dir = os.getenv("RETRO_DIR") or "/home/vlad/.essentials/retro-arch"
+    local icon_dir = retro_dir .. "/icons"
+    local n = name:lower()
+
+    local icon_map = {
+        { pattern = "xbox.*wireless", file = "xbox_wireless_controller.png" },
+        { pattern = "nothing.*headphone.*1", file = "nothing_headphone_1.png" },
+        { pattern = "nothing.*phone.*2", file = "nothing_phone_2.png" },
+        { pattern = "nothing.*ear", file = "nothing_ear.png" },
+        { pattern = "at.*over.*ear", file = "at_over_ear.png" },
+    }
+
+    for _, entry in ipairs(icon_map) do
+        if n:match(entry.pattern) then
+            local full_path = icon_dir .. "/" .. entry.file
+            local f = io.open(full_path, "r")
+            if f then f:close(); return full_path end
+        end
+    end
+    return "bluetooth-active"
 end
 
 function Bluetooth.get_device_full_info(mac)
