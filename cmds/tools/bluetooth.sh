@@ -59,10 +59,9 @@ cmd_bluetooth() {
                         local profile=$(get_bt_audio_profile "$device_card")
                         local display=$(get_bt_profile_display_name "$profile" | sed -E \
                             's/High Fidelity Playback \(A2DP Sink, codec /A2DP /; s/Headset Head Unit \(HSP\/HFP, codec /HSP\//')
-                        printf "  ${GRAY}%s${RESET}" "$display"
+                        printf "  ${GRAY}%s${RESET}\n" "$display"
                     fi
                 fi
-                echo ""
             done
         fi
         rx_table_separator && rx_table_spacer
@@ -125,7 +124,79 @@ cmd_bluetooth() {
         rx_table_separator && rx_table_spacer
     }
 
+    _profile_icon() {
+        local profile="$1"
+        case "$profile" in
+            *a2dp-sink*) echo "󰎄" ;;
+            *headset-head-unit*) echo "󰍣" ;;
+            *off*) echo "󰖭" ;;
+            *) echo "󰎄" ;;
+        esac
+    }
+
     _bt_profile_show() {
+        local mac="$1"
+        local raw_info=$(bash "$bt_script" --profile-info "$mac" 2>/dev/null)
+        local device_name=$(get_bt_device_info "$mac")
+        [[ -z $device_name ]] && device_name="$mac"
+
+        local active="N/A" codec="N/A" is_online=true
+        if [[ $raw_info == "NO_CARD" ]]; then
+            is_online=false
+        else
+            while IFS='|' read -r key value; do
+                [[ $key == "ACTIVE" ]] && active="$value"
+                [[ $key == "CODEC" ]] && codec="$value"
+            done < <(echo "$raw_info")
+        fi
+
+        local forced=$(get_var "BT_FORCE_PROFILE_${mac//:/_}" "")
+        local forced_display="None"
+        if [[ -n $forced ]]; then
+            local f_prof
+            f_prof=$(echo "$forced" | cut -d'|' -f1)
+            forced_display="$f_prof (locked)"
+        fi
+
+        local mic_disabled=$(get_var "BT_MIC_DISABLED_${mac//:/_}" "")
+        local mic_display="Enabled"
+        local mic_color="$SUCCESS"
+        if [[ $mic_disabled == "true" ]]; then
+            mic_display="Disabled (suspended)"
+            mic_color="$ERROR"
+        fi
+
+        local status_color="$SUCCESS"
+        [[ $is_online == "false" ]] && status_color="$MUTE"
+
+        rx_table_header "󰕌" "Audio Profiles: ${device_name:0:32}"
+        rx_table_row "󰈐" "Status:" "$([ $is_online == true ] && echo "Connected" || echo "Offline")" "$status_color" "20"
+        rx_table_row "󰈐" "Active:" "$(get_bt_profile_display_name "$active")" "$PINK" "20"
+        rx_table_row "󰈐" "Codec:" "${codec}" "$PINK" "20"
+        rx_table_row "󰈐" "Forced:" "$forced_display" "$PINK" "20"
+        rx_table_row "󰍣" "Microphone:" "$mic_display" "$mic_color" "20"
+
+        if [[ $is_online == "true" ]]; then
+            rx_table_separator
+            echo "$raw_info" | grep "^PROFILE" | while IFS='|' read -r _ raw_name is_active desc; do
+                [[ $raw_name == "off" ]] && continue
+                local icon row_color
+                icon=$(_profile_icon "$raw_name")
+                if [[ $is_active == "1" ]]; then
+                    row_color="$PINK"
+                else
+                    row_color="$GRAY"
+                fi
+                printf " ${PINK}%s${RESET} ${row_color}%s${RESET}  ${GRAY}%s${RESET}\n" "$icon" "$raw_name" "$desc"
+            done
+        fi
+
+        rx_table_separator
+        rx_table_spacer
+        rx_log "info" "Set profile: ${PINK}retro bluetooth profile $mac <profile_name> [-f]${RESET}"
+    }
+
+    _bt_profile_list() {
         local mac="$1"
         local raw_info=$(bash "$bt_script" --profile-info "$mac" 2>/dev/null)
         [[ $raw_info == "NO_CARD" ]] && rx_log "warn" "Device ${PINK}$mac${RESET} is not connected." && return 1
@@ -138,16 +209,26 @@ cmd_bluetooth() {
 
         local device_name=$(get_bt_device_info "$mac")
         [[ -z $device_name ]] && device_name="$mac"
-        rx_table_header "󰕌" "Audio Profile: ${device_name:0:32}"
+
+        rx_table_header "󰕌" "Audio Profiles: ${device_name:0:32}"
         rx_table_row "󰈐" "Active:" "$(get_bt_profile_display_name "$active")" "$PINK" "20"
         rx_table_row "󰈐" "Codec:" "${codec:-unknown}" "$PINK" "20"
         rx_table_separator
-        echo "$raw_info" | grep "^PROFILE" | while IFS='|' read -r _ _ is_active desc; do
-            local color="$GRAY" marker="  "
-            [[ $is_active == "1" ]] && color="$SUCCESS" marker="󰊠"
-            printf " ${color}%s${RESET} %s\n" "$marker" "$desc"
+
+        echo "$raw_info" | grep "^PROFILE" | while IFS='|' read -r _ raw_name is_active desc; do
+            local icon row_color
+            icon=$(_profile_icon "$raw_name")
+            if [[ $is_active == "1" ]]; then
+                row_color="$PINK"
+            else
+                row_color="$GRAY"
+            fi
+            printf " ${PINK}%s${RESET} ${row_color}%s${RESET}  ${GRAY}%s${RESET}\n" "$icon" "$raw_name" "$desc"
         done
-        rx_table_separator && rx_table_spacer
+
+        rx_table_separator
+        rx_table_spacer
+        rx_log "info" "Set profile: ${PINK}retro bluetooth profile $mac <profile_name> [-f]${RESET}"
     }
 
     _bt_send() {
@@ -279,11 +360,44 @@ cmd_bluetooth() {
             local mac=$(_normalize_mac "$1")
             local prof="$2"
             local cod="$3"
-            [[ -z $mac ]] && rx_log "error" "Usage: retro bluetooth profile <mac> [profile] [codec]" && return 1
-            if [[ -z $prof ]]; then _bt_profile_show "$mac"; else
+            local force=false
+            for arg in "$@"; do
+                case "${arg,,}" in
+                    --force|-f) force=true ;;
+                esac
+            done
+            [[ -z $mac ]] && rx_log "error" "Usage: retro bluetooth profile <mac> [profile] [codec] [--force]" && return 1
+            if [[ $prof == "list" ]]; then
+                _bt_profile_list "$mac"
+                return
+            fi
+            if [[ -z $prof ]]; then
+                _bt_profile_show "$mac"
+            elif [[ $prof == "clear" || $prof == "unforce" ]]; then
+                local is_audio=$(is_bt_device_audio_capable "$mac")
+                [[ $is_audio != "true" ]] && rx_log "error" "Device ${PINK}$mac${RESET} is not an audio device." && return 1
+                local prev=$(get_var "BT_FORCE_PROFILE_${mac//:/_}" "")
+                [[ -z $prev ]] && rx_log "warn" "No forced profile set for ${PINK}$mac${RESET}." && return 1
+                set_var "BT_FORCE_PROFILE_${mac//:/_}" ""
+                rx_log "success" "Forced profile cleared for ${PINK}$mac${RESET}."
+                return 0
+            else
+                local is_audio=$(is_bt_device_audio_capable "$mac")
+                [[ $is_audio != "true" ]] && rx_log "error" "Device ${PINK}$mac${RESET} is not an audio device." && return 1
                 local res=$(bash "$bt_script" --profile-set "$mac" "$prof" "$cod" 2>/dev/null)
-                if [[ $res == ERR_* ]]; then rx_log "error" "Failed to set profile ($res)"; else
-                    rx_log "success" "Profile set to ${PINK}$(get_bt_profile_display_name "$(echo "$res" | awk -F'|' '{print $2}')")${RESET}."
+                if [[ $res == ERR_PROFILE_NOT_FOUND ]]; then
+                    rx_log "error" "Profile ${PINK}$prof${RESET} not supported by this device"
+                    _bt_profile_show "$mac"
+                elif [[ $res == ERR_* ]]; then
+                    rx_log "error" "Failed to set profile ($res)"
+                else
+                    if [[ $force == "true" ]]; then
+                        set_var "BT_FORCE_PROFILE_${mac//:/_}" "$(echo "$res" | awk -F'|' '{print $2}')|$cod"
+                        rx_log "success" "Profile ${PINK}$(get_bt_profile_display_name "$(echo "$res" | awk -F'|' '{print $2}')")${RESET} forced (will not auto-change)."
+                    else
+                        set_var "BT_FORCE_PROFILE_${mac//:/_}" ""
+                        rx_log "success" "Profile set to ${PINK}$(get_bt_profile_display_name "$(echo "$res" | awk -F'|' '{print $2}')")${RESET}."
+                    fi
                 fi
             fi
             ;;
@@ -345,6 +459,36 @@ cmd_bluetooth() {
         "discoverable")
             [[ $(bash "$bt_script" --toggle-discovery) == "on" ]] && rx_log "success" "Visible for 3 mins." || rx_log "info" "Hidden."
             ;;
+        "mic")
+            [[ -z $2 ]] && rx_log "error" "Usage: retro bluetooth mic <mac> <disable|enable>" && return 1
+            local mac=$(_normalize_mac "$2")
+            local mic_action="${3,,}"
+            case "$mic_action" in
+                disable|off)
+                    local res
+                    res=$(bash "$bt_script" --mic-suspend "$mac")
+                    if [[ $res == OK* ]]; then
+                        set_var "BT_MIC_DISABLED_${mac//:/_}" "true"
+                        rx_log "success" "Microphone disabled for ${PINK}$mac${RESET} (output-only mode)"
+                    else
+                        rx_log "error" "Failed to disable mic (${res#ERR_})"
+                    fi
+                    ;;
+                enable|on)
+                    local res
+                    res=$(bash "$bt_script" --mic-resume "$mac")
+                    if [[ $res == OK* ]]; then
+                        set_var "BT_MIC_DISABLED_${mac//:/_}" ""
+                        rx_log "success" "Microphone enabled for ${PINK}$mac${RESET}"
+                    else
+                        rx_log "error" "Failed to enable mic (${res#ERR_})"
+                    fi
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro bluetooth mic <mac> <disable|enable>"
+                    ;;
+            esac
+            ;;
         "trust")
             [[ -z $2 ]] && rx_log "error" "Usage: retro bluetooth trust <mac>" && return 1
             local mac=$(_normalize_mac "$2")
@@ -375,7 +519,9 @@ cmd_bluetooth() {
             rx_help_cmd "scan [on|off]" "Toggle device discovery"
             rx_help_cmd "list" "List paired devices with type"
             rx_help_cmd "nearby" "Show discoverable devices"
-            rx_help_cmd "profile <mac>" "Manage audio profile"
+            rx_help_cmd "profile <mac>" "Show all profiles, forced settings, and usage"
+            rx_help_cmd "profile <mac> list" "List available profiles only"
+            rx_help_cmd "profile <mac> clear" "Remove forced profile lock"
             rx_help_cmd "send <mac> <file>" "Send file to your phone/PC"
             rx_help_cmd "connect <mac>" "Connect to a device"
             rx_help_cmd "disconnect <mac>" "Disconnect a device"
@@ -383,14 +529,19 @@ cmd_bluetooth() {
             rx_help_cmd "trust <mac>" "Mark device as trusted (auto-accept files)"
             rx_help_cmd "untrust <mac>" "Remove trust (prompts on each file)"
             rx_help_cmd "discoverable" "Toggle visibility mode"
+            rx_help_cmd "mic <mac> <disable|enable>" "Switch to output-only or headset profile"
             rx_help_cmd "receive [start|restart|stop]" "Manage file reception agent"
             rx_help_cmd "restore" "Restore saved Bluetooth state"
             rx_help_spacer
             rx_help_examples "Examples"
-            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF" "Show available audio profiles"
+            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF" "Show all profiles and forced settings"
+            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF list" "List all available profiles"
             rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF a2dp-sink ldac" "Switch to LDAC codec"
+            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF a2dp-sink ldac -f" "Lock to LDAC (prevent auto-switch)"
+            rx_help_example "retro bluetooth profile AA:BB:CC:DD:EE:FF clear" "Remove forced profile lock"
             rx_help_example "retro bluetooth send AA:BB:CC:DD:EE:FF ~/photo.jpg" "Send a file to your phone"
             rx_help_example "retro bluetooth receive restart" "Restart the receive agent"
+            rx_help_example "retro bluetooth mic AA:BB:CC:DD:EE:FF disable" "Switch to output-only (hide mic)"
             rx_help_spacer
             ;;
     esac
