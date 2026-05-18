@@ -11,16 +11,20 @@ bt_power_on() {
     fi
 
     if bluetoothctl power on >/dev/null 2>&1; then
+        rx_log_file "info" "Bluetooth radio powered ON"
         echo "OK|on"
     else
+        rx_log_file "error" "Bluetooth power ON failed"
         echo "ERR|power_on_failed"
     fi
 }
 
 bt_power_off() {
     if bluetoothctl power off >/dev/null 2>&1; then
+        rx_log_file "info" "Bluetooth radio powered OFF"
         echo "OK|off"
     else
+        rx_log_file "error" "Bluetooth power OFF failed"
         echo "ERR|power_off_failed"
     fi
 }
@@ -435,9 +439,24 @@ set_audio_profile() {
         return 1
     fi
 
+    local available_profiles
+    available_profiles=$(get_available_profiles "$card" | awk -F: '{print $1}' | xargs)
+    local found=0
+    for p in $available_profiles; do
+        [[ "$p" == "$profile" ]] && found=1 && break
+    done
+
+    if [[ $found -eq 0 ]]; then
+        rx_log_file "error" "Profile $profile not available for $mac"
+        echo "ERR_PROFILE_NOT_FOUND"
+        return 1
+    fi
+
     if pactl set-card-profile "$card" "$profile" 2>/dev/null; then
+        rx_log_file "info" "Audio profile set to $profile for $mac"
         echo "OK|$profile"
     else
+        rx_log_file "error" "Failed to set audio profile $profile for $mac"
         echo "ERR_SET_FAILED"
         return 1
     fi
@@ -487,6 +506,7 @@ bt_pair_with_agent() {
         local pair_result=$?
         if [[ $pair_result -ne 0 ]]; then
             kill "$agent_pid" 2>/dev/null
+            rx_log_file "error" "Pairing failed for $name ($mac)"
             echo "ERR_PAIR_FAILED|$pair_result"
             return 1
         fi
@@ -498,9 +518,11 @@ bt_pair_with_agent() {
     kill "$agent_pid" 2>/dev/null
 
     if [[ $connect_result -eq 0 ]]; then
+        rx_log_file "info" "Connected to $name ($mac)"
         echo "OK|$mac|$name"
         return 0
     else
+        rx_log_file "error" "Connection failed for $name ($mac)"
         echo "ERR_CONNECT_FAILED|$connect_result"
         return 1
     fi
@@ -510,6 +532,7 @@ bt_disconnect() {
     local mac="$1"
     [[ -z $mac ]] && return 1
     bluetoothctl disconnect "$mac" >/dev/null 2>&1
+    rx_log_file "info" "Disconnected $mac"
 }
 
 bt_reconnect_with_agent() {
@@ -527,9 +550,11 @@ bt_reconnect_with_agent() {
     kill "$agent_pid" 2>/dev/null
 
     if [[ $connect_result -eq 0 ]]; then
+        rx_log_file "info" "Reconnected to $name ($mac)"
         echo "OK|$mac|$name"
         return 0
     else
+        rx_log_file "error" "Reconnection failed for $name ($mac)"
         echo "ERR_CONNECT_FAILED|$connect_result"
         return 1
     fi
@@ -539,6 +564,7 @@ bt_remove_device() {
     local mac="$1"
     [[ -z $mac ]] && return 1
     bluetoothctl remove "$mac" >/dev/null 2>&1
+    rx_log_file "info" "Removed device $mac"
 }
 
 _rx_notif_id() {
@@ -573,6 +599,8 @@ bt_obex_ask() {
     local human_size
     human_size=$(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "${size} bytes")
 
+    rx_log_file "info" "Incoming file: $filename ($human_size) from $device_name ($source)"
+
     local action
     action=$(
         notify-send \
@@ -590,6 +618,7 @@ bt_obex_ask() {
     if [[ $action == "accept" ]]; then
         exit 0
     else
+        rx_log_file "warn" "File transfer denied: $filename from $device_name ($source)"
         exit 1
     fi
 }
@@ -632,6 +661,10 @@ bt_obex_notify_progress() {
     else
         cur_human="${transferred}B"
         total_human="${total}B"
+    fi
+
+    if [[ $pct -eq 100 ]]; then
+        rx_log_file "info" "Transfer progress: $filename from $device_name - 100%"
     fi
 
     (
@@ -715,6 +748,7 @@ bt_obex_notify_done() {
             -u normal \
             "Transfer Complete" \
             "<b>${filename}</b> received from <b>${device_name}</b> in ${elapsed} seconds."
+        rx_log_file "success" "File $filename received from $device_name ($source) in ${elapsed}s"
     elif [[ $status == "cancelled" ]]; then
         notify-send \
             -r "$notif_id" \
@@ -723,6 +757,7 @@ bt_obex_notify_done() {
             -u normal \
             "Transfer Aborted" \
             "Connection to <b>${device_name}</b> severed."
+        rx_log_file "warn" "File transfer cancelled: $filename from $device_name ($source)"
     else
         notify-send \
             -r "$notif_id" \
@@ -731,6 +766,7 @@ bt_obex_notify_done() {
             -u normal \
             "Transfer Failed" \
             "Receiving <b>${filename}</b> from <b>${device_name}</b> was interrupted."
+        rx_log_file "error" "File transfer failed: $filename from $device_name ($source)"
     fi
 }
 
@@ -794,6 +830,8 @@ bt_send_file() {
     local cancel_flag="/tmp/.bt_send_${notif_id}_cancel"
     local result_file="/tmp/.bt_send_${notif_id}_result.txt"
     rm -f "$log_file" "$cancel_flag" "$result_file"
+
+    rx_log_file "info" "Sending $file_name to $device_name ($mac)"
 
     stdbuf -oL bt-obex -p "$mac" "$file_path" >"$log_file" 2>&1 &
     local obex_pid=$!
@@ -879,11 +917,15 @@ bt_send_file() {
                 -i "$icon_path" \
                 "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed} seconds."
             echo "OK|$elapsed" >"$result_file"
+            source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
+            rx_log_file "success" "File $file_name sent to $device_name ($mac) in ${elapsed}s"
         else
             _bt_dismiss_notif "$notif_id"
             notify-send -r "$notif_id" -a "RetroTransfer" -u normal -i "$icon_path" \
                 "Transfer Failed" "<b>$device_name</b> rejected the request."
             echo "ERR|rejected" >"$result_file"
+            source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
+            rx_log_file "error" "Failed to send $file_name to $device_name ($mac) - rejected"
         fi
 
         rm -f "$log_file" "$cancel_flag"
@@ -899,6 +941,7 @@ bt_cancel_send() {
     local notif_id=$((0x$mac_clean % 1000000))
     [[ $notif_id -lt 10000 ]] && notif_id=$((notif_id + 10000))
     touch "/tmp/.bt_send_${notif_id}_cancel"
+    rx_log_file "warn" "Send transfer cancelled for $mac"
 }
 
 rx_handle_profile_set() {
@@ -907,7 +950,17 @@ rx_handle_profile_set() {
     local codec="$3"
     local normalized
     normalized=$(normalize_profile "$profile" "$codec")
+    rx_log_file "info" "Setting audio profile for $mac: $profile ($codec) -> $normalized"
     set_audio_profile "$mac" "$normalized"
+}
+
+rx_handle_can_send() {
+    local mac="$1"
+    [[ -z $mac ]] && echo "false" && return
+    local is_phone is_computer
+    is_phone=$(is_device_phone "$mac")
+    is_computer=$(is_device_computer "$mac")
+    [[ $is_phone == "true" || $is_computer == "true" ]] && echo "true" || echo "false"
 }
 
 bt_obex_ensure_download_dir() {
@@ -948,6 +1001,7 @@ bt_obex_ensure_download_dir() {
     fi
 
     set_var "BT_DOWNLOAD_DIR" "$dir_path"
+    rx_log_file "info" "Download directory set to: $dir_path"
     echo "$dir_path"
 }
 
@@ -964,6 +1018,7 @@ bt_obex_move_received_file() {
 
     if [[ -f $cache_file ]]; then
         mv "$cache_file" "$dl_dir/" 2>/dev/null && {
+            rx_log_file "info" "Moved $filename to $dl_dir"
             xdg-open "$dl_dir/$filename" >/dev/null 2>&1 &
             return 0
         }
@@ -973,6 +1028,7 @@ bt_obex_move_received_file() {
     found=$(find "$cache_dir" -maxdepth 2 -name "$filename" -newer /tmp/.bt_obex_receive.pid 2>/dev/null | head -1)
     if [[ -n $found ]]; then
         mv "$found" "$dl_dir/" 2>/dev/null && {
+            rx_log_file "info" "Moved $filename to $dl_dir"
             xdg-open "$dl_dir/$filename" >/dev/null 2>&1 &
             return 0
         }
@@ -994,6 +1050,7 @@ bt_obex_restart_with_root() {
     nohup /usr/lib/bluetooth/obexd --root="$dl_dir" >/dev/null 2>&1 &
     sleep 1.5
 
+    rx_log_file "info" "OBEX daemon restarted with root: $dl_dir"
     bt_obex_receive_restart
 }
 
@@ -1043,12 +1100,14 @@ bt_obex_receive_start() {
     sleep 2
     if kill -0 "$pid" 2>/dev/null; then
         set_var "BT_RECEIVE_ACTIVE" "true"
+        rx_log_file "info" "OBEX receive agent started (PID: $pid)"
         echo "OK|$pid"
     else
         local err
         err=$(cat /tmp/.bt_obex_receive.log 2>/dev/null | head -1)
         [[ -z $err ]] && err="start_failed"
         rm -f "$pid_file"
+        rx_log_file "error" "OBEX receive agent failed to start: $err"
         echo "ERR|$err"
     fi
 }
@@ -1065,6 +1124,7 @@ bt_obex_receive_stop() {
     pkill -f 'bluetooth_receive.py' 2>/dev/null
     rm -f /tmp/.bt_obex_receive.log
     set_var "BT_RECEIVE_ACTIVE" "false"
+    rx_log_file "info" "OBEX receive agent stopped"
     echo "OK|stopped"
 }
 
@@ -1084,6 +1144,78 @@ bt_obex_receive_status() {
         echo "running|${dl_dir}"
     else
         echo "stopped|${dl_dir}"
+    fi
+}
+
+bt_mic_suspend() {
+    local mac="$1"
+    [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+
+    local card
+    card=$(get_audio_card_for_mac "$mac")
+    [[ -z $card ]] && echo "ERR_NO_CARD" && return 1
+
+    local current_profile
+    current_profile=$(get_audio_profile "$card")
+    [[ -z $current_profile ]] && echo "ERR_NO_PROFILE" && return 1
+
+    if [[ $current_profile == a2dp-sink* ]]; then
+        echo "OK|already_output_only"
+        return 0
+    fi
+
+    set_var "BT_MIC_PREV_PROFILE_${mac//:/_}" "$current_profile"
+
+    if pactl set-card-profile "$card" "a2dp-sink" 2>/dev/null; then
+        rx_log_file "info" "Mic disabled for $mac (switched to a2dp-sink)"
+        echo "OK|a2dp-sink"
+    else
+        rx_log_file "error" "Failed to switch profile for $mac"
+        echo "ERR_SWITCH_FAILED"
+        return 1
+    fi
+}
+
+bt_mic_resume() {
+    local mac="$1"
+    [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+
+    local card
+    card=$(get_audio_card_for_mac "$mac")
+    [[ -z $card ]] && echo "ERR_NO_CARD" && return 1
+
+    local prev_profile
+    prev_profile=$(get_var "BT_MIC_PREV_PROFILE_${mac//:/_}" "")
+
+    if [[ -z $prev_profile ]]; then
+        prev_profile="headset-head-unit"
+    fi
+
+    if pactl set-card-profile "$card" "$prev_profile" 2>/dev/null; then
+        rx_log_file "info" "Mic enabled for $mac (switched to $prev_profile)"
+        echo "OK|$prev_profile"
+    else
+        rx_log_file "error" "Failed to switch profile for $mac"
+        echo "ERR_SWITCH_FAILED"
+        return 1
+    fi
+}
+
+bt_mic_status() {
+    local mac="$1"
+    [[ -z $mac ]] && echo "ERR_NO_MAC" && return 1
+
+    local card
+    card=$(get_audio_card_for_mac "$mac")
+    [[ -z $card ]] && echo "ERR_NO_CARD" && return 1
+
+    local current_profile
+    current_profile=$(get_audio_profile "$card")
+
+    if [[ $current_profile == a2dp-sink* ]]; then
+        echo "disabled|a2dp-sink"
+    else
+        echo "enabled|$current_profile"
     fi
 }
 
@@ -1188,4 +1320,7 @@ case "$1" in
         [[ -z $mac ]] && echo "ERR_NO_MAC" && exit 1
         bluetoothctl untrust "$mac" >/dev/null 2>&1 && echo "OK|untrusted" || echo "ERR|untrust_failed"
         ;;
+    "--mic-suspend") bt_mic_suspend "$2" ;;
+    "--mic-resume") bt_mic_resume "$2" ;;
+    "--mic-status") bt_mic_status "$2" ;;
 esac

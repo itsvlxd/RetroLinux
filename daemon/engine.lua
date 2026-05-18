@@ -1,5 +1,4 @@
 local Watcher = require("watcher")
-local Log = require("log")
 
 local Engine = {}
 Engine.__index = Engine
@@ -33,28 +32,33 @@ function Engine:load_watchers()
     for _, file in ipairs(watcher_files) do
         local name = file:match("([^/]+)%.lua$")
         if name then
-            local ok, mod = pcall(dofile, file)
-            if ok and mod and type(mod.start) == "function" then
-                local enabled = true
-                if mod.enabled and type(mod.enabled) == "function" then
-                    enabled = mod.enabled()
-                end
-                if enabled then
-                    Log.register(name)
-                    table.insert(self.watchers, {
-                        name = name,
-                        module = mod,
-                        interval = mod.interval or 15,
-                        crashes = 0,
-                        disabled = false,
-                    })
-                end
+            local disabled_file = "/tmp/retro_logs/watcher_" .. name .. ".disabled"
+            local df = io.open(disabled_file, "r")
+            if df then
+                df:close()
             else
-                local log_path = "/tmp/retro_engine.log"
-                local f = io.open(log_path, "a")
-                if f then
-                    f:write(string.format("[%s] Failed to load %s: %s\n", os.date("%H:%M:%S"), name, tostring(mod)))
-                    f:close()
+                local ok, mod = pcall(dofile, file)
+                if ok and mod and type(mod.start) == "function" then
+                    local enabled = true
+                    if mod.enabled and type(mod.enabled) == "function" then
+                        enabled = mod.enabled()
+                    end
+                    if enabled then
+                        table.insert(self.watchers, {
+                            name = name,
+                            module = mod,
+                            interval = mod.interval or 15,
+                            crashes = 0,
+                            disabled = false,
+                        })
+                    end
+                else
+                    local log_path = "/tmp/retro_engine.log"
+                    local f = io.open(log_path, "a")
+                    if f then
+                        f:write(string.format("[%s] Failed to load %s: %s\n", os.date("%H:%M:%S"), name, tostring(mod)))
+                        f:close()
+                    end
                 end
             end
         end
@@ -135,7 +139,7 @@ function Engine:emit_sync(event_name, ...)
 end
 
 function Engine:run_watcher(watcher_info)
-    local log_path = "/tmp/retro_watcher_" .. watcher_info.name .. ".log"
+    local log_path = "/tmp/retro_logs/watcher_" .. watcher_info.name .. ".log"
     local lf = io.open(log_path, "a")
     if lf then
         lf:write(string.format("[%s] Watcher started (interval: %d)\n", os.date("%H:%M:%S"), watcher_info.interval))

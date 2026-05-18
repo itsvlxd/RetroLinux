@@ -15,7 +15,7 @@ from gi.repository import GLib  # type: ignore
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from lib.python.log import rx_log  # pylint: disable=import-error
+from scripts.python.log_core import rx_log_file, register  # pylint: disable=import-error
 from lib.python.obex import (  # pylint: disable=import-error
     BUS_NAME, AGENT_IFACE, PROPS_IFACE, TRANSFER_IFACE, SESSION_IFACE,
     clean_cancel_flag, get_cancel_flag_path,
@@ -43,7 +43,7 @@ class ObexAgent(dbus.service.Object):
             iface = dbus.Interface(obj, PROPS_IFACE)
             props = iface.GetAll(TRANSFER_IFACE)
         except dbus.DBusException as exc:
-            rx_log("error", f"Cannot read transfer properties: {exc}")
+            rx_log_file("error", f"Cannot read transfer properties: {exc}")
             err = "org.bluez.obex.Error.Rejected"
             raise dbus.exceptions.DBusException(err)
 
@@ -58,9 +58,9 @@ class ObexAgent(dbus.service.Object):
                 session_props = dbus.Interface(session_obj, PROPS_IFACE)
                 source = str(session_props.Get(SESSION_IFACE, "Destination"))
             except Exception as e:
-                rx_log("warn", f"Could not resolve session address: {e}")
+                rx_log_file("warn", f"Could not resolve session address: {e}")
 
-        rx_log("info", f"Incoming: {filename} ({size} bytes) from {source}")
+        rx_log_file("info", f"Incoming: {filename} ({size} bytes) from {source}")
 
         if source != "Unknown":
             clean_cancel_flag(source)
@@ -88,7 +88,7 @@ class ObexAgent(dbus.service.Object):
                     )
                     dl_dir = result.stdout.strip()
                     if dl_dir:
-                        rx_log("info", f"Download directory set to: {dl_dir}")
+                        rx_log_file("info", f"Download directory set to: {dl_dir}")
                     self._needs_move = True
                 else:
                     result_box[0] = False
@@ -117,7 +117,7 @@ class ObexAgent(dbus.service.Object):
             flag = get_cancel_flag_path(source)
             if os.path.exists(flag) and transfer_path not in self._cancelled:
                 self._cancelled[transfer_path] = True
-                rx_log(
+                rx_log_file(
                     "info",
                     f"Transfer cancelled by user, restarting agent: {filename}"
                 )
@@ -160,7 +160,7 @@ class ObexAgent(dbus.service.Object):
                     ])
                     self._remove_receiver(transfer_path)
                     if status == "complete" and self._needs_move:
-                        rx_log(
+                        rx_log_file(
                             "info",
                             "First transfer complete, "
                             "moving file and restarting with new root"
@@ -202,12 +202,13 @@ class ObexAgent(dbus.service.Object):
 
     @dbus.service.method(AGENT_IFACE, in_signature="", out_signature="")
     def Release(self):
-        rx_log("info", "Agent released.")
+        rx_log_file("info", "Agent released.")
 
 
 def main():
     if len(sys.argv) < 2:
         sys.exit(1)
+    register("bluetooth")
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     unique_path = f"/retro/agent_{int(time.time())}"

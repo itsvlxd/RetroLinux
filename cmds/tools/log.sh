@@ -116,7 +116,7 @@ cmd_log_view() {
             ERROR) color="$ERROR" ;;
             WARN) color="$WARN" ;;
             SUCCESS) color="$SUCCESS" ;;
-            INFO) color="$PINK" ;;
+            INFO) color="$WHITE" ;;
         esac
 
         printf " ${color}%s${RESET}\n" "$line"
@@ -276,4 +276,4 @@ cmd_log() {
     esac
 }
 
-register_command "Tools" "log" "View and manage system logs" "cmd_log"
+register_command "TOOLS" "log" "View and manage system logs" "cmd_log"

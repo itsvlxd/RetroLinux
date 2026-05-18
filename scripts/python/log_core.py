@@ -57,13 +57,8 @@ def register(identifier):
     return True
 
 
-def log(level, message):
+def rx_log_file(level, message):
     level = level.upper()
-    icon = _ICONS.get(level, "󰀦 ")
-    color = _COLORS.get(level, RESET)
-
-    print(f"{color}[{icon}{level}]{RESET} {message}")
-
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_line = f"[{ts}] [{level}] {message}\n"
 
@@ -75,6 +70,18 @@ def log(level, message):
             _rotate(path)
         except Exception:
             pass
+
+
+def rx_log(level, message):
+    level = level.upper()
+    icon = _ICONS.get(level, "󰀦 ")
+    color = _COLORS.get(level, RESET)
+    print(f"{color}[{icon}{level}]{RESET} {message}")
+
+
+def log(level, message):
+    rx_log(level, message)
+    rx_log_file(level, message)
 
 
 def info(message):
