@@ -1,14 +1,15 @@
 #!/bin/bash
 
 source "$RETRO_DIR/scripts/log_core.sh"
+source "$RETRO_DIR/lib/variable.sh"
 rx_log_register "audio"
 
 get_default_sink() {
-    wpctl status 2>/dev/null | grep -A5 "Sinks:" | grep "\*" | grep -oE "[0-9]+\." | head -1 | tr -d '.'
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/ && match($(i-1),/\*/)) {gsub(/\./,"",$i); print $i; exit}}'
 }
 
 get_default_source() {
-    wpctl status 2>/dev/null | sed -n '/Audio/,/Video/p' | sed -n '/Sources:/,/Filters:/p' | grep -E "│  \*" | grep -oE "[0-9]+\." | head -1 | tr -d '.'
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/ && match($(i-1),/\*/)) {gsub(/\./,"",$i); print $i; exit}}'
 }
 
 get_sink_volume() {
@@ -26,36 +27,82 @@ get_sink_mute() {
 get_source_mute() {
     local source=$(get_default_source)
     [[ -z $source ]] && echo "false" && return
-    pactl get-source-mute "$source" 2/ | grep -qi "yes" && echo "true" || echo "false"
+    wpctl get-mute "$source" 2>/dev/null | grep -qi "yes" && echo "true" || echo "false"
 }
 
 get_sinks() {
-    wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/ && !match($(i-1),/\*/)) {gsub(/\./,"",$i); print $i}}'
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
+        local name=$(wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/' | grep "${id}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs)
+        if [[ "$name" != *"Easy Effects"* ]]; then
+            echo "$id"
+        fi
+    done
 }
 
 get_sources() {
-    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Filters:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/ && !match($(i-1),/\*/)) {gsub(/\./,"",$i); print $i}}'
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
+        local name=$(wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/' | grep "${id}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs)
+        if [[ "$name" != *"Easy Effects"* ]]; then
+            echo "$id"
+        fi
+    done
 }
 
 get_sink_name() {
     local sink="$1"
     [[ -z $sink ]] && return
-    wpctl status 2>/dev/null | grep -A10 "Sinks:" | grep "${sink}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/' | grep "${sink}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs
 }
 
 get_source_name() {
     local source="$1"
     [[ -z $source ]] && return
-    wpctl status 2>/dev/null | grep -A10 "Sources:" | grep "${source}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/' | grep "${source}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs
+}
+
+get_sink_persistent_name() {
+    local sink_id="$1"
+    [[ -z $sink_id ]] && return
+    wpctl inspect "$sink_id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"'
+}
+
+get_source_persistent_name() {
+    local source_id="$1"
+    [[ -z $source_id ]] && return
+    wpctl inspect "$source_id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"'
+}
+
+get_sink_id_by_persistent() {
+    local name="$1"
+    [[ -z $name ]] && return
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
+        local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
+        if [[ "$pw_name" == "$name" ]]; then
+            echo "$id"
+            break
+        fi
+    done
+}
+
+get_source_id_by_persistent() {
+    local name="$1"
+    [[ -z $name ]] && return
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
+        local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
+        if [[ "$pw_name" == "$name" ]]; then
+            echo "$id"
+            break
+        fi
+    done
 }
 
 get_pipewire_version() {
-    local ver=$(pipewire --version 2>/dev/null | awk '{print $NF}' | tr -d ')')
+    local ver=$(pipewire --version 2>/dev/null | grep "Linked with" | awk '{print $NF}' | tr -d ')')
     [[ -z $ver ]] && echo "N/A" || echo "$ver"
 }
 
 get_wireplumber_version() {
-    local ver=$(wireplumber --version 2>/dev/null | awk '{print $NF}' | tr -d ')')
+    local ver=$(wireplumber --version 2>/dev/null | grep "Linked with" | awk '{print $NF}' | tr -d ')')
     [[ -z $ver ]] && echo "N/A" || echo "$ver"
 }
 
@@ -114,6 +161,279 @@ set_source() {
     wpctl set-default "$source_id" 2>/dev/null
 }
 
+set_audio_priority() {
+    local type="$1"
+    local primary_input="$2"
+    local fallback_input="$3"
+
+    [[ -z $type || -z $primary_input ]] && echo "ERR_MISSING_ARGS" && return 1
+
+    local primary_name=""
+    local fallback_name=""
+
+    if [[ $type == "sink" ]]; then
+        if [[ "$primary_input" =~ ^[0-9]+$ ]]; then
+            primary_name=$(get_sink_persistent_name "$primary_input")
+        else
+            if get_sink_id_by_persistent "$primary_input" | grep -q .; then
+                primary_name="$primary_input"
+            fi
+        fi
+        if [[ -n $fallback_input ]]; then
+            if [[ "$fallback_input" =~ ^[0-9]+$ ]]; then
+                fallback_name=$(get_sink_persistent_name "$fallback_input")
+            else
+                if get_sink_id_by_persistent "$fallback_input" | grep -q .; then
+                    fallback_name="$fallback_input"
+                fi
+            fi
+        fi
+        if [[ -z $primary_name ]]; then
+            echo "ERR_PRIMARY_NOT_FOUND"
+            return 1
+        fi
+        set_var "AUDIO_PRIMARY_SINK" "$primary_name"
+        set_var "AUDIO_FALLBACK_SINK" "${fallback_name:-}"
+        echo "OK|primary=$primary_name|fallback=${fallback_name:-none}"
+    elif [[ $type == "source" ]]; then
+        if [[ "$primary_input" =~ ^[0-9]+$ ]]; then
+            primary_name=$(get_source_persistent_name "$primary_input")
+        else
+            if get_source_id_by_persistent "$primary_input" | grep -q .; then
+                primary_name="$primary_input"
+            fi
+        fi
+        if [[ -n $fallback_input ]]; then
+            if [[ "$fallback_input" =~ ^[0-9]+$ ]]; then
+                fallback_name=$(get_source_persistent_name "$fallback_input")
+            else
+                if get_source_id_by_persistent "$fallback_input" | grep -q .; then
+                    fallback_name="$fallback_input"
+                fi
+            fi
+        fi
+        if [[ -z $primary_name ]]; then
+            echo "ERR_PRIMARY_NOT_FOUND"
+            return 1
+        fi
+        set_var "AUDIO_PRIMARY_SOURCE" "$primary_name"
+        set_var "AUDIO_FALLBACK_SOURCE" "${fallback_name:-}"
+        echo "OK|primary=$primary_name|fallback=${fallback_name:-none}"
+    else
+        echo "ERR_INVALID_TYPE"
+        return 1
+    fi
+}
+
+get_audio_priority() {
+    local type="$1"
+    [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
+
+    if [[ $type == "sink" ]]; then
+        local primary=$(get_var "AUDIO_PRIMARY_SINK" "")
+        local fallback=$(get_var "AUDIO_FALLBACK_SINK" "")
+        echo "primary=$primary|fallback=${fallback:-none}"
+    elif [[ $type == "source" ]]; then
+        local primary=$(get_var "AUDIO_PRIMARY_SOURCE" "")
+        local fallback=$(get_var "AUDIO_FALLBACK_SOURCE" "")
+        echo "primary=$primary|fallback=${fallback:-none}"
+    else
+        echo "ERR_INVALID_TYPE"
+        return 1
+    fi
+}
+
+clear_audio_priority() {
+    local type="$1"
+    [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
+
+    if [[ $type == "sink" ]]; then
+        set_var "AUDIO_PRIMARY_SINK" ""
+        set_var "AUDIO_FALLBACK_SINK" ""
+    elif [[ $type == "source" ]]; then
+        set_var "AUDIO_PRIMARY_SOURCE" ""
+        set_var "AUDIO_FALLBACK_SOURCE" ""
+    else
+        echo "ERR_INVALID_TYPE"
+        return 1
+    fi
+    echo "OK"
+}
+
+device_exists_by_persistent() {
+    local type="$1"
+    local name="$2"
+    [[ -z $type || -z $name ]] && return 1
+
+    local current_id=""
+    if [[ $type == "sink" ]]; then
+        current_id=$(get_sink_id_by_persistent "$name")
+    else
+        current_id=$(get_source_id_by_persistent "$name")
+    fi
+
+    [[ -n $current_id ]]
+}
+
+get_current_id_by_persistent() {
+    local type="$1"
+    local name="$2"
+    [[ -z $type || -z $name ]] && return
+
+    if [[ $type == "sink" ]]; then
+        get_sink_id_by_persistent "$name"
+    else
+        get_source_id_by_persistent "$name"
+    fi
+}
+
+get_device_name_by_persistent() {
+    local type="$1"
+    local name="$2"
+    [[ -z $type || -z $name ]] && return
+
+    local current_id
+    current_id=$(get_current_id_by_persistent "$type" "$name")
+    if [[ -n $current_id ]]; then
+        if [[ $type == "sink" ]]; then
+            get_sink_name "$current_id"
+        else
+            get_source_name "$current_id"
+        fi
+    fi
+}
+
+apply_audio_fallback() {
+    local type="$1"
+    [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
+
+    local current_id
+    if [[ $type == "sink" ]]; then
+        current_id=$(get_default_sink)
+    else
+        current_id=$(get_default_source)
+    fi
+
+    local current_name=""
+    if [[ -n $current_id ]]; then
+        if [[ $type == "sink" ]]; then
+            current_name=$(get_sink_name "$current_id")
+        else
+            current_name=$(get_source_name "$current_id")
+        fi
+    fi
+
+    if [[ -n $current_name && $current_name != "EasyEffects" ]]; then
+        echo "OK|current_still_valid|$current_name"
+        return 0
+    fi
+
+    local fallback_name
+    if [[ $type == "sink" ]]; then
+        fallback_name=$(get_var "AUDIO_FALLBACK_SINK" "")
+    else
+        fallback_name=$(get_var "AUDIO_FALLBACK_SOURCE" "")
+    fi
+
+    if [[ -z $fallback_name ]]; then
+        echo "ERR_NO_FALLBACK_CONFIGURED"
+        return 1
+    fi
+
+    local fallback_id
+    fallback_id=$(get_current_id_by_persistent "$type" "$fallback_name")
+
+    if [[ -z $fallback_id ]]; then
+        echo "ERR_FALLBACK_NOT_AVAILABLE"
+        return 1
+    fi
+
+    wpctl set-default "$fallback_id" 2>/dev/null
+
+    local fallback_display_name
+    if [[ $type == "sink" ]]; then
+        fallback_display_name=$(get_sink_name "$fallback_id")
+    else
+        fallback_display_name=$(get_source_name "$fallback_id")
+    fi
+
+    rx_log_file "info" "Audio fallback applied: $type -> $fallback_display_name (ID: $fallback_id)"
+
+    local eq_preset=$(get_var "AUDIO_EQ_PRESET" "")
+    if [[ -n $eq_preset && $eq_preset != "None" ]]; then
+        if command -v easyeffects >/dev/null 2>&1 && pgrep -x easyeffects >/dev/null 2>&1; then
+            easyeffects -l "$eq_preset" 2>/dev/null
+            rx_log_file "info" "EQ preset '$eq_preset' re-applied after fallback"
+        fi
+    fi
+
+    echo "OK|$fallback_display_name"
+}
+
+apply_audio_primary() {
+    local type="$1"
+    [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
+
+    local primary_name
+    if [[ $type == "sink" ]]; then
+        primary_name=$(get_var "AUDIO_PRIMARY_SINK" "")
+    else
+        primary_name=$(get_var "AUDIO_PRIMARY_SOURCE" "")
+    fi
+
+    if [[ -z $primary_name ]]; then
+        echo "OK|no_primary_configured"
+        return 0
+    fi
+
+    local primary_id
+    primary_id=$(get_current_id_by_persistent "$type" "$primary_name")
+
+    if [[ -z $primary_id ]]; then
+        echo "OK|primary_not_available"
+        return 0
+    fi
+
+    local current_id
+    if [[ $type == "sink" ]]; then
+        current_id=$(get_default_sink)
+    else
+        current_id=$(get_default_source)
+    fi
+
+    if [[ "$current_id" == "$primary_id" ]]; then
+        local current_name
+        if [[ $type == "sink" ]]; then
+            current_name=$(get_sink_name "$current_id")
+        else
+            current_name=$(get_source_name "$current_id")
+        fi
+        echo "OK|already_primary|$current_name"
+        return 0
+    fi
+
+    wpctl set-default "$primary_id" 2>/dev/null
+
+    local primary_display_name
+    if [[ $type == "sink" ]]; then
+        primary_display_name=$(get_sink_name "$primary_id")
+    else
+        primary_display_name=$(get_source_name "$primary_id")
+    fi
+
+    rx_log_file "info" "Audio primary restored: $type -> $primary_display_name (ID: $primary_id)"
+
+    local eq_preset=$(get_var "AUDIO_EQ_PRESET" "")
+    if [[ -n $eq_preset && $eq_preset != "None" ]]; then
+        if command -v easyeffects >/dev/null 2>&1 && pgrep -x easyeffects >/dev/null 2>&1; then
+            easyeffects -l "$eq_preset" 2>/dev/null
+            rx_log_file "info" "EQ preset '$eq_preset' re-applied after primary restore"
+        fi
+    fi
+
+    echo "OK|$primary_display_name"
+}
+
 list_eq_profiles() {
     local eq_dir="$HOME/.local/share/easyeffects/output"
     [[ ! -d $eq_dir ]] && echo "No EQ profiles found" && return
@@ -130,7 +450,7 @@ get_current_eq_profile() {
             echo "$preset"
             return
         fi
-        
+
         local has_eq=$(grep "band.*Gain=" "$eq_config" 2>/dev/null | grep -v "=0$\|=-0$\|=[+-]0\." | head -1)
         if [[ -n "$has_eq" ]]; then
             echo "Custom"
@@ -144,7 +464,7 @@ apply_eq_profile() {
     local profile="$1"
     local eq_dir="$HOME/.local/share/easyeffects/output"
     local profile_path=""
-    
+
     if [[ -f "$eq_dir/$profile" ]]; then
         profile_path="$eq_dir/$profile"
     elif [[ -f "$eq_dir/${profile}.json" ]]; then
@@ -156,12 +476,12 @@ apply_eq_profile() {
                 echo "$f"
             fi
         done | head -1)
-        
+
         if [[ -n "$matches" ]]; then
             profile_path="$matches"
         fi
     fi
-    
+
     if [[ -f "$profile_path" ]]; then
         echo "$profile_path"
     else
@@ -180,7 +500,7 @@ get_remote_eq_repos() {
 
 eq_list_remote_profiles() {
     local dest_dir="$HOME/.local/share/easyeffects/output"
-    
+
     if [[ -d "$dest_dir" ]]; then
         find "$dest_dir" -name "*.json" -o -name "*.presets" 2>/dev/null | while read -r f; do
             local name=$(basename "$f")
@@ -196,7 +516,7 @@ download_eq_preset() {
     local dest_dir="$HOME/.local/share/easyeffects/output"
     mkdir -p "$cache_dir"
     mkdir -p "$dest_dir"
-    
+
     case "$repo" in
         "JackHack96")
             local url="https://github.com/JackHack96/EasyEffects-Presets/archive/refs/heads/master.zip"
@@ -242,7 +562,7 @@ download_eq_preset() {
 
 start_easyeffects() {
     pgrep -x easyeffects >/dev/null 2>&1 && echo "Already running" && return 0
-    nohup easyeffects --gapplication-service >/dev/null 2>&1 &
+    nohup easyeffects --service-mode >/dev/null 2>&1 &
     sleep 1
     pgrep -x easyeffects >/dev/null 2>&1 && echo "Started" || echo "Failed to start"
 }
@@ -257,10 +577,10 @@ stop_easyeffects() {
 get_pcore_threads() {
     local cpu_vendor=$(grep -m1 "vendor" /proc/cpuinfo | awk '{print $3}')
     local cpu_model=$(grep -m1 "model name" /proc/cpuinfo | awk '{$1=""; $2=""; print $0}' | xargs)
-    
+
     if [[ "$cpu_vendor" == *"Intel"* ]]; then
         local is_big_little=false
-        
+
         if [[ "$cpu_model" == *"Ultra"* ]]; then
             is_big_little=true
         elif [[ "$cpu_model" =~ [0-9]{2}[0-9]H ]]; then
@@ -274,12 +594,12 @@ get_pcore_threads() {
                 is_big_little=true
             fi
         fi
-        
+
         if [[ "$is_big_little" == "true" ]]; then
             local p_cores=()
             for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
                 local id=$(basename "$cpu" | sed 's/cpu//')
-                
+
                 if [[ -f "$cpu/online" ]] && [[ $(cat "$cpu/online") == "1" ]]; then
                     local freq=$(cat "$cpu/cpufreq/scaling_max_freq" 2>/dev/null)
                     if [[ -n "$freq" && $freq -gt 4000000 ]]; then
@@ -287,17 +607,17 @@ get_pcore_threads() {
                     fi
                 fi
             done
-            
+
             if [[ ${#p_cores[@]} -gt 0 ]]; then
                 echo "$(IFS=,; echo "${p_cores[*]}")"
                 return 0
             fi
         fi
-        
+
         local cores=$(nproc 2>/dev/null || echo 4)
         local threads_per_core=$(lscpu 2>/dev/null | grep "Thread(s) per core" | awk '{print $4}')
         local pcore_cores=$((cores / threads_per_core))
-        
+
         local pcore_threads=""
         for ((i=0; i<pcore_cores * threads_per_core; i++)); do
             [[ -n "$pcore_threads" ]] && pcore_threads+="," || pcore_threads+=""
@@ -308,7 +628,7 @@ get_pcore_threads() {
         local cores=$(nproc 2>/dev/null || echo 4)
         local threads_per_core=$(lscpu 2>/dev/null | grep "Thread(s) per core" | awk '{print $4}')
         local total_threads=$((cores / threads_per_core))
-        
+
         local threads=""
         for ((i=0; i<total_threads; i++)); do
             [[ -n "$threads" ]] && threads+=","
@@ -329,18 +649,18 @@ get_pcore_threads() {
 fix_stutter() {
     local services=("pipewire" "wireplumber" "easyeffects")
     local cpu_vendor=$(grep -m1 "vendor" /proc/cpuinfo | awk '{print $3}')
-    
+
     local affinity=$(get_pcore_threads)
-    
+
     if [[ -z "$affinity" ]]; then
         local cores=$(nproc 2>/dev/null || echo 4)
         affinity="0-$((cores - 1))"
     fi
-    
+
     local method="P-cores"
     [[ "$cpu_vendor" == *"AMD"* ]] && method="all cores"
     [[ "$cpu_vendor" != *"Intel"* && "$cpu_vendor" != *"AMD"* ]] && method="all cores"
-    
+
     for svc in "${services[@]}"; do
         local unit="${svc}.service"
         local override_dir="$HOME/.config/systemd/user/${unit}.d"
@@ -375,6 +695,10 @@ case "$1" in
     "--get-sources") get_sources ;;
     "--get-sink-name") get_sink_name "$2" ;;
     "--get-source-name") get_source_name "$2" ;;
+    "--get-sink-persistent-name") get_sink_persistent_name "$2" ;;
+    "--get-source-persistent-name") get_source_persistent_name "$2" ;;
+    "--get-sink-id-by-name") get_sink_id_by_persistent "$2" ;;
+    "--get-source-id-by-name") get_source_id_by_persistent "$2" ;;
     "--set-sink") set_sink "$2" ;;
     "--set-source") set_source "$2" ;;
     "--eq-list") list_eq_profiles ;;
@@ -386,4 +710,10 @@ case "$1" in
     "--ee-start") start_easyeffects ;;
     "--ee-stop") stop_easyeffects ;;
     "--fix-stutter") fix_stutter ;;
+    "--audio-priority-set") set_audio_priority "$2" "$3" "$4" ;;
+    "--audio-priority-get") get_audio_priority "$2" ;;
+    "--audio-priority-clear") clear_audio_priority "$2" ;;
+    "--audio-fallback") apply_audio_fallback "$2" ;;
+    "--audio-primary") apply_audio_primary "$2" ;;
+    "--audio-find-device") find_device_by_pattern "$2" "$3" ;;
 esac

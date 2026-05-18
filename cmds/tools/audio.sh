@@ -3,26 +3,19 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/variable.sh"
 
-# TODO: add priority for some device and fallback in easyeffects
-
 cmd_audio() {
     local audio_core="$RETRO_DIR/scripts/audio_core.sh"
     local action="${1,,}"
     local val1="$2"
     local val2="$3"
+    local val3="$4"
+    local val4="$5"
 
     case "$action" in
         "status")
             local status_output=$(bash "$audio_core" --status)
 
-            local pw_ver=""
-            local wp_ver=""
-            local sink=""
-            local sink_vol=""
-            local sink_mute=""
-            local source=""
-            local source_mute=""
-            local ee_status=""
+            local pw_ver="" wp_ver="" sink="" sink_vol="" sink_mute="" source="" source_mute="" ee_status="" ee_output="" ee_input=""
 
             while IFS=: read -r key val; do
                 case "$key" in
@@ -34,6 +27,8 @@ cmd_audio() {
                     "source") source="$val" ;;
                     "source_mute") source_mute="$val" ;;
                     "easyeffects") ee_status="$val" ;;
+                    "ee_output") ee_output="$val" ;;
+                    "ee_input") ee_input="$val" ;;
                 esac
             done <<<"$status_output"
 
@@ -61,13 +56,48 @@ cmd_audio() {
             local sink_name=$(bash "$audio_core" --get-sink-name "$sink" 2>/dev/null || echo "$sink")
             local source_name=$(bash "$audio_core" --get-source-name "$source" 2>/dev/null || echo "$source")
 
+            local sink_pri=$(bash "$audio_core" --audio-priority-get "sink")
+            local source_pri=$(bash "$audio_core" --audio-priority-get "source")
+            IFS='|' read -r sp sf <<<"$sink_pri"
+            IFS='|' read -r srp srf <<<"$source_pri"
+            local sink_p="${sp#primary=}"
+            local sink_f="${sf#fallback=}"
+            local src_p="${srp#primary=}"
+            local src_f="${srf#fallback=}"
+
+            local output_display="$sink_name"
+            local input_display="$source_name"
+
+            local resolved_sink_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_p" 2>/dev/null)
+            if [[ -n $resolved_sink_id ]]; then
+                output_display=$(bash "$audio_core" --get-sink-name "$resolved_sink_id" 2>/dev/null)
+            elif [[ -n $sink_f && $sink_f != "none" ]]; then
+                local resolved_fallback_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_f" 2>/dev/null)
+                if [[ -n $resolved_fallback_id ]]; then
+                    output_display=$(bash "$audio_core" --get-sink-name "$resolved_fallback_id" 2>/dev/null)
+                fi
+            fi
+
+            local resolved_source_id=$(bash "$audio_core" --get-source-id-by-name "$src_p" 2>/dev/null)
+            if [[ -n $resolved_source_id ]]; then
+                input_display=$(bash "$audio_core" --get-source-name "$resolved_source_id" 2>/dev/null)
+            elif [[ -n $src_f && $src_f != "none" ]]; then
+                local resolved_fallback_id=$(bash "$audio_core" --get-source-id-by-name "$src_f" 2>/dev/null)
+                if [[ -n $resolved_fallback_id ]]; then
+                    input_display=$(bash "$audio_core" --get-source-name "$resolved_fallback_id" 2>/dev/null)
+                fi
+            fi
+
+            [[ -z $output_display ]] && output_display="$sink_name"
+            [[ -z $input_display ]] && input_display="$source_name"
+
             rx_table_header "" "Audio Status"
             rx_table_row "󰿅" "PipeWire:" "$pw_ver" "$GRAY" "14"
             rx_table_row "󰛫" "WirePlumber:" "$wp_ver" "$GRAY" "14"
             rx_table_separator
-            rx_table_row "󰝥" "Volume:" "${sink_vol}%" "$PINK" "14"
-            rx_table_row "󰕿" "Output:" "${sink_name:0:35}" "$GRAY" "14"
-            rx_table_row "󰍬" "Input:" "${source_name:0:35}" "$GRAY" "14"
+            rx_table_row "󰝥" "Volume:" "${sink_vol:-0}%" "$PINK" "14"
+            rx_table_row "󰕿" "Output:" "$output_display" "$GRAY" "14"
+            rx_table_row "󰍬" "Input:" "$input_display" "$GRAY" "14"
             rx_table_separator
             rx_table_row "󰊽" "EasyEffects:" "$ee_status" "$ee_color" "14"
 
@@ -80,17 +110,52 @@ cmd_audio() {
                 eq_color="$PINK"
             fi
             rx_table_row "$eq_icon" "EQ:" "$current_eq" "$eq_color" "14"
+
+            if [[ -n $sink_p || -n $src_p ]]; then
+                rx_table_separator
+                if [[ -n $sink_p ]]; then
+                    local sink_p_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_p" 2>/dev/null)
+                    local sp_name=""
+                    [[ -n $sink_p_id ]] && sp_name=$(bash "$audio_core" --get-sink-name "$sink_p_id" 2>/dev/null)
+                    local sf_display="none"
+                    if [[ -n $sink_f && $sink_f != "none" ]]; then
+                        local sink_f_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_f" 2>/dev/null)
+                        local sf_name=""
+                        [[ -n $sink_f_id ]] && sf_name=$(bash "$audio_core" --get-sink-name "$sink_f_id" 2>/dev/null)
+                        sf_display="${sf_name:-$sink_f}"
+                    fi
+                    rx_table_row "󰕿" "Sink Priority:" "${sp_name:-$sink_p} → $sf_display" "$PINK" "14"
+                else
+                    rx_table_row "󰕿" "Sink Priority:" "Not configured" "$GRAY" "14"
+                fi
+                if [[ -n $src_p ]]; then
+                    local src_p_id=$(bash "$audio_core" --get-source-id-by-name "$src_p" 2>/dev/null)
+                    local srp_name=""
+                    [[ -n $src_p_id ]] && srp_name=$(bash "$audio_core" --get-source-name "$src_p_id" 2>/dev/null)
+                    local srf_display="none"
+                    if [[ -n $src_f && $src_f != "none" ]]; then
+                        local src_f_id=$(bash "$audio_core" --get-source-id-by-name "$src_f" 2>/dev/null)
+                        local srf_name=""
+                        [[ -n $src_f_id ]] && srf_name=$(bash "$audio_core" --get-source-name "$src_f_id" 2>/dev/null)
+                        srf_display="${srf_name:-$src_f}"
+                    fi
+                    rx_table_row "󰍬" "Source Priority:" "${srp_name:-$src_p} → $srf_display" "$PINK" "14"
+                else
+                    rx_table_row "󰍬" "Source Priority:" "Not configured" "$GRAY" "14"
+                fi
+            fi
+
             rx_table_separator
             rx_table_spacer
             ;;
 
-        "set")
-            [[ -z $val1 ]] && rx_log "error" "Usage: retro audio set <0-100>" && return 1
+        "volume")
+            [[ -z $val1 ]] && rx_log "error" "Usage: retro audio volume <0-100>" && return 1
             if ! [[ $val1 =~ ^[0-9]+$ ]] || ((val1 < 0 || val1 > 100)); then
                 rx_log "error" "Volume must be between 0 and 100" && return 1
             fi
             bash "$audio_core" --set-volume "$val1" >/dev/null
-            rx_log "success" "Volume set to ${PINK}${val1}%${RESET}"
+            rx_log "success" "Volume set to ${PINK}${val1}%%${RESET}"
             ;;
 
         "up")
@@ -99,7 +164,7 @@ cmd_audio() {
                 rx_log "error" "Step must be a number" && return 1
             fi
             local new_vol=$(bash "$audio_core" --volume-up "$step")
-            rx_log "success" "Volume increased to ${PINK}${new_vol}%${RESET}"
+            rx_log "success" "Volume increased to ${PINK}${new_vol}%%${RESET}"
             ;;
 
         "down")
@@ -108,7 +173,7 @@ cmd_audio() {
                 rx_log "error" "Step must be a number" && return 1
             fi
             local new_vol=$(bash "$audio_core" --volume-down "$step")
-            rx_log "success" "Volume decreased to ${PINK}${new_vol}%${RESET}"
+            rx_log "success" "Volume decreased to ${PINK}${new_vol}%%${RESET}"
             ;;
 
         "mute")
@@ -199,7 +264,6 @@ cmd_audio() {
                 printf " ${marker} %s\n" "${s_name:0:45}"
             done <<<"$sinks_raw"
 
-            echo ""
             rx_table_simple "󰍬" "Inputs (Sources):" "$GRAY"
 
             while IFS= read -r s; do
@@ -472,24 +536,105 @@ cmd_audio() {
             rx_table_separator
             ;;
 
+        "list")
+            local sinks_raw=$(bash "$audio_core" --get-sinks)
+            local sources_raw=$(bash "$audio_core" --get-sources)
+            local current_sink=$(bash "$audio_core" --status | grep "^sink:" | cut -d: -f2)
+            local current_source=$(bash "$audio_core" --status | grep "^source:" | cut -d: -f2)
+
+            rx_table_header "" "Audio Devices"
+            rx_table_simple "󰕿" "Outputs (Sinks):" "$GRAY"
+
+            while IFS= read -r s; do
+                [[ -n $s ]] || continue
+                local s_name=$(bash "$audio_core" --get-sink-name "$s" 2>/dev/null || echo "$s")
+                local s_pw=$(bash "$audio_core" --get-sink-persistent-name "$s" 2>/dev/null)
+                local marker="   "
+                [[ $s == "$current_sink" ]] && marker="${PINK}󰤨${RESET}"
+                if [[ -n $s_pw ]]; then
+                    printf " ${marker} %s ${GRAY}[%s]${RESET}\n" "${s_name:0:45}" "$s_pw"
+                else
+                    printf " ${marker} %s\n" "${s_name:0:45}"
+                fi
+            done <<<"$sinks_raw"
+
+            rx_table_simple "󰍬" "Inputs (Sources):" "$GRAY"
+
+            while IFS= read -r s; do
+                [[ -n $s ]] || continue
+                local s_name=$(bash "$audio_core" --get-source-name "$s" 2>/dev/null || echo "$s")
+                local s_pw=$(bash "$audio_core" --get-source-persistent-name "$s" 2>/dev/null)
+                local marker="   "
+                [[ $s == "$current_source" ]] && marker="${PINK}󰤨${RESET}"
+                if [[ -n $s_pw ]]; then
+                    printf " ${marker} %s ${GRAY}[%s]${RESET}\n" "${s_name:0:45}" "$s_pw"
+                else
+                    printf " ${marker} %s\n" "${s_name:0:45}"
+                fi
+            done <<<"$sources_raw"
+
+            rx_table_separator
+            rx_table_spacer
+            ;;
+
+        "set")
+            local set_action="${val1,,}"
+            case "$set_action" in
+                "sink"|"source")
+                    local primary="$val2"
+                    local fallback="$val3"
+                    if [[ -z $primary ]]; then
+                        rx_log "error" "Usage: retro audio set $set_action <primary_name> [fallback_name]"
+                        rx_log "info" "Use ${PINK}retro audio list${RESET} to see persistent names"
+                        return 1
+                    fi
+                    local res
+                    res=$(bash "$audio_core" --audio-priority-set "$set_action" "$primary" "$fallback")
+                    if [[ $res == OK* ]]; then
+                        local res_primary=$(echo "$res" | grep -oP 'primary=\K[^|]+')
+                        local res_fallback=$(echo "$res" | grep -oP 'fallback=\K[^|]+')
+                        rx_log "success" "Priority set: $set_action primary=${PINK}${res_primary}${RESET} fallback=${GRAY}${res_fallback:-none}${RESET}"
+                    else
+                        rx_log "error" "Failed to set priority ($res)"
+                    fi
+                    ;;
+                "clear")
+                    local type="${val2,,}"
+                    [[ -z $type ]] && rx_log "error" "Usage: retro audio set clear <sink|source>" && return 1
+                    local res
+                    res=$(bash "$audio_core" --audio-priority-clear "$type")
+                    if [[ $res == OK* ]]; then
+                        rx_log "success" "Priority cleared for $type"
+                    else
+                        rx_log "error" "Failed to clear priority ($res)"
+                    fi
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro audio set <sink|source|clear>"
+                    ;;
+            esac
+            ;;
+
         *)
             rx_help_usage "retro audio <command>"
             rx_help_commands "Available commands"
             rx_help_cmd "status" "Show audio status and info"
-            rx_help_cmd "set <0-100>" "Set volume level"
+            rx_help_cmd "volume <0-100>" "Set volume level"
             rx_help_cmd "up [step]" "Increase volume (default 5%)"
             rx_help_cmd "down [step]" "Decrease volume (default 5%)"
             rx_help_cmd "mute" "Toggle output mute"
             rx_help_cmd "mic-mute" "Toggle microphone mute"
             rx_help_cmd "switch" "Switch output device"
-            rx_help_cmd "list-devices" "List all audio devices"
+            rx_help_cmd "list" "List all audio devices"
+            rx_help_cmd "list-devices" "List all audio devices (alias)"
             rx_help_cmd "set-sink <name>" "Set default output"
             rx_help_cmd "set-source <name>" "Set default input"
             rx_help_cmd "eq [args]" "EQ profile management"
             rx_help_cmd "easyeffects [cmd]" "Control EasyEffects"
             rx_help_cmd "fix-stutter" "Fix audio crackling"
+            rx_help_cmd "set <sink|source|clear>" "Set device priority"
             rx_help_examples
-            rx_help_example "retro audio set 50" "Set volume to 50%"
+            rx_help_example "retro audio volume 50" "Set volume to 50%"
             rx_help_example "retro audio up 10" "Increase volume by 10%"
             rx_help_example "retro audio mute" "Toggle mute"
             rx_help_example "retro audio eq list" "List EQ profiles"
