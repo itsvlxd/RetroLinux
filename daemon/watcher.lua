@@ -6,6 +6,9 @@ local _vars_mtime = 0
 
 local _log_caps = {}
 local _log_enabled = nil
+local _log_dir = "/tmp/retro_logs"
+
+os.execute("mkdir -p " .. _log_dir)
 
 local function _get_vars_file()
     if _vars_file then return _vars_file end
@@ -155,7 +158,7 @@ function Watcher.sleep(seconds)
 end
 
 function Watcher.get_log_path(name)
-    return "/tmp/retro_watcher_" .. name .. ".log"
+    return _log_dir .. "/watcher_" .. name .. ".log"
 end
 
 function Watcher.get_log_cap(name)
@@ -179,8 +182,16 @@ function Watcher.set_log_enabled(enabled)
     Watcher.set_var("RETRO_EVENT_LOG_ENABLED", enabled and "true" or "false")
 end
 
+function Watcher.is_log_disabled(name)
+    local disabled_file = _log_dir .. "/watcher_" .. name .. ".disabled"
+    local f = io.open(disabled_file, "r")
+    if f then f:close(); return true end
+    return false
+end
+
 function Watcher.log(name, msg)
     if not Watcher.is_log_enabled() then return end
+    if Watcher.is_log_disabled(name) then return end
 
     local log_path = Watcher.get_log_path(name)
     local cap = Watcher.get_log_cap(name)
@@ -188,8 +199,8 @@ function Watcher.log(name, msg)
     local f = io.open(log_path, "a")
     if not f then return end
 
-    local ts = os.date("%H:%M:%S")
-    f:write(string.format("[%s] %s\n", ts, msg))
+    local ts = os.date("%Y-%m-%d %H:%M:%S")
+    f:write(string.format("[%s] [INFO] %s\n", ts, msg))
     f:close()
 
     local lines = {}
@@ -245,10 +256,10 @@ end
 
 function Watcher.list_logs()
     local logs = {}
-    local handle = io.popen("ls /tmp/retro_watcher_*.log 2>/dev/null")
+    local handle = io.popen("ls " .. _log_dir .. "/watcher_*.log 2>/dev/null")
     if handle then
         for line in handle:lines() do
-            local name = line:match("retro_watcher_(.+)%.log")
+            local name = line:match("watcher_(.+)%.log")
             if name then
                 table.insert(logs, name)
             end

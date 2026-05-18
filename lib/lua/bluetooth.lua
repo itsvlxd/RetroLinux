@@ -185,6 +185,16 @@ function Bluetooth.get_audio_card(mac)
     return result
 end
 
+function Bluetooth.get_audio_source(mac)
+    if not mac or mac == "" then return "" end
+    local mac_us = mac:gsub(":", "_")
+    local result = run_cmd("pactl list sources short 2>/dev/null | awk '{print $2}' | grep -i 'bluez_input.*" .. mac_us .. "' | head -1")
+    if result == "" then
+        result = run_cmd("pactl list sources short 2>/dev/null | awk '{print $2}' | grep -i 'bluez_input.*" .. mac .. "' | head -1")
+    end
+    return result
+end
+
 function Bluetooth.get_audio_profile(card)
     if not card or card == "" then return "" end
     local result = run_cmd("pactl list cards 2>/dev/null | sed -n '/Name: .*" .. card .. "/,/Ports:/p' | grep 'Active Profile:' | awk '{print $3}' | tr -d '\\n' | xargs")
