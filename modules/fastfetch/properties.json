@@ -1,11 +1,11 @@
 {
-    "title": "FastFetch",
-    "description": "Fast system information tool that displays detailed hardware and software specifications in a visually appealing CLI format, similar to neofetch but faster.",
-    "type": "extra",
-    "access": "user",
-    "defaults": false,
-    "mode": "all",
-    "config": "./files",
-    "install": "~/.config/fastfetch"
+  "title": "FastFetch",
+  "description": "Fast system information tool that displays detailed hardware and software specifications in a visually appealing CLI format, similar to neofetch but faster.",
+  "type": "extra",
+  "access": "user",
+  "defaults": false,
+  "mode": "all",
+  "config": "./files",
+  "install": "~/.config/fastfetch",
+  "overwrite": false
 }
-

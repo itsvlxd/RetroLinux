@@ -1,11 +1,11 @@
 {
-    "title": "Hyprland",
-    "description": "Modern, highly customizable window manager that is entirely written from scratch with a fully customizable look, with support for both multi-WM setups.",
-    "type": "core",
-    "access": "user",
-    "defaults": false,
-    "mode": "all",
-    "config": "./files",
-    "install": "~/.config/hypr"
+  "title": "Hyprland",
+  "description": "Modern, highly customizable window manager that is entirely written from scratch with a fully customizable look, with support for both multi-WM setups.",
+  "type": "core",
+  "access": "user",
+  "defaults": false,
+  "mode": "all",
+  "config": "./files",
+  "install": "~/.config/hypr",
+  "overwrite": false
 }
-

@@ -36,7 +36,8 @@ for mod_dir in "${MODULES_DIRS[@]}"; do
             if .defaults == null or (.defaults | type != "boolean") then "invalid defaults" else empty end,
             if .mode == null or (.mode | IN("all", "install", "mirror") | not) then "invalid mode (must be all/install/mirror)" else empty end,
             if .config == null or (.config | type != "string") then "invalid config path" else empty end,
-            if .install == null or (.install | type != "string") then "invalid install path" else empty end
+            if .install == null or (.install | type != "string") then "invalid install path" else empty end,
+            if .overwrite == null or (.overwrite | type != "boolean") then "missing or invalid overwrite (must be boolean)" else empty end
         ] | join(", ")
     ' "$json_file")
 

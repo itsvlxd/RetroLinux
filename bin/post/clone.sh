@@ -4,6 +4,8 @@ source /opt/retrolinux/bin/lib/setup_lib.sh
 
 RETRO_REPO_URL="https://github.com/itsvlxd/RetroLinux.git"
 
+# TODO: when we will release retrolinux add a branch setting
+
 rx_post_clone_repo() {
     rx_clear_logo
     rx_step "Deploying RetroLinux Framework..."
@@ -37,7 +39,7 @@ rx_post_clone_repo() {
     fi
 
     if [[ $iso_valid == "false" ]]; then
-        gum style --foreground 5 "Falling back to GitHub..."
+        gum style --foreground 5 "Downloading RetroLinux from github..."
 
         if ! ping -c 1 1.1.1.1 &>/dev/null; then
             gum style --foreground 1 "ERROR: No internet connection. Cannot clone repository."

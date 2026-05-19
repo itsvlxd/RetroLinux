@@ -71,6 +71,14 @@ get_module_mode() {
     rx_get_json "$json_file" "mode" "all" 2>/dev/null
 }
 
+get_module_overwrite() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    rx_get_json "$json_file" "overwrite" "false" 2>/dev/null
+}
+
 is_core_module() {
     local name="$1"
     local mod_type=$(get_module_type "$name")
@@ -264,7 +272,16 @@ rx_default_mirror() {
     local name="$1"
     IFS='|' read -r src dest <<<"$(get_module_paths "$name")"
 
-    [[ -d $src ]] && rx_mirror_install "$src" "$dest"
+    [[ -d $src ]] || return 0
+
+    local ricing=$(get_var "RETRO_RICING" "false")
+    local overwrite=$(get_module_overwrite "$name")
+
+    if [[ $ricing == "true" || $overwrite == "true" ]]; then
+        rx_mirror_install "$src" "$dest"
+    else
+        rx_mirror_add_missing "$src" "$dest"
+    fi
 }
 
 rx_default_uninstall() {

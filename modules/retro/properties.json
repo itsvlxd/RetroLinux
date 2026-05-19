@@ -1,10 +1,11 @@
 {
-    "title": "Retro CLI",
-    "description": "The main ricing framework that provides CLI tools, automation scripts, and module management for RetroLinux, including integration with Hyprland and system utilities.",
-    "type": "core",
-    "access": "user",
-    "defaults": true,
-    "mode": "mirror",
-    "config": "./files",
-    "install": "~/.config/retro"
+  "title": "Retro CLI",
+  "description": "The main ricing framework that provides CLI tools, automation scripts, and module management for RetroLinux, including integration with Hyprland and system utilities.",
+  "type": "core",
+  "access": "user",
+  "defaults": true,
+  "mode": "mirror",
+  "config": "./files",
+  "install": "~/.config/retro",
+  "overwrite": false
 }

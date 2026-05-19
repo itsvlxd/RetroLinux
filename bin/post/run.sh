@@ -51,6 +51,8 @@ rx_run_post_install() {
     local total=${#scripts[@]}
     local current=0
 
+    [[ $EUID -ne 0 ]] && sudo -v
+
     for script in "${scripts[@]}"; do
         ((current++))
         local name="${script##*/}"
