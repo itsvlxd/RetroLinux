@@ -46,6 +46,7 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/fingerprint.sh" && setup_fingerprint
     source "$RETRO_DIR/cmds/system/setup/power.sh" && setup_power
     source "$RETRO_DIR/cmds/system/setup/browser.sh" && setup_browser
+    source "$RETRO_DIR/cmds/system/setup/audio.sh" && setup_audio
 
     retro wallpaper "static" "false"
 

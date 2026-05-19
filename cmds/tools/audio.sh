@@ -65,41 +65,15 @@ cmd_audio() {
             local src_p="${srp#primary=}"
             local src_f="${srf#fallback=}"
 
-            local output_display="$sink_name"
-            local input_display="$source_name"
-
-            local resolved_sink_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_p" 2>/dev/null)
-            if [[ -n $resolved_sink_id ]]; then
-                output_display=$(bash "$audio_core" --get-sink-name "$resolved_sink_id" 2>/dev/null)
-            elif [[ -n $sink_f && $sink_f != "none" ]]; then
-                local resolved_fallback_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_f" 2>/dev/null)
-                if [[ -n $resolved_fallback_id ]]; then
-                    output_display=$(bash "$audio_core" --get-sink-name "$resolved_fallback_id" 2>/dev/null)
-                fi
-            fi
-
-            local resolved_source_id=$(bash "$audio_core" --get-source-id-by-name "$src_p" 2>/dev/null)
-            if [[ -n $resolved_source_id ]]; then
-                input_display=$(bash "$audio_core" --get-source-name "$resolved_source_id" 2>/dev/null)
-            elif [[ -n $src_f && $src_f != "none" ]]; then
-                local resolved_fallback_id=$(bash "$audio_core" --get-source-id-by-name "$src_f" 2>/dev/null)
-                if [[ -n $resolved_fallback_id ]]; then
-                    input_display=$(bash "$audio_core" --get-source-name "$resolved_fallback_id" 2>/dev/null)
-                fi
-            fi
-
-            [[ -z $output_display ]] && output_display="$sink_name"
-            [[ -z $input_display ]] && input_display="$source_name"
-
             rx_table_header "" "Audio Status"
-            rx_table_row "󰿅" "PipeWire:" "$pw_ver" "$GRAY" "14"
-            rx_table_row "󰛫" "WirePlumber:" "$wp_ver" "$GRAY" "14"
+            rx_table_row "󰿅" "PipeWire:" "$pw_ver" "$GRAY" "16"
+            rx_table_row "󰛫" "WirePlumber:" "$wp_ver" "$GRAY" "16"
             rx_table_separator
-            rx_table_row "󰝥" "Volume:" "${sink_vol:-0}%" "$PINK" "14"
-            rx_table_row "󰕿" "Output:" "$output_display" "$GRAY" "14"
-            rx_table_row "󰍬" "Input:" "$input_display" "$GRAY" "14"
+            rx_table_row "󰝥" "Volume:" "${sink_vol:-0}%" "$PINK" "16"
+            rx_table_row "󰕿" "Output:" "$sink_name" "$GRAY" "16"
+            rx_table_row "󰍬" "Input:" "$source_name" "$GRAY" "16"
             rx_table_separator
-            rx_table_row "󰊽" "EasyEffects:" "$ee_status" "$ee_color" "14"
+            rx_table_row "󰊽" "EasyEffects:" "$ee_status" "$ee_color" "16"
 
             local current_eq=$(get_var "AUDIO_EQ_PRESET" "")
             [[ -z $current_eq ]] && current_eq="None"
@@ -109,40 +83,36 @@ cmd_audio() {
                 eq_icon="󰾰"
                 eq_color="$PINK"
             fi
-            rx_table_row "$eq_icon" "EQ:" "$current_eq" "$eq_color" "14"
+            rx_table_row "$eq_icon" "EQ:" "$current_eq" "$eq_color" "16"
 
-            if [[ -n $sink_p || -n $src_p ]]; then
-                rx_table_separator
-                if [[ -n $sink_p ]]; then
-                    local sink_p_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_p" 2>/dev/null)
-                    local sp_name=""
-                    [[ -n $sink_p_id ]] && sp_name=$(bash "$audio_core" --get-sink-name "$sink_p_id" 2>/dev/null)
-                    local sf_display="none"
-                    if [[ -n $sink_f && $sink_f != "none" ]]; then
-                        local sink_f_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_f" 2>/dev/null)
-                        local sf_name=""
-                        [[ -n $sink_f_id ]] && sf_name=$(bash "$audio_core" --get-sink-name "$sink_f_id" 2>/dev/null)
-                        sf_display="${sf_name:-$sink_f}"
-                    fi
-                    rx_table_row "󰕿" "Sink Priority:" "${sp_name:-$sink_p} → $sf_display" "$PINK" "14"
-                else
-                    rx_table_row "󰕿" "Sink Priority:" "Not configured" "$GRAY" "14"
+            rx_table_separator
+            if [[ -n $sink_p ]]; then
+                local sink_p_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_p" 2>/dev/null)
+                local sp_display="$sink_p"
+                [[ -n $sink_p_id ]] && sp_display=$(bash "$audio_core" --get-sink-name "$sink_p_id" 2>/dev/null)
+                local sf_display="none"
+                if [[ -n $sink_f && $sink_f != "none" ]]; then
+                    local sink_f_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_f" 2>/dev/null)
+                    sf_display="$sink_f"
+                    [[ -n $sink_f_id ]] && sf_display=$(bash "$audio_core" --get-sink-name "$sink_f_id" 2>/dev/null)
                 fi
-                if [[ -n $src_p ]]; then
-                    local src_p_id=$(bash "$audio_core" --get-source-id-by-name "$src_p" 2>/dev/null)
-                    local srp_name=""
-                    [[ -n $src_p_id ]] && srp_name=$(bash "$audio_core" --get-source-name "$src_p_id" 2>/dev/null)
-                    local srf_display="none"
-                    if [[ -n $src_f && $src_f != "none" ]]; then
-                        local src_f_id=$(bash "$audio_core" --get-source-id-by-name "$src_f" 2>/dev/null)
-                        local srf_name=""
-                        [[ -n $src_f_id ]] && srf_name=$(bash "$audio_core" --get-source-name "$src_f_id" 2>/dev/null)
-                        srf_display="${srf_name:-$src_f}"
-                    fi
-                    rx_table_row "󰍬" "Source Priority:" "${srp_name:-$src_p} → $srf_display" "$PINK" "14"
-                else
-                    rx_table_row "󰍬" "Source Priority:" "Not configured" "$GRAY" "14"
+                rx_table_row "󰕿" "Sink Priority:" "${sp_display:0:25} → ${sf_display:0:25}" "$PINK" "16"
+            else
+                rx_table_row "󰕿" "Sink Priority:" "Not configured" "$GRAY" "16"
+            fi
+            if [[ -n $src_p ]]; then
+                local src_p_id=$(bash "$audio_core" --get-source-id-by-name "$src_p" 2>/dev/null)
+                local srp_display="$src_p"
+                [[ -n $src_p_id ]] && srp_display=$(bash "$audio_core" --get-source-name "$src_p_id" 2>/dev/null)
+                local srf_display="none"
+                if [[ -n $src_f && $src_f != "none" ]]; then
+                    local src_f_id=$(bash "$audio_core" --get-source-id-by-name "$src_f" 2>/dev/null)
+                    srf_display="$src_f"
+                    [[ -n $src_f_id ]] && srf_display=$(bash "$audio_core" --get-source-name "$src_f_id" 2>/dev/null)
                 fi
+                rx_table_row "󰍬" "Source Priority:" "${srp_display:0:25} → ${srf_display:0:25}" "$PINK" "16"
+            else
+                rx_table_row "󰍬" "Source Priority:" "Not configured" "$GRAY" "16"
             fi
 
             rx_table_separator
@@ -580,7 +550,7 @@ cmd_audio() {
         "set")
             local set_action="${val1,,}"
             case "$set_action" in
-                "sink"|"source")
+                "sink" | "source")
                     local primary="$val2"
                     local fallback="$val3"
                     if [[ -z $primary ]]; then
