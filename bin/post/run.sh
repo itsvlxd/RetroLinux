@@ -70,6 +70,15 @@ rx_run_post_install() {
     done
 
     gum style --foreground 2 "Post-installation complete!" --padding "1 0 1 $PADDING_LEFT"
+
+    rx_clear_logo
+    echo
+    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "RetroLinux has not been fully installed yet."
+    gum style --foreground 7 --padding "1 0 1 $PADDING_LEFT" "There is another post-configuration step that runs on first boot."
+    echo
+    gum style --foreground 7 --padding "1 0 1 $PADDING_LEFT" "Please remove the USB drive and boot into the OS."
+    echo
+
     return 0
 }
 
