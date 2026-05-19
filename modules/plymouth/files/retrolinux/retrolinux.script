@@ -107,6 +107,20 @@ if (global.boot_mode) {
 
   bullet.sprites = [];
 
+  fun show_password_dialog()
+    {
+      entry.sprite.SetOpacity(1);
+      lock.sprite.SetOpacity(1);
+    }
+
+  fun hide_password_dialog()
+    {
+      entry.sprite.SetOpacity(0);
+      lock.sprite.SetOpacity(0);
+      for (index = 0; bullet.sprites[index]; index++)
+        bullet.sprites[index].SetOpacity(0);
+    }
+
   fun display_normal_callback()
     {
       mode = Plymouth.GetMode();
