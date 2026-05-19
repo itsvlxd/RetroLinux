@@ -25,22 +25,20 @@ rx_pkg_install() {
     helper=$(get_var "PKG_HELPER" "yay")
 
     local install_cmd=""
-    if command -v "$helper" >/dev/null 2>&1; then
+    if [[ $EUID -eq 0 ]]; then
+        install_cmd="pacman -S --needed --noconfirm"
+    elif command -v "$helper" >/dev/null 2>&1; then
         install_cmd="$helper -S --needed --noconfirm"
     else
-        if [[ $sudo_run == "true" ]]; then
-            install_cmd="sudo pacman -S --needed --noconfirm"
-        else
-            if ! command -v pacman >/dev/null 2>&1; then
-                rx_log "error" "No package manager available"
-                return 1
-            fi
-            rx_log "warn" "Using pacman (no AUR helper)"
-            install_cmd="sudo pacman -S --needed --noconfirm"
+        if ! command -v pacman >/dev/null 2>&1; then
+            rx_log "error" "No package manager available"
+            return 1
         fi
+        rx_log "warn" "Using pacman (no AUR helper)"
+        install_cmd="sudo pacman -S --needed --noconfirm"
     fi
 
-    if [[ $sudo_run == "true" ]]; then
+    if [[ $sudo_run == "true" && $EUID -ne 0 ]]; then
         sudo bash -c "$install_cmd ${missing_pkgs[*]}"
     else
         $install_cmd "${missing_pkgs[@]}"
