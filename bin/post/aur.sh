@@ -51,7 +51,7 @@ rx_post_aur() {
             git clone --depth 1 $aur_repo &&
             cd $aur_dir &&
             makepkg -si --noconfirm
-        " >/dev/null 2>&1
+        " 2>&1
 
         if [[ $? -eq 0 ]]; then
             gum style --foreground 2 "${aur_helper} installed"

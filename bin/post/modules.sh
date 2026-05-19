@@ -41,7 +41,20 @@ rx_post_install_modules() {
 
     gum style "Installing user modules..."
 
-    arch-chroot /mnt su - "$username" -c "/opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
+    local home_dir=$(arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
+    arch-chroot /mnt bash -c "HOME=$home_dir USER=$username /opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
+
+    # Fix ownership of user config dirs that were installed as root
+    if [[ -n $home_dir ]]; then
+        arch-chroot /mnt bash -c "
+            for d in \"$home_dir\"/.config/*/; do
+                [[ -d \$d ]] && chown -R \"$username:\" \"\$d\" 2>/dev/null
+            done
+            for f in \"$home_dir\"/.config/*; do
+                [[ -f \$f ]] && chown \"$username:\" \"\$f\" 2>/dev/null
+            done
+        " 2>/dev/null
+    fi
 
     gum style --foreground 2 "Module installation complete"
     echo

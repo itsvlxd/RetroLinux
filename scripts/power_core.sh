@@ -6,6 +6,12 @@ source "$RETRO_DIR/scripts/battery_core.sh"
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "power"
 
+if [[ $EUID -eq 0 ]]; then
+    SUDO_CMD=""
+else
+    SUDO_CMD="sudo"
+fi
+
 CPU_VENDOR=$(grep -m 1 'vendor_id' /proc/cpuinfo | awk '{print $3}')
 BAT_CORE="$RETRO_DIR/scripts/battery_core.sh"
 RAPL_LOADED_FILE="/tmp/retro_rapl_loaded"
@@ -146,14 +152,14 @@ set_profile() {
     sync_hardware_power "$profile"
 
     if [[ ! -d /sys/class/powercap/intel-rapl:0 && ! -f $RAPL_LOADED_FILE ]]; then
-        sudo modprobe intel_rapl_msr 2>/dev/null
-        sudo modprobe intel_rapl_common 2>/dev/null
+        $SUDO_CMD modprobe intel_rapl_msr 2>/dev/null
+        $SUDO_CMD modprobe intel_rapl_common 2>/dev/null
         [[ -d /sys/class/powercap/intel-rapl:0 ]] && touch "$RAPL_LOADED_FILE"
     fi
 
     if [[ $CPU_VENDOR == "GenuineIntel" ]]; then
         if [[ ! -d /sys/class/powercap/intel-rapl:0 && ! -f $RAPL_LOADED_FILE ]]; then
-            sudo modprobe intel_rapl_msr 2>/dev/null
+            $SUDO_CMD modprobe intel_rapl_msr 2>/dev/null
             [[ -d /sys/class/powercap/intel-rapl:0 ]] && touch "$RAPL_LOADED_FILE"
         fi
 
@@ -330,12 +336,12 @@ optimize_cpu() {
 }
 
 apply_permissions() {
-    echo -e "intel_rapl_msr\nintel_rapl_common" | sudo tee /etc/modules-load.d/retro-power.conf >/dev/null
+    echo -e "intel_rapl_msr\nintel_rapl_common" | $SUDO_CMD tee /etc/modules-load.d/retro-power.conf >/dev/null
 
     local udev_rule='SUBSYSTEM=="powercap", ACTION=="add", RUN+="/bin/sh -c \"chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null\""'
-    echo "$udev_rule" | sudo tee /etc/udev/rules.d/99-retro-power.rules >/dev/null
-    sudo udevadm control --reload-rules
-    sudo udevadm trigger --subsystem-match=powercap
+    echo "$udev_rule" | $SUDO_CMD tee /etc/udev/rules.d/99-retro-power.rules >/dev/null
+    $SUDO_CMD udevadm control --reload-rules
+    $SUDO_CMD udevadm trigger --subsystem-match=powercap
 
     read -r -d '' expected_content <<EOF
 # Retro Power Management Permissions
@@ -350,21 +356,21 @@ z /sys/bus/usb/devices/*/power/control                                        06
 EOF
 
     local tmp_file="/etc/tmpfiles.d/retro-power.conf"
-    echo "$expected_content" | sudo tee "$tmp_file" >/dev/null
-    sudo systemd-tmpfiles --create "$tmp_file" 2>/dev/null
+    echo "$expected_content" | $SUDO_CMD tee "$tmp_file" >/dev/null
+    $SUDO_CMD systemd-tmpfiles --create "$tmp_file" 2>/dev/null
 
-    sudo modprobe intel_rapl_msr 2>/dev/null
-    sudo modprobe intel_rapl_common 2>/dev/null
+    $SUDO_CMD modprobe intel_rapl_msr 2>/dev/null
+    $SUDO_CMD modprobe intel_rapl_common 2>/dev/null
 
     if [[ -f /sys/module/snd_hda_intel/parameters/power_save ]]; then
-        sudo chmod 666 /sys/module/snd_hda_intel/parameters/power_save 2>/dev/null
+        $SUDO_CMD chmod 666 /sys/module/snd_hda_intel/parameters/power_save 2>/dev/null
     fi
 
-    sudo chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null
-    sudo chmod 666 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null
+    $SUDO_CMD chmod 666 /sys/class/powercap/intel-rapl:*/constraint_* 2>/dev/null
+    $SUDO_CMD chmod 666 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null
 
-    sudo chmod 666 /sys/bus/usb/devices/*/power/control 2>/dev/null
-    sudo chmod 666 /sys/class/bluetooth/hci*/device/power/control 2>/dev/null
+    $SUDO_CMD chmod 666 /sys/bus/usb/devices/*/power/control 2>/dev/null
+    $SUDO_CMD chmod 666 /sys/class/bluetooth/hci*/device/power/control 2>/dev/null
 
     return 0
 }

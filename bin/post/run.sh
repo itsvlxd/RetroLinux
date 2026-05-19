@@ -73,6 +73,8 @@ rx_run_post_install() {
 
     gum style --foreground 2 "Post-installation complete!" --padding "1 0 1 $PADDING_LEFT"
 
+    arch-chroot /mnt rm -f /etc/sudoers.d/retro-post-install 2>/dev/null
+
     rx_clear_logo
     echo
     gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "RetroLinux has not been fully installed yet."
