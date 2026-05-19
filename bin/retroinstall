@@ -293,10 +293,9 @@ Network,${network_info}"
 
     rx_clear_logo
     echo
-    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "RetroLinux has not been fully installed yet."
+    gum style --foreground 5 --padding "1 0 1 $PADDING_LEFT" "RetroLinux has not been fully installed yet."
     gum style --foreground 7 --padding "1 0 1 $PADDING_LEFT" "There is another post-configuration step that runs on first boot."
-    echo
-    gum style --foreground 7 --padding "1 0 1 $PADDING_LEFT" "Please remove the USB drive and boot into the OS."
+    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Please remove the USB drive and boot into the OS."
     echo
     gum style --foreground 7 "Press Enter to reboot or Ctrl+C to exit."
     read -r
