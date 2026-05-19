@@ -75,14 +75,6 @@ rx_run_post_install() {
 
     arch-chroot /mnt rm -f /etc/sudoers.d/retro-post-install 2>/dev/null
 
-    rx_clear_logo
-    echo
-    gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "RetroLinux has not been fully installed yet."
-    gum style --foreground 7 --padding "1 0 1 $PADDING_LEFT" "There is another post-configuration step that runs on first boot."
-    echo
-    gum style --foreground 7 --padding "1 0 1 $PADDING_LEFT" "Please remove the USB drive and boot into the OS."
-    echo
-
     return 0
 }
 
