@@ -11,31 +11,49 @@ rx_pkg_install() {
     [[ -z $all_pkgs ]] && return 0
 
     local missing_pkgs=()
+    local skipped_pkgs=()
     for pkg in $all_pkgs; do
-        if ! pacman -Qq "$pkg" >/dev/null 2>&1; then
+        if pacman -Qq "$pkg" >/dev/null 2>&1; then
+            continue
+        fi
+
+        if [[ $RETRO_CHROOT == "true" ]]; then
+            if pacman -Si "$pkg" >/dev/null 2>&1; then
+                missing_pkgs+=("$pkg")
+            else
+                skipped_pkgs+=("$pkg")
+            fi
+        else
             missing_pkgs+=("$pkg")
         fi
     done
+
+    if [[ ${#skipped_pkgs[@]} -gt 0 ]]; then
+        rx_log "warn" "Skipping AUR packages (will install on first boot): ${PINK}${skipped_pkgs[*]}${RESET}"
+    fi
 
     [[ ${#missing_pkgs[@]} -eq 0 ]] && return 0
 
     rx_log "info" "Installing missing packages: ${PINK}${missing_pkgs[*]}${RESET}"
 
-    local helper
-    helper=$(get_var "PKG_HELPER" "yay")
-
     local install_cmd=""
-    if [[ $EUID -eq 0 ]]; then
+    if [[ $RETRO_CHROOT == "true" ]]; then
         install_cmd="pacman -S --needed --noconfirm"
-    elif command -v "$helper" >/dev/null 2>&1; then
-        install_cmd="$helper -S --needed --noconfirm"
+    elif [[ $EUID -eq 0 ]]; then
+        install_cmd="pacman -S --needed --noconfirm"
     else
-        if ! command -v pacman >/dev/null 2>&1; then
-            rx_log "error" "No package manager available"
-            return 1
+        local helper
+        helper=$(get_var "PKG_HELPER" "yay")
+        if command -v "$helper" >/dev/null 2>&1; then
+            install_cmd="$helper -S --needed --noconfirm"
+        else
+            if ! command -v pacman >/dev/null 2>&1; then
+                rx_log "error" "No package manager available"
+                return 1
+            fi
+            rx_log "warn" "Using pacman (no AUR helper found, AUR packages will fail)"
+            install_cmd="sudo pacman -S --needed --noconfirm"
         fi
-        rx_log "warn" "Using pacman (no AUR helper)"
-        install_cmd="sudo pacman -S --needed --noconfirm"
     fi
 
     if [[ $sudo_run == "true" && $EUID -ne 0 ]]; then
@@ -44,4 +62,3 @@ rx_pkg_install() {
         $install_cmd "${missing_pkgs[@]}"
     fi
 }
-

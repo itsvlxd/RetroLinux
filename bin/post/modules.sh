@@ -37,12 +37,12 @@ rx_post_install_modules() {
 
     gum style "Installing root modules..."
 
-    arch-chroot /mnt /opt/retrolinux/retro.sh -i all -a root $type_flag -y 2>&1
+    arch-chroot /mnt bash -c "RETRO_CHROOT=true /opt/retrolinux/retro.sh -i all -a root $type_flag -y" 2>&1
 
     gum style "Installing user modules..."
 
     local home_dir=$(arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
-    arch-chroot /mnt bash -c "HOME=$home_dir USER=$username /opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
+    arch-chroot /mnt bash -c "RETRO_CHROOT=true HOME=$home_dir USER=$username /opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
 
     # Fix ownership of user config dirs that were installed as root
     if [[ -n $home_dir ]]; then
