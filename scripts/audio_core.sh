@@ -51,13 +51,23 @@ get_sources() {
 get_sink_name() {
     local sink="$1"
     [[ -z $sink ]] && return
-    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/' | grep "${sink}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs
+    local name=$(wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/' | grep "${sink}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs)
+    if [[ "$name" == bluez_* ]]; then
+        local desc=$(wpctl inspect "$sink" 2>/dev/null | grep "node.description" | head -1 | sed 's/.*= *//' | tr -d '"')
+        [[ -n $desc ]] && name="$desc"
+    fi
+    echo "$name"
 }
 
 get_source_name() {
     local source="$1"
     [[ -z $source ]] && return
-    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/' | grep "${source}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs
+    local name=$(wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/' | grep "${source}\." | head -1 | sed 's/.*[0-9]\. //' | awk -F'[' '{print $1}' | xargs)
+    if [[ "$name" == bluez_* ]]; then
+        local desc=$(wpctl inspect "$source" 2>/dev/null | grep "node.description" | head -1 | sed 's/.*= *//' | tr -d '"')
+        [[ -n $desc ]] && name="$desc"
+    fi
+    echo "$name"
 }
 
 get_sink_persistent_name() {
