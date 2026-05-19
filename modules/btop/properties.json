@@ -1,10 +1,11 @@
 {
-    "title": "Btop",
-    "description": "A highly interactive and aesthetically pleasing resource monitor that tracks CPU, memory, disks, network, and processes with a modern terminal UI.",
-    "type": "extra",
-    "access": "user",
-    "defaults": true,
-    "mode": "mirror",
-    "config": "./files",
-    "install": "~/.config/btop"
+  "title": "Btop",
+  "description": "A highly interactive and aesthetically pleasing resource monitor that tracks CPU, memory, disks, network, and processes with a modern terminal UI.",
+  "type": "extra",
+  "access": "user",
+  "defaults": true,
+  "mode": "mirror",
+  "config": "./files",
+  "install": "~/.config/btop",
+  "overwrite": false
 }

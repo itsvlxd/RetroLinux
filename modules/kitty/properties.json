@@ -1,11 +1,11 @@
 {
-    "title": "Kitty",
-    "description": "Fast, feature-rich, GPU based terminal emulator that can render graphics and images, with full Unicode support and allows running commands in the background.",
-    "type": "core",
-    "access": "user",
-    "defaults": false,
-    "mode": "all",
-    "config": "./files",
-    "install": "~/.config/kitty"
+  "title": "Kitty",
+  "description": "Fast, feature-rich, GPU based terminal emulator that can render graphics and images, with full Unicode support and allows running commands in the background.",
+  "type": "core",
+  "access": "user",
+  "defaults": false,
+  "mode": "all",
+  "config": "./files",
+  "install": "~/.config/kitty",
+  "overwrite": false
 }
-

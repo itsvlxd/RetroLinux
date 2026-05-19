@@ -84,3 +84,31 @@ if [[ -n $shell_conf ]]; then
 fi
 
 [[ ! -d $RETRO_CONFIG ]] && mkdir -p "$RETRO_CONFIG"
+
+sync_missing_variables() {
+    local template_vars="$RETRO_DIR/modules/retro/files/variables.sh"
+    local user_vars="$RETRO_CONFIG/variables.sh"
+
+    [[ ! -f $template_vars ]] && return 0
+
+    local added=0
+    while IFS= read -r line; do
+        if [[ $line =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)= ]]; then
+            local key="${BASH_REMATCH[1]}"
+            if [[ -f $user_vars ]] && grep -q "^export $key=" "$user_vars" 2>/dev/null; then
+                continue
+            fi
+            echo "$line" >> "$user_vars"
+            rx_log "success" "Added missing variable: $key"
+            added=1
+        fi
+    done <"$template_vars"
+
+    if [[ $added -eq 0 ]]; then
+        rx_log "info" "All variables are up to date"
+    else
+        rx_log "success" "Variable sync complete ($added new variables added)"
+    fi
+}
+
+sync_missing_variables

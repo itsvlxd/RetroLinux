@@ -27,6 +27,7 @@ rx_setup_traps
 
 SETUP_SCRIPTS=(
     "install.sh"
+    "ricing.sh"
     "user.sh"
     "root.sh"
     "hostname.sh"
@@ -58,6 +59,7 @@ else
     SYS_LANG="en_US"
     SYS_ENC="UTF-8"
     INSTALL_TYPE="complete"
+    RICE_MODE="stable"
     USER_NAME=""
     USER_PASSWORD=""
     USER_HOSTNAME=""

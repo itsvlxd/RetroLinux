@@ -81,6 +81,46 @@ rx_mirror_install() {
     rx_sanitize "$system_path"
 }
 
+rx_mirror_add_missing() {
+    local repo_data_path="$1"
+    local system_path="$2"
+
+    [[ -d $repo_data_path ]] || return 0
+
+    local added=0
+
+    if [[ ! -d $system_path ]]; then
+        mkdir -p "$system_path"
+        rsync -a "$repo_data_path/" "$system_path/"
+        added=1
+    else
+        local missing_files
+        missing_files=$(cd "$repo_data_path" && find . -not -path '.' | while read -r item; do
+            if [[ ! -e "$system_path/$item" ]]; then
+                echo "$item"
+            fi
+        done)
+
+        if [[ -n $missing_files ]]; then
+            while IFS= read -r item; do
+                local src_item="$repo_data_path/$item"
+                local dest_item="$system_path/$item"
+                if [[ -d $src_item ]]; then
+                    mkdir -p "$dest_item"
+                else
+                    mkdir -p "$(dirname "$dest_item")"
+                    cp "$src_item" "$dest_item"
+                fi
+                added=1
+            done <<<"$missing_files"
+        fi
+    fi
+
+    if [[ $added -eq 1 ]]; then
+        rx_log "success" "Added missing files to $system_path"
+    fi
+}
+
 rx_sanitize() {
     local target="$1"
 
