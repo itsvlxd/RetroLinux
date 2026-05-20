@@ -224,6 +224,8 @@ list_wallpapers_with_resolution() {
 }
 
 set_wallpaper() {
+    local name=$(basename "$1")
+    rx_log_file "INFO" "Setting wallpaper: $(rx_format_string "${name%.*}")"
     rx_wallpaper_start "$1" "${2:-false}"
 }
 
