@@ -50,7 +50,7 @@ slideshow_next() {
         shuf)
 
     if [[ -n $next_wall ]]; then
-        rx_log "info" "Slideshow advancing to: $(rx_format_string "$next_wall")"
+        rx_log_file "INFO" "Slideshow advancing to: $(rx_format_string "$next_wall")"
         rx_wallpaper_start "$next_wall"
     fi
 }
@@ -228,7 +228,7 @@ set_wallpaper() {
 }
 
 restore_wallpaper() {
-    rx_log "info" "Restoring last wallpaper"
+    rx_log_file "INFO" "Restoring last wallpaper"
     rx_wallpaper_restore "${1:-false}"
 }
 
@@ -240,20 +240,20 @@ static_wallpaper() {
     fi
     set_var "WALL_STATIC_FORCED" "$new_state"
     if [[ $new_state == "true" ]]; then
-        rx_log "info" "Static mode enabled"
+        rx_log_file "INFO" "Static mode enabled"
     else
-        rx_log "info" "Static mode disabled"
+        rx_log_file "INFO" "Static mode disabled"
     fi
     rx_wallpaper_restore
 }
 
 pause_wallpaper() {
-    rx_log "info" "Wallpaper paused"
+    rx_log_file "INFO" "Wallpaper paused"
     rx_wallpaper_pause
 }
 
 resume_wallpaper() {
-    rx_log "info" "Wallpaper resumed"
+    rx_log_file "INFO" "Wallpaper resumed"
     rx_wallpaper_resume
 }
 
