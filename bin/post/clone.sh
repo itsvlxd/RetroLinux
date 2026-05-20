@@ -33,8 +33,6 @@ rx_post_clone_repo() {
 
             gum style --foreground 2 "RetroLinux successfully deployed from ISO"
             return 0
-        else
-            gum style --foreground 3 "ISO repo incomplete."
         fi
     fi
 
