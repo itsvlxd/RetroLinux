@@ -2,44 +2,9 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/battery.sh"
+source "$RETRO_DIR/lib/wallpaper.sh"
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "wallpaper"
-
-WALL_DIR="$RETRO_CONFIG/wallpapers"
-FRAME_CACHE="$RETRO_CONFIG/wallpaper_frames"
-REPO_WALLS="$RETRO_DIR/wallpapers"
-
-mkdir -p "$FRAME_CACHE"
-mkdir -p "$WALL_DIR"
-
-generate_cache() {
-    local target="$1"
-    [[ -z $target ]] && return 1
-
-    local filename=$(basename "$target")
-    local output="$FRAME_CACHE/${filename}.png"
-
-    if [[ ! -f $output ]]; then
-        if [[ $target =~ \.(mp4|mkv|webm)$ ]]; then
-            ffmpeg -i "$target" -frames:v 1 "$output" -y -loglevel quiet
-        else
-            ln -sf "$target" "$output"
-        fi
-    fi
-    echo "$output"
-}
-
-get_theme_dir() {
-    local theme=$(get_var "RETRO_THEME")
-    [[ -z $theme || $theme == "null" ]] && theme="retro"
-
-    local target="$WALL_DIR/$theme"
-    if [[ -d $target ]]; then
-        echo "$target"
-    else
-        echo "$WALL_DIR"
-    fi
-}
 
 add_wallpaper() {
     local source_file="$1"
@@ -62,13 +27,13 @@ add_wallpaper() {
     local target_file="$target_dir/$filename"
 
     cp "$source_file" "$target_file"
-    generate_cache "$target_file" >/dev/null
+    rx_wallpaper_generate_cache "$target_file" >/dev/null
 
-    set_wallpaper "$target_file"
+    rx_wallpaper_start "$target_file"
 }
 
 slideshow_next() {
-    local target_dir=$(get_theme_dir)
+    local target_dir=$(rx_wallpaper_get_theme_dir)
     local current=$(get_var "WALL_CURRENT")
 
     local next_wall
@@ -85,23 +50,24 @@ slideshow_next() {
         shuf)
 
     if [[ -n $next_wall ]]; then
-        set_wallpaper "$next_wall"
+        rx_log "info" "Slideshow advancing to: $(rx_format_string "$next_wall")"
+        rx_wallpaper_start "$next_wall"
     fi
 }
 
 optimize_wallpapers() {
     local res_map=$(get_var "WALL_RES_MAP")
-    
+
     if [[ -z $res_map || $res_map == "null" ]]; then
         local mon_res
         mon_res=$(get_monitor_resolutions)
         res_map="default|$mon_res"
     fi
-    
+
     local target_res=$(echo "$res_map" | tr ',' '\n' | cut -d'|' -f2 | head -n 1)
     local target_w="${target_res%x*}"
     local target_h="${target_res#*x}"
-    
+
     [[ -z $target_w || -z $target_h ]] && return 0
 
     local theme=$(get_var "RETRO_THEME" "retro")
@@ -158,38 +124,38 @@ optimize_wallpapers() {
         fi
     done
 
-    restore_wallpaper
+    rx_wallpaper_restore
 }
 
 get_monitor_resolutions() {
     local res_map=$(get_var "WALL_RES_MAP")
-    
+
     if [[ -n $res_map && $res_map != "null" ]]; then
         echo "$res_map" | tr ',' '\n' | cut -d'|' -f2
         return 0
     fi
-    
+
     if command -v hyprctl >/dev/null 2>&1; then
         hyprctl monitors -j | jq -r '.[] | "\(.description)|\(.x)\((.width/.scale)|0floor)x\((.height/.scale)|0floor)"' 2>/dev/null | cut -d'|' -f2
         return 0
     fi
-    
+
     local primary
     primary=$(cat /sys/class/drm/card0-HDMI-A-1/modes 2>/dev/null | head -1)
     if [[ -n $primary ]]; then
         echo "$primary"
         return 0
     fi
-    
+
     echo "1920x1080"
 }
 
 get_image_resolution() {
     local file="$1"
     [[ -z $file || ! -f $file ]] && return 1
-    
+
     local ext="${file##*.}"
-    
+
     if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
         ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$file" 2>/dev/null
     else
@@ -200,47 +166,47 @@ get_image_resolution() {
 check_wallpaper_resolution() {
     local file="$1"
     [[ -z $file || ! -f $file ]] && return 1
-    
+
     local file_res
     file_res=$(get_image_resolution "$file")
     [[ -z $file_res ]] && return 1
-    
+
     local file_w="${file_res%x*}"
     local file_h="${file_res#*x}"
-    
+
     while IFS= read -r mon_res; do
         [[ -z $mon_res ]] && continue
         local mon_w="${mon_res%x*}"
         local mon_h="${mon_res#*x}"
-        
+
         if [[ $file_w -eq $mon_w && $file_h -eq $mon_h ]]; then
             return 0
         fi
     done < <(get_monitor_resolutions)
-    
+
     return 1
 }
 
 list_wallpapers_with_resolution() {
-    local target_dir=$(get_theme_dir)
+    local target_dir=$(rx_wallpaper_get_theme_dir)
     local show_all="${1:-false}"
-    
+
     local valid_count=0
     local invalid_count=0
-    
+
     for f in "$target_dir"/*; do
         [[ -d $f ]] && continue
         [[ -f $f || -L $f ]] || continue
-        
+
         local filename=$(basename "$f")
-        
+
         if [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]]; then
             continue
         fi
-        
+
         local file_res
         file_res=$(get_image_resolution "$f")
-        
+
         local status="MATCH"
         if ! check_wallpaper_resolution "$f"; then
             status="MISMATCH"
@@ -248,169 +214,57 @@ list_wallpapers_with_resolution() {
         else
             ((valid_count++))
         fi
-        
+
         if [[ $show_all == "true" || $status == "MISMATCH" ]]; then
             echo "$status|$filename|${file_res:-unknown}"
         fi
     done
-    
+
     echo "valid=$valid_count|invalid=$invalid_count"
 }
 
 set_wallpaper() {
-    local input_path="$1"
-    local quick="${2:-false}"
-    local wall_path=""
-    local theme_dir=$(get_theme_dir)
-
-    if [[ -f $input_path ]]; then
-        wall_path="$input_path"
-    elif [[ -f "$theme_dir/$input_path" ]]; then
-        wall_path="$theme_dir/$input_path"
-    elif [[ -f "$WALL_DIR/$input_path" ]]; then
-        wall_path="$WALL_DIR/$input_path"
-    else
-        return 1
-    fi
-
-    local filename=$(basename "$wall_path")
-    local base="${filename%.*}"
-    local ext="${filename##*.}"
-    local is_video=false
-    [[ $ext =~ ^(mp4|mkv|webm)$ ]] && is_video=true
-
-    local is_saver=$(get_var "BAT_SAVER_ACTIVE" "false")
-    local force_static=$(get_var "WALL_STATIC_FORCED" "false")
-    local static_on_bat=$(get_var "WALL_STATIC_ON_BAT" "false")
-    local on_bat=$(is_on_battery)
-
-    local should_be_static=false
-    if [[ $is_saver == "true" || $force_static == "true" ]]; then
-        should_be_static=true
-    elif [[ $on_bat == "true" && $static_on_bat == "true" ]]; then
-        should_be_static=true
-    fi
-
-    local is_first_load=false
-    if ! pgrep -x "awww-daemon" >/dev/null; then
-        is_first_load=true
-        nohup awww-daemon >/dev/null 2>&1 &
-        local delay=0.1
-        for i in $(seq 1 30); do
-            sleep "$delay" 2>/dev/null || sleep 1
-            awww query >/dev/null 2>&1 && break
-            delay=$(awk "BEGIN {printf \"%.2f\", $delay * 1.5}")
-        done
-    fi
-
-    local static_source="$wall_path"
-    [[ $is_video == "true" ]] && static_source=$(generate_cache "$wall_path")
-
-    local current_wall=$(get_var "WALL_CURRENT")
-    local is_same_wall=false
-    [[ "$current_wall" == "$wall_path" ]] && is_same_wall=true
-
-    if [[ $is_first_load == "true" || $quick == "true" ]]; then
-        awww img "$static_source" --transition-type none
-    else
-        local rand_x=$((RANDOM % 1920))
-        local rand_y=$((RANDOM % 1080))
-        awww img "$static_source" \
-            --transition-type random \
-            --transition-duration 2.5 \
-            --transition-fps 120 \
-            --transition-pos "$rand_x,$rand_y"
-    fi
-
-    (
-        pkill mpvpaper
-
-        if [[ $is_same_wall == "false" ]]; then
-            local color_cache="$FRAME_CACHE/${filename}.colors"
-            local scheme_type=""
-
-            if [[ -f $color_cache ]]; then
-                scheme_type=$(cat "$color_cache")
-            else
-                COLOR=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info:)
-                if [ "$(echo "$COLOR < 1.0" | bc)" -eq 1 ]; then
-                    scheme_type="monochrome"
-                else
-                    scheme_type="vibrant"
-                fi
-                echo "$scheme_type" > "$color_cache"
-            fi
-
-            if [[ $scheme_type == "monochrome" ]]; then
-                matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
-            else
-                matugen image -b wal "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
-            fi
-
-            "$RETRO_DIR/retro.sh" app all refresh
-        fi
-
-        if [[ $is_video == "true" && $should_be_static == "false" ]]; then
-            if [[ $is_first_load == "false" && $quick == "false" ]]; then
-                sleep 2.2
-            fi
-
-            local res_map=$(get_var "WALL_RES_MAP")
-
-            hyprctl monitors -j | jq -r '.[] | "\(.name)|\(.description)"' | while IFS='|' read -r m_name m_desc; do
-                local custom_res=""
-                if [[ -n $res_map ]]; then
-                    custom_res=$(echo "$res_map" | tr ',' '\n' | grep -F "$m_desc|" | cut -d'|' -f2)
-                fi
-
-                local target_video="$wall_path"
-
-                if [[ -n $custom_res ]]; then
-                    local clean_base=$(echo "$base" | sed -E 's/\.[0-9]+x[0-9]+$//')
-                    local opt_file="$theme_dir/${clean_base}.${custom_res}.${ext}"
-
-                    if [[ -f $opt_file ]]; then
-                        target_video="$opt_file"
-                    fi
-                fi
-
-                local mpv_opts="--loop --panscan=1.0 --no-audio --hwdec=auto"
-                NV_PRIME_RENDER_OFFLOAD=0 nohup mpvpaper -o "$mpv_opts" "$m_name" "$target_video" >/dev/null 2>&1 &
-            done
-        fi
-    ) &
-
-    set_var "WALL_CURRENT" "$wall_path"
+    rx_wallpaper_start "$1" "${2:-false}"
 }
 
 restore_wallpaper() {
-    local quick="${1:-false}"
-    local last_wall=$(get_var "WALL_CURRENT")
-    if [[ -n $last_wall && -f $last_wall ]]; then
-        set_wallpaper "$last_wall" "$quick"
-    else
-        return 1
-    fi
+    rx_log "info" "Restoring last wallpaper"
+    rx_wallpaper_restore "${1:-false}"
 }
 
 static_wallpaper() {
-    local current_state=$(get_var "WALL_STATIC_FORCED")
-    local new_state=""
-
-    case "$2" in
-        "on" | "true") new_state="true" ;;
-        "off" | "false") new_state="false" ;;
-        "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
-    esac
-
+    local current=$(get_var "WALL_STATIC_FORCED")
+    local new_state="$2"
+    if [[ -z $new_state || $new_state == "toggle" ]]; then
+        [[ $current == "true" ]] && new_state="false" || new_state="true"
+    fi
     set_var "WALL_STATIC_FORCED" "$new_state"
-    restore_wallpaper
+    if [[ $new_state == "true" ]]; then
+        rx_log "info" "Static mode enabled"
+    else
+        rx_log "info" "Static mode disabled"
+    fi
+    rx_wallpaper_restore
+}
+
+pause_wallpaper() {
+    rx_log "info" "Wallpaper paused"
+    rx_wallpaper_pause
+}
+
+resume_wallpaper() {
+    rx_log "info" "Wallpaper resumed"
+    rx_wallpaper_resume
+}
+
+should_pause() {
+    rx_wallpaper_should_pause
 }
 
 launch_picker() {
     local theme_conf="$HOME/.config/rofi/themes/gallery.rasi"
     local list=""
-    local target_dir=$(get_theme_dir)
+    local target_dir=$(rx_wallpaper_get_theme_dir)
 
     declare -A wall_map
 
@@ -425,7 +279,7 @@ launch_picker() {
         fi
 
         local display=$(rx_format_string "$filename")
-        local thumb=$(generate_cache "$f")
+        local thumb=$(rx_wallpaper_generate_cache "$f")
 
         wall_map["$display"]="$f"
         list+="${display}\0icon\x1f${thumb}\n"
@@ -461,8 +315,59 @@ launch_picker() {
     fi
 }
 
+resolve_name() {
+    local display_name="$1"
+    [[ -z $display_name ]] && return 1
+
+    local target_dir=$(rx_wallpaper_get_theme_dir)
+    local search_pattern=$(echo "$display_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
+
+    for f in "$target_dir"/*; do
+        [[ -f $f || -L $f ]] || continue
+        local filename=$(basename "$f")
+        [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
+        local raw="${filename%.*}"
+        local raw_lower=$(echo "$raw" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
+        if [[ "$raw_lower" == "$search_pattern" ]]; then
+            echo "$f"
+            return 0
+        fi
+    done
+    return 1
+}
+
+sync_wallpapers() {
+    local source_dir="$REPO_WALLS"
+    [[ ! -d $source_dir ]] && echo "result=error|reason=repo_not_found" && return 1
+
+    local theme=$(get_var "RETRO_THEME" "retro")
+    local config_theme="$WALL_DIR/$theme"
+    mkdir -p "$config_theme"
+
+    local synced=0
+    local skipped=0
+
+    for src_file in "$source_dir"/*; do
+        [[ -f $src_file ]] || continue
+
+        local filename=$(basename "$src_file")
+        [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
+
+        local target_file="$config_theme/$filename"
+
+        if [[ -f $target_file ]]; then
+            ((skipped++))
+        else
+            cp "$src_file" "$target_file"
+            ((synced++))
+        fi
+    done
+
+    echo "synced=$synced|skipped=$skipped"
+}
+
 case "$1" in
-    "--set") set_wallpaper "$2" ;;
+    "--set") set_wallpaper "$2" "${3:-false}" ;;
     "--add") add_wallpaper "$2" ;;
     "--slideshow-next") slideshow_next ;;
     "--optimize") optimize_wallpapers ;;
@@ -471,7 +376,6 @@ case "$1" in
             if check_wallpaper_resolution "$2"; then
                 echo "result=match|file=$2"
             else
-                local res
                 res=$(get_image_resolution "$2")
                 echo "result=mismatch|file=$2|resolution=${res:-unknown}"
             fi
@@ -484,34 +388,61 @@ case "$1" in
         mkdir -p "$FRAME_CACHE"
 
         if [[ -n $2 ]]; then
-            generate_cache "$2" >/dev/null
+            rx_wallpaper_generate_cache "$2" >/dev/null
         else
-            target_dir=$(get_theme_dir)
+            target_dir=$(rx_wallpaper_get_theme_dir)
             for f in "$target_dir"/*; do
-                [[ -f $f || -L $f ]] && generate_cache "$f" >/dev/null
+                [[ -f $f || -L $f ]] && rx_wallpaper_generate_cache "$f" >/dev/null
             done
         fi
         ;;
     "--precache-all")
         mkdir -p "$FRAME_CACHE"
-        local target_dir=$(get_theme_dir)
+        target_dir=$(rx_wallpaper_get_theme_dir)
         for f in "$target_dir"/*; do
             [[ -f $f || -L $f ]] || continue
-            local ext="${f##*.}"
+            ext="${f##*.}"
             if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
-                generate_cache "$f" >/dev/null
+                rx_wallpaper_generate_cache "$f" >/dev/null
             fi
         done
         ;;
     "--restore") restore_wallpaper "${2:-false}" ;;
     "--static") static_wallpaper "$2" ;;
+    "--pause") pause_wallpaper ;;
+    "--resume") resume_wallpaper ;;
+    "--should-pause") should_pause && echo "should_pause=true" || echo "should_pause=false" ;;
     "--list")
-        target_dir=$(get_theme_dir)
-        if [[ "${2:-}" == "--with-resolution" || "${2:-}" == "-r" ]]; then
+        target_dir=$(rx_wallpaper_get_theme_dir)
+        if [[ ${2:-} == "--with-resolution" || ${2:-} == "-r" ]]; then
             list_wallpapers_with_resolution true
         else
             ls -1 "$target_dir"
         fi
+        ;;
+    "--list-with-res")
+        target_dir=$(rx_wallpaper_get_theme_dir)
+        for f in "$target_dir"/*; do
+            [[ -f $f || -L $f ]] || continue
+            filename=$(basename "$f")
+            [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
+            res=$(get_image_resolution "$f")
+            [[ -z $res ]] && res="unknown"
+            echo "$filename|$res"
+        done
+        ;;
+    "--resolve-name")
+        resolve_name "$2"
+        ;;
+    "--get-resolution")
+        if [[ -n $2 && -f $2 ]]; then
+            get_image_resolution "$2"
+        else
+            echo "unknown"
+        fi
+        ;;
+    "--sync")
+        sync_wallpapers
         ;;
     "--picker") launch_picker ;;
 esac
