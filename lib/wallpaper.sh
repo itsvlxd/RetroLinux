@@ -217,6 +217,7 @@ rx_wallpaper_start() {
 
     (
         pkill mpvpaper 2>/dev/null
+        sleep 1
 
         rx_wallpaper_apply_colors "$static_source" "$filename" "$is_same_wall"
 
