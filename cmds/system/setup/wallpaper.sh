@@ -4,10 +4,8 @@ source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/wallpaper.sh"
 
-source "$RETRO_DIR/cmds/tools/wallpaper.sh"
-
-WALL_CORE="$RETRO_DIR/scripts/wallpaper_core.sh"
 CONFIG_WALLS="$HOME/.config/retro/wallpapers"
 SOURCE_WALLS="$RETRO_DIR/wallpapers"
 
@@ -15,7 +13,7 @@ mkdir -p "$CONFIG_WALLS"
 
 setup_wallpaper() {
     rx_log "info" "Configuring wallpapers..."
-    [[ -d "$RETRO_DIR/wallpapers" ]] && mkdir -p "$RETRO_CONFIG/wallpapers" && cp -rn "$RETRO_DIR/wallpapers/"* "$HOME/.config/retro/wallpapers/" 2>/dev/null
+    [[ -d "$SOURCE_WALLS" ]] && mkdir -p "$CONFIG_WALLS" && cp -rn "$SOURCE_WALLS/"* "$HOME/.config/retro/wallpapers/" 2>/dev/null
 
     if [[ ! -d $SOURCE_WALLS ]]; then
         rx_log "error" "Source wallpapers not found in $SOURCE_WALLS"
@@ -93,26 +91,26 @@ setup_wallpaper() {
             fi
 
             if [[ -n $def_wall ]]; then
-                bash "$WALL_CORE" --set "$def_wall" >/dev/null 2>&1 &
+                rx_wallpaper_start "$CONFIG_WALLS/$selected_theme/$def_wall" "true" &>/dev/null &
             fi
         fi
     fi
 
-    if [[ -f $WALL_CORE ]]; then
-        rx_log "info" "Generating missing wallpaper caches..."
-        bash "$WALL_CORE" --cache
+    rx_log "info" "Generating wallpaper caches..."
+    rm -rf "$FRAME_CACHE"
+    mkdir -p "$FRAME_CACHE"
+    local target_dir=$(rx_wallpaper_get_theme_dir)
+    for f in "$target_dir"/*; do
+        [[ -f $f || -L $f ]] && rx_wallpaper_generate_cache "$f" >/dev/null
+    done
 
-        local res_map=$(get_var "WALL_RES_MAP")
-        if [[ -z $res_map || $res_map == "null" ]]; then
-            rx_help_spacer
-            rx_log "info" "Let's optimize your video wallpapers to save CPU overhead."
-            cmd_wallpaper "res"
-        else
-            bash "$WALL_CORE" --restore >/dev/null 2>&1 &
-        fi
+    local res_map=$(get_var "WALL_RES_MAP")
+    if [[ -z $res_map || $res_map == "null" ]]; then
+        rx_help_spacer
+        rx_log "info" "Let's optimize your video wallpapers to save CPU overhead."
+        cmd_wallpaper "res"
     else
-        rx_log "error" "Wallpaper core script missing."
-        return 1
+        rx_wallpaper_restore "true" &>/dev/null &
     fi
 
     rx_log "success" "Wallpapers configured"

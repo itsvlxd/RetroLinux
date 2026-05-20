@@ -2,22 +2,33 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/wallpaper.sh"
 
 cmd_wallpaper() {
     local wall_script="$RETRO_DIR/scripts/wallpaper_core.sh"
     local wall_dir="$RETRO_CONFIG/wallpapers"
     local action="${1,,}"
-    local value="$2"
-    local options="$3"
+    shift
+    local value="$*"
 
     case "$action" in
         "set")
-            [[ -z $value ]] && rx_log "error" "I need a wallpaper name or a path to set it." && return 1
+            [[ -z $value ]] && rx_log "error" "Provide a wallpaper name or path." && return 1
+
+            local resolved=""
+            resolved=$(bash "$wall_script" --resolve-name "$value" 2>/dev/null)
+
+            if [[ -n $resolved ]]; then
+                value="$resolved"
+            fi
 
             if bash "$wall_script" --set "$value"; then
-                rx_log "success" "Wallpaper's all set to: ${PINK}${value}${RESET}"
+                local display="${value##*/}"
+                display="${display%.*}"
+                display=$(rx_format_string "$display")
+                rx_log "success" "Wallpaper set to: ${PINK}${display}${RESET}"
             else
-                rx_log "error" "I couldn't set that wallpaper: $value"
+                rx_log "error" "Wallpaper not found: ${PINK}${value}${RESET}"
             fi
             ;;
 
@@ -41,10 +52,12 @@ cmd_wallpaper() {
             ;;
 
         "slideshow")
+            local mode=$(echo "$value" | awk '{print $1}')
+            local interval=$(echo "$value" | awk '{print $2}')
             local current_state=$(get_var "WALL_SLIDESHOW_ACTIVE")
             local new_state="true"
 
-            case "$value" in
+            case "$mode" in
                 "on" | "true") new_state="true" ;;
                 "off" | "false") new_state="false" ;;
                 "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
@@ -52,9 +65,9 @@ cmd_wallpaper() {
 
             set_var "WALL_SLIDESHOW_ACTIVE" "$new_state"
 
-            if [[ -n $options ]]; then
-                set_var "WALL_SLIDESHOW_INTERVAL" "$options"
-                rx_log "info" "Slideshow interval set to: $options"
+            if [[ -n $interval ]]; then
+                set_var "WALL_SLIDESHOW_INTERVAL" "$interval"
+                rx_log "info" "Slideshow interval set to: $interval"
             fi
 
             local status_text="${PINK}ENABLED${RESET}"
@@ -63,10 +76,11 @@ cmd_wallpaper() {
             ;;
 
         "static")
+            local mode=$(echo "$value" | awk '{print $1}')
             local current_state=$(get_var "WALL_STATIC_FORCED")
             local new_state=""
 
-            case "$value" in
+            case "$mode" in
                 "on" | "true") new_state="true" ;;
                 "off" | "false") new_state="false" ;;
                 "toggle" | *) [[ $current_state == "true" ]] && new_state="false" || new_state="true" ;;
@@ -74,12 +88,13 @@ cmd_wallpaper() {
 
             set_var "WALL_STATIC_FORCED" "$new_state"
 
-            local status_text="${PINK}ENABLED${RESET}"
-            [[ $new_state == "false" ]] && status_text="${MUTE}DISABLED${RESET}"
-
-            rx_log "success" "Static mode is now $status_text"
-            rx_log "info" "Updating the wallpaper..."
-            bash "$wall_script" --restore
+            if [[ $new_state == "true" ]]; then
+                rx_wallpaper_pause
+                rx_log "success" "Static mode ${PINK}ENABLED${RESET}"
+            else
+                rx_wallpaper_resume
+                rx_log "success" "Static mode ${GRAY}DISABLED${RESET}"
+            fi
             ;;
 
         "list")
@@ -89,14 +104,49 @@ cmd_wallpaper() {
             local target_dir="$wall_dir/$theme"
             [[ ! -d $target_dir ]] && target_dir="$wall_dir"
 
-            rx_table_header "󰸉" "Your Wallpapers: $target_dir"
-            while read -r file; do
+            declare -a names
+            declare -a resolutions
+            declare -a icons
+            local max_len=0
+
+            while IFS='|' read -r file res; do
+                [[ -z $file ]] && continue
                 local icon="󰋫"
                 [[ $file =~ \.(mp4|mkv|webm)$ ]] && icon="󰎁"
-                rx_table_simple "$icon" "$file" "$GRAY"
-            done < <(ls -1 "$target_dir" 2>/dev/null)
+                local display_name="${file%.*}"
+                display_name=$(rx_format_string "$display_name")
+
+                local name_len=${#display_name}
+                (( name_len > max_len )) && max_len=$name_len
+
+                names+=("$display_name")
+                resolutions+=("$res")
+                icons+=("$icon")
+            done < <(bash "$wall_script" --list-with-res 2>/dev/null)
+
+            local col_width=$(( max_len + 2 ))
+
+            rx_table_header "󰸉" "Your Wallpapers: $target_dir"
+            for i in "${!names[@]}"; do
+                printf " ${PINK}${icons[$i]}${RESET} ${RESET}%-${col_width}s${GRAY}%s${RESET}\n" "${names[$i]}" "${resolutions[$i]}"
+            done
             rx_table_separator
             rx_table_spacer
+            ;;
+
+        "sync")
+            rx_log "info" "Syncing wallpapers from repository..."
+            local sync_result=$(bash "$wall_script" --sync)
+            if echo "$sync_result" | grep -q "result=error"; then
+                rx_log "error" "Sync failed."
+                return 1
+            fi
+            local count=$(echo "$sync_result" | grep -oP 'synced=\K[0-9]+')
+            local skipped=$(echo "$sync_result" | grep -oP 'skipped=\K[0-9]+')
+            rx_log "success" "Sync complete: ${PINK}${count}${RESET} new, ${GRAY}${skipped}${RESET} already present."
+            rx_log "info" "Optimizing wallpapers for your monitors..."
+            bash "$wall_script" --optimize
+            rx_log "success" "All wallpapers are now optimized."
             ;;
 
         "picker")
@@ -104,8 +154,9 @@ cmd_wallpaper() {
             ;;
 
         "cache")
+            local cache_target=$(echo "$value" | awk '{print $1}')
             rx_log "info" "Building the frame cache... this might take a second."
-            bash "$wall_script" --cache "$value" && rx_log "success" "Cache is ready." || rx_log "error" "I couldn't build the cache."
+            bash "$wall_script" --cache "$cache_target" && rx_log "success" "Cache is ready." || rx_log "error" "I couldn't build the cache."
             ;;
 
         "restore")
@@ -194,13 +245,6 @@ cmd_wallpaper() {
             ;;
 
         "optimize")
-            #local res_map=$(get_var "WALL_RES_MAP")
-
-            #if [[ -z $res_map || $res_map == "null" ]]; then
-            #    rx_log "error" "No custom monitor resolutions are set. Run '${PINK}retro wallpaper res${RESET}' first."
-            #    return 1
-            #fi
-
             rx_log "info" "Scanning repository for missing optimized video feeds..."
             bash "$wall_script" --optimize
             rx_log "success" "All wallpapers are now optimized for your monitors."
@@ -210,25 +254,76 @@ cmd_wallpaper() {
             local current_wall=$(get_var "WALL_CURRENT")
             local engine=$(get_var "CLR_ENGINE")
             local theme=$(get_var "RETRO_THEME")
+            local static_forced=$(get_var "WALL_STATIC_FORCED")
+            local static_on_bat=$(get_var "WALL_STATIC_ON_BAT")
+            local static_on_saver=$(get_var "WALL_STATIC_ON_SAVER")
+            local static_on_fullscreen=$(get_var "WALL_STATIC_ON_FULLSCREEN")
+            local pause_procs=$(get_var "WALL_PAUSE_PROCS")
+            local saver_active=$(get_var "BAT_SAVER_ACTIVE")
+            local wall_paused=$(get_var "WALL_PAUSED")
+            local slideshow_active=$(get_var "WALL_SLIDESHOW_ACTIVE")
 
             : ${current_wall:="None"}
             : ${engine:="matugen"}
             : ${theme:="retro"}
+            : ${static_forced:="false"}
+            : ${static_on_bat:="false"}
+            : ${static_on_saver:="true"}
+            : ${static_on_fullscreen:="true"}
+            : ${pause_procs:=""}
+            : ${saver_active:="false"}
+            : ${wall_paused:="false"}
+            : ${slideshow_active:="false"}
 
-            local wall_name=$(basename "$current_wall")
-            local type="Static"
-            local type_icon="󰈟"
-            if [[ $wall_name =~ \.(mp4|mkv|webm)$ ]]; then
-                type="Live"
-                type_icon="󰈫"
+            local wall_name="${current_wall%.*}"
+            wall_name=$(basename "$wall_name")
+            wall_name=$(echo "$wall_name" | sed 's/[-_]/ /g; s/\b\(.\)/\u\1/g')
+            local type="Live"
+            local type_icon="󰈫"
+            local saver_static=false
+            [[ $saver_active == "true" && $static_on_saver == "true" ]] && saver_static=true
+            if [[ ! $current_wall =~ \.(mp4|mkv|webm)$ ]] || [[ $static_forced == "true" ]] || [[ $saver_static == "true" ]] || [[ $wall_paused == "true" ]]; then
+                type="Static"
+                type_icon="󰈟"
+            fi
+
+            local static_status="Off"
+            local static_color="$MUTE"
+            if [[ $static_forced == "true" ]]; then
+                static_status="Forced"
+                static_color="$PINK"
+            elif [[ $saver_static == "true" ]]; then
+                static_status="Battery Saver"
+                static_color="$WARN"
+            elif [[ $static_on_bat == "true" ]]; then
+                static_status="On Battery"
+                static_color="$WARN"
+            fi
+
+            local paused_status="No"
+            local paused_color="$MUTE"
+            if [[ $wall_paused == "true" ]]; then
+                paused_status="Yes"
+                paused_color="$WARN"
+            fi
+
+            local slide_status="Off"
+            local slide_color="$MUTE"
+            if [[ $slideshow_active == "true" ]]; then
+                slide_status="On"
+                slide_color="$PINK"
             fi
 
             rx_table_header "󰸉" "Wallpaper Status"
-            rx_table_row "󰀻" "Active:" "$wall_name" "$PINK" "14"
+            rx_table_row "󰀻" "Name:" "$wall_name" "$PINK" "14"
             rx_table_row "󰏘" "Theme Pool:" "${theme^}" "$PINK" "14"
             rx_table_row "$type_icon" "Style:" "$type" "$PINK" "14"
-            rx_table_row "󰉖" "Path:" "${current_wall/$HOME/\~}" "$PINK" "14"
             rx_table_row "󰓅" "Engine:" "${engine^^}" "$PINK" "14"
+            rx_table_row "󰏤" "Paused:" "$paused_status" "$paused_color" "14"
+            rx_table_row "󰏦" "Slideshow:" "$slide_status" "$slide_color" "14"
+            if [[ -n $pause_procs && $pause_procs != "null" ]]; then
+                rx_table_row "󰓅" "Pause Procs:" "$pause_procs" "$WARN" "14"
+            fi
             rx_table_separator
             rx_table_spacer
             ;;
@@ -240,7 +335,8 @@ cmd_wallpaper() {
             rx_help_cmd "add <path>" "Import image to wallpaper cache"
             rx_help_cmd "slideshow [mode]" "Toggle slideshow mode"
             rx_help_cmd "static [mode]" "Toggle static wallpaper mode"
-            rx_help_cmd "list" "List all wallpapers in theme"
+            rx_help_cmd "list" "List all wallpapers with resolution info"
+            rx_help_cmd "sync" "Sync wallpapers from repository and optimize"
             rx_help_cmd "picker" "Launch interactive wallpaper picker"
             rx_help_cmd "cache [value]" "Build animated wallpaper cache"
             rx_help_cmd "restore" "Restore previous wallpaper"
