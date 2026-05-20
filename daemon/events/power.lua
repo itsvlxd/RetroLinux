@@ -1,17 +1,12 @@
 local Watcher = require("watcher")
 local Power = require("power")
 local Battery = require("battery")
-local Wallpaper = require("wallpaper")
 
 local Events = {}
 
 function Events.on_power_disconnect(cap)
     if Watcher.get_var("BAT_SAVER_ON_PWR_DIS") == "true" and Watcher.get_var("BAT_SAVER_ACTIVE") ~= "true" then
         Power.set_profile("saver")
-    end
-
-    if Watcher.get_var("WALL_STATIC_ON_BAT") == "true" then
-        Wallpaper.restore_wallpaper(true)
     end
 
     Watcher.set_var("BAT_DISCONNECT_TIME", tostring(os.time()))
@@ -22,10 +17,6 @@ function Events.on_power_connect(cap)
 
     if Watcher.get_var("BAT_SAVER_ON_PWR_DIS") == "true" and Watcher.get_var("BAT_SAVER_ACTIVE") == "true" then
         Battery.set_saver("false")
-    end
-
-    if Watcher.get_var("WALL_STATIC_ON_BAT") == "true" then
-        Wallpaper.restore_wallpaper(true)
     end
 
     local start = Watcher.get_var("BAT_DISCONNECT_TIME")
@@ -46,8 +37,6 @@ function Events.on_power_profile_changed(current_pwr)
         Battery.set_saver("true")
         Battery.sync_hyprland_power("true")
     end
-
-    Wallpaper.restore_wallpaper(true)
 end
 
 return Events
