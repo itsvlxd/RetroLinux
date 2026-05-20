@@ -68,7 +68,7 @@ return {
                     if card and card ~= "" then
                         last_profile_state[mac] = Bluetooth.get_audio_profile(card)
                     end
-                    os.execute("sleep 2")
+                    Watcher.sleep(2)
                     apply_forced_profile(mac)
                 end
             end
@@ -101,7 +101,7 @@ return {
                         log("  Category: " .. info.category_label .. " | Audio: " .. tostring(info.audio_capable) .. " | Input: " .. tostring(info.input_capable))
                         engine:emit("on_bluetooth_connected", info.name, mac)
                         if info.audio_capable then
-                            os.execute("sleep 3")
+                            Watcher.sleep(3)
                             local card = Bluetooth.get_audio_card(mac)
                             if card and card ~= "" then
                                 local profile = Bluetooth.get_audio_profile(card)

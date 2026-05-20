@@ -45,7 +45,7 @@ return {
                         log("Not mounted, attempting mount via udisksctl...")
                         local mount_out = Watcher.run_cmd("udisksctl mount -b '" .. dev_path .. "' --no-user-interaction 2>&1")
                         log("udisksctl output: " .. mount_out)
-                        os.execute("sleep 1")
+                        Watcher.sleep(1)
                         actual_mount = Watcher.run_cmd("findmnt -nlo TARGET '" .. dev_path .. "' 2>/dev/null"):gsub("%s+$", "")
                         if actual_mount ~= "" then
                             log("Mount successful: " .. actual_mount)
