@@ -9,12 +9,14 @@ rx_log_register "wallpaper"
 add_wallpaper() {
     local source_file="$1"
     if [[ ! -f $source_file ]]; then
+        rx_log_file "ERROR" "Add failed: source file not found: $source_file"
         echo "result=error|reason=file_not_found|path=$source_file"
         return 1
     fi
 
     local ext="${source_file##*.}"
     if [[ ! ${ext,,} =~ ^(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$ ]]; then
+        rx_log_file "ERROR" "Add failed: unsupported format: $ext"
         echo "result=error|reason=unsupported_format|ext=$ext"
         return 1
     fi
@@ -26,9 +28,14 @@ add_wallpaper() {
     local filename=$(basename "$source_file")
     local target_file="$target_dir/$filename"
 
+    if [[ -f $target_file ]]; then
+        rx_log_file "WARN" "Wallpaper already exists, overwriting: $filename"
+    fi
+
     cp "$source_file" "$target_file"
     rx_wallpaper_generate_cache "$target_file" >/dev/null
 
+    rx_log_file "INFO" "Wallpaper added: $filename"
     rx_wallpaper_start "$target_file"
 }
 
@@ -50,8 +57,10 @@ slideshow_next() {
         shuf)
 
     if [[ -n $next_wall ]]; then
-        rx_log_file "INFO" "Slideshow advancing to: $(rx_format_string "$next_wall")"
+        rx_log_file "INFO" "Slideshow advancing to: $(rx_format_string "$(basename "$next_wall")")"
         rx_wallpaper_start "$next_wall"
+    else
+        rx_log_file "WARN" "Slideshow skipped: no valid wallpapers found in $target_dir"
     fi
 }
 
@@ -78,6 +87,9 @@ optimize_wallpapers() {
     local cache_target="$WALL_DIR/$theme"
     mkdir -p "$cache_target"
 
+    local optimized=0
+    local skipped=0
+
     for src_file in "$source_dir"/*; do
         [[ -f $src_file ]] || continue
 
@@ -94,6 +106,7 @@ optimize_wallpapers() {
 
         if [[ -z $src_w || -z $src_h ]]; then
             ln -sf "$src_file" "$opt_file"
+            ((skipped++))
             continue
         fi
 
@@ -102,6 +115,7 @@ optimize_wallpapers() {
                 rm -f "$opt_file"
                 ln -sf "$src_file" "$opt_file"
             fi
+            ((skipped++))
         else
 
             local cached_res=""
@@ -117,14 +131,19 @@ optimize_wallpapers() {
                         -vf "scale=${target_w}:${target_h}:force_original_aspect_ratio=decrease,pad=${target_w}:${target_h}:(ow-iw)/2:(oh-ih)/2" \
                         -c:v libx264 -preset fast -crf 23 \
                         -an "$opt_file" -loglevel error
+                    ((optimized++))
                 else
                     magick "$src_file" -resize "${target_w}x${target_h}^" -gravity center -extent "${target_w}x${target_h}" "$opt_file"
+                    ((optimized++))
                 fi
+            else
+                ((skipped++))
             fi
         fi
     done
 
-    rx_wallpaper_restore
+    rx_log_file "INFO" "Optimization complete: $optimized optimized, $skipped skipped"
+    restore_wallpaper
 }
 
 get_monitor_resolutions() {
@@ -224,14 +243,71 @@ list_wallpapers_with_resolution() {
 }
 
 set_wallpaper() {
-    local name=$(basename "$1")
+    local input="$1"
+    local name=$(basename "$input")
     rx_log_file "INFO" "Setting wallpaper: $(rx_format_string "${name%.*}")"
-    rx_wallpaper_start "$1" "${2:-false}"
+
+    if [[ ! -f $input ]]; then
+        rx_log_file "ERROR" "Wallpaper file not found: $input"
+        echo "ERR|file_not_found|$input"
+        return 1
+    fi
+
+    if [[ -L $input ]]; then
+        local link_target=$(readlink -f "$input")
+        if [[ ! -f $link_target ]]; then
+            rx_log_file "ERROR" "Symlink target missing: $input -> $link_target"
+            echo "ERR|symlink_broken|$input|$link_target"
+            return 1
+        fi
+    fi
+
+    rx_wallpaper_start "$input" "${2:-false}"
+    echo "OK|$input"
 }
 
 restore_wallpaper() {
-    rx_log_file "INFO" "Restoring last wallpaper"
-    rx_wallpaper_restore "${1:-false}"
+    local last_wall=$(get_var "WALL_CURRENT")
+    if [[ -z $last_wall || $last_wall == "null" ]]; then
+        rx_log_file "ERROR" "Restore failed: WALL_CURRENT is not set"
+        echo "ERR|WALL_CURRENT_not_set"
+        return 1
+    fi
+
+    rx_log_file "INFO" "Restoring wallpaper: $last_wall"
+
+    if [[ ! -f $last_wall ]]; then
+        rx_log_file "ERROR" "Restore failed: wallpaper file not found: $last_wall"
+        echo "ERR|file_not_found|$last_wall"
+        return 1
+    fi
+
+    if [[ -L $last_wall ]]; then
+        local link_target=$(readlink -f "$last_wall")
+        if [[ ! -f $link_target ]]; then
+            rx_log_file "ERROR" "Restore failed: symlink target missing: $last_wall -> $link_target"
+            echo "ERR|symlink_broken|$last_wall|$link_target"
+            return 1
+        fi
+        rx_log_file "INFO" "Symlink: $last_wall -> $link_target"
+    fi
+
+    local filename=$(basename "$last_wall")
+    local ext="${filename##*.}"
+    local is_video=false
+    [[ $ext =~ ^(mp4|mkv|webm)$ ]] && is_video=true
+
+    if [[ $is_video == "true" ]]; then
+        local video_path=$(rx_wallpaper_find_video "$last_wall")
+        if [[ -n $video_path ]]; then
+            rx_log_file "INFO" "Video version found: $video_path"
+        else
+            rx_log_file "WARN" "No video version found for: $filename"
+        fi
+    fi
+
+    rx_wallpaper_start "$last_wall" "${1:-false}"
+    echo "OK|$last_wall"
 }
 
 static_wallpaper() {
@@ -246,17 +322,28 @@ static_wallpaper() {
     else
         rx_log_file "INFO" "Static mode disabled"
     fi
-    rx_wallpaper_restore
+    restore_wallpaper
 }
 
 pause_wallpaper() {
-    rx_log_file "INFO" "Wallpaper paused"
-    rx_wallpaper_pause
+    pkill mpvpaper 2>/dev/null
+    set_var "WALL_PAUSED" "true"
+    rx_log_file "INFO" "Wallpaper paused (mpvpaper killed)"
+    echo "OK|paused"
 }
 
 resume_wallpaper() {
-    rx_log_file "INFO" "Wallpaper resumed"
+    local current_wall=$(get_var "WALL_CURRENT")
+    local video_path=$(rx_wallpaper_find_video "$current_wall")
+    if [[ -n $video_path ]]; then
+        rx_log_file "INFO" "Resuming with video: $(basename "$video_path")"
+    else
+        rx_log_file "WARN" "Resume attempted but no video version found for: $current_wall"
+        echo "ERR|no_video_version|$current_wall"
+        return 1
+    fi
     rx_wallpaper_resume
+    echo "OK|$video_path"
 }
 
 should_pause() {

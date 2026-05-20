@@ -242,11 +242,15 @@ rx_wallpaper_start() {
 rx_wallpaper_restore() {
     local quick="${1:-false}"
     local last_wall=$(get_var "WALL_CURRENT")
-    if [[ -n $last_wall && -f $last_wall ]]; then
-        rx_wallpaper_start "$last_wall" "$quick"
-    else
+    if [[ -z $last_wall || $last_wall == "null" ]]; then
+        rx_log_file "ERROR" "Restore failed: WALL_CURRENT is not set"
         return 1
     fi
+    if [[ ! -f $last_wall ]]; then
+        rx_log_file "ERROR" "Restore failed: wallpaper file not found: $last_wall"
+        return 1
+    fi
+    rx_wallpaper_start "$last_wall" "$quick"
 }
 
 rx_wallpaper_pause() {

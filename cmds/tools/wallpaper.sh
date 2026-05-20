@@ -89,10 +89,10 @@ cmd_wallpaper() {
             set_var "WALL_STATIC_FORCED" "$new_state"
 
             if [[ $new_state == "true" ]]; then
-                rx_wallpaper_pause
+                bash "$wall_script" --pause >/dev/null 2>&1
                 rx_log "success" "Static mode ${PINK}ENABLED${RESET}"
             else
-                rx_wallpaper_resume
+                bash "$wall_script" --resume >/dev/null 2>&1
                 rx_log "success" "Static mode ${GRAY}DISABLED${RESET}"
             fi
             ;;
@@ -161,7 +161,15 @@ cmd_wallpaper() {
 
         "restore")
             rx_log "info" "Putting the wallpaper back how it was..."
-            bash "$wall_script" --restore && rx_log "success" "Wallpaper restored." || rx_log "error" "Nothing to restore."
+            local restore_result
+            restore_result=$(bash "$wall_script" --restore 2>&1)
+            if echo "$restore_result" | grep -q "^OK|"; then
+                local wall_path=$(echo "$restore_result" | sed 's/^OK|//')
+                rx_log "success" "Wallpaper restored: ${PINK}$(basename "${wall_path%.*}" | sed 's/[-_]/ /g; s/\b\(.\)/\u\1/g')${RESET}"
+            else
+                local err=$(echo "$restore_result" | head -1)
+                rx_log "error" "Restore failed: ${PINK}${err}${RESET}"
+            fi
             ;;
 
         "res")
