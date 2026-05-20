@@ -15,7 +15,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck jq bash
+          sudo apt-get update && sudo apt-get install -y shellcheck jq bash lua5.4 liblua5.4-dev
 
       - name: Set up environment
         run: |
