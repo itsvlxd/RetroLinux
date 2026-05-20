@@ -1011,7 +1011,15 @@ bt_obex_move_received_file() {
 
     local dl_dir
     dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
-    [[ -z $dl_dir ]] && return 1
+    if [[ -z $dl_dir ]]; then
+        dl_dir="$HOME/Downloads"
+    fi
+
+    if [[ -f "$dl_dir/$filename" ]]; then
+        rx_log_file "info" "File already in $dl_dir: $filename"
+        xdg-open "$dl_dir/$filename" >/dev/null 2>&1 &
+        return 0
+    fi
 
     local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}"
     local cache_file="$cache_dir/$filename"
@@ -1040,7 +1048,9 @@ bt_obex_move_received_file() {
 bt_obex_restart_with_root() {
     local dl_dir
     dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
-    [[ -z $dl_dir ]] && return 1
+    if [[ -z $dl_dir ]]; then
+        dl_dir="$HOME/Downloads"
+    fi
 
     sleep 1
 
@@ -1068,15 +1078,15 @@ bt_obex_receive_start() {
 
     local dl_dir
     dl_dir=$(get_var "BT_DOWNLOAD_DIR" 2>/dev/null)
+    if [[ -z $dl_dir ]]; then
+        dl_dir="$HOME/Downloads"
+        mkdir -p "$dl_dir"
+    fi
 
     pkill obexd 2>/dev/null
     sleep 0.5
 
-    if [[ -n $dl_dir ]]; then
-        nohup /usr/lib/bluetooth/obexd --root="$dl_dir" >/dev/null 2>&1 &
-    else
-        nohup /usr/lib/bluetooth/obexd >/dev/null 2>&1 &
-    fi
+    nohup /usr/lib/bluetooth/obexd --root="$dl_dir" >/dev/null 2>&1 &
     sleep 1.5
 
     pid_file="/tmp/.bt_obex_receive.pid"
