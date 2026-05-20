@@ -33,7 +33,7 @@ lsp-plugins-lv2
 networkmanager
 
 # Wallpaper
-awww-bin
+awww
 mpvpaper
 imagemagick
 
