@@ -572,7 +572,7 @@ download_eq_preset() {
 
 start_easyeffects() {
     pgrep -x easyeffects >/dev/null 2>&1 && echo "Already running" && return 0
-    nohup easyeffects --service-mode >/dev/null 2>&1 &
+    nohup easyeffects --gapplication-service >/dev/null 2>&1 &
     sleep 1
     pgrep -x easyeffects >/dev/null 2>&1 && echo "Started" || echo "Failed to start"
 }
