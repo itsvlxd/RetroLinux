@@ -1,4 +1,3 @@
-from .log import setup_logger
 from .obex import (
     BUS_NAME, AGENT_IFACE, PROPS_IFACE, TRANSFER_IFACE, SESSION_IFACE,
     calc_notif_id, get_cancel_flag_path, clean_cancel_flag, set_cancel_flag,
