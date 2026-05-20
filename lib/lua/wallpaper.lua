@@ -135,10 +135,10 @@ function Wallpaper.should_pause()
 	end
 
 	if pause_procs ~= "" and pause_procs ~= "null" then
-		for proc in pause_procs:gmatch("([^|]+)") do
-			proc = proc:gsub("%s+", "")
-			if proc ~= "" then
-				if Watcher.run_cmd("pgrep -x '" .. proc .. "' >/dev/null 2>&1 && echo yes") == "yes" then
+		for p in pause_procs:gmatch("([^|]+)") do
+			local trimmed = p:gsub("%s+", "")
+			if trimmed ~= "" then
+				if Watcher.run_cmd("pgrep -x '" .. trimmed .. "' >/dev/null 2>&1 && echo yes") == "yes" then
 					return true
 				end
 			end
