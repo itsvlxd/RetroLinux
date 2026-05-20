@@ -18,10 +18,9 @@ register_command() {
 run_postinstall() {
     rx_logo
     rx_log "info" "Running post-install setup..."
+    faillock --user $USER --reset
 
     rx_git_fix_owner
-
-    faillock --user $USER --reset
 
     source "$HOME/.retro_install"
 
