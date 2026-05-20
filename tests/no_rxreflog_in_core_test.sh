@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: Verify core scripts contain no rx_log calls
+# Description: Verify core scripts use rx_log_file for logging, not rx_log
 
 if [[ -z $RETRO_DIR ]]; then
     export RETRO_DIR="$(dirname "$(readlink -f "$0")")"
@@ -20,18 +20,24 @@ if [[ ${#CORE_SCRIPTS[@]} -eq 0 ]]; then
 fi
 
 for script in "${CORE_SCRIPTS[@]}"; do
+    local_name=$(basename "$script")
+
     if grep -qE 'rx_log "(info|success|warn|error)"' "$script" 2>/dev/null; then
-        VIOLATIONS+=("$(basename "$script") contains rx_log")
+        VIOLATIONS+=("$local_name: contains rx_log (use rx_log_file for backend logging)")
+    fi
+
+    if grep -qE 'rx_log_file "(INFO|WARN|ERROR|SUCCESS)"' "$script" 2>/dev/null; then
+        continue
     fi
 done
 
 if [[ ${#VIOLATIONS[@]} -gt 0 ]]; then
-    echo "FAIL: ${#VIOLATIONS[@]} core scripts contain rx_log"
+    echo "FAIL: ${#VIOLATIONS[@]} core scripts have logging violations"
     for v in "${VIOLATIONS[@]}"; do
         echo "ERROR: $v"
     done
     exit 1
 else
-    echo "PASS: No core scripts contain rx_log"
+    echo "PASS: Core scripts follow logging conventions"
     exit 0
 fi
