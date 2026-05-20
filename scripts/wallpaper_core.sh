@@ -342,27 +342,28 @@ sync_wallpapers() {
     local source_dir="$REPO_WALLS"
     [[ ! -d $source_dir ]] && echo "result=error|reason=repo_not_found" && return 1
 
-    local theme=$(get_var "RETRO_THEME" "retro")
-    local config_theme="$WALL_DIR/$theme"
-    mkdir -p "$config_theme"
-
     local synced=0
     local skipped=0
 
-    for src_file in "$source_dir"/*; do
-        [[ -f $src_file ]] || continue
+    for theme_dir in "$source_dir"/*/; do
+        [[ -d $theme_dir ]] || continue
+        local theme_name=$(basename "$theme_dir")
+        local config_theme="$WALL_DIR/$theme_name"
+        mkdir -p "$config_theme"
 
-        local filename=$(basename "$src_file")
-        [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
+        for src_file in "$theme_dir"/*; do
+            [[ -f $src_file ]] || continue
 
-        local target_file="$config_theme/$filename"
+            local filename=$(basename "$src_file")
+            local target_file="$config_theme/$filename"
 
-        if [[ -f $target_file ]]; then
-            ((skipped++))
-        else
-            cp "$src_file" "$target_file"
-            ((synced++))
-        fi
+            if [[ -f $target_file || -L $target_file ]]; then
+                ((skipped++))
+            else
+                cp "$src_file" "$target_file"
+                ((synced++))
+            fi
+        done
     done
 
     echo "synced=$synced|skipped=$skipped"
