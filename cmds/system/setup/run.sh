@@ -34,10 +34,10 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
     source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
     source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
-    source "$RETRO_DIR/cmds/system/setup/editor.sh" && setup_editor
-    source "$RETRO_DIR/cmds/system/setup/ssh.sh" && setup_ssh
-    source "$RETRO_DIR/cmds/system/setup/filemanager.sh" && setup_filemanager
 
+    retro xdg setup -o "${EDITOR_CHOICE:-nvim},${BROWSER_CHOICE:-firefox},${FILEMANAGER_CHOICE:-thunar},loupe,mpv"
+
+    source "$RETRO_DIR/cmds/system/setup/ssh.sh" && setup_ssh
     source "$RETRO_DIR/cmds/system/setup/terminal.sh" && setup_terminal
     source "$RETRO_DIR/cmds/system/setup/variables.sh" && setup_variables
     source "$RETRO_DIR/cmds/system/setup/wallpaper.sh" && setup_wallpaper
