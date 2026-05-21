@@ -1078,6 +1078,52 @@ show_hypr_env() {
     fi
 }
 
+generate_grub_cmdline() {
+    local gpu_vendors=()
+    local cpu_vendor=""
+    local cmdline=""
+
+    if [[ -f /proc/cpuinfo ]]; then
+        local vendor_id=$(grep -m1 "vendor_id" /proc/cpuinfo | awk -F': ' '{print $2}')
+        case "$vendor_id" in
+            *Intel*) cpu_vendor="intel" ;;
+            *AMD*) cpu_vendor="amd" ;;
+        esac
+    fi
+
+    local gpus=$(detect_gpus)
+    if [[ $gpus != "NONE" && -n $gpus ]]; then
+        while IFS= read -r gpu; do
+            IFS='|' read -r pci_id vendor_id vendor model driver <<<"$gpu"
+            gpu_vendors+=("$vendor")
+        done <<<"$gpus"
+    fi
+
+    cmdline="quiet splash loglevel=3 net.ifnames=0"
+
+    if [[ " ${gpu_vendors[@]} " =~ " intel" ]]; then
+        cmdline+=" i915.enable_psr=1 i915.enable_fbc=1 i915.enable_guc=3"
+    fi
+
+    if [[ $cpu_vendor == "intel" ]]; then
+        cmdline+=" intel_iommu=on iommu=pt"
+    fi
+
+    if [[ " ${gpu_vendors[@]} " =~ " amd" ]]; then
+        cmdline+=" amdgpu.sg=0"
+    fi
+
+    if [[ $cpu_vendor == "amd" ]]; then
+        cmdline+=" amd_iommu=on iommu=pt"
+    fi
+
+    if [[ " ${gpu_vendors[@]} " =~ " nvidia" ]]; then
+        cmdline+=" nvidia-drm.modeset=1 fbdev=1"
+    fi
+
+    echo "$cmdline"
+}
+
 case "$1" in
     "--scan") run_full_scan ;;
     "--install") run_full_install ;;
@@ -1107,4 +1153,5 @@ case "$1" in
     "--hypr-show") show_hypr_env ;;
     "--hypr-env-show") show_hypr_env ;;
     "--mkinit") configure_mkinitcpio_nvidia ;;
+    "--grub-cmdline") generate_grub_cmdline ;;
 esac
