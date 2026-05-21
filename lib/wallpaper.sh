@@ -278,9 +278,19 @@ rx_wallpaper_start() {
                 return 0
             fi
 
-            if ! rx_wallpaper_is_static; then
-                rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename"
+            reload_vars
+
+            local wall_paused=$(get_var "WALL_PAUSED" "false")
+            if [[ $wall_paused == "true" ]]; then
+                return 0
             fi
+
+            local force_static=$(get_var "WALL_STATIC_FORCED" "false")
+            if [[ $force_static == "true" ]]; then
+                return 0
+            fi
+
+            rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename"
         fi
     ) &>/dev/null &
 }
