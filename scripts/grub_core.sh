@@ -473,7 +473,7 @@ patch_snapshot_entry() {
     local temp_cfg=$(mktemp)
 
     while IFS= read -r line; do
-        if [[ $line =~ ^submenu\ \'Retro[[:space:]]Linux\ snapshots\' ]]; then
+        if [[ $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]+Linux\ snapshots\' ]]; then
             echo "submenu 'RetroLinux Snapshots' --class retrolinux {" >>"$temp_cfg"
             patched=true
         else
@@ -491,7 +491,55 @@ patch_snapshot_entry() {
     rm -f "$temp_cfg"
 }
 
+remove_snapshot_entry() {
+    local grub_cfg="/boot/grub/grub.cfg"
+
+    if [[ ! -f $grub_cfg ]]; then
+        rx_log_file "error" "GRUB config not found: $grub_cfg"
+        return 1
+    fi
+
+    rx_log_file "info" "Removing snapshot submenu entry..."
+
+    local temp_cfg=$(mktemp)
+    local skip=false
+    local brace_depth=0
+    local removed=false
+
+    while IFS= read -r line; do
+        if [[ $skip == false && $line =~ submenu\ \'Retro[^\']*[Ss]napshot ]]; then
+            skip=true
+            brace_depth=$(echo "$line" | tr -cd '{' | wc -c)
+            brace_depth=$((brace_depth - $(echo "$line" | tr -cd '}' | wc -c)))
+            removed=true
+            continue
+        fi
+
+        if [[ $skip == true ]]; then
+            local open_b=$(echo "$line" | tr -cd '{' | wc -c)
+            local close_b=$(echo "$line" | tr -cd '}' | wc -c)
+            brace_depth=$((brace_depth + open_b - close_b))
+            if [[ $brace_depth -le 0 ]]; then
+                skip=false
+            fi
+            continue
+        fi
+
+        echo "$line" >>"$temp_cfg"
+    done <"$grub_cfg"
+
+    if [[ $removed == true ]]; then
+        $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
+        rx_log_file "success" "Snapshot submenu entry removed"
+    else
+        rx_log_file "info" "No snapshot submenu entry found to remove"
+    fi
+
+    rm -f "$temp_cfg"
+}
+
 regenerate_grub() {
+    local remove_snapshots="${1:-false}"
     rx_log_file "info" "Regenerating GRUB configuration..."
 
     if command -v grub-mkconfig >/dev/null 2>&1; then
@@ -508,7 +556,11 @@ regenerate_grub() {
             patch_grub_menu_entries
             add_shutdown_reboot_entries
             remove_grub_echo_messages
-            patch_snapshot_entry
+            if [[ $remove_snapshots == true ]]; then
+                remove_snapshot_entry
+            else
+                patch_snapshot_entry
+            fi
             set_default_kernel
             rx_log_file "success" "GRUB configuration regenerated and patched"
         else
