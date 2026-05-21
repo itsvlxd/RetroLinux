@@ -17,6 +17,10 @@ base-devel
 pacman-contrib
 xdg-desktop-portal-gtk
 
+# Apps
+loupe
+mpv
+
 # Bluetooth
 bluez
 bluez-libs
