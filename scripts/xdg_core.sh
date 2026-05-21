@@ -78,6 +78,12 @@ reset_defaults() {
     echo "$result"
 }
 
+setup_defaults() {
+    local result=$(rx_xdg_setup "$1" "$2" "$3" "$4" "$5")
+    rx_log_file "INFO" "XDG setup applied"
+    echo "$result"
+}
+
 find_handlers() {
     local mime="$1"
     [[ -z $mime ]] && echo "result=error|reason=no_mime" && return 1
@@ -89,10 +95,6 @@ portal_status() {
     local running="no"
     pgrep -f "xdg-desktop-portal" >/dev/null 2>&1 && running="yes"
     echo "backend=$backend|running=$running"
-}
-
-portal_list() {
-    rx_xdg_list_portals
 }
 
 portal_list() {
@@ -191,6 +193,7 @@ case "$1" in
     "--get-default") get_default "$2" ;;
     "--list-defaults") list_defaults ;;
     "--reset-defaults") reset_defaults ;;
+    "--setup") setup_defaults "$2" "$3" "$4" "$5" "$6" ;;
     "--find-handlers") find_handlers "$2" ;;
     "--portal-status") portal_status ;;
     "--portal-list") portal_list ;;

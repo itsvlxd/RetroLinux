@@ -216,6 +216,153 @@ EOF
     echo "OK|reset_complete"
 }
 
+rx_xdg_resolve_desktop() {
+    local input="$1"
+    [[ -z $input ]] && return 1
+
+    if [[ $input == *.desktop ]]; then
+        if rx_xdg_validate_desktop "$input"; then
+            echo "$input"
+            return 0
+        fi
+        input="${input%.desktop}"
+    fi
+
+    local direct="${input}.desktop"
+    if rx_xdg_validate_desktop "$direct"; then
+        echo "$direct"
+        return 0
+    fi
+
+    local search_paths=(
+        "/usr/share/applications"
+        "$HOME/.local/share/applications"
+        "/var/lib/flatpak/exports/share/applications"
+    )
+    for sp in "${search_paths[@]}"; do
+        [[ ! -d $sp ]] && continue
+        local found=$(find "$sp" -maxdepth 1 -name "${input}*.desktop" -type f 2>/dev/null | head -1)
+        if [[ -n $found ]]; then
+            local basename=$(basename "$found")
+            if rx_xdg_validate_desktop "$basename"; then
+                echo "$basename"
+                return 0
+            fi
+        fi
+    done
+
+    for sp in "${search_paths[@]}"; do
+        [[ ! -d $sp ]] && continue
+        while IFS= read -r df; do
+            [[ -z $df ]] && continue
+            if grep -q "^Exec=.*${input}" "$df" 2>/dev/null || grep -q "^Exec=${input}" "$df" 2>/dev/null; then
+                local basename=$(basename "$df")
+                if rx_xdg_validate_desktop "$basename"; then
+                    echo "$basename"
+                    return 0
+                fi
+            fi
+        done < <(find "$sp" -maxdepth 1 -name "*.desktop" -type f 2>/dev/null)
+    done
+
+    echo "${input}.desktop"
+}
+
+rx_xdg_setup() {
+    local editor_input="$1"
+    local browser_input="$2"
+    local fm_input="$3"
+    local image_input="$4"
+    local video_input="$5"
+
+    [[ -z $editor_input ]] && editor_input=$(get_var "RETRO_EDITOR_CMD" "nvim")
+    [[ -z $browser_input ]] && browser_input=$(get_var "BROWSER_CHOICE" "zen")
+    [[ -z $fm_input ]] && fm_input=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
+    [[ -z $image_input ]] && image_input="loupe"
+    [[ -z $video_input ]] && video_input="mpv"
+
+    local editor_desktop=$(rx_xdg_resolve_desktop "$editor_input")
+    local browser_desktop=$(rx_xdg_resolve_desktop "$browser_input")
+    local fm_desktop=$(rx_xdg_resolve_desktop "$fm_input")
+    local image_desktop=$(rx_xdg_resolve_desktop "$image_input")
+    local video_desktop=$(rx_xdg_resolve_desktop "$video_input")
+    local terminal_desktop="kitty.desktop"
+
+    [[ $fm_desktop == "thunar.desktop" ]] && ! rx_xdg_validate_desktop "thunar.desktop" && fm_desktop=$(rx_xdg_resolve_desktop "nemo")
+    [[ $image_desktop == "loupe.desktop" ]] && ! rx_xdg_validate_desktop "loupe.desktop" && image_desktop=$(rx_xdg_resolve_desktop "viewnior")
+
+    local editor_mimes=(
+        "text/plain" "text/x-shellscript" "text/x-lua" "text/x-c" "text/x-c++src"
+        "text/x-c++hdr" "text/x-java" "text/x-python" "text/javascript" "text/typescript"
+        "text/x-ruby" "text/x-rust" "text/x-go" "text/x-scala" "text/x-kotlin"
+        "text/x-swift" "text/markdown" "text/x-yaml" "text/x-toml" "text/xml"
+        "application/json" "text/css" "text/x-scss" "text/x-sass" "text/x-sql"
+        "text/x-diff" "text/csv" "text/x-perl" "text/x-php" "text/x-haskell"
+        "text/x-erlang" "text/x-latex" "text/x-objc" "text/x-fortran" "text/x-pascal"
+        "text/x-asm" "text/x-dockerfile" "text/x-properties" "text/x-ini"
+        "application/x-desktop" "text/x-makefile" "text/x-cmake" "text/x-gradle"
+        "text/x-zig" "text/x-nim" "application/x-shellscript"
+    )
+
+    local fm_mimes=(
+        "inode/directory" "application/x-directory"
+        "x-scheme-handler/file" "x-scheme-handler/trash"
+    )
+
+    local browser_mimes=(
+        "x-scheme-handler/http" "x-scheme-handler/https" "x-scheme-handler/about"
+        "x-scheme-handler/chrome" "text/html" "application/xhtml+xml"
+        "application/x-extension-htm" "application/x-extension-html"
+        "application/x-extension-shtml" "application/x-extension-xhtml"
+        "application/x-extension-xht"
+    )
+
+    local image_mimes=(
+        "image/png" "image/jpeg" "image/gif" "image/webp" "image/svg+xml"
+        "image/bmp" "image/tiff" "image/x-xcf" "image/x-ico" "image/x-psd"
+        "image/avif" "image/heic" "image/heif"
+    )
+
+    local video_mimes=(
+        "video/mp4" "video/x-matroska" "video/webm" "video/x-msvideo"
+        "video/x-flv" "video/quicktime" "video/x-ms-wmv" "video/ogg"
+        "video/mpeg" "video/3gpp" "video/x-m4v"
+    )
+
+    mkdir -p "$(dirname "$XDG_MIMEAPPS_FILE")"
+    cat >"$XDG_MIMEAPPS_FILE" <<EOF
+[Default Applications]
+EOF
+
+    for mime in "${editor_mimes[@]}"; do
+        echo "${mime}=${editor_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${fm_mimes[@]}"; do
+        echo "${mime}=${fm_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${browser_mimes[@]}"; do
+        echo "${mime}=${browser_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${image_mimes[@]}"; do
+        echo "${mime}=${image_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${video_mimes[@]}"; do
+        echo "${mime}=${video_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    echo "x-scheme-handler/terminal=${terminal_desktop}" >>"$XDG_MIMEAPPS_FILE"
+
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+    fi
+
+    rx_xdg_bridge_flatpak >/dev/null 2>&1
+
+    set_var "RETRO_EDITOR_CMD" "$editor_input"
+    set_var "RETRO_FILEMANAGER_CMD" "$fm_input"
+
+    echo "OK|editor=$editor_desktop|browser=$browser_desktop|fm=$fm_desktop|image=$image_desktop|video=$video_desktop|terminal=$terminal_desktop"
+}
+
 rx_xdg_find_handlers() {
     local mime="$1"
     [[ -z $mime ]] && return 1

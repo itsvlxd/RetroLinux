@@ -444,6 +444,133 @@ cmd_xdg() {
             esac
             ;;
 
+        "setup")
+            local options=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    -o|--options) options="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+
+            local editor_input=""
+            local browser_input=""
+            local fm_input=""
+            local image_input=""
+            local video_input=""
+
+            if [[ -n $options ]]; then
+                IFS=',' read -ra opts_array <<< "$options"
+                editor_input="${opts_array[0]:-}"
+                browser_input="${opts_array[1]:-}"
+                fm_input="${opts_array[2]:-}"
+                image_input="${opts_array[3]:-}"
+                video_input="${opts_array[4]:-}"
+            else
+                local cur_editor=$(get_var "RETRO_EDITOR_CMD" "nvim")
+                local cur_fm=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
+
+                local detected_browser="firefox"
+                for b in zen firefox chromium floorp; do
+                    if rx_xdg_validate_desktop "${b}.desktop"; then
+                        detected_browser="$b"
+                        break
+                    fi
+                done
+
+                local detected_image="loupe"
+                rx_xdg_validate_desktop "loupe.desktop" || detected_image="viewnior"
+                rx_xdg_validate_desktop "$detected_image.desktop" || detected_image="feh"
+
+            _rx_xdg_input() {
+                local icon="$1"
+                local label="$2"
+                local default="$3"
+
+                echo "" >&2
+                echo -e " ${PINK}$icon  Configure $label${RESET}" >&2
+                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}" >&2
+
+                while true; do
+                    echo -ne " ${PINK}󰄾${RESET} ${label} ${MUTE}[$default]${RESET}: " >&2
+                    read -r input
+                    [[ -z $input ]] && input="$default"
+
+                    local desktop
+                    desktop=$(rx_xdg_resolve_desktop "$input")
+                    if [[ -n $desktop ]]; then
+                        echo "$input"
+                        return 0
+                    fi
+
+                    echo -e "\n ${WARN}✗${RESET} Desktop file not found for: ${PINK}$input${RESET}" >&2
+                    echo -e " ${GRAY}Try again or press Enter for default ($default)${RESET}" >&2
+                done
+            }
+
+            rx_table_header "󱗼" "Configure Default Applications"
+            rx_table_row "󰓅" "Editor:" "$cur_editor" "$PINK" "16"
+            rx_table_row "󰤨" "Browser:" "$detected_browser" "$PINK" "16"
+            rx_table_row "󰉋" "File Manager:" "$cur_fm" "$PINK" "16"
+            rx_table_row "󰋩" "Image Viewer:" "$detected_image" "$PINK" "16"
+            rx_table_row "󰎁" "Video Player:" "mpv" "$PINK" "16"
+            rx_table_row "󰆍" "Terminal:" "kitty.desktop" "$PINK" "16"
+            rx_table_separator
+            rx_table_spacer
+
+            editor_input=$(_rx_xdg_input "󰓅" "Editor" "$cur_editor")
+            browser_input=$(_rx_xdg_input "󰤨" "Browser" "$detected_browser")
+            fm_input=$(_rx_xdg_input "󰉋" "File Manager" "$cur_fm")
+            image_input=$(_rx_xdg_input "󰋩" "Image Viewer" "$detected_image")
+            video_input=$(_rx_xdg_input "󰎁" "Video Player" "mpv")
+            fi
+
+            local editor_desktop=$(rx_xdg_resolve_desktop "$editor_input")
+            local browser_desktop=$(rx_xdg_resolve_desktop "$browser_input")
+            local fm_desktop=$(rx_xdg_resolve_desktop "$fm_input")
+            local image_desktop=$(rx_xdg_resolve_desktop "$image_input")
+            local video_desktop=$(rx_xdg_resolve_desktop "$video_input")
+
+            local editor_count=45
+            local browser_count=11
+            local fm_count=4
+            local image_count=13
+            local video_count=11
+
+            if [[ -z $options ]]; then
+                rx_table_header "󰈔" "Summary"
+                rx_table_row "󰓅" "Editor:" "${editor_count} MIME types" "$PINK" "16"
+                rx_table_row "󰤨" "Browser:" "${browser_count} MIME types" "$PINK" "16"
+                rx_table_row "󰉋" "File Manager:" "${fm_count} MIME types" "$PINK" "16"
+                rx_table_row "󰋩" "Image Viewer:" "${image_count} MIME types" "$PINK" "16"
+                rx_table_row "󰎁" "Video Player:" "${video_count} MIME types" "$PINK" "16"
+                rx_table_row "󰆍" "Terminal:" "1 MIME type" "$PINK" "16"
+                rx_table_separator
+                rx_table_spacer
+
+                if ! rx_confirm "Apply these defaults?" "N"; then
+                    rx_log "info" "Setup cancelled."
+                    return 0
+                fi
+            fi
+
+            local result=$(bash "$xdg_script" --setup "$editor_input" "$browser_input" "$fm_input" "$image_input" "$video_input" 2>&1)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_table_header "󱗼" "XDG Defaults Configured"
+                rx_table_row "󰓅" "Editor:" "$editor_desktop (${editor_count} types)" "$SUCCESS" "16"
+                rx_table_row "󰤨" "Browser:" "$browser_desktop (${browser_count} types)" "$SUCCESS" "16"
+                rx_table_row "󰉋" "File Manager:" "$fm_desktop (${fm_count} types)" "$SUCCESS" "16"
+                rx_table_row "󰋩" "Image Viewer:" "$image_desktop (${image_count} types)" "$SUCCESS" "16"
+                rx_table_row "󰎁" "Video Player:" "$video_desktop (${video_count} types)" "$SUCCESS" "16"
+                rx_table_row "󰆍" "Terminal:" "kitty.desktop (1 type)" "$SUCCESS" "16"
+                rx_table_separator
+                rx_table_spacer
+            else
+                rx_log "error" "Failed to configure XDG defaults."
+                return 1
+            fi
+            ;;
+
         *)
             rx_help_usage "retro xdg <command>"
             rx_help_commands "Available commands"
@@ -455,6 +582,7 @@ cmd_xdg() {
             rx_help_cmd "flatpak" "Bridge host defaults into Flatpak sandbox" "40"
             rx_help_cmd "query <file|ext>" "Reverse lookup: find app for a file or extension" "40"
             rx_help_cmd "autostart [toggle|clean]" "Manage XDG autostart entries" "40"
+            rx_help_cmd "setup [-o options]" "Interactive or scripted XDG default configuration" "40"
             rx_help_cmd "status" "Show full XDG status with health metrics" "40"
             rx_help_examples
             rx_help_example "retro xdg dirs" "List XDG directories" "38"
@@ -465,6 +593,8 @@ cmd_xdg() {
             rx_help_example "retro xdg flatpak" "Bridge defaults to Flatpak" "38"
             rx_help_example "retro xdg query invoice.pdf" "Find what opens PDFs" "38"
             rx_help_example "retro xdg autostart disable discord.desktop" "Disable Discord autostart" "38"
+            rx_help_example "retro xdg setup" "Interactive configuration wizard" "38"
+            rx_help_example "retro xdg setup -o nvim,zen,nemo,loupe,mpv" "Non-interactive setup" "38"
             rx_help_spacer
             ;;
     esac
