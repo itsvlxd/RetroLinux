@@ -3,6 +3,7 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/lib/menu.sh"
 source "$RETRO_DIR/scripts/grub_core.sh"
 
 cmd_grub() {
@@ -548,8 +549,120 @@ cmd_grub() {
                 return $?
             fi
 
-            source "$RETRO_DIR/cmds/system/setup/grub.sh"
-            setup_grub
+            local current_theme=$(get_var "GRUB_THEME_CHOICE" "retropunk")
+            local theme_choice=$(rx_menu "󰀻" "Select GRUB theme:" "retropunk" "retrolinux")
+            set_var "GRUB_THEME_CHOICE" "$theme_choice"
+
+            local res_x=1920
+            local res_y=1080
+            if command -v xrandr &>/dev/null; then
+                local detected_res=$(xrandr 2>/dev/null | grep '*' | head -1 | awk '{print $1}')
+                if [[ -n $detected_res && $detected_res =~ ^[0-9]+x[0-9]+$ ]]; then
+                    res_x=${detected_res%%x*}
+                    res_y=${detected_res##*x}
+                fi
+            fi
+
+            _gcd() {
+                local a=$1 b=$2
+                while [[ $b -ne 0 ]]; do
+                    local t=$b
+                    b=$((a % b))
+                    a=$t
+                done
+                echo $a
+            }
+
+            local gcd=$(_gcd $res_x $res_y)
+            local ar_x=$((res_x / gcd))
+            local ar_y=$((res_y / gcd))
+            local aspect="${ar_x}:${ar_y}"
+
+            local res_options=()
+            local scales=(100 80 75 70 60 50 40)
+            for scale in "${scales[@]}"; do
+                local sx=$((res_x * scale / 100))
+                local sy=$((res_y * scale / 100))
+                [[ $sx -lt 320 || $sy -lt 240 ]] && continue
+                local g=$(_gcd $sx $sy)
+                local ax=$((sx / g))
+                local ay=$((sy / g))
+                if [[ $ax -eq $ar_x && $ay -eq $ar_y ]]; then
+                    res_options+=("${sx}x${sy}")
+                fi
+            done
+
+            local common_alternatives=(
+                "1920x1080" "1280x720" "1024x768" "800x600"
+            )
+            for alt in "${common_alternatives[@]}"; do
+                local ax=${alt%%x*}
+                local ay=${alt##*x}
+                local g=$(_gcd $ax $ay)
+                local cx=$((ax / g))
+                local cy=$((ay / g))
+                local exists=false
+                for existing in "${res_options[@]}"; do
+                    [[ "$existing" == "$alt" ]] && exists=true && break
+                done
+                if [[ $exists == false && $cx -le 16 && $cy -le 10 ]]; then
+                    res_options+=("$alt")
+                fi
+            done
+
+            local native="${res_x}x${res_y}"
+            local final_options=("$native (Native)")
+            for opt in "${res_options[@]}"; do
+                [[ "$opt" == "$native" ]] && continue
+                local g=$(_gcd ${opt%%x*} ${opt##*x})
+                local ax=$((${opt%%x*} / g))
+                local ay=$((${opt##*x} / g))
+                final_options+=("$opt (${ax}:${ay})")
+            done
+
+            local selected_res=$(rx_menu "󰍹" "Select GRUB resolution (${aspect}):" "${final_options[@]}")
+            local gfxmode=$(echo "$selected_res" | cut -d' ' -f1)
+            set_var "BOOT_VIDEO_GRUB" "$gfxmode"
+
+            if rx_confirm "Enable OS prober for dual-boot detection?"; then
+                set_var "GRUB_OS_PROBER" "true"
+            else
+                set_var "GRUB_OS_PROBER" "false"
+            fi
+
+            if rx_confirm "Enable BTRFS snapshot boot for easy rollback?"; then
+                set_var "GRUB_SNAPSHOTS_ENABLED" "true"
+            else
+                set_var "GRUB_SNAPSHOTS_ENABLED" "false"
+            fi
+
+            echo ""
+            echo -ne " ${PINK}󰄾${RESET} Boot timeout seconds ${MUTE}[default: 10]${RESET}: "
+            local timeout_input
+            read -r timeout_input
+            if [[ "$timeout_input" =~ ^[0-9]+$ && $timeout_input -gt 0 ]]; then
+                set_var "GRUB_TIMEOUT" "$timeout_input"
+            else
+                set_var "GRUB_TIMEOUT" "10"
+            fi
+
+            echo ""
+            echo -ne " ${PINK}󰄾${RESET} Default kernel ${MUTE}[linux/linux-zen/linux-lts/linux-hardened, default: linux]${RESET}: "
+            local kernel_input
+            read -r kernel_input
+            case "$kernel_input" in
+                linux|linux-zen|linux-lts|linux-hardened)
+                    set_var "GRUB_KERNEL" "$kernel_input"
+                    ;;
+                *)
+                    set_var "GRUB_KERNEL" "linux"
+                    ;;
+            esac
+
+            rx_log "info" "Applying GRUB configuration..."
+            update_grub_config
+            regenerate_grub
+            rx_log "success" "GRUB setup complete"
             ;;
 
         *)
@@ -565,9 +678,8 @@ cmd_grub() {
             rx_help_cmd "apply" "Backup, apply pending changes, regenerate GRUB"
             rx_help_cmd "setup" "Run GRUB setup wizard"
             rx_help_examples
-            rx_help_example "retro grub kernel list" "Show available kernels" "38"
-            rx_help_example "retro grub kernel set linux-zen" "Switch to zen kernel" "38"
-            rx_help_example "retro grub entries" "Show current boot menu entries" "38"
+            rx_help_example "retro grub kernel" "Show available kernels" "38"
+            rx_help_example "retro grub kernel linux-zen" "Switch to zen kernel" "38"
             rx_help_example "retro grub status" "Show current GRUB config" "38"
             rx_help_example "retro grub theme retrolinux" "Switch to retrolinux theme" "38"
             rx_help_example "retro grub resolution 2560x1440" "Set 1440p resolution" "38"
