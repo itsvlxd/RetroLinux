@@ -119,6 +119,21 @@ configure_xdg_open() {
     fi
 }
 
+bridge_flatpak() {
+    if ! command -v flatpak >/dev/null 2>&1; then
+        echo "result=error|reason=flatpak_not_installed"
+        return 1
+    fi
+    local result=$(rx_xdg_bridge_flatpak)
+    if [[ $result == OK* ]]; then
+        rx_log_file "INFO" "Flatpak MIME bridge applied"
+        echo "$result"
+    else
+        echo "result=error|reason=bridge_failed"
+        return 1
+    fi
+}
+
 full_status() {
     echo "===DIRS==="
     rx_xdg_list_dirs
@@ -142,5 +157,6 @@ case "$1" in
     "--portal-list") portal_list ;;
     "--portal-set") portal_set "$2" ;;
     "--configure-xdg-open") configure_xdg_open ;;
+    "--bridge-flatpak") bridge_flatpak ;;
     "--status") full_status ;;
 esac
