@@ -124,15 +124,15 @@ cmd_grub() {
             fi
 
             rx_table_header "󰂕" "GRUB Configuration Status"
-            rx_table_row "󰂱" "Detected Hardware:" "$hw_info" "$PINK" "22"
-            rx_table_row "󰏗" "Kernel:" "$kernel_display" "$PINK" "22"
-            rx_table_row "󰈔" "Boot Cmdline:" "$cmdline" "$PINK" "22"
-            rx_table_row "󰓅" "Boot Timeout:" "${timeout}s" "$PINK" "22"
-            rx_table_row "󰉋" "Snapshot Daemon:" "$snapshot_status" "$snapshot_color" "22"
-            rx_table_row "󰍹" "OS Prober:" "$os_prober_status" "$os_prober_color" "22"
-            rx_table_row "󰈐" "Resolution:" "$gfxmode" "$PINK" "22"
-            rx_table_row "󰀻" "Theme:" "${theme_name^}" "$PINK" "22"
-            rx_table_row "󰆍" "Distributor:" "$distributor" "$PINK" "22"
+            rx_table_row "󰂱" "Detected Hardware:" "$hw_info" "$PINK" "32"
+            rx_table_row "󰏗" "Kernel:" "$kernel_display" "$PINK" "32"
+            rx_table_row "󰈔" "Boot Cmdline:" "$cmdline" "$PINK" "32"
+            rx_table_row "󰓅" "Boot Timeout:" "${timeout}s" "$PINK" "32"
+            rx_table_row "󰉋" "Snapshot Daemon:" "$snapshot_status" "$snapshot_color" "32"
+            rx_table_row "󰍹" "OS Prober:" "$os_prober_status" "$os_prober_color" "32"
+            rx_table_row "󰈐" "Resolution:" "$gfxmode" "$PINK" "32"
+            rx_table_row "󰀻" "Theme:" "${theme_name^}" "$PINK" "32"
+            rx_table_row "󰆍" "Distributor:" "$distributor" "$PINK" "32"
             rx_table_separator
 
                 local grub_cfg="/boot/grub/grub.cfg"
@@ -146,13 +146,13 @@ cmd_grub() {
                 local first_entry_kernel=""
 
                 while IFS= read -r line; do
-                    if [[ $line =~ ^submenu[[:space:]]+\'([^\']+)\' ]]; then
+                    if [[ $line =~ ^[[:space:]]*submenu[[:space:]]+\'([^\']+)\' ]]; then
                         submenu_name="${BASH_REMATCH[1]}"
                         in_submenu=true
                         entries+=("${submenu_name}")
                         entry_details+=("Submenu")
                         next_is_vmlinuz=false
-                    elif [[ $line =~ ^menuentry[[:space:]]+\'([^\']+)\' ]]; then
+                    elif [[ $line =~ ^[[:space:]]*menuentry[[:space:]]+\'([^\']+)\' ]]; then
                         local entry_name="${BASH_REMATCH[1]}"
                         local detail=""
 
@@ -177,6 +177,22 @@ cmd_grub() {
                             next_is_vmlinuz=true
                         fi
                         entry_details+=("${detail:---}")
+                    elif [[ $line =~ ^[[:space:]]*menuentry[[:space:]]+\"([^\"]+)\" ]]; then
+                        local entry_name="${BASH_REMATCH[1]}"
+                        local detail=""
+
+                        if [[ $entry_name =~ (memtest|Memory) ]]; then
+                            detail="Memtest86+"
+                        elif [[ $entry_name =~ (UEFI|firmware) ]]; then
+                            detail="UEFI"
+                        fi
+
+                        if [[ $in_submenu == true ]]; then
+                            entries+=("${indent}${entry_name}")
+                        else
+                            entries+=("${entry_name}")
+                        fi
+                        entry_details+=("${detail:---}")
                     elif [[ $next_is_vmlinuz == true && -z $first_entry_kernel && $line =~ /vmlinuz-([^[:space:]]+) ]]; then
                         first_entry_kernel="${BASH_REMATCH[1]}"
                         next_is_vmlinuz=false
@@ -199,7 +215,7 @@ cmd_grub() {
                         icon="  󰓅"
                         color="$GRAY"
                     fi
-                    printf " ${PINK}${icon}${RESET} %-22s ${GRAY}%s${RESET}\n" "$entry" "$detail"
+                    printf " ${PINK}${icon}${RESET} %-32s ${GRAY}%s${RESET}\n" "$entry" "$detail"
                 done
                 rx_table_separator
             fi
