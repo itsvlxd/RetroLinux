@@ -129,7 +129,8 @@ function Wallpaper.should_pause()
 	if on_fullscreen == "true" then
 		local clients = Watcher.run_cmd("hyprctl clients -j 2>/dev/null")
 		if clients ~= "" then
-			local fs_count = tonumber(Watcher.run_cmd("echo '" .. clients .. "' | jq '[.[] | select(.fullscreen > 0 and .initialClass != \"mpvpaper\" and .class != \"mpvpaper\")] | length'")) or 0
+			local fs_str = Watcher.run_cmd("echo '" .. clients .. "' | jq '[.[] | select(.fullscreen > 0 and .initialClass != \"mpvpaper\" and .class != \"mpvpaper\")] | length'")
+			local fs_count = tonumber(fs_str, 10) or 0
 			if fs_count > 0 then return true end
 		end
 	end

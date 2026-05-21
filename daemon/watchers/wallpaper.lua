@@ -10,6 +10,7 @@ return {
         local log = function(msg) Watcher.log("wallpaper", msg) end
 
         local was_paused = false
+        local was_static = false
 
         while true do
             Watcher.reload_vars()
@@ -22,6 +23,12 @@ return {
 
             local should_be_static = force_static == "true" or (saver_active == "true" and static_on_saver == "true")
 
+            if was_static and not should_be_static then
+                log("Static mode disabled, resuming live wallpaper")
+                Watcher.set_var("WALL_PAUSED", "false")
+                wall_paused = "false"
+            end
+
             if should_be_static then
                 if mpvpaper_running == "yes" then
                     log("Static mode active, stopping mpvpaper")
@@ -31,7 +38,7 @@ return {
                     was_paused = false
                 end
             else
-                if mpvpaper_running ~= "yes" then
+                if mpvpaper_running ~= "yes" and wall_paused ~= "true" then
                     local gen_ts = Watcher.run_cmd("cat /tmp/retro_wallpaper_gen 2>/dev/null"):gsub("%s+$", "")
                     local gen_age = 99
                     if gen_ts ~= "" and tonumber(gen_ts) and tonumber(gen_ts) > 1000000000 then
@@ -40,7 +47,7 @@ return {
                     end
                     local transition_in_progress = gen_age < 3
 
-                    if not transition_in_progress and wall_paused ~= "true" then
+                    if not transition_in_progress then
                         local current = Watcher.get_var("WALL_CURRENT", "")
                         if current ~= "" and current ~= "null" then
                             local video = Wallpaper.find_video_version(current)
@@ -71,6 +78,7 @@ return {
                 end
             end
 
+            was_static = should_be_static
             coroutine.yield()
         end
     end
