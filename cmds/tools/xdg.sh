@@ -237,6 +237,21 @@ cmd_xdg() {
             fi
             ;;
 
+        "flatpak")
+            if ! command -v flatpak >/dev/null 2>&1; then
+                rx_log "error" "Flatpak is not installed on this system"
+                return 1
+            fi
+            local result=$(bash "$xdg_script" --bridge-flatpak 2>&1)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Host MIME defaults bridged into Flatpak sandbox"
+                rx_log "info" "Flatpak apps will now respect your default application choices"
+            else
+                rx_log "error" "Failed to apply Flatpak MIME bridge."
+                return 1
+            fi
+            ;;
+
         "status")
             local dir_count=0
             local dir_missing=0
@@ -282,6 +297,7 @@ cmd_xdg() {
             rx_help_cmd "handlers <mime>" "Find apps that handle a MIME type"
             rx_help_cmd "portal [status|set|list]" "Manage XDG portal backend"
             rx_help_cmd "xdg-open" "Configure xdg-open for Hyprland"
+            rx_help_cmd "flatpak" "Bridge host defaults into Flatpak sandbox"
             rx_help_cmd "status" "Show full XDG status"
             rx_help_examples
             rx_help_example "retro xdg dirs" "List XDG directories"
@@ -289,6 +305,7 @@ cmd_xdg() {
             rx_help_example "retro xdg defaults reset" "Regenerate defaults from settings"
             rx_help_example "retro xdg handlers image/png" "Find image viewers"
             rx_help_example "retro xdg portal set gtk" "Switch to GTK portal"
+            rx_help_example "retro xdg flatpak" "Bridge defaults to Flatpak"
             rx_help_spacer
             ;;
     esac

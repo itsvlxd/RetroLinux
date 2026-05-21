@@ -122,6 +122,9 @@ rx_xdg_set_default() {
         echo -e "\n[Default Applications]\n${mime}=${desktop_file}" >>"$XDG_MIMEAPPS_FILE"
     fi
 
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+    rx_xdg_bridge_flatpak >/dev/null 2>&1
+
     echo "OK|$mime=$desktop_file"
 }
 
@@ -207,6 +210,8 @@ EOF
         update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
     fi
 
+    rx_xdg_bridge_flatpak >/dev/null 2>&1
+
     echo "OK|reset_complete"
 }
 
@@ -291,6 +296,12 @@ rx_xdg_desktop_name() {
     echo "${desktop_file%.desktop}"
 }
 
+rx_xdg_bridge_flatpak() {
+    command -v flatpak >/dev/null 2>&1 || return 0
+    flatpak override --user --filesystem=xdg-config/mimeapps.list:ro 2>/dev/null
+    echo "OK|flatpak_bridge_applied"
+}
+
 rx_xdg_get_portal_backend() {
     local active=""
 
@@ -366,6 +377,9 @@ rx_xdg_set_portal_backend() {
 [portal]
 portal=$backend
 EOF
+
+    systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null
+    systemctl --user restart xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
 
     echo "OK|$backend"
 }
