@@ -18,15 +18,23 @@ return {
             local force_static = Watcher.get_var("WALL_STATIC_FORCED", "false")
             local saver_active = Watcher.get_var("BAT_SAVER_ACTIVE", "false")
             local static_on_saver = Watcher.get_var("WALL_STATIC_ON_SAVER", "true")
+            local static_on_bat = Watcher.get_var("WALL_STATIC_ON_BAT", "false")
             local wall_paused = Watcher.get_var("WALL_PAUSED", "false")
             local mpvpaper_running = Watcher.run_cmd("pgrep -x mpvpaper >/dev/null 2>&1 && echo yes")
+            local on_battery = Watcher.run_cmd("grep -q 'Discharging' /sys/class/power_supply/BAT*/status 2>/dev/null && echo yes")
 
-            local should_be_static = force_static == "true" or (saver_active == "true" and static_on_saver == "true")
+            local should_be_static = force_static == "true" or (saver_active == "true" and static_on_saver == "true") or (on_battery == "yes" and static_on_bat == "true")
 
             if was_static and not should_be_static then
                 log("Static mode disabled, resuming live wallpaper")
                 Watcher.set_var("WALL_PAUSED", "false")
                 wall_paused = "false"
+            end
+
+            if not should_be_static and wall_paused == "true" then
+                Watcher.set_var("WALL_PAUSED", "false")
+                wall_paused = "false"
+                log("Resetting WALL_PAUSED (static mode inactive)")
             end
 
             if should_be_static then
