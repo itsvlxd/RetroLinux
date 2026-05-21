@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
+source "$RETRO_DIR/lib/xdg.sh"
 
 setup_xdg() {
     sudo -v
@@ -12,6 +13,6 @@ setup_xdg() {
             sudo pacman -S --noconfirm --needed "$pkg" 2>&1 | tail -3
         fi
     done
-    command -v xdg-user-dirs-update &>/dev/null && xdg-user-dirs-update
+    rx_xdg_ensure_dirs >/dev/null
     rx_log "success" "XDG directories configured"
 }

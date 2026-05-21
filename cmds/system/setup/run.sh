@@ -34,7 +34,6 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
     source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
     source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
-    source "$RETRO_DIR/cmds/system/setup/mimeapps.sh" && setup_mimeapps
     source "$RETRO_DIR/cmds/system/setup/editor.sh" && setup_editor
     source "$RETRO_DIR/cmds/system/setup/ssh.sh" && setup_ssh
     source "$RETRO_DIR/cmds/system/setup/filemanager.sh" && setup_filemanager
