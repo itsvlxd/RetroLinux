@@ -359,6 +359,8 @@ EOF
 
     set_var "RETRO_EDITOR_CMD" "$editor_input"
     set_var "RETRO_FILEMANAGER_CMD" "$fm_input"
+    set_var "RETRO_TERMINAL_CMD" "kitty"
+    set_var "RETRO_BROWSER_CMD" "$browser_input"
 
     echo "OK|editor=$editor_desktop|browser=$browser_desktop|fm=$fm_desktop|image=$image_desktop|video=$video_desktop|terminal=$terminal_desktop"
 }
