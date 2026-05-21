@@ -59,11 +59,31 @@ get_grub_cmdline() {
 
 update_grub_config() {
     local grub_defaults="/etc/default/grub"
-    local gfxmode=$(get_var "BOOT_VIDEO_GRUB" "1920x1080")
-    local theme_choice=$(get_var "GRUB_THEME_CHOICE" "retropunk")
-    local os_prober=$(get_var "GRUB_OS_PROBER" "false")
-    local timeout_val=$(get_var "GRUB_TIMEOUT" "10")
+
+    _get_grub_val() {
+        local var_name="$1"
+        local var_key="$2"
+        local default_val="$3"
+        local file_val=""
+        if [[ -f $grub_defaults ]]; then
+            file_val=$(grep "^${var_name}=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
+        fi
+        if [[ -n $file_val ]]; then
+            echo "$file_val"
+        else
+            get_var "$var_key" "$default_val"
+        fi
+    }
+
+    local gfxmode=$(_get_grub_val "GRUB_GFXMODE" "BOOT_VIDEO_GRUB" "1920x1080")
+    local theme_choice=$(_get_grub_val "GRUB_THEME" "GRUB_THEME_CHOICE" "retropunk")
+    local os_prober=$(_get_grub_val "GRUB_DISABLE_OS_PROBER" "GRUB_OS_PROBER" "false")
+    local timeout_val=$(_get_grub_val "GRUB_TIMEOUT" "GRUB_TIMEOUT" "10")
     local cmdline=$(get_grub_cmdline)
+
+    if [[ $theme_choice =~ /themes/([^/]+)/theme\.txt ]]; then
+        theme_choice="${BASH_REMATCH[1]}"
+    fi
 
     rx_log_file "info" "Updating GRUB config (theme=$theme_choice, timeout=${timeout_val}s, gfxmode=$gfxmode, os_prober=$os_prober)"
 
@@ -382,6 +402,61 @@ UEFI_ENTRY
     fi
 }
 
+set_default_kernel() {
+    local grub_cfg="/boot/grub/grub.cfg"
+    local target_kernel=$(get_var "GRUB_KERNEL" "linux")
+
+    if [[ $target_kernel == "linux" ]]; then
+        return 0
+    fi
+
+    if [[ ! -f $grub_cfg ]]; then
+        rx_log_file "error" "GRUB config not found: $grub_cfg"
+        return 1
+    fi
+
+    rx_log_file "info" "Setting default kernel to: $target_kernel"
+
+    local kernel_count=$(grep -c "^menuentry 'RetroLinux'" "$grub_cfg" 2>/dev/null || echo "0")
+    if [[ $kernel_count -eq 0 ]]; then
+        rx_log_file "warn" "No RetroLinux menuentry found, skipping kernel patch"
+        return 1
+    fi
+
+    local temp_cfg=$(mktemp)
+    local patched=false
+    local first_entry=true
+
+    while IFS= read -r line; do
+        if [[ $first_entry == true && $line =~ ^menuentry\ \'RetroLinux\' ]]; then
+            first_entry=false
+            echo "$line" >>"$temp_cfg"
+            continue
+        fi
+
+        if [[ $patched == false && $first_entry == false ]]; then
+            if [[ $line =~ /vmlinuz-linux[[:space:]] ]] || [[ $line =~ /vmlinuz-linux$ ]]; then
+                line=$(echo "$line" | sed "s|/vmlinuz-linux[[:space:]]|/vmlinuz-${target_kernel} |g; s|/vmlinuz-linux$|/vmlinuz-${target_kernel}|g")
+                patched=true
+            fi
+            if [[ $line =~ /initramfs-linux\.img ]]; then
+                line=$(echo "$line" | sed "s|/initramfs-linux\.img|/initramfs-${target_kernel}.img|g")
+            fi
+        fi
+
+        echo "$line" >>"$temp_cfg"
+    done <"$grub_cfg"
+
+    if [[ $patched == true ]]; then
+        $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
+        rx_log_file "success" "Default kernel set to: $target_kernel"
+    else
+        rx_log_file "warn" "Could not patch default kernel entry"
+    fi
+
+    rm -f "$temp_cfg"
+}
+
 regenerate_grub() {
     rx_log_file "info" "Regenerating GRUB configuration..."
 
@@ -399,6 +474,7 @@ regenerate_grub() {
             patch_grub_menu_entries
             add_shutdown_reboot_entries
             remove_grub_echo_messages
+            set_default_kernel
             rx_log_file "success" "GRUB configuration regenerated and patched"
         else
             rx_log_file "error" "GRUB configuration regeneration failed, restoring backup..."
