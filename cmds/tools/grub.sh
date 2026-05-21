@@ -135,13 +135,15 @@ cmd_grub() {
             rx_table_row "󰆍" "Distributor:" "$distributor" "$PINK" "22"
             rx_table_separator
 
-            local grub_cfg="/boot/grub/grub.cfg"
+                local grub_cfg="/boot/grub/grub.cfg"
             if [[ -f $grub_cfg ]]; then
                 local entries=()
                 local entry_details=()
                 local in_submenu=false
                 local submenu_name=""
                 local indent="  "
+                local next_is_vmlinuz=false
+                local first_entry_kernel=""
 
                 while IFS= read -r line; do
                     if [[ $line =~ ^submenu[[:space:]]+\'([^\']+)\' ]]; then
@@ -149,6 +151,7 @@ cmd_grub() {
                         in_submenu=true
                         entries+=("${submenu_name}")
                         entry_details+=("Submenu")
+                        next_is_vmlinuz=false
                     elif [[ $line =~ ^menuentry[[:space:]]+\'([^\']+)\' ]]; then
                         local entry_name="${BASH_REMATCH[1]}"
                         local detail=""
@@ -171,13 +174,21 @@ cmd_grub() {
                             entries+=("${indent}${entry_name}")
                         else
                             entries+=("${entry_name}")
+                            next_is_vmlinuz=true
                         fi
                         entry_details+=("${detail:---}")
+                    elif [[ $next_is_vmlinuz == true && -z $first_entry_kernel && $line =~ /vmlinuz-([^[:space:]]+) ]]; then
+                        first_entry_kernel="${BASH_REMATCH[1]}"
+                        next_is_vmlinuz=false
                     elif [[ $line =~ ^fi$ ]] && [[ $in_submenu == true ]]; then
                         in_submenu=false
                         submenu_name=""
                     fi
                 done <"$grub_cfg"
+
+                if [[ -n $first_entry_kernel ]]; then
+                    entry_details[0]="$first_entry_kernel"
+                fi
 
                 for i in "${!entries[@]}"; do
                     local entry="${entries[$i]}"
@@ -439,18 +450,8 @@ cmd_grub() {
                 done <"$pending_file"
             fi
 
-            local ts_comment="RetroGRUB Change $(date '+%Y-%m-%d %H:%M')"
-            rx_log "info" "Creating Timeshift backup: ${PINK}${ts_comment}${RESET}"
-            if command -v timeshift &>/dev/null; then
-                sudo timeshift --create --comments "$ts_comment" --tags O >/dev/null 2>&1
-                if [[ $? -eq 0 ]]; then
-                    rx_log "success" "Timeshift backup created"
-                else
-                    rx_log "warn" "Timeshift backup failed, continuing anyway"
-                fi
-            else
-                rx_log "warn" "Timeshift not installed, skipping backup"
-            fi
+            rx_log "info" "Creating Timeshift backup..."
+            create_timeshift_backup
 
             if [[ $has_kernel == true && -n $pending_kernel ]]; then
                 local kernel_pkg="$pending_kernel"
@@ -541,6 +542,8 @@ cmd_grub() {
                 done
 
                 rx_log "info" "GRUB configured (non-interactive mode)"
+                rx_log "info" "Creating Timeshift backup..."
+                create_timeshift_backup
                 update_grub_config
                 regenerate_grub
                 if [[ -f $pending_file ]]; then
@@ -632,8 +635,10 @@ cmd_grub() {
 
             if rx_confirm "Enable BTRFS snapshot boot for easy rollback?"; then
                 set_var "GRUB_SNAPSHOTS_ENABLED" "true"
+                sudo systemctl enable --now grub-btrfsd 2>/dev/null
             else
                 set_var "GRUB_SNAPSHOTS_ENABLED" "false"
+                sudo systemctl disable --now grub-btrfsd 2>/dev/null
             fi
 
             echo ""
@@ -646,19 +651,14 @@ cmd_grub() {
                 set_var "GRUB_TIMEOUT" "10"
             fi
 
-            echo ""
-            echo -ne " ${PINK}󰄾${RESET} Default kernel ${MUTE}[linux/linux-zen/linux-lts/linux-hardened, default: linux]${RESET}: "
-            local kernel_input
-            read -r kernel_input
-            case "$kernel_input" in
-                linux|linux-zen|linux-lts|linux-hardened)
-                    set_var "GRUB_KERNEL" "$kernel_input"
-                    ;;
-                *)
-                    set_var "GRUB_KERNEL" "linux"
-                    ;;
-            esac
+            local kernel_options=("linux" "linux-zen" "linux-lts" "linux-hardened")
+            local kernel_input=$(rx_menu "󰏗" "Select default kernel:" "${kernel_options[@]}")
+            set_var "GRUB_KERNEL" "$kernel_input"
+            _grub_add_pending "kernel" "$kernel_input"
+            _grub_show_pending
 
+            rx_log "info" "Creating Timeshift backup..."
+            create_timeshift_backup
             rx_log "info" "Applying GRUB configuration..."
             update_grub_config
             regenerate_grub
