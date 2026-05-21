@@ -27,12 +27,12 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/network.sh" && setup_network
     source "$RETRO_DIR/cmds/system/setup/ricing.sh" && setup_ricing_mode
     source "$RETRO_DIR/cmds/system/setup/variables.sh" && setup_variables
-    source "$RETRO_DIR/cmds/system/setup/modules.sh" && setup_modules
+    source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
 
     retro wallpaper "static" "true"
     retro wallpaper "set" "car-in-neon-gas-station.mp4"
 
-    source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
+    source "$RETRO_DIR/cmds/system/setup/modules.sh" && setup_modules
     source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
     source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
 
