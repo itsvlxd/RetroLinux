@@ -65,7 +65,8 @@ update_grub_config() {
     local timeout_val=$(get_var "GRUB_TIMEOUT" "10")
     local cmdline=$(get_grub_cmdline)
 
-    rx_log_file "info" "Updating GRUB config (theme=$theme_choice, timeout=${timeout_val}s, gfxmode=$gfxmode, os_prober=$os_prober)"
+    local snapshots=$(get_var "GRUB_SNAPSHOTS_ENABLED" "true")
+    rx_log_file "info" "Updating GRUB config (theme=$theme_choice, timeout=${timeout_val}s, gfxmode=$gfxmode, os_prober=$os_prober, snapshots=$snapshots)"
 
     if [[ -f $grub_defaults ]]; then
         rx_log_file "info" "Writing GRUB configuration..."
