@@ -15,6 +15,8 @@ cmd_update() {
         return 1
     fi
 
+    faillock --user $USER --reset
+
     rx_git_fix_owner
 
     local has_changes=$(git -C "$RETRO_DIR" status --porcelain 2>/dev/null)
