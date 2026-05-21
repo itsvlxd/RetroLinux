@@ -33,7 +33,6 @@ run_postinstall() {
     retro wallpaper "set" "car-in-neon-gas-station.mp4"
 
     source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
-    source "$RETRO_DIR/cmds/system/setup/grub.sh" && setup_grub
     source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
     source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
 

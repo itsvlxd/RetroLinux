@@ -28,6 +28,7 @@ setup_variables() {
     local grub_os_prober="${GRUB_OS_PROBER:-false}"
     local grub_snapshots="${GRUB_SNAPSHOTS_ENABLED:-true}"
     local grub_timeout="${GRUB_TIMEOUT:-10}"
+    local grub_kernel="${GRUB_KERNEL:-linux}"
 
     local grub_defaults=(
         "GRUB_THEME_CHOICE|$grub_theme"
@@ -35,6 +36,7 @@ setup_variables() {
         "GRUB_OS_PROBER|$grub_os_prober"
         "GRUB_SNAPSHOTS_ENABLED|$grub_snapshots"
         "GRUB_TIMEOUT|$grub_timeout"
+        "GRUB_KERNEL|$grub_kernel"
     )
 
     for entry in "${grub_defaults[@]}"; do
