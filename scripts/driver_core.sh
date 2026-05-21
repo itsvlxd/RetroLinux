@@ -1101,7 +1101,7 @@ generate_grub_cmdline() {
 
     cmdline="quiet splash loglevel=3 net.ifnames=0"
 
-    if [[ " ${gpu_vendors[@]} " =~ " intel" ]]; then
+    if [[ " ${gpu_vendors[*]} " =~ " intel" ]]; then
         cmdline+=" i915.enable_psr=1 i915.enable_fbc=1 i915.enable_guc=3"
     fi
 
@@ -1109,7 +1109,7 @@ generate_grub_cmdline() {
         cmdline+=" intel_iommu=on iommu=pt"
     fi
 
-    if [[ " ${gpu_vendors[@]} " =~ " amd" ]]; then
+    if [[ " ${gpu_vendors[*]} " =~ " amd" ]]; then
         cmdline+=" amdgpu.sg=0"
     fi
 
@@ -1117,7 +1117,7 @@ generate_grub_cmdline() {
         cmdline+=" amd_iommu=on iommu=pt"
     fi
 
-    if [[ " ${gpu_vendors[@]} " =~ " nvidia" ]]; then
+    if [[ " ${gpu_vendors[*]} " =~ " nvidia" ]]; then
         cmdline+=" nvidia-drm.modeset=1 fbdev=1"
     fi
 

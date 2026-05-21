@@ -2,6 +2,8 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/scripts/log_core.sh"
+rx_log_register "grub"
 
 if [[ $EUID -eq 0 ]]; then
     SUDO_CMD=""
@@ -13,7 +15,7 @@ install_grub_themes() {
     local themes_dir="/boot/grub/themes"
     local module_files="$RETRO_DIR/modules/grub/files"
 
-    rx_log "info" "Installing GRUB themes..."
+    rx_log_file "info" "Installing GRUB themes..."
 
     if [[ ! -d $themes_dir ]]; then
         $SUDO_CMD mkdir -p "$themes_dir"
@@ -22,12 +24,12 @@ install_grub_themes() {
     for theme in "$module_files"/*; do
         if [[ -d $theme ]]; then
             local theme_name=$(basename "$theme")
-            rx_log "info" "Installing theme: ${PINK}$theme_name${RESET}"
+            rx_log_file "info" "Installing theme: ${PINK}$theme_name${RESET}"
             $SUDO_CMD cp -rf "$theme" "$themes_dir/"
         fi
     done
 
-    rx_log "success" "GRUB themes installed to $themes_dir"
+    rx_log_file "success" "GRUB themes installed to $themes_dir"
 }
 
 get_grub_cmdline() {
@@ -56,7 +58,7 @@ update_grub_config() {
     local cmdline=$(get_grub_cmdline)
 
     if [[ -f $grub_defaults ]]; then
-        rx_log "info" "Updating GRUB configuration..."
+        rx_log_file "info" "Updating GRUB configuration..."
 
         if grep -q "^GRUB_DISTRIBUTOR=" "$grub_defaults"; then
             $SUDO_CMD sed -i 's|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR="RetroLinux"|' "$grub_defaults"
@@ -103,7 +105,7 @@ update_grub_config() {
             echo "GRUB_DISABLE_OS_PROBER=$os_prober" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
         fi
 
-        rx_log "success" "GRUB configuration updated"
+        rx_log_file "success" "GRUB configuration updated"
     fi
 }
 
@@ -112,7 +114,7 @@ patch_grub_cfg() {
     local theme_choice=$(get_var "GRUB_THEME_CHOICE" "retropunk")
 
     if [[ -f $grub_cfg ]]; then
-        rx_log "info" "Patching GRUB cfg with theme settings..."
+        rx_log_file "info" "Patching GRUB cfg with theme settings..."
 
         local temp_cfg=$(mktemp)
         local found_terminal_output=false
@@ -144,9 +146,9 @@ GRUB_SETTINGS
 
         if [[ $patched == true ]]; then
             $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
-            rx_log "success" "GRUB cfg patched with theme settings"
+            rx_log_file "success" "GRUB cfg patched with theme settings"
         else
-            rx_log "warn" "Could not patch GRUB cfg automatically"
+            rx_log_file "warn" "Could not patch GRUB cfg automatically"
         fi
 
         rm -f "$temp_cfg"
@@ -157,12 +159,12 @@ remove_grub_echo_messages() {
     local grub_cfg="/boot/grub/grub.cfg"
     
     if [[ -f $grub_cfg ]]; then
-        rx_log "info" "Removing GRUB loading messages..."
+        rx_log_file "info" "Removing GRUB loading messages..."
         
         $SUDO_CMD sed -i "/echo.*Loading Linux linux/d" "$grub_cfg"
         $SUDO_CMD sed -i "/echo.*Loading initial ramdisk/d" "$grub_cfg"
         
-        rx_log "success" "GRUB loading messages removed"
+        rx_log_file "success" "GRUB loading messages removed"
     fi
 }
 
@@ -170,7 +172,7 @@ patch_grub_menu_entries() {
     local grub_cfg="/boot/grub/grub.cfg"
 
     if [[ -f $grub_cfg ]]; then
-        rx_log "info" "Patching GRUB menu entries..."
+        rx_log_file "info" "Patching GRUB menu entries..."
 
         $SUDO_CMD sed -i 's/Arch Linux/RetroLinux/g' "$grub_cfg"
         $SUDO_CMD sed -i 's/GNU\/Linux/RetroLinux/g' "$grub_cfg"
@@ -205,7 +207,7 @@ patch_grub_menu_entries() {
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
         rm -f "$temp_grub"
 
-        rx_log "success" "GRUB menu entries updated to RetroLinux"
+        rx_log_file "success" "GRUB menu entries updated to RetroLinux"
     fi
 }
 
@@ -213,7 +215,7 @@ add_shutdown_reboot_entries() {
     local grub_cfg="/boot/grub/grub.cfg"
 
     if [[ -f $grub_cfg ]]; then
-        rx_log "info" "Adding shutdown and reboot entries..."
+        rx_log_file "info" "Adding shutdown and reboot entries..."
 
         local temp_grub=$(mktemp)
         local skip_block=0
@@ -331,12 +333,12 @@ UEFI_ENTRY
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
         rm -f "$temp_grub"
 
-        rx_log "success" "UEFI, shutdown, reboot, and memtest entries added"
+        rx_log_file "success" "UEFI, shutdown, reboot, and memtest entries added"
     fi
 }
 
 regenerate_grub() {
-    rx_log "info" "Regenerating GRUB configuration..."
+    rx_log_file "info" "Regenerating GRUB configuration..."
 
     if command -v grub-mkconfig >/dev/null 2>&1; then
         local grub_defaults="/etc/default/grub"
@@ -348,9 +350,9 @@ regenerate_grub() {
             patch_grub_menu_entries
             add_shutdown_reboot_entries
             remove_grub_echo_messages
-            rx_log "success" "GRUB configuration regenerated and patched"
+            rx_log_file "success" "GRUB configuration regenerated and patched"
         else
-            rx_log "warn" "GRUB configuration regeneration had issues, restoring backup..."
+            rx_log_file "warn" "GRUB configuration regeneration had issues, restoring backup..."
             sudo cp "$backup_file" "$grub_defaults" 2>/dev/null
         fi
     fi
