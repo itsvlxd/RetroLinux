@@ -88,8 +88,7 @@ cmd_xdg() {
 
                     rx_table_header "󰈔" "Default Applications"
                     for i in "${!d_mimes[@]}"; do
-                        local mime_display=$(echo "${d_mimes[$i]}" | sed 's/x-scheme-handler/URL/' | sed 's/application\/x-/app:/' | sed 's/inode\/dir/Dir/')
-                        rx_table_row "󰈔" "$mime_display:" "${d_apps[$i]}" "$PINK" "22"
+                        rx_table_row "󰈔" "${d_mimes[$i]}:" "${d_apps[$i]}" "$PINK" "28"
                     done
                     rx_table_separator
                     rx_table_spacer
@@ -229,10 +228,10 @@ cmd_xdg() {
                     : ${backend:="none"}
 
                     if [[ $backend != "none" ]]; then
-                        systemctl --user restart xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
+                        systemctl --user restart --wait xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
                         rx_log "success" "Session env injected, portal restarted (${backend^})"
                     else
-                        systemctl --user restart xdg-desktop-portal 2>/dev/null
+                        systemctl --user restart --wait xdg-desktop-portal 2>/dev/null
                         rx_log "success" "Session env injected, base portal restarted"
                     fi
                     ;;
