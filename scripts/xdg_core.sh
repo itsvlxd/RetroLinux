@@ -95,6 +95,10 @@ portal_list() {
     rx_xdg_list_portals
 }
 
+portal_list() {
+    rx_xdg_list_portals
+}
+
 portal_set() {
     local backend="$1"
     [[ -z $backend ]] && echo "result=error|reason=no_backend" && return 1
@@ -134,6 +138,41 @@ bridge_flatpak() {
     fi
 }
 
+query_file() {
+    local input="$1"
+    [[ -z $input ]] && echo "result=error|reason=no_input" && return 1
+    rx_xdg_query "$input"
+}
+
+autostart_list() {
+    rx_xdg_autostart_list
+}
+
+autostart_toggle() {
+    local name="$1"
+    local action="${2:-toggle}"
+    [[ -z $name ]] && echo "result=error|reason=no_name" && return 1
+    local result=$(rx_xdg_autostart_toggle "$name" "$action")
+    if [[ $result == OK* ]]; then
+        rx_log_file "INFO" "Autostart $action: $name"
+        echo "$result"
+    else
+        echo "$result"
+        return 1
+    fi
+}
+
+autostart_clean() {
+    local result=$(rx_xdg_autostart_clean)
+    local cleaned=$(echo "$result" | grep -oP 'cleaned=\K[0-9]+')
+    rx_log_file "INFO" "Autostart cleaned (${cleaned:-0} entries removed)"
+    echo "$result"
+}
+
+health_check() {
+    rx_xdg_health
+}
+
 full_status() {
     echo "===DIRS==="
     rx_xdg_list_dirs
@@ -158,5 +197,10 @@ case "$1" in
     "--portal-set") portal_set "$2" ;;
     "--configure-xdg-open") configure_xdg_open ;;
     "--bridge-flatpak") bridge_flatpak ;;
+    "--query") query_file "$2" ;;
+    "--autostart-list") autostart_list ;;
+    "--autostart-toggle") autostart_toggle "$2" "$3" ;;
+    "--autostart-clean") autostart_clean ;;
+    "--health") health_check ;;
     "--status") full_status ;;
 esac

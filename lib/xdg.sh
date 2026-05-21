@@ -326,7 +326,7 @@ rx_xdg_get_portal_backend() {
     if [[ -f $env_conf ]]; then
         local portal_line=$(grep "xdg-desktop-portal" "$env_conf" 2>/dev/null | head -1)
         if [[ -n $portal_line ]]; then
-            local backend=$(echo "$portal_line" | grep -oP '(hyprland|gtk|kde|wlroots|gnome)' | head -1)
+            local backend=$(echo "$portal_line" | grep -oP '(hyprland|gtk)' | head -1)
             if [[ -n $backend ]]; then
                 echo "$backend"
                 return 0
@@ -336,22 +336,17 @@ rx_xdg_get_portal_backend() {
 
     if pacman -Qq xdg-desktop-portal-hyprland >/dev/null 2>&1; then
         echo "hyprland"
-    elif pacman -Qq xdg-desktop-portal-kde >/dev/null 2>&1; then
-        echo "kde"
     elif pacman -Qq xdg-desktop-portal-gtk >/dev/null 2>&1; then
         echo "gtk"
-    elif pacman -Qq xdg-desktop-portal-wlr >/dev/null 2>&1; then
-        echo "wlroots"
     else
         echo "none"
     fi
 }
 
 rx_xdg_list_portals() {
-    local portals=(hyprland gtk kde wlroots gnome)
+    local portals=(hyprland gtk)
     for p in "${portals[@]}"; do
         local pkg="xdg-desktop-portal-${p}"
-        [[ $p == "gnome" ]] && pkg="xdg-desktop-portal-gnome"
         local installed="no"
         pacman -Qq "$pkg" >/dev/null 2>&1 && installed="yes"
         local running="no"
@@ -364,8 +359,9 @@ rx_xdg_set_portal_backend() {
     local backend="$1"
     [[ -z $backend ]] && return 1
 
+    [[ $backend != "hyprland" && $backend != "gtk" ]] && echo "result=error|reason=invalid_backend|backend=$backend" && return 1
+
     local pkg="xdg-desktop-portal-${backend}"
-    [[ $backend == "gnome" ]] && pkg="xdg-desktop-portal-gnome"
 
     if ! pacman -Qq "$pkg" >/dev/null 2>&1; then
         echo "result=error|reason=package_not_installed|package=$pkg"
@@ -409,4 +405,189 @@ exec /usr/bin/xdg-open "$1"
 WRAPPER
     chmod +x "$wrapper"
     echo "OK|wrapper_created"
+}
+
+rx_xdg_query() {
+    local input="$1"
+    [[ -z $input ]] && return 1
+
+    local mime=""
+    local display_name="$input"
+
+    if [[ -f $input ]]; then
+        mime=$(xdg-mime query filetype "$input" 2>/dev/null)
+        display_name=$(basename "$input")
+    elif [[ $input == .* ]]; then
+        mime=$(xdg-mime query filetype "dummy${input}" 2>/dev/null)
+        display_name="$input"
+    else
+        mime=$(xdg-mime query filetype "dummy.${input}" 2>/dev/null)
+        display_name="$input"
+    fi
+
+    [[ -z $mime ]] && echo "result=error|reason=unknown_mime|input=$input" && return 1
+
+    local default_app=""
+    local app_name="No default set"
+    default_app=$(rx_xdg_get_default "$mime")
+    if [[ -n $default_app ]]; then
+        app_name=$(rx_xdg_desktop_name "$default_app")
+    fi
+
+    local handlers_count=0
+    while IFS='|' read -r _ _ _; do
+        ((handlers_count++))
+    done < <(rx_xdg_find_handlers "$mime")
+
+    echo "file=$display_name|mime=$mime|default=$default_app|app_name=$app_name|handlers=$handlers_count"
+}
+
+rx_xdg_autostart_list() {
+    local search_paths=(
+        "$HOME/.config/autostart"
+        "/etc/xdg/autostart"
+    )
+
+    for sp in "${search_paths[@]}"; do
+        [[ ! -d $sp ]] && continue
+        local scope="system"
+        [[ $sp == "$HOME"* ]] && scope="user"
+
+        while IFS= read -r desktop_file; do
+            [[ -z $desktop_file ]] && continue
+            [[ ! -f $desktop_file ]] && continue
+
+            local name=$(grep "^Name=" "$desktop_file" 2>/dev/null | head -1 | cut -d= -f2-)
+            local exec_cmd=$(grep "^Exec=" "$desktop_file" 2>/dev/null | head -1 | cut -d= -f2-)
+            local hidden=$(grep -c "^Hidden=true" "$desktop_file" 2>/dev/null)
+            local enabled="true"
+            [[ $hidden -gt 0 ]] && enabled="false"
+
+            local binary=$(echo "$exec_cmd" | awk '{print $1}')
+            local binary_exists="no"
+            [[ -n $binary ]] && command -v "$binary" >/dev/null 2>&1 && binary_exists="yes"
+
+            echo "$name|$desktop_file|$enabled|$binary_exists|$scope"
+        done < <(find "$sp" -maxdepth 1 -name "*.desktop" -type f 2>/dev/null | sort)
+    done
+}
+
+rx_xdg_autostart_toggle() {
+    local name="$1"
+    local action="$2"
+    [[ -z $name ]] && echo "result=error|reason=no_name" && return 1
+
+    local user_autostart="$HOME/.config/autostart"
+    local system_autostart="/etc/xdg/autostart"
+    local target_file=""
+
+    if [[ -f "$user_autostart/$name" ]]; then
+        target_file="$user_autostart/$name"
+    elif [[ -f "$system_autostart/$name" ]]; then
+        mkdir -p "$user_autostart"
+        cp "$system_autostart/$name" "$user_autostart/$name"
+        target_file="$user_autostart/$name"
+    else
+        echo "result=error|reason=not_found|name=$name"
+        return 1
+    fi
+
+    case "$action" in
+        enable)
+            sed -i '/^Hidden=true/d' "$target_file"
+            echo "OK|enabled"
+            ;;
+        disable)
+            if grep -q "^Hidden=true" "$target_file" 2>/dev/null; then
+                echo "OK|already_disabled"
+            else
+                echo "Hidden=true" >>"$target_file"
+                echo "OK|disabled"
+            fi
+            ;;
+        toggle)
+            if grep -q "^Hidden=true" "$target_file" 2>/dev/null; then
+                sed -i '/^Hidden=true/d' "$target_file"
+                echo "OK|enabled"
+            else
+                echo "Hidden=true" >>"$target_file"
+                echo "OK|disabled"
+            fi
+            ;;
+        *)
+            echo "result=error|reason=invalid_action|action=$action"
+            return 1
+            ;;
+    esac
+}
+
+rx_xdg_autostart_clean() {
+    local user_autostart="$HOME/.config/autostart"
+    [[ ! -d $user_autostart ]] && echo "cleaned=0" && return 0
+
+    local cleaned=0
+    while IFS= read -r desktop_file; do
+        [[ -z $desktop_file ]] && continue
+        local exec_cmd=$(grep "^Exec=" "$desktop_file" 2>/dev/null | head -1 | cut -d= -f2-)
+        local binary=$(echo "$exec_cmd" | awk '{print $1}')
+        if [[ -n $binary ]] && ! command -v "$binary" >/dev/null 2>&1; then
+            rm -f "$desktop_file"
+            ((cleaned++))
+        fi
+    done < <(find "$user_autostart" -maxdepth 1 -name "*.desktop" -type f 2>/dev/null)
+
+    echo "cleaned=$cleaned"
+}
+
+rx_xdg_health() {
+    local mimeapps="$HOME/.config/mimeapps.list"
+    [[ ! -f $mimeapps ]] && echo "status=ok|issues=0" && return 0
+
+    local total=0
+    local valid=0
+    local ghost_desktop=0
+    local ghost_binary=0
+    local issues=""
+
+    local in_section=false
+    while IFS= read -r line; do
+        [[ $line =~ ^\[ ]] && {
+            in_section=false
+            [[ $line == "[Default Applications]" ]] && in_section=true
+            continue
+        }
+        if $in_section && [[ $line == *=* && ! $line =~ ^# ]]; then
+            local mime="${line%%=*}"
+            local desktop="${line#*=}"
+            ((total++))
+
+            local desktop_path=""
+            local found=false
+            for sp in "/usr/share/applications" "$HOME/.local/share/applications" "/var/lib/flatpak/exports/share/applications"; do
+                if [[ -f "$sp/$desktop" ]]; then
+                    desktop_path="$sp/$desktop"
+                    found=true
+                    break
+                fi
+            done
+
+            if [[ $found == false ]]; then
+                ((ghost_desktop++))
+                issues+="desktop_missing|$mime|$desktop|"
+                continue
+            fi
+
+            local exec_cmd=$(grep "^Exec=" "$desktop_path" 2>/dev/null | head -1 | cut -d= -f2-)
+            local binary=$(echo "$exec_cmd" | awk '{print $1}')
+            if [[ -n $binary ]] && ! command -v "$binary" >/dev/null 2>&1; then
+                ((ghost_binary++))
+                issues+="binary_missing|$mime|$desktop|$binary|"
+                continue
+            fi
+
+            ((valid++))
+        fi
+    done <"$mimeapps"
+
+    echo "total=$total|valid=$valid|ghost_desktop=$ghost_desktop|ghost_binary=$ghost_binary|issues=$issues"
 }

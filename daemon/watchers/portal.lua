@@ -22,7 +22,6 @@ return {
 			local portal_pid = Watcher.run_cmd("pgrep -x 'xdg-desktop-portal' | head -1")
 			local backend = XDG.get_portal_backend()
 			local backend_pkg = "xdg-desktop-portal-" .. backend
-			if backend == "gnome" then backend_pkg = "xdg-desktop-portal-gnome" end
 
 			local portal_alive = false
 			if portal_pid ~= "" then
