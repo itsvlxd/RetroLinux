@@ -25,6 +25,7 @@ cmd_load() {
 
         "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
+        "retro xdg flatpak|Bridging host MIME defaults into Flatpak sandbox"
     )
 
     local auto_load=$(get_var "RETRO_SESSION_AUTOLOAD")
