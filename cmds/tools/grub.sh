@@ -511,7 +511,13 @@ cmd_grub() {
             fi
 
             update_grub_config
-            regenerate_grub
+
+            local snap_enabled=$(get_var "GRUB_SNAPSHOTS_ENABLED" "true")
+            if [[ $snap_enabled == "false" ]]; then
+                regenerate_grub true
+            else
+                regenerate_grub
+            fi
 
             if [[ -f $pending_file ]]; then
                 rm -f "$pending_file"
@@ -560,8 +566,14 @@ cmd_grub() {
                 rx_log "info" "GRUB configured (non-interactive mode)"
                 rx_log "info" "Creating Timeshift backup..."
                 create_timeshift_backup
-                update_grub_config
+            update_grub_config
+
+            local snap_enabled=$(get_var "GRUB_SNAPSHOTS_ENABLED" "true")
+            if [[ $snap_enabled == "false" ]]; then
+                regenerate_grub true
+            else
                 regenerate_grub
+            fi
                 if [[ -f $pending_file ]]; then
                     rm -f "$pending_file"
                 fi
