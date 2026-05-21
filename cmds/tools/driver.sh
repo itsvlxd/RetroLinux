@@ -164,52 +164,52 @@ cmd_driver() {
             local tagged_missing=$(_tag_missing "$unique_all_missing")
 
             rx_table_header "󰢮" "Driver Status"
-            [[ -n $cpu_name ]] && rx_table_row "󰻠" "${cpu_name:0:35}" "$cpu_info" "$PINK" "36"
+            [[ -n $cpu_name ]] && rx_table_row "󰻠" "${cpu_name:0:47}" "$cpu_info" "$PINK" "48"
             if [[ -n $gpu_name ]]; then
                 if [[ -n $gpu_miss ]]; then
-                    printf " ${PINK}󰢮${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${gpu_name:0:35}" "$gpu_drv" "$gpu_miss"
+                    printf " ${PINK}󰢮${RESET} %-48s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${gpu_name:0:47}" "$gpu_drv" "$gpu_miss"
                 else
-                    rx_table_row "󰢮" "${gpu_name:0:35}" "$gpu_drv" "$PINK" "36"
+                    rx_table_row "󰢮" "${gpu_name:0:47}" "$gpu_drv" "$PINK" "48"
                 fi
             fi
             if [[ -n $npu_name ]]; then
                 if [[ -n $npu_miss ]]; then
-                    printf " ${PINK}󰓅${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${npu_name:0:35}" "$npu_drv" "$npu_miss"
+                    printf " ${PINK}󰓅${RESET} %-48s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${npu_name:0:47}" "$npu_drv" "$npu_miss"
                 else
-                    rx_table_row "󰓅" "${npu_name:0:35}" "$npu_drv" "$PINK" "36"
+                    rx_table_row "󰓅" "${npu_name:0:47}" "$npu_drv" "$PINK" "48"
                 fi
             fi
             if [[ -n $net_name ]]; then
                 if [[ -n $net_miss ]]; then
-                    printf " ${PINK}󰤨${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${net_name:0:35}" "$net_drv" "$net_miss"
+                    printf " ${PINK}󰤨${RESET} %-48s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "${net_name:0:47}" "$net_drv" "$net_miss"
                 else
-                    rx_table_row "󰤨" "${net_name:0:35}" "$net_drv" "$PINK" "36"
+                    rx_table_row "󰤨" "${net_name:0:47}" "$net_drv" "$PINK" "48"
                 fi
             fi
-            [[ -n $audio_name ]] && rx_table_row "󰥲" "${audio_name:0:35}" "$audio_drv" "$PINK" "36"
+            [[ -n $audio_name ]] && rx_table_row "󰥲" "${audio_name:0:47}" "$audio_drv" "$PINK" "48"
             if [[ -n $bt_info ]]; then
                 if [[ -n $bt_miss ]]; then
-                    printf " ${PINK}󰂯${RESET} %-36s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "Bluetooth" "$bt_info" "$bt_miss"
+                    printf " ${PINK}󰂯${RESET} %-48s ${PINK}%-16s${RESET} ${GRAY}%s${RESET}\n" "Bluetooth" "$bt_info" "$bt_miss"
                 else
-                    printf " ${PINK}󰂯${RESET} %-36s ${PINK}%s${RESET}\n" "Bluetooth" "$bt_info"
+                    printf " ${PINK}󰂯${RESET} %-48s ${PINK}%s${RESET}\n" "Bluetooth" "$bt_info"
                 fi
             fi
             if [[ -n $fw_miss ]]; then
-                printf " ${PINK}󰓅${RESET} %-36s ${PINK}%s${RESET}\n" "System Firmware" "$fw_miss"
+                printf " ${PINK}󰓅${RESET} %-48s ${PINK}%s${RESET}\n" "System Firmware" "$fw_miss"
             else
-                printf " ${PINK}󰓅${RESET} %-36s ${PINK}%s${RESET}\n" "System Firmware" "installed"
+                printf " ${PINK}󰓅${RESET} %-48s ${PINK}%s${RESET}\n" "System Firmware" "installed"
             fi
             for entry in "${other_entries[@]}"; do
                 IFS='|' read -r o_type o_model o_miss <<<"$entry"
                 if [[ -n $o_miss ]]; then
-                    rx_table_row "󰓅" "$o_type" "$o_miss" "$PINK" "36"
+                    rx_table_row "󰓅" "$o_type" "$o_miss" "$PINK" "48"
                 else
-                    rx_table_row "󰓅" "$o_type" "$o_model" "$PINK" "36"
+                    rx_table_row "󰓅" "$o_type" "$o_model" "$PINK" "48"
                 fi
             done
             rx_table_separator
-            [[ -n $ml_status ]] && rx_table_row_gray "󰓅" "Multilib" "$ml_status" "36"
-            [[ -n $rb_status ]] && rx_table_row_gray "󰓅" "Resizable BAR" "$rb_status" "36"
+            [[ -n $ml_status ]] && rx_table_row_gray "󰓅" "Multilib" "$ml_status" "48"
+            [[ -n $rb_status ]] && rx_table_row_gray "󰓅" "Resizable BAR" "$rb_status" "48"
             if [[ -n $kernel_warn ]]; then
                 rx_table_simple "󰅸" "$kernel_warn" "$PINK"
             fi
@@ -233,7 +233,7 @@ cmd_driver() {
                 IFS='|' read -r ie ne ae <<<"$intel_env"
                 local iv="${ie#intel:}"
                 if [[ $iv != "not_set" ]]; then
-                    rx_table_row "󰓅" "NPU" "$iv" "$SUCCESS" "36"
+                    rx_table_row "󰓅" "NPU" "$iv" "$SUCCESS" "48"
                 fi
             fi
             rx_table_separator
