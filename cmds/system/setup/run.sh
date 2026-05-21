@@ -37,7 +37,7 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
     source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
 
-    retro xdg setup -o "${EDITOR_CHOICE:-nvim},${BROWSER_CHOICE:-firefox},${FILEMANAGER_CHOICE:-thunar},loupe,mpv"
+    retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${BROWSER_CHOICE:-firefox},filemanager=${FILEMANAGER_CHOICE:-thunar},image=loupe,video=mpv"
 
     source "$RETRO_DIR/cmds/system/setup/ssh.sh" && setup_ssh
     source "$RETRO_DIR/cmds/system/setup/terminal.sh" && setup_terminal

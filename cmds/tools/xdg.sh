@@ -461,11 +461,17 @@ cmd_xdg() {
 
             if [[ -n $options ]]; then
                 IFS=',' read -ra opts_array <<< "$options"
-                editor_input="${opts_array[0]:-}"
-                browser_input="${opts_array[1]:-}"
-                fm_input="${opts_array[2]:-}"
-                image_input="${opts_array[3]:-}"
-                video_input="${opts_array[4]:-}"
+                for pair in "${opts_array[@]}"; do
+                    local key="${pair%%=*}"
+                    local val="${pair#*=}"
+                    case "$key" in
+                        editor) editor_input="$val" ;;
+                        browser) browser_input="$val" ;;
+                        filemanager|fm) fm_input="$val" ;;
+                        image) image_input="$val" ;;
+                        video) video_input="$val" ;;
+                    esac
+                done
             else
                 local cur_editor=$(get_var "RETRO_EDITOR_CMD" "nvim")
                 local cur_fm=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
@@ -594,7 +600,7 @@ cmd_xdg() {
             rx_help_example "retro xdg query invoice.pdf" "Find what opens PDFs" "38"
             rx_help_example "retro xdg autostart disable discord.desktop" "Disable Discord autostart" "38"
             rx_help_example "retro xdg setup" "Interactive configuration wizard" "38"
-            rx_help_example "retro xdg setup -o nvim,zen,nemo,loupe,mpv" "Non-interactive setup" "38"
+            rx_help_example "retro xdg setup -o editor=nvim,browser=zen,filemanager=thunar,image=loupe,video=mpv" "Non-interactive setup" "38"
             rx_help_spacer
             ;;
     esac
