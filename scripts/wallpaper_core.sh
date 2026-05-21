@@ -425,6 +425,53 @@ resolve_name() {
     return 1
 }
 
+gpu_wallpaper() {
+    local action="${1:-status}"
+
+    case "$action" in
+        status)
+            local mode=$(get_var "WALL_GPU_OFFLOAD" "auto")
+            local vendor="none"
+            local driver="none"
+            local model="none"
+
+            if command -v lspci >/dev/null 2>&1; then
+                local gpu_line=$(lspci 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
+                if [[ -n $gpu_line ]]; then
+                    local pci_id=$(echo "$gpu_line" | awk '{print $1}')
+                    local vendor_id=$(lspci -nn -s "$pci_id" 2>/dev/null | grep -oP '\[([0-9a-f]{4}):' | tr -d '[][')
+                    vendor_id="${vendor_id%%:*}"
+                    model=$(lspci -s "$pci_id" 2>/dev/null | sed 's/^[^:]*: //' | sed 's/.*VGA compatible controller: //;s/.*3D controller: //;s/.*Display controller: //')
+                    case "$vendor_id" in
+                        10de) vendor="nvidia" ;;
+                        1002) vendor="amd" ;;
+                        8086) vendor="intel" ;;
+                    esac
+                    driver=$(lspci -k -s "$pci_id" 2>/dev/null | grep "Kernel driver in use:" | awk -F': ' '{print $2}')
+                fi
+            fi
+
+            local installed="no"
+            case "$vendor" in
+                nvidia) pacman -Qq "nvidia-utils" >/dev/null 2>&1 && installed="yes" ;;
+                amd) pacman -Qq "mesa" >/dev/null 2>&1 && installed="yes" ;;
+                intel) pacman -Qq "mesa" >/dev/null 2>&1 && installed="yes" ;;
+            esac
+
+            echo "mode=$mode|vendor=$vendor|model=$model|driver=$driver|installed=$installed"
+            ;;
+        auto|nvidia|amd|intel|off)
+            set_var "WALL_GPU_OFFLOAD" "$action"
+            rx_log_file "INFO" "GPU offload mode set to: $action"
+            restore_wallpaper >/dev/null 2>&1
+            ;;
+        *)
+            echo "result=error|reason=invalid_action|action=$action"
+            return 1
+            ;;
+    esac
+}
+
 sync_wallpapers() {
     local source_dir="$REPO_WALLS"
     [[ ! -d $source_dir ]] && echo "result=error|reason=repo_not_found" && return 1
@@ -533,6 +580,9 @@ case "$1" in
         ;;
     "--sync")
         sync_wallpapers
+        ;;
+    "--gpu")
+        gpu_wallpaper "$2"
         ;;
     "--picker") launch_picker ;;
 esac
