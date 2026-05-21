@@ -24,6 +24,7 @@ core_scripts=(
     "timeshift_core.sh"
     "benchmark_core.sh"
     "event_core.sh"
+    "xdg_core.sh"
 )
 
 for script in "${core_scripts[@]}"; do

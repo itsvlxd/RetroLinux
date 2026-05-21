@@ -35,6 +35,7 @@ core_scripts=(
     "service_core.sh"
     "driver_core.sh"
     "variable_core.sh"
+    "xdg_core.sh"
 )
 
 for script in "${core_scripts[@]}"; do
