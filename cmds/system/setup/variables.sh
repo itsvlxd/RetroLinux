@@ -23,5 +23,25 @@ setup_variables() {
     done
     rx_log "success" "System variables initialized"
 
+    local grub_theme="${GRUB_THEME_CHOICE:-retropunk}"
+    local grub_resolution="${BOOT_VIDEO_GRUB:-1920x1080}"
+    local grub_os_prober="${GRUB_OS_PROBER:-false}"
+    local grub_snapshots="${GRUB_SNAPSHOTS_ENABLED:-true}"
+    local grub_timeout="${GRUB_TIMEOUT:-10}"
+
+    local grub_defaults=(
+        "GRUB_THEME_CHOICE|$grub_theme"
+        "BOOT_VIDEO_GRUB|$grub_resolution"
+        "GRUB_OS_PROBER|$grub_os_prober"
+        "GRUB_SNAPSHOTS_ENABLED|$grub_snapshots"
+        "GRUB_TIMEOUT|$grub_timeout"
+    )
+
+    for entry in "${grub_defaults[@]}"; do
+        IFS='|' read -r key val <<<"$entry"
+        "$RETRO_DIR/retro.sh" variable set "$key" "$val" 2>/dev/null
+    done
+    rx_log "success" "GRUB variables initialized"
+
     command -v gsettings &>/dev/null && gsettings set org.gnome.desktop.default-applications.terminal exec 'kitty'
 }
