@@ -176,7 +176,7 @@ execute_logic() {
         rx_log "warn" "Module '${name}' requires root permissions, running with sudo..."
         local y_flag=""
         [[ $SKIP_PROMPT == "true" ]] && y_flag="-y"
-        sudo "$RETRO_DIR/retro.sh" -i "$name" $y_flag "${extra_args[@]}"
+        sudo RETRO_CONFIG="$RETRO_CONFIG" "$RETRO_DIR/retro.sh" -i "$name" $y_flag "${extra_args[@]}"
         return $?
     fi
 
