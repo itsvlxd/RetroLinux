@@ -352,7 +352,7 @@ function XDG.get_portal_backend()
 	local elines = read_file_lines(env_conf)
 	for _, line in ipairs(elines) do
 		if line:find("xdg%-desktop%-portal") then
-			for _, backend in ipairs({ "hyprland", "gtk", "kde", "wlroots", "gnome" }) do
+			for _, backend in ipairs({ "hyprland", "gtk" }) do
 				if line:find(backend) then return backend end
 			end
 		end
@@ -360,9 +360,7 @@ function XDG.get_portal_backend()
 
 	local backends = {
 		{ name = "hyprland", pkg = "xdg-desktop-portal-hyprland" },
-		{ name = "kde", pkg = "xdg-desktop-portal-kde" },
 		{ name = "gtk", pkg = "xdg-desktop-portal-gtk" },
-		{ name = "wlroots", pkg = "xdg-desktop-portal-wlr" },
 	}
 	for _, b in ipairs(backends) do
 		if Watcher.run_cmd("pacman -Qq '" .. b.pkg .. "' >/dev/null 2>&1 && echo yes") == "yes" then
@@ -376,9 +374,6 @@ function XDG.list_portals()
 	local backends = {
 		{ name = "hyprland", pkg = "xdg-desktop-portal-hyprland" },
 		{ name = "gtk", pkg = "xdg-desktop-portal-gtk" },
-		{ name = "kde", pkg = "xdg-desktop-portal-kde" },
-		{ name = "wlroots", pkg = "xdg-desktop-portal-wlr" },
-		{ name = "gnome", pkg = "xdg-desktop-portal-gnome" },
 	}
 	local result = {}
 	for _, b in ipairs(backends) do
@@ -390,8 +385,11 @@ function XDG.list_portals()
 end
 
 function XDG.set_portal_backend(backend)
+	if backend ~= "hyprland" and backend ~= "gtk" then
+		return nil, "invalid_backend", backend
+	end
+
 	local pkg = "xdg-desktop-portal-" .. backend
-	if backend == "gnome" then pkg = "xdg-desktop-portal-gnome" end
 
 	if Watcher.run_cmd("pacman -Qq '" .. pkg .. "' >/dev/null 2>&1 && echo yes") ~= "yes" then
 		return nil, "package_not_installed", pkg
