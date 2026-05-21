@@ -59,31 +59,11 @@ get_grub_cmdline() {
 
 update_grub_config() {
     local grub_defaults="/etc/default/grub"
-
-    _get_grub_val() {
-        local var_name="$1"
-        local var_key="$2"
-        local default_val="$3"
-        local file_val=""
-        if [[ -f $grub_defaults ]]; then
-            file_val=$(grep "^${var_name}=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
-        fi
-        if [[ -n $file_val ]]; then
-            echo "$file_val"
-        else
-            get_var "$var_key" "$default_val"
-        fi
-    }
-
-    local gfxmode=$(_get_grub_val "GRUB_GFXMODE" "BOOT_VIDEO_GRUB" "1920x1080")
-    local theme_choice=$(_get_grub_val "GRUB_THEME" "GRUB_THEME_CHOICE" "retropunk")
-    local os_prober=$(_get_grub_val "GRUB_DISABLE_OS_PROBER" "GRUB_OS_PROBER" "false")
-    local timeout_val=$(_get_grub_val "GRUB_TIMEOUT" "GRUB_TIMEOUT" "10")
+    local gfxmode=$(get_var "BOOT_VIDEO_GRUB" "1920x1080")
+    local theme_choice=$(get_var "GRUB_THEME_CHOICE" "retropunk")
+    local os_prober=$(get_var "GRUB_OS_PROBER" "false")
+    local timeout_val=$(get_var "GRUB_TIMEOUT" "10")
     local cmdline=$(get_grub_cmdline)
-
-    if [[ $theme_choice =~ /themes/([^/]+)/theme\.txt ]]; then
-        theme_choice="${BASH_REMATCH[1]}"
-    fi
 
     rx_log_file "info" "Updating GRUB config (theme=$theme_choice, timeout=${timeout_val}s, gfxmode=$gfxmode, os_prober=$os_prober)"
 
@@ -232,7 +212,9 @@ patch_grub_menu_entries() {
         while IFS= read -r line; do
             if [[ $skip_block -eq 0 ]] && [[ $line =~ ^submenu\ \'Advanced\ options\ for ]]; then
                 skip_block=1
-                brace_count=0
+                local open_b=$(echo "$line" | tr -cd '{' | wc -c)
+                local close_b=$(echo "$line" | tr -cd '}' | wc -c)
+                brace_count=$((open_b - close_b))
                 ((removed_entries++))
                 continue
             fi
@@ -417,41 +399,93 @@ set_default_kernel() {
 
     rx_log_file "info" "Setting default kernel to: $target_kernel"
 
-    local kernel_count=$(grep -c "^menuentry 'RetroLinux'" "$grub_cfg" 2>/dev/null || echo "0")
-    if [[ $kernel_count -eq 0 ]]; then
-        rx_log_file "warn" "No RetroLinux menuentry found, skipping kernel patch"
-        return 1
-    fi
-
     local temp_cfg=$(mktemp)
-    local patched=false
-    local first_entry=true
+    local in_first_entry=false
+    local brace_depth=0
+    local patched_vmlinuz=false
+    local patched_initrd=false
 
     while IFS= read -r line; do
-        if [[ $first_entry == true && $line =~ ^menuentry\ \'RetroLinux\' ]]; then
-            first_entry=false
-            echo "$line" >>"$temp_cfg"
-            continue
+        if [[ $in_first_entry == false && $line =~ ^menuentry\ \'RetroLinux\' ]]; then
+            in_first_entry=true
+            brace_depth=0
         fi
 
-        if [[ $patched == false && $first_entry == false ]]; then
-            if [[ $line =~ /vmlinuz-linux[[:space:]] ]] || [[ $line =~ /vmlinuz-linux$ ]]; then
-                line=$(echo "$line" | sed "s|/vmlinuz-linux[[:space:]]|/vmlinuz-${target_kernel} |g; s|/vmlinuz-linux$|/vmlinuz-${target_kernel}|g")
-                patched=true
+        if [[ $in_first_entry == true ]]; then
+            local open_b=$(echo "$line" | tr -cd '{' | wc -c)
+            local close_b=$(echo "$line" | tr -cd '}' | wc -c)
+            brace_depth=$((brace_depth + open_b - close_b))
+
+            if [[ $patched_vmlinuz == false && $line =~ /vmlinuz-[^[:space:]]+ ]]; then
+                line=$(echo "$line" | sed 's|/vmlinuz-[^[:space:]]*|/vmlinuz-'"${target_kernel}"'|')
+                patched_vmlinuz=true
             fi
-            if [[ $line =~ /initramfs-linux\.img ]]; then
-                line=$(echo "$line" | sed "s|/initramfs-linux\.img|/initramfs-${target_kernel}.img|g")
+            if [[ $patched_initrd == false && $line =~ /initramfs-[^[:space:]]+\.img ]]; then
+                line=$(echo "$line" | sed 's|/initramfs-[^[:space:]]*\.img|/initramfs-'"${target_kernel}"'.img|')
+                patched_initrd=true
+            fi
+
+            if [[ $brace_depth -le 0 ]]; then
+                in_first_entry=false
             fi
         fi
 
         echo "$line" >>"$temp_cfg"
     done <"$grub_cfg"
 
-    if [[ $patched == true ]]; then
+    if [[ $patched_vmlinuz == true || $patched_initrd == true ]]; then
         $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
         rx_log_file "success" "Default kernel set to: $target_kernel"
     else
         rx_log_file "warn" "Could not patch default kernel entry"
+    fi
+
+    rm -f "$temp_cfg"
+}
+
+create_timeshift_backup() {
+    local comment="${1:-"Grub Changes $(date '+%Y-%m-%d %H:%M')"}"
+
+    if ! command -v timeshift &>/dev/null; then
+        rx_log_file "warn" "Timeshift not installed, skipping backup"
+        return 0
+    fi
+
+    rx_log_file "info" "Creating Timeshift backup: $comment"
+    if sudo timeshift --create --comments "$comment" --tags O >/dev/null 2>&1; then
+        rx_log_file "success" "Timeshift backup created"
+    else
+        rx_log_file "warn" "Timeshift backup failed, continuing anyway"
+    fi
+}
+
+patch_snapshot_entry() {
+    local grub_cfg="/boot/grub/grub.cfg"
+
+    if [[ ! -f $grub_cfg ]]; then
+        rx_log_file "error" "GRUB config not found: $grub_cfg"
+        return 1
+    fi
+
+    rx_log_file "info" "Patching snapshot submenu entry..."
+
+    local patched=false
+    local temp_cfg=$(mktemp)
+
+    while IFS= read -r line; do
+        if [[ $line =~ ^submenu\ \'Retro[[:space:]]Linux\ snapshots\' ]]; then
+            echo "submenu 'RetroLinux Snapshots' --class retrolinux {" >>"$temp_cfg"
+            patched=true
+        else
+            echo "$line" >>"$temp_cfg"
+        fi
+    done <"$grub_cfg"
+
+    if [[ $patched == true ]]; then
+        $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
+        rx_log_file "success" "Snapshot submenu entry patched"
+    else
+        rx_log_file "warn" "Could not patch snapshot submenu entry"
     fi
 
     rm -f "$temp_cfg"
@@ -474,6 +508,7 @@ regenerate_grub() {
             patch_grub_menu_entries
             add_shutdown_reboot_entries
             remove_grub_echo_messages
+            patch_snapshot_entry
             set_default_kernel
             rx_log_file "success" "GRUB configuration regenerated and patched"
         else
