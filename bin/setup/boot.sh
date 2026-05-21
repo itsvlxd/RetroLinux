@@ -115,6 +115,32 @@ Custom (Enter manually)"
         GRUB_OS_PROBER="false"
     fi
 
+    rx_clear_logo
+    rx_step "Let's configure your bootloader..."
+
+    gum style --foreground 7 "Include BTRFS snapshots in GRUB boot menu for easy rollback"
+    echo
+
+    if gum confirm --affirmative "Yes, enable snapshots" --negative "No, disable snapshots" "Snapshot Boot" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+        GRUB_SNAPSHOTS_ENABLED="true"
+    else
+        GRUB_SNAPSHOTS_ENABLED="false"
+    fi
+
+    rx_clear_logo
+    rx_step "Let's configure your bootloader..."
+
+    local timeout_input
+    timeout_input=$(gum input --placeholder "10" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Boot timeout (seconds)> " --value "${GRUB_TIMEOUT:-10}" --padding "$GUM_INPUT_PADDING") || {
+        timeout_input="10"
+    }
+
+    if [[ "$timeout_input" =~ ^[0-9]+$ ]]; then
+        GRUB_TIMEOUT="$timeout_input"
+    else
+        GRUB_TIMEOUT="10"
+    fi
+
     rx_save_state
     return 0
 }
