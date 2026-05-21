@@ -63,7 +63,7 @@ return {
 					local pkg_installed = Watcher.run_cmd("pacman -Qq '" .. backend_pkg .. "' >/dev/null 2>&1 && echo yes") == "yes"
 					if pkg_installed then
 						log("Backend '" .. backend .. "' died, restarting")
-						Watcher.run_cmd("systemctl --user restart xdg-desktop-portal-" .. backend .. " 2>/dev/null")
+						Watcher.run_cmd("systemctl --user restart --wait xdg-desktop-portal-" .. backend .. " 2>/dev/null")
 						Watcher.sleep(2)
 						local new_backend_pid = Watcher.run_cmd("pgrep -x 'xdg-desktop-portal-" .. backend .. "' | head -1")
 						if new_backend_pid ~= "" then

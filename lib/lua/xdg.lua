@@ -134,7 +134,10 @@ function XDG.get_default(mime)
 	local lines = read_file_lines(mimeapps_file)
 	for _, line in ipairs(lines) do
 		local m, app = line:match("^" .. mime .. "=(.+)$")
-		if m then return app end
+		if m then
+			app = app:match("^([^;]+)")
+			return app
+		end
 	end
 	local fallback = Watcher.run_cmd("xdg-mime query default '" .. mime .. "' 2>/dev/null")
 	if fallback ~= "" then return fallback end
@@ -152,6 +155,7 @@ function XDG.list_defaults()
 		elseif in_section and line:match("=.+") and not line:match("^#") then
 			local mime, desktop = line:match("^(.-)=(.+)$")
 			if mime then
+				desktop = desktop:match("^([^;]+)")
 				local name = XDG.desktop_name(desktop)
 				table.insert(result, { mime = mime, desktop = desktop, name = name })
 			end
@@ -224,7 +228,7 @@ function XDG.reset_defaults()
 	local fm_desktop = fm_map[fm] or "thunar.desktop"
 
 	local browser_desktop = "firefox.desktop"
-	local browsers = { "firefox", "chromium", "zen-browser-bin", "floorp", "thorium", "nyxt", "google-chrome" }
+	local browsers = { "zen", "firefox", "chromium", "floorp", "thorium", "nyxt", "google-chrome" }
 	for _, b in ipairs(browsers) do
 		if XDG.validate_desktop(b .. ".desktop") then
 			browser_desktop = b .. ".desktop"
@@ -404,9 +408,9 @@ function XDG.inject_portal_env()
 	Watcher.run_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null")
 	local backend = XDG.get_portal_backend()
 	if backend ~= "none" then
-		Watcher.run_cmd("systemctl --user restart xdg-desktop-portal xdg-desktop-portal-" .. backend .. " 2>/dev/null")
+		Watcher.run_cmd("systemctl --user restart --wait xdg-desktop-portal xdg-desktop-portal-" .. backend .. " 2>/dev/null")
 	else
-		Watcher.run_cmd("systemctl --user restart xdg-desktop-portal 2>/dev/null")
+		Watcher.run_cmd("systemctl --user restart --wait xdg-desktop-portal 2>/dev/null")
 	end
 	return backend
 end

@@ -133,7 +133,7 @@ rx_xdg_get_default() {
     [[ -z $mime ]] && return 1
 
     if [[ -f $XDG_MIMEAPPS_FILE ]]; then
-        local val=$(grep "^${mime}=" "$XDG_MIMEAPPS_FILE" 2>/dev/null | head -1 | cut -d= -f2-)
+        local val=$(grep "^${mime}=" "$XDG_MIMEAPPS_FILE" 2>/dev/null | head -1 | cut -d= -f2- | cut -d';' -f1)
         if [[ -n $val ]]; then
             echo "$val"
             return 0
@@ -163,6 +163,7 @@ rx_xdg_list_defaults() {
         if $in_section && [[ $line == *=* && ! $line =~ ^# ]]; then
             local mime="${line%%=*}"
             local desktop="${line#*=}"
+            desktop="${desktop%%;*}"
             local app_name=$(rx_xdg_desktop_name "$desktop")
             echo "$mime|$desktop|$app_name"
         fi
@@ -185,7 +186,7 @@ rx_xdg_reset_defaults() {
     esac
 
     local browser_desktop="firefox.desktop"
-    for b in firefox chromium zen-browser-bin floorp thorium nyxt google-chrome; do
+    for b in zen firefox chromium floorp thorium nyxt google-chrome; do
         if rx_xdg_validate_desktop "${b}.desktop"; then
             browser_desktop="${b}.desktop"
             break
@@ -375,7 +376,7 @@ portal=$backend
 EOF
 
     systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null
-    systemctl --user restart xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
+    systemctl --user restart --wait xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
 
     echo "OK|$backend"
 }
