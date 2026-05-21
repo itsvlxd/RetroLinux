@@ -15,6 +15,8 @@ cmd_load() {
         "retro event start|Initializing event loop and custom hooks"
         "retro power restore|Restoring hardware power profiles"
         "retro wallpaper restore|Applying last used wallpaper"
+        "retro xdg dirs reset|Ensuring XDG user directories exist"
+        "retro xdg portal inject|Injecting session env into XDG portal daemon"
 
         "retro benchmark hud load|Loads mangohud and benchmark variables"
 
