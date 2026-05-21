@@ -154,6 +154,48 @@ rx_wallpaper_apply_colors() {
     "$RETRO_DIR/retro.sh" app all refresh
 }
 
+rx_wallpaper_get_gpu_env() {
+    local mode=$(get_var "WALL_GPU_OFFLOAD" "auto")
+
+    case "$mode" in
+        off)
+            echo "NV_PRIME_RENDER_OFFLOAD=0"
+            return 0
+            ;;
+        nvidia)
+            echo "__GLX_VENDOR_LIBRARY_NAME=nvidia LIBVA_DRIVER_NAME=nvidia GBM_BACKEND=nvidia-drm"
+            return 0
+            ;;
+        amd)
+            echo "LIBVA_DRIVER_NAME=radeonsi VDPAU_DRIVER=radeonsi"
+            return 0
+            ;;
+        intel)
+            echo "LIBVA_DRIVER_NAME=iHD VDPAU_DRIVER=va_gl"
+            return 0
+            ;;
+        auto|*)
+            if command -v lspci >/dev/null 2>&1; then
+                local gpu_line=$(lspci 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
+                if [[ -n $gpu_line ]]; then
+                    local pci_id=$(echo "$gpu_line" | awk '{print $1}')
+                    local vendor_id=$(lspci -nn -s "$pci_id" 2>/dev/null | grep -oP '\[([0-9a-f]{4}):' | tr -d '[][')
+                    vendor_id="${vendor_id%%:*}"
+                    case "$vendor_id" in
+                        10de) echo "__GLX_VENDOR_LIBRARY_NAME=nvidia LIBVA_DRIVER_NAME=nvidia GBM_BACKEND=nvidia-drm" ;;
+                        1002) echo "LIBVA_DRIVER_NAME=radeonsi VDPAU_DRIVER=radeonsi" ;;
+                        8086) echo "LIBVA_DRIVER_NAME=iHD VDPAU_DRIVER=va_gl" ;;
+                        *) echo "NV_PRIME_RENDER_OFFLOAD=0" ;;
+                    esac
+                    return 0
+                fi
+            fi
+            echo "NV_PRIME_RENDER_OFFLOAD=0"
+            return 0
+            ;;
+    esac
+}
+
 rx_wallpaper_launch_mpvpaper() {
     local video_path="$1"
     local theme_dir="$2"
@@ -164,6 +206,10 @@ rx_wallpaper_launch_mpvpaper() {
     local base="${filename%.*}"
     local ext="${filename##*.}"
     local res_map=$(get_var "WALL_RES_MAP")
+    local gpu_env=$(rx_wallpaper_get_gpu_env)
+    local gpu_mode=$(get_var "WALL_GPU_OFFLOAD" "auto")
+    local hwdec="auto"
+    [[ $gpu_mode == "off" ]] && hwdec="no"
 
     hyprctl monitors -j 2>/dev/null | jq -r '.[] | "\(.name)|\(.description)"' | while IFS='|' read -r m_name m_desc; do
         [[ -z $m_name ]] && continue
@@ -179,8 +225,8 @@ rx_wallpaper_launch_mpvpaper() {
             fi
         fi
 
-        local mpv_opts="--loop --panscan=1.0 --no-audio --hwdec=auto --input-ipc-server=$MPV_SOCKET"
-        NV_PRIME_RENDER_OFFLOAD=0 nohup mpvpaper -o "$mpv_opts" "$m_name" "$target_video" >/dev/null 2>&1 &
+        local mpv_opts="--loop --panscan=1.0 --no-audio --hwdec=$hwdec --input-ipc-server=$MPV_SOCKET"
+        eval "$gpu_env nohup mpvpaper -o \"$mpv_opts\" \"$m_name\" \"$target_video\" >/dev/null 2>&1 &"
     done
 }
 

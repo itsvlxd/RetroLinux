@@ -149,6 +149,74 @@ cmd_wallpaper() {
             rx_log "success" "All wallpapers are now optimized."
             ;;
 
+        "gpu")
+            local gpu_action="${1:-status}"
+            shift 2>/dev/null || true
+
+            case "$gpu_action" in
+                status)
+                    local gpu_result=$(bash "$wall_script" --gpu status)
+                    local mode=$(echo "$gpu_result" | grep -oP 'mode=\K[^|]+')
+                    local vendor=$(echo "$gpu_result" | grep -oP 'vendor=\K[^|]+')
+                    local model=$(echo "$gpu_result" | grep -oP 'model=\K[^|]+')
+                    local driver=$(echo "$gpu_result" | grep -oP 'driver=\K[^|]+')
+                    local installed=$(echo "$gpu_result" | grep -oP 'installed=\K[^|]+')
+
+                    : ${mode:="auto"}
+                    : ${vendor:="none"}
+                    : ${model:="unknown"}
+                    : ${driver:="none"}
+                    : ${installed:="no"}
+
+                    local mode_display="${mode^}"
+                    local mode_color="$PINK"
+                    [[ $mode == "off" ]] && mode_color="$MUTE"
+
+                    local vendor_display="${vendor^}"
+                    local vendor_color="$PINK"
+                    [[ $vendor == "none" ]] && vendor_color="$MUTE"
+
+                    local driver_status="Not detected"
+                    local driver_color="$MUTE"
+                    if [[ -n $driver && $driver != "none" ]]; then
+                        driver_status="$driver"
+                        driver_color="$PINK"
+                    fi
+
+                    local install_status="Unknown"
+                    local install_color="$MUTE"
+                    if [[ $installed == "yes" ]]; then
+                        install_status="Installed"
+                        install_color="$PINK"
+                    elif [[ $installed == "no" && $vendor != "none" ]]; then
+                        install_status="Missing"
+                        install_color="$WARN"
+                    fi
+
+                    rx_table_header "󰢮" "GPU Offload Status"
+                    rx_table_row "󰓅" "Mode:" "$mode_display" "$mode_color" "14"
+                    rx_table_row "󰢮" "GPU Vendor:" "$vendor_display" "$vendor_color" "14"
+                    rx_table_row "󰍹" "Model:" "$model" "$PINK" "14"
+                    rx_table_row "󰓅" "Active Driver:" "$driver_status" "$driver_color" "14"
+                    rx_table_row "󰏗" "Drivers:" "$install_status" "$install_color" "14"
+                    rx_table_separator
+                    rx_table_spacer
+                    rx_log "info" "Available modes: ${PINK}auto${RESET} (detect), ${PINK}nvidia${RESET}, ${PINK}amd${RESET}, ${PINK}intel${RESET}, ${PINK}off${RESET} (CPU only)"
+                    rx_log "info" "Example: ${PINK}retro wallpaper gpu intel${RESET}"
+                    ;;
+                auto|nvidia|amd|intel|off)
+                    bash "$wall_script" --gpu "$gpu_action"
+                    local mode_display="${gpu_action^}"
+                    rx_log "success" "GPU offload set to: ${PINK}${mode_display}${RESET}"
+                    ;;
+                *)
+                    rx_log "error" "Unknown GPU action: $gpu_action"
+                    rx_log "info" "Usage: retro wallpaper gpu [status|auto|nvidia|amd|intel|off]"
+                    return 1
+                    ;;
+            esac
+            ;;
+
         "picker")
             bash "$wall_script" --picker
             ;;
@@ -351,6 +419,7 @@ cmd_wallpaper() {
             rx_help_cmd "res" "Set wallpaper render resolution"
             rx_help_cmd "optimize" "Optimize video feeds for resolution"
             rx_help_cmd "status" "Show active wallpaper info"
+            rx_help_cmd "gpu [mode]" "Configure GPU offloading for mpvpaper"
             rx_help_examples
             rx_help_example "retro wallpaper set bmw-m760" "Set wallpaper by name"
             rx_help_example "retro wallpaper slideshow on 300" "Enable slideshow 5min"
