@@ -27,6 +27,7 @@ linux-hardened'
 
     # shellcheck disable=SC2034
     KERNEL_SELECTION="$choice"
+    GRUB_KERNEL="$choice"
 
     rx_save_state
     return 0
