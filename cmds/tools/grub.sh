@@ -56,6 +56,15 @@ cmd_grub() {
             local cmdline=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
             local distributor=$(grep "^GRUB_DISTRIBUTOR=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
 
+            local current_kernel=$(uname -r)
+            local current_pkg=""
+            case "$current_kernel" in
+                *zen*) current_pkg="linux-zen" ;;
+                *lts*) current_pkg="linux-lts" ;;
+                *hardened*) current_pkg="linux-hardened" ;;
+                *) current_pkg="linux" ;;
+            esac
+
             : ${timeout:="10"}
             : ${gfxmode:="auto"}
             : ${theme:="none"}
@@ -107,8 +116,15 @@ cmd_grub() {
                 hw_info="${cpu_vendor} CPU (GPU not detected)"
             fi
 
+            local configured_kernel=$(get_var "GRUB_KERNEL" "linux")
+            local kernel_display="${current_kernel} (${current_pkg})"
+            if [[ $configured_kernel != "$current_pkg" ]]; then
+                kernel_display="${kernel_display} → ${configured_kernel}"
+            fi
+
             rx_table_header "󰂕" "GRUB Configuration Status"
             rx_table_row "󰂱" "Detected Hardware:" "$hw_info" "$PINK" "20"
+            rx_table_row "󰏗" "Kernel:" "$kernel_display" "$PINK" "20"
             rx_table_row "󰈔" "Boot Cmdline:" "$cmdline" "$PINK" "20"
             rx_table_row "󰓅" "Boot Timeout:" "${timeout}s" "$PINK" "20"
             rx_table_row "󰉋" "Snapshot Daemon:" "$snapshot_status" "$snapshot_color" "20"
@@ -269,7 +285,176 @@ cmd_grub() {
             _grub_show_pending
             ;;
 
+        "kernel")
+            local sub="${1:-list}"
+            local kname="${2:-}"
+
+            case "$sub" in
+                "list")
+                    local current_kernel=$(uname -r)
+                    local current_pkg=""
+                    case "$current_kernel" in
+                        *zen*) current_pkg="linux-zen" ;;
+                        *lts*) current_pkg="linux-lts" ;;
+                        *hardened*) current_pkg="linux-hardened" ;;
+                        *) current_pkg="linux" ;;
+                    esac
+
+                    rx_table_header "󰏗" "Available Kernels"
+                    rx_table_row "󰓅" "Running:" "${PINK}${current_kernel}${RESET} (${current_pkg})" "$PINK" "20"
+                    rx_table_separator
+
+                    local kernels=("linux|Stable" "linux-zen|Zen" "linux-lts|LTS" "linux-hardened|Hardened")
+                    for entry in "${kernels[@]}"; do
+                        local pkg="${entry%%|*}"
+                        local label="${entry#*|}"
+                        local headers="${pkg}-headers"
+                        local installed="No"
+                        local color="$MUTE"
+                        if pacman -Qi "$pkg" &>/dev/null; then
+                            if [[ $pkg == "$current_pkg" ]]; then
+                                installed="Running"
+                                color="$SUCCESS"
+                            else
+                                installed="Installed"
+                                color="$PINK"
+                            fi
+                        fi
+                        rx_table_row "󰏗" "${label} (${pkg})" "$installed" "$color" "20"
+                    done
+
+                    rx_table_separator
+                    rx_table_spacer
+                    ;;
+
+                "set")
+                    if [[ -z "$kname" ]]; then
+                        rx_log "error" "Please specify a kernel: linux, linux-zen, linux-lts, linux-hardened"
+                        return 1
+                    fi
+
+                    case "$kname" in
+                        linux|linux-zen|linux-lts|linux-hardened) ;;
+                        *)
+                            rx_log "error" "Unknown kernel: ${PINK}${kname}${RESET}"
+                            rx_log "info" "Available: linux, linux-zen, linux-lts, linux-hardened"
+                            return 1
+                            ;;
+                    esac
+
+                    local current_kernel=$(uname -r)
+                    local current_pkg=""
+                    case "$current_kernel" in
+                        *zen*) current_pkg="linux-zen" ;;
+                        *lts*) current_pkg="linux-lts" ;;
+                        *hardened*) current_pkg="linux-hardened" ;;
+                        *) current_pkg="linux" ;;
+                    esac
+
+                    if [[ $kname == "$current_pkg" ]]; then
+                        rx_log "warn" "Already running ${PINK}${kname}${RESET}"
+                        return 0
+                    fi
+
+                    set_var "GRUB_KERNEL" "$kname"
+                    rx_log "success" "Kernel set to: ${PINK}${kname}${RESET}"
+                    _grub_add_pending "kernel" "$kname"
+                    _grub_show_pending
+                    ;;
+
+                *)
+                    rx_log "error" "Unknown kernel action: $sub"
+                    return 1
+                    ;;
+            esac
+            ;;
+
+        "entries")
+            local grub_cfg="/boot/grub/grub.cfg"
+            if [[ ! -f $grub_cfg ]]; then
+                rx_log "error" "GRUB configuration not found at $grub_cfg"
+                return 1
+            fi
+
+            local entries=()
+            local in_submenu=false
+            local submenu_name=""
+            local indent="  "
+
+            while IFS= read -r line; do
+                if [[ $line =~ ^submenu[[:space:]]+\'([^\']+)\' ]]; then
+                    submenu_name="${BASH_REMATCH[1]}"
+                    in_submenu=true
+                    entries+=("${submenu_name}")
+                elif [[ $line =~ ^menuentry[[:space:]]+\'([^\']+)\' ]]; then
+                    local entry_name="${BASH_REMATCH[1]}"
+                    if [[ $in_submenu == true ]]; then
+                        entries+=("${indent}${entry_name}")
+                    else
+                        entries+=("${entry_name}")
+                    fi
+                elif [[ $line =~ ^fi$ ]] && [[ $in_submenu == true ]]; then
+                    in_submenu=false
+                    submenu_name=""
+                fi
+            done < "$grub_cfg"
+
+            rx_table_header "󰍹" "GRUB Boot Menu Entries"
+            for entry in "${entries[@]}"; do
+                local icon="󰓅"
+                local color="$PINK"
+                if [[ $entry == "${indent}"* ]]; then
+                    icon="  󰓅"
+                    color="$GRAY"
+                fi
+                rx_table_simple "$icon" "$entry" "$color"
+            done
+            rx_table_separator
+            rx_table_spacer
+            ;;
+
         "apply")
+            local has_kernel=false
+            local pending_kernel=""
+            if [[ -f $pending_file ]]; then
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    local key="${line%%=*}"
+                    local val="${line#*=}"
+                    if [[ $key == "kernel" ]]; then
+                        has_kernel=true
+                        pending_kernel="$val"
+                        break
+                    fi
+                done < "$pending_file"
+            fi
+
+            local ts_comment="RetroGRUB Change $(date '+%Y-%m-%d %H:%M')"
+            rx_log "info" "Creating Timeshift backup: ${PINK}${ts_comment}${RESET}"
+            if command -v timeshift &>/dev/null; then
+                sudo timeshift --create --comments "$ts_comment" --tags O >/dev/null 2>&1
+                if [[ $? -eq 0 ]]; then
+                    rx_log "success" "Timeshift backup created"
+                else
+                    rx_log "warn" "Timeshift backup failed, continuing anyway"
+                fi
+            else
+                rx_log "warn" "Timeshift not installed, skipping backup"
+            fi
+
+            if [[ $has_kernel == true && -n $pending_kernel ]]; then
+                local kernel_pkg="$pending_kernel"
+                local headers_pkg="${pending_kernel}-headers"
+                rx_log "info" "Installing kernel: ${PINK}${kernel_pkg}${RESET} + ${PINK}${headers_pkg}${RESET}"
+                sudo pacman -S --needed --noconfirm "$kernel_pkg" "$headers_pkg" 2>&1 | tail -3
+                if [[ $? -eq 0 ]]; then
+                    rx_log "success" "Kernel ${PINK}${kernel_pkg}${RESET} installed"
+                else
+                    rx_log "error" "Kernel installation failed"
+                    return 1
+                fi
+            fi
+
             if [[ -f $pending_file ]]; then
                 rx_log "info" "Applying GRUB configuration:"
                 while IFS= read -r line; do
@@ -290,6 +475,7 @@ cmd_grub() {
                             [[ $val == "true" ]] && status="true"
                             rx_log "info" "Snapshots: ${PINK}${status}${RESET}"
                             ;;
+                        kernel) rx_log "info" "Kernel: ${PINK}${val}${RESET}" ;;
                         *) rx_log "info" "${key}: ${PINK}${val}${RESET}" ;;
                     esac
                 done < "$pending_file"
@@ -340,6 +526,7 @@ cmd_grub() {
                             [[ $val == "true" || $val == "on" ]] && val="true" || val="false"
                             set_var "GRUB_SNAPSHOTS_ENABLED" "$val"
                             ;;
+                        kernel) set_var "GRUB_KERNEL" "$val" ;;
                     esac
                 done
 
@@ -359,21 +546,26 @@ cmd_grub() {
         *)
             rx_help_usage "retro grub <command>"
             rx_help_commands "Available commands"
+            rx_help_cmd "kernel [list|set]" "Manage kernel packages" "40"
+            rx_help_cmd "entries" "Show current GRUB boot menu entries" "40"
             rx_help_cmd "status" "Show current GRUB configuration"
             rx_help_cmd "theme <name>" "Set GRUB theme (retropunk, retrolinux)"
             rx_help_cmd "resolution <WxH>" "Set GRUB resolution (e.g., 1920x1080)"
             rx_help_cmd "timeout <seconds>" "Set boot timeout"
             rx_help_cmd "os-prober <on|off>" "Enable/disable OS prober"
             rx_help_cmd "snapshots <on|off>" "Enable/disable grub-btrfs snapshots"
-            rx_help_cmd "apply" "Regenerate GRUB configuration"
+            rx_help_cmd "apply" "Backup, apply pending changes, regenerate GRUB"
             rx_help_cmd "setup" "Run GRUB setup wizard"
             rx_help_examples
-            rx_help_example "retro grub status" "Show current GRUB config"
-            rx_help_example "retro grub theme retrolinux" "Switch to retrolinux theme"
-            rx_help_example "retro grub resolution 2560x1440" "Set 1440p resolution"
-            rx_help_example "retro grub os-prober on" "Enable dual-boot detection"
-            rx_help_example "retro grub snapshots off" "Disable snapshot boot"
-            rx_help_example "retro grub setup -o theme=retropunk,resolution=1920x1080" "Non-interactive setup"
+            rx_help_example "retro grub kernel list" "Show available kernels" "38"
+            rx_help_example "retro grub kernel set linux-zen" "Switch to zen kernel" "38"
+            rx_help_example "retro grub entries" "Show current boot menu entries" "38"
+            rx_help_example "retro grub status" "Show current GRUB config" "38"
+            rx_help_example "retro grub theme retrolinux" "Switch to retrolinux theme" "38"
+            rx_help_example "retro grub resolution 2560x1440" "Set 1440p resolution" "38"
+            rx_help_example "retro grub os-prober on" "Enable dual-boot detection" "38"
+            rx_help_example "retro grub snapshots off" "Disable snapshot boot" "38"
+            rx_help_example "retro grub setup -o theme=retropunk,kernel=linux-zen" "Non-interactive setup" "38"
             rx_help_spacer
             ;;
     esac
