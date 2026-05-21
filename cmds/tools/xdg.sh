@@ -219,6 +219,20 @@ cmd_xdg() {
                         echo "$name: $status"
                     done < <(bash "$xdg_script" --portal-list 2>/dev/null)
                     ;;
+                "inject")
+                    systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null
+
+                    local backend=$(bash "$xdg_script" --portal-status 2>/dev/null | grep -oP 'backend=\K[^|]+')
+                    : ${backend:="none"}
+
+                    if [[ $backend != "none" ]]; then
+                        systemctl --user restart xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
+                        rx_log "success" "Session env injected, portal restarted (${backend^})"
+                    else
+                        systemctl --user restart xdg-desktop-portal 2>/dev/null
+                        rx_log "success" "Session env injected, base portal restarted"
+                    fi
+                    ;;
                 *)
                     rx_log "error" "Unknown portal action: $sub"
                     return 1
@@ -295,7 +309,7 @@ cmd_xdg() {
             rx_help_cmd "dirs [list|set|reset]" "Manage XDG user directories"
             rx_help_cmd "defaults [list|set|reset]" "Manage default applications"
             rx_help_cmd "handlers <mime>" "Find apps that handle a MIME type"
-            rx_help_cmd "portal [status|set|list]" "Manage XDG portal backend"
+            rx_help_cmd "portal [status|set|list|inject]" "Manage XDG portal backend"
             rx_help_cmd "xdg-open" "Configure xdg-open for Hyprland"
             rx_help_cmd "flatpak" "Bridge host defaults into Flatpak sandbox"
             rx_help_cmd "status" "Show full XDG status"
