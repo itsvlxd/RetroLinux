@@ -31,25 +31,23 @@ return {
             log("Fallback source: " .. fallback_source_name)
         end
 
-        local sink_id = Audio.get_default_sink()
-        if sink_id ~= "" then
-            last_sink_id = sink_id
-            log("Initial sink ID: " .. sink_id)
-        end
-
-        local source_id = Audio.get_default_source()
-        if source_id ~= "" then
-            last_source_id = source_id
-            log("Initial source ID: " .. source_id)
-        end
-
         while true do
+            local old_primary_sink = primary_sink_name
+            local old_primary_source = primary_source_name
+
             Watcher.reload_vars()
 
             primary_sink_name = Watcher.get_var("AUDIO_PRIMARY_SINK", "")
             primary_source_name = Watcher.get_var("AUDIO_PRIMARY_SOURCE", "")
             fallback_sink_name = Watcher.get_var("AUDIO_FALLBACK_SINK", "")
             fallback_source_name = Watcher.get_var("AUDIO_FALLBACK_SOURCE", "")
+
+            if primary_sink_name ~= old_primary_sink then
+                log("Priority config changed: sink primary " .. (old_primary_sink or "none") .. " -> " .. primary_sink_name)
+            end
+            if primary_source_name ~= old_primary_source then
+                log("Priority config changed: source primary " .. (old_primary_source or "none") .. " -> " .. primary_source_name)
+            end
 
             local current_sink_id = Audio.get_default_sink()
 
@@ -65,23 +63,26 @@ return {
                             log("No fallback available (" .. result .. ")")
                         end
                     end
-                    last_sink_id = current_sink_id
                 elseif current_sink_id ~= "" and last_sink_id ~= "" then
                     log("Default sink changed: " .. last_sink_id .. " -> " .. current_sink_id)
-                    last_sink_id = current_sink_id
                 elseif current_sink_id ~= "" and last_sink_id == "" then
                     log("Default sink appeared: " .. current_sink_id)
-                    last_sink_id = current_sink_id
                 end
-            end
 
-            if primary_sink_name ~= "" then
-                local primary_id = Audio.get_sink_id_by_persistent(primary_sink_name)
-                if primary_id ~= "" and current_sink_id ~= primary_id then
-                    log("Primary sink available, switching: " .. primary_sink_name .. " -> ID " .. primary_id)
-                    Audio.set_default("sink", primary_id)
-                    last_sink_id = primary_id
+                if primary_sink_name ~= "" then
+                    local primary_id = Audio.get_sink_id_by_persistent(primary_sink_name)
+                    if primary_id ~= "" then
+                        if current_sink_id ~= primary_id then
+                            log("Enforcing primary sink: " .. primary_sink_name .. " (ID " .. primary_id .. "), current was " .. current_sink_id)
+                            Audio.set_default("sink", primary_id)
+                            current_sink_id = primary_id
+                        end
+                    else
+                        log("WARN: Primary sink not available: " .. primary_sink_name)
+                    end
                 end
+
+                last_sink_id = current_sink_id
             end
 
             local current_source_id = Audio.get_default_source()
@@ -98,23 +99,26 @@ return {
                             log("No fallback available (" .. result .. ")")
                         end
                     end
-                    last_source_id = current_source_id
                 elseif current_source_id ~= "" and last_source_id ~= "" then
                     log("Default source changed: " .. last_source_id .. " -> " .. current_source_id)
-                    last_source_id = current_source_id
                 elseif current_source_id ~= "" and last_source_id == "" then
                     log("Default source appeared: " .. current_source_id)
-                    last_source_id = current_source_id
                 end
-            end
 
-            if primary_source_name ~= "" then
-                local primary_id = Audio.get_source_id_by_persistent(primary_source_name)
-                if primary_id ~= "" and current_source_id ~= primary_id then
-                    log("Primary source available, switching: " .. primary_source_name .. " -> ID " .. primary_id)
-                    Audio.set_default("source", primary_id)
-                    last_source_id = primary_id
+                if primary_source_name ~= "" then
+                    local primary_id = Audio.get_source_id_by_persistent(primary_source_name)
+                    if primary_id ~= "" then
+                        if current_source_id ~= primary_id then
+                            log("Enforcing primary source: " .. primary_source_name .. " (ID " .. primary_id .. "), current was " .. current_source_id)
+                            Audio.set_default("source", primary_id)
+                            current_source_id = primary_id
+                        end
+                    else
+                        log("WARN: Primary source not available: " .. primary_source_name)
+                    end
                 end
+
+                last_source_id = current_source_id
             end
 
             coroutine.yield()

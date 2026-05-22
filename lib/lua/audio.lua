@@ -10,26 +10,101 @@ local function run_cmd(cmd)
     return result:gsub("%s+$", "")
 end
 
+local _wpctl_cache = {}
+local _wpctl_mtime = 0
+
+local function _parse_wpctl_status()
+    local mtime_result = io.popen("stat -c %Y /proc/$(pgrep -o wireplumber)/status 2>/dev/null")
+    if mtime_result then
+        local current_mtime = mtime_result:read("*l")
+        mtime_result:close()
+        if current_mtime == _wpctl_mtime and current_mtime ~= "" then
+            return _wpctl_cache
+        end
+        _wpctl_mtime = current_mtime
+    end
+
+    _wpctl_cache = { sinks = {}, sources = {}, default_sink = "", default_source = "" }
+
+    local status = run_cmd("wpctl status")
+    local in_audio = true
+    local section = ""
+    local sub_section = ""
+    local seen_streams = false
+
+    for line in status:gmatch("[^\n]+") do
+        if line:match("^%s*├─ Sinks:") or line:match("^%s*└─ Sinks:") then
+            if seen_streams then
+                in_audio = false
+            end
+            section = in_audio and "sinks" or ""
+            sub_section = in_audio and "devices" or ""
+        elseif line:match("^%s*├─ Sources:") or line:match("^%s*└─ Sources:") then
+            if seen_streams then
+                in_audio = false
+            end
+            section = in_audio and "sources" or ""
+            sub_section = in_audio and "devices" or ""
+        elseif line:match("^%s*├─ Streams:") or line:match("^%s*└─ Streams:") then
+            if seen_streams then
+                in_audio = false
+            end
+            sub_section = "streams"
+            if in_audio then seen_streams = true end
+        elseif sub_section == "devices" and section ~= "" and in_audio then
+            local is_default = line:match("%*") ~= nil
+            local id = line:match("[%│├└─]%s*%*?%s*(%d+)%.%s")
+            if id then
+                local name = line:match("%d+%.%s+(.-)%s+%[") or ""
+                name = name:gsub("^%s+", ""):gsub("%s+$", "")
+                local entry = { id = id, name = name, is_default = is_default }
+                if section == "sinks" then
+                    table.insert(_wpctl_cache.sinks, entry)
+                    if is_default then _wpctl_cache.default_sink = id end
+                else
+                    table.insert(_wpctl_cache.sources, entry)
+                    if is_default then _wpctl_cache.default_source = id end
+                end
+            end
+        end
+    end
+
+    return _wpctl_cache
+end
+
+function Audio.invalidate_cache()
+    _wpctl_cache = {}
+    _wpctl_mtime = 0
+end
+
 function Audio.get_default_sink()
-    local result = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\.$/ && match($(i-1),/\\*/)) {gsub(/\\./,'',$i); print $i; exit}}'")
-    return result
+    local parsed = _parse_wpctl_status()
+    return parsed.default_sink
 end
 
 function Audio.get_default_source()
-    local result = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\.$/ && match($(i-1),/\\*/)) {gsub(/\\./,'',$i); print $i; exit}}'")
-    return result
+    local parsed = _parse_wpctl_status()
+    return parsed.default_source
 end
 
 function Audio.get_sink_name(id)
     if not id or id == "" then return "" end
-    local result = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/' | grep '" .. id .. "\\.' | head -1 | sed 's/.*[0-9]\\. //' | awk -F'[' '{print $1}' | xargs")
-    return result
+    local parsed = _parse_wpctl_status()
+    for _, sink in ipairs(parsed.sinks) do
+        if sink.id == id then return sink.name end
+    end
+    local name = run_cmd("wpctl inspect " .. id .. " 2>/dev/null | grep 'node.description' | head -1 | sed 's/.*= *//' | tr -d '\"'")
+    return name
 end
 
 function Audio.get_source_name(id)
     if not id or id == "" then return "" end
-    local result = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/' | grep '" .. id .. "\\.' | head -1 | sed 's/.*[0-9]\\. //' | awk -F'[' '{print $1}' | xargs")
-    return result
+    local parsed = _parse_wpctl_status()
+    for _, source in ipairs(parsed.sources) do
+        if source.id == id then return source.name end
+    end
+    local name = run_cmd("wpctl inspect " .. id .. " 2>/dev/null | grep 'node.description' | head -1 | sed 's/.*= *//' | tr -d '\"'")
+    return name
 end
 
 function Audio.get_sink_persistent_name(id)
@@ -46,49 +121,43 @@ end
 
 function Audio.get_sink_id_by_persistent(name)
     if not name or name == "" then return "" end
-    local ids = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\./) {gsub(/\\./,'',$i); print $i}}'")
-    for id in ids:gmatch("[^%s]+") do
-        local pw_name = Audio.get_sink_persistent_name(id)
-        if pw_name == name then
-            return id
-        end
+    local parsed = _parse_wpctl_status()
+    for _, sink in ipairs(parsed.sinks) do
+        local pw_name = Audio.get_sink_persistent_name(sink.id)
+        if pw_name == name then return sink.id end
     end
     return ""
 end
 
 function Audio.get_source_id_by_persistent(name)
     if not name or name == "" then return "" end
-    local ids = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\./) {gsub(/\\./,'',$i); print $i}}'")
-    for id in ids:gmatch("[^%s]+") do
-        local pw_name = Audio.get_source_persistent_name(id)
-        if pw_name == name then
-            return id
-        end
+    local parsed = _parse_wpctl_status()
+    for _, source in ipairs(parsed.sources) do
+        local pw_name = Audio.get_source_persistent_name(source.id)
+        if pw_name == name then return source.id end
     end
     return ""
 end
 
 function Audio.list_sinks()
-    local result = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\./) {gsub(/\\./,'',$i); print $i}}'")
+    local parsed = _parse_wpctl_status()
     local sinks = {}
-    for id in result:gmatch("[^%s]+") do
-        local name = Audio.get_sink_name(id)
-        local pw_name = Audio.get_sink_persistent_name(id)
-        if not name:match("Easy Effects") then
-            table.insert(sinks, { id = id, name = name, persistent_name = pw_name })
+    for _, sink in ipairs(parsed.sinks) do
+        local pw_name = Audio.get_sink_persistent_name(sink.id)
+        if not sink.name:match("Easy Effects") then
+            table.insert(sinks, { id = sink.id, name = sink.name, persistent_name = pw_name })
         end
     end
     return sinks
 end
 
 function Audio.list_sources()
-    local result = run_cmd("wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\\./) {gsub(/\\./,'',$i); print $i}}'")
+    local parsed = _parse_wpctl_status()
     local sources = {}
-    for id in result:gmatch("[^%s]+") do
-        local name = Audio.get_source_name(id)
-        local pw_name = Audio.get_source_persistent_name(id)
-        if not name:match("Easy Effects") then
-            table.insert(sources, { id = id, name = name, persistent_name = pw_name })
+    for _, source in ipairs(parsed.sources) do
+        local pw_name = Audio.get_source_persistent_name(source.id)
+        if not source.name:match("Easy Effects") then
+            table.insert(sources, { id = source.id, name = source.name, persistent_name = pw_name })
         end
     end
     return sources
