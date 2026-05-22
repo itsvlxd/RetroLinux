@@ -217,13 +217,19 @@ cmd_timeshift() {
             ;;
 
         "setup")
+            local non_interactive=false
             local options=""
             while [[ $# -gt 0 ]]; do
                 case "$1" in
-                    -o|--options) options="$2"; shift 2 ;;
+                    -o|--options) non_interactive=true; options="$2"; [[ -n $2 ]] && shift 2 || shift ;;
                     *) shift ;;
                 esac
             done
+
+            if [[ $non_interactive == true && -z $options ]]; then
+                rx_log "error" "Empty options. Valid keys: device, btrfs, daily, weekly, monthly, boot, boot_count, exclude_home"
+                return 1
+            fi
 
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
@@ -269,6 +275,7 @@ cmd_timeshift() {
                         boot) boot_enabled="$val" ;;
                         boot_count) boot_count="$val" ;;
                         exclude_home) exclude_home="$val" ;;
+                        *) rx_log "warn" "Unknown key: ${PINK}$key${RESET} (valid: device, btrfs, daily, weekly, monthly, boot, boot_count, exclude_home)" ;;
                     esac
                 done
             else
