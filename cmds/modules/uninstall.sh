@@ -10,4 +10,4 @@ cmd_uninstall() {
     run_task "uninstall" "$target"
 }
 
-register_command "MODULES" "-r|--remove" "Uninstall module and restore backups" "cmd_uninstall"
+register_command "MODULES" "-r|--remove" "Remove module configs from system and restore previous backup files" "cmd_uninstall"

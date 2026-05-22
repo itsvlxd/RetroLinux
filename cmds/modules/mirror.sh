@@ -10,4 +10,4 @@ cmd_mirror() {
     run_task "mirror" "$target"
 }
 
-register_command "MODULES" "-m|--mirror" "Hard copy repo files to system (Stability / Testing)" "cmd_mirror"
+register_command "MODULES" "-m|--mirror" "Copy module configs as physical files, full custom freedom" "cmd_mirror"
