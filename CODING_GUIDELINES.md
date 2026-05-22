@@ -1491,9 +1491,9 @@ The Installer is a self-contained system that runs during initial system setup. 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  retroinstall (parent process)                              │
-│  - Holds all state variables                               │
-│  - Exports RETRO_STATE="/tmp/retroinstall_state"           │
-│  - Calls rx_load_state before each step                    │
+│  - Holds all state variables                                │
+│  - Exports RETRO_STATE="/tmp/retroinstall_state"            │
+│  - Calls rx_load_state before each step                     │
 │  - Calls rx_load_state after each step                      │
 └─────────────────────────────────────────────────────────────┘
                                │
@@ -1504,12 +1504,12 @@ The Installer is a self-contained system that runs during initial system setup. 
 │  - Sources lib/setup_lib.sh to load utilities               │
 │  - Collects user input, modifies variables                  │
 │  - Calls rx_save_state to write updated values              │
-│  - Exits with success/failure code                         │
+│  - Exits with success/failure code                          │
 └─────────────────────────────────────────────────────────────┘
                                │
                                ▼ sources
 ┌─────────────────────────────────────────────────────────────┐
-│  UTILITIES (bin/lib/*)                                     │
+│  UTILITIES (bin/lib/*)                                      │
 │  - Pure functions, no orchestration                         │
 │  - crypto, display, errors, gum, wifi, locale, timezone,    │
 │    disk, handlers, output, debug, progress, qr, setup_lib,  │
