@@ -541,6 +541,11 @@ cmd_grub() {
                 esac
             done
 
+            if [[ $interactive == false && -z $opts ]]; then
+                rx_log "error" "Empty options. Valid keys: theme, resolution, timeout, os-prober, snapshots, kernel"
+                return 1
+            fi
+
             if [[ $interactive == false && -n $opts ]]; then
                 IFS=',' read -ra pairs <<<"$opts"
                 for pair in "${pairs[@]}"; do
@@ -560,6 +565,7 @@ cmd_grub() {
                             set_var "GRUB_SNAPSHOTS_ENABLED" "$val"
                             ;;
                         kernel) set_var "GRUB_KERNEL" "$val" ;;
+                        *) rx_log "warn" "Unknown key: ${PINK}$key${RESET} (valid: theme, resolution, timeout, os-prober, snapshots, kernel)" ;;
                     esac
                 done
 
