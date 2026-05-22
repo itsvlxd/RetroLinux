@@ -85,6 +85,7 @@ get_source_persistent_name() {
 get_sink_id_by_persistent() {
     local name="$1"
     [[ -z $name ]] && return
+    local found_id=""
     wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
         local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
         if [[ "$pw_name" == "$name" ]]; then
@@ -162,12 +163,16 @@ toggle_mic_mute() {
 set_sink() {
     local sink_id="$1"
     [[ -z $sink_id ]] && return 1
+    local sink_name=$(get_sink_name "$sink_id")
+    rx_log_file "info" "set_default sink: $sink_name (ID: $sink_id)"
     wpctl set-default "$sink_id" 2>/dev/null
 }
 
 set_source() {
     local source_id="$1"
     [[ -z $source_id ]] && return 1
+    local source_name=$(get_source_name "$source_id")
+    rx_log_file "info" "set_default source: $source_name (ID: $source_id)"
     wpctl set-default "$source_id" 2>/dev/null
 }
 
@@ -334,6 +339,7 @@ apply_audio_fallback() {
     fi
 
     if [[ -n $current_name && $current_name != "EasyEffects" ]]; then
+        rx_log_file "debug" "apply_fallback: current still valid $type=$type id=$current_id name=$current_name"
         echo "OK|current_still_valid|$current_name"
         return 0
     fi
@@ -346,6 +352,7 @@ apply_audio_fallback() {
     fi
 
     if [[ -z $fallback_name ]]; then
+        rx_log_file "debug" "apply_fallback: no fallback configured for $type"
         echo "ERR_NO_FALLBACK_CONFIGURED"
         return 1
     fi
@@ -354,10 +361,12 @@ apply_audio_fallback() {
     fallback_id=$(get_current_id_by_persistent "$type" "$fallback_name")
 
     if [[ -z $fallback_id ]]; then
+        rx_log_file "debug" "apply_fallback: fallback not available $type=$type name=$fallback_name"
         echo "ERR_FALLBACK_NOT_AVAILABLE"
         return 1
     fi
 
+    rx_log_file "info" "apply_fallback: switching $type from $current_name (ID $current_id) to $fallback_name (ID $fallback_id)"
     wpctl set-default "$fallback_id" 2>/dev/null
 
     local fallback_display_name
@@ -392,6 +401,7 @@ apply_audio_primary() {
     fi
 
     if [[ -z $primary_name ]]; then
+        rx_log_file "debug" "apply_primary: no primary configured for $type"
         echo "OK|no_primary_configured"
         return 0
     fi
@@ -400,6 +410,7 @@ apply_audio_primary() {
     primary_id=$(get_current_id_by_persistent "$type" "$primary_name")
 
     if [[ -z $primary_id ]]; then
+        rx_log_file "debug" "apply_primary: primary not available for $type ($primary_name)"
         echo "OK|primary_not_available"
         return 0
     fi
@@ -411,17 +422,22 @@ apply_audio_primary() {
         current_id=$(get_default_source)
     fi
 
-    if [[ "$current_id" == "$primary_id" ]]; then
-        local current_name
+    local current_name=""
+    if [[ -n $current_id ]]; then
         if [[ $type == "sink" ]]; then
             current_name=$(get_sink_name "$current_id")
         else
             current_name=$(get_source_name "$current_id")
         fi
+    fi
+
+    if [[ "$current_id" == "$primary_id" ]]; then
+        rx_log_file "debug" "apply_primary: already primary $type=$type id=$primary_id name=$current_name"
         echo "OK|already_primary|$current_name"
         return 0
     fi
 
+    rx_log_file "info" "apply_primary: switching $type from $current_name (ID $current_id) to $primary_name (ID $primary_id)"
     wpctl set-default "$primary_id" 2>/dev/null
 
     local primary_display_name
