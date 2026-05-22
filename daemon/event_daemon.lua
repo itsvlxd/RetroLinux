@@ -20,33 +20,11 @@ local Help = require("help")
 local Colors = require("colors")
 local Log = require("log")
 
-local function show_help()
-	Help.usage("retro event <command>")
-	Help.commands("Commands")
-	Help.cmd("start", "Start the event daemon in background")
-	Help.cmd("stop", "Stop the running daemon")
-	Help.cmd("status", "Check if daemon is running")
-	Help.cmd("trigger [name]", "Manually fire an event")
-	Help.cmd("list", "List available watchers")
-	Help.cmd("log [name]", "View watcher logs")
-	Help.cmd("log true/false", "Enable/disable all watcher logs")
-	Help.cmd("log limit [number]", "Set log line cap for a watcher")
-	Help.cmd("help", "Show this help")
-	Help.examples()
-	Help.example("retro event status", "Check if daemon is running")
-	Help.example("retro event list", "Show all loaded watchers")
-	Help.example("retro event log usb", "View USB watcher logs")
-	Help.example("retro event log true", "Enable log generation")
-	Help.example("retro event log false", "Disable log generation")
-	Help.example("retro event log limit 200", "Set log cap to 200 lines")
-	Help.spacer()
-end
-
 local action = arg[1]
 
-if not action or action == "help" then
-	show_help()
-	os.exit(0)
+if not action then
+	Log.error("No command specified. Use: retro daemon --help")
+	os.exit(1)
 end
 
 local engine = Engine.new(daemon_dir)
@@ -116,100 +94,7 @@ elseif action == "stop" then
 	else
 		Log.warn("Event daemon was not running")
 	end
-elseif action == "list" then
-	local watchers = engine:list_watchers()
-	if #watchers == 0 then
-		Help.table_simple("󰓅", "(No watchers found)", Colors.MUTE)
-	else
-		Help.table_header("󱐋", "Event Modules")
-		for _, w in ipairs(watchers) do
-			Help.table_list_single("󱐋", w.name .. " (interval: " .. w.interval .. "s)", Colors.GRAY)
-		end
-		Help.table_separator()
-		Help.table_spacer()
-	end
-elseif action == "log" then
-	local sub = arg[2]
-
-	if sub == "true" then
-		Watcher.set_log_enabled(true)
-		Log.success("Watcher log generation ENABLED")
-		os.exit(0)
-	end
-
-	if sub == "false" then
-		Watcher.set_log_enabled(false)
-		Log.warn("Watcher log generation DISABLED")
-		os.exit(0)
-	end
-
-	if sub == "limit" then
-		local name = arg[3]
-		local cap = tonumber(arg[4])
-		if not name then
-			Log.error("Watcher name required")
-			print("Usage: retro event log limit <name> <lines>")
-			os.exit(1)
-		end
-		if not cap or cap < 10 then
-			Log.error("Cap must be at least 10 lines")
-			os.exit(1)
-		end
-		Watcher.set_log_cap(name, cap)
-		Log.success("Log cap for '" .. name .. "' set to " .. cap .. " lines")
-		os.exit(0)
-	end
-
-	if not sub then
-		local logs = Watcher.list_logs()
-		local log_enabled = Watcher.is_log_enabled()
-		local log_color = log_enabled and Colors.SUCCESS or Colors.ERROR
-		local log_text = log_enabled and "ENABLED" or "DISABLED"
-		Help.table_header("󱐋", "Watcher Logs [" .. log_text .. "]")
-		if #logs == 0 then
-			Help.table_simple("󰓅", "(No watcher logs found)", Colors.MUTE)
-		else
-			for _, name in ipairs(logs) do
-				local cap = Watcher.get_log_cap(name)
-				local lines = Watcher.tail_log(name, 3)
-				local last = lines[#lines] or "(empty)"
-				Help.table_list_single("󱐋", name .. " [" .. cap .. " cap] - " .. last, Colors.GRAY)
-			end
-		end
-		Help.table_separator()
-		Help.table_spacer()
-		os.exit(0)
-	end
-
-	local limit = tonumber(arg[3]) or 30
-	local lines = Watcher.tail_log(sub, limit)
-
-	if #lines == 0 then
-		Log.warn("No logs found for watcher: " .. sub)
-		os.exit(1)
-	end
-
-	Help.table_header("󱐋", sub .. " Logs (last " .. #lines .. " lines)")
-	for _, line in ipairs(lines) do
-		local ts, msg = line:match("^%[(.-)%] (.*)$")
-		if ts and msg then
-			local color = Colors.RESET
-			if msg:find("ERROR") or msg:find("CRITICAL") or msg:find("fail") then
-				color = Colors.ERROR
-			elseif msg:find("WARN") then
-				color = Colors.WARN
-			elseif msg:find("connected") or msg:find("ENABLED") or msg:find("complete") then
-				color = Colors.SUCCESS
-			end
-			io.write(string.format(" %s[%s]%s %s%s\n", Colors.GRAY, ts, Colors.RESET, color, msg))
-		else
-			io.write(string.format(" %s%s\n", Colors.RESET, line))
-		end
-	end
-	Help.table_separator()
-	Help.table_spacer()
 else
-	Log.error("Unknown command: " .. action)
-	show_help()
+	Log.error("Unknown command: " .. action .. ". Use: retro daemon --help")
 	os.exit(1)
 end
