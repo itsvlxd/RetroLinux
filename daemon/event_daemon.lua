@@ -19,6 +19,7 @@ local Watcher = require("watcher")
 local Help = require("help")
 local Colors = require("colors")
 local Log = require("log")
+local Format = require("format")
 
 local action = arg[1]
 
@@ -53,16 +54,30 @@ elseif action == "status" then
 		Help.table_header("󱐋", "Event Daemon Status")
 		Help.table_row("󱐋", "State:", "ACTIVE (PID: " .. status.pid .. ")", Colors.PINK, 14)
 		local uptime_handle = io.popen("ps -o etime= -p " .. status.pid .. " 2>/dev/null | xargs")
-		local uptime = uptime_handle:read("*l")
-
+		local uptime_str = uptime_handle:read("*l")
 		uptime_handle:close()
 
-		uptime = uptime and uptime:gsub("%s+", "")
+		uptime_str = uptime_str and uptime_str:gsub("%s+", "") or ""
 
-		if uptime == "" then
-			uptime = "N/A"
+		local uptime_seconds = 0
+		if uptime_str ~= "" then
+			local d, h, m, s = uptime_str:match("(%d+)-(%d+):(%d+):(%d+)")
+			if d then
+				uptime_seconds = d * 86400 + h * 3600 + m * 60 + s
+			else
+				local h, m, s = uptime_str:match("(%d+):(%d+):(%d+)")
+				if h then
+					uptime_seconds = h * 3600 + m * 60 + s
+				else
+					local m, s = uptime_str:match("(%d+):(%d+)")
+					if m then
+						uptime_seconds = m * 60 + s
+					end
+				end
+			end
 		end
 
+		local uptime = uptime_seconds > 0 and Format.uptime(uptime_seconds) or "N/A"
 		Help.table_row("󱎫", "Uptime:", uptime, Colors.PINK, 14)
 
 		local log_enabled = Watcher.is_log_enabled()
