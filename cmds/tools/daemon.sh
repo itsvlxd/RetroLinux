@@ -27,6 +27,10 @@ cmd_event() {
         [[ -f "/tmp/retro_logs/watcher_${1}.disabled" ]]
     }
 
+    _event_row() {
+        printf " ${PINK}󰓦${RESET} %-32s ${GRAY}%s${RESET}\n" "$1" "$2"
+    }
+
     case "$action" in
         "trigger")
             [[ -z $value ]] && rx_log "error" "Please provide an event name to trigger." && return 1
@@ -34,14 +38,14 @@ cmd_event() {
             lua "$daemon_script" trigger "$value" $rest
             ;;
 
-        "list")
+        "list" | "watchers")
             local watchers=()
             while IFS= read -r w; do
                 [[ -n $w ]] && watchers+=("$w")
             done < <(_get_watchers)
 
             if [[ ${#watchers[@]} -eq 0 ]]; then
-                rx_table_header "󱐋" "No event modules found"
+                rx_table_header "󱐋" "No event watchers found"
                 rx_table_spacer
                 return
             fi
@@ -56,7 +60,7 @@ cmd_event() {
                 fi
             done
 
-            rx_table_header "󱐋" "Event Modules"
+            rx_table_header "󱐋" "Event Watchers"
             rx_table_row "󱐋" "Total:" "${#watchers[@]}" "$PINK" "18"
             rx_table_row "󰓅" "Active:" "$active" "$SUCCESS" "18"
             rx_table_row "󱐋" "Disabled:" "$disabled" "$ERROR" "18"
@@ -79,6 +83,33 @@ cmd_event() {
             rx_table_separator && rx_table_spacer
             ;;
 
+        "events")
+            rx_table_header "󰓦" "Available Events"
+            rx_table_row "󰓦" "Event" "Emitter → Handler(s)" "$PINK" "32"
+            rx_table_separator
+
+            _event_row "on_audio_sink_fallback" "audio → —"
+            _event_row "on_audio_source_fallback" "audio → —"
+            _event_row "on_battery_saver_enabled" "battery → battery, notifications"
+            _event_row "on_battery_saver_disabled" "battery → battery, notifications"
+            _event_row "on_battery_low" "battery → notifications"
+            _event_row "on_battery_critical" "battery → notifications"
+            _event_row "on_power_disconnect" "power → power, notifications"
+            _event_row "on_power_connect" "power → power, notifications"
+            _event_row "on_power_profile_changed" "power → power"
+            _event_row "on_bluetooth_pairing_request" "bluetooth → notifications"
+            _event_row "on_bluetooth_connected" "bluetooth → notifications"
+            _event_row "on_bluetooth_disconnected" "bluetooth → notifications"
+            _event_row "on_slideshow_tick" "slideshow → wallpaper"
+            _event_row "on_pkg_updates_available" "timers → notifications"
+            _event_row "on_retro_update_available" "timers → notifications"
+            _event_row "on_usb_connected" "usb → notifications"
+            _event_row "on_usb_disconnected" "usb → notifications"
+            _event_row "on_event_loop_start" "engine → —"
+            rx_table_separator
+            rx_table_spacer
+            ;;
+
         "start")
             rx_log "info" "Starting the event daemon..."
 
@@ -97,7 +128,7 @@ cmd_event() {
             local daemon_pid=$!
             sleep 0.3
             if kill -0 "$daemon_pid" 2>/dev/null; then
-                echo "$daemon_pid" > "$pid_file"
+                echo "$daemon_pid" >"$pid_file"
                 rx_log "success" "Event daemon started in the background."
             else
                 rx_log "error" "Daemon failed to start."
@@ -120,7 +151,7 @@ cmd_event() {
             ;;
 
         "enable")
-            [[ -z $value ]] && rx_log "error" "Usage: retro event enable <name|all>" && return 1
+            [[ -z $value ]] && rx_log "error" "Usage: retro daemon enable <name|all>" && return 1
             if [[ $value == "all" ]]; then
                 local count=0
                 for f in /tmp/retro_logs/watcher_*.disabled; do
@@ -131,28 +162,24 @@ cmd_event() {
                         count=$((count + 1))
                     fi
                 done
-                [[ $count -eq 0 ]] && rx_log "info" "No disabled event modules." || rx_log "success" "Enabled $count module(s). Restart the daemon to apply."
-            else
-                local disabled_file="/tmp/retro_logs/watcher_${value}.disabled"
-                [[ ! -f $disabled_file ]] && rx_log "warn" "Module ${PINK}$value${RESET} is not disabled." && return 1
-                rm -f "$disabled_file"
-                rx_log "success" "Module ${PINK}$value${RESET} enabled. Restart the daemon to apply."
+                [[ $count -eq 0 ]] && rx_log "info" "No disabled event watchers." || rx_log "success" "Enabled $count watcher(s). Restart the daemon to apply."
             fi
             ;;
 
         "disable")
-            [[ -z $value ]] && rx_log "error" "Usage: retro event disable <name>" && return 1
+            [[ -z $value ]] && rx_log "error" "Usage: retro daemon disable <name>" && return 1
             local disabled_file="/tmp/retro_logs/watcher_${value}.disabled"
-            [[ ! -f "$RETRO_DIR/daemon/watchers/${value}.lua" ]] && rx_log "error" "Module ${PINK}$value${RESET} not found." && return 1
+            [[ ! -f "$RETRO_DIR/daemon/watchers/${value}.lua" ]] && rx_log "error" "Watcher ${PINK}$value${RESET} not found." && return 1
             touch "$disabled_file"
-            rx_log "warn" "Module ${PINK}$value${RESET} disabled. Restart the daemon to apply."
+            rx_log "warn" "Watcher ${PINK}$value${RESET} disabled. Restart the daemon to apply."
             ;;
 
         *)
-            rx_help_usage "retro event <command>"
+            rx_help_usage "retro daemon <command>"
             rx_help_commands "Available commands"
             rx_help_cmd "trigger <event>" "Fire a system event"
-            rx_help_cmd "list" "List all event modules"
+            rx_help_cmd "watchers" "List all event watchers"
+            rx_help_cmd "events" "List all available events"
             rx_help_cmd "start" "Start the event daemon"
             rx_help_cmd "stop" "Stop the event daemon"
             rx_help_cmd "restart" "Restart the event daemon"
@@ -160,13 +187,13 @@ cmd_event() {
             rx_help_cmd "enable <name|all>" "Enable a module or all"
             rx_help_cmd "disable <name>" "Disable a module"
             rx_help_examples
-            rx_help_example "retro event status" "Check if daemon is running"
-            rx_help_example "retro event list" "Show all loaded modules"
-            rx_help_example "retro event disable bluetooth" "Disable bluetooth watcher"
-            rx_help_example "retro event enable all" "Enable all modules"
+            rx_help_example "retro daemon status" "Check if daemon is running"
+            rx_help_example "retro daemon watchers" "Show all loaded watchers"
+            rx_help_example "retro daemon disable bluetooth" "Disable bluetooth watcher"
+            rx_help_example "retro daemon enable all" "Enable all modules"
             rx_help_spacer
             ;;
     esac
 }
 
-register_command "TOOLS" "event" "Manage system events and hooks" "cmd_event"
+register_command "TOOLS" "daemon" "Manage system events and hooks" "cmd_event"

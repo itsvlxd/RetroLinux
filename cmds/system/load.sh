@@ -12,7 +12,7 @@ cmd_load() {
         "retro --setup|Initializing first boot system setup"
         "retro bluetooth restore|Initializing bluetooth radio cards"
         "retro audio easyeffects start|Initializing audio drivers"
-        "retro event start|Initializing event loop and custom hooks"
+        "retro daemon start|Initializing retro daemon engine and watchers"
         "retro power restore|Restoring hardware power profiles"
         "retro wallpaper restore|Applying last used wallpaper"
         "retro xdg dirs reset|Ensuring XDG user directories exist"
