@@ -894,7 +894,7 @@ modules/<name>/
 > [!NOTE]
 > **Why properties.json:** The module system reads this file to determine how to install, where to place files, and whether to symlink or copy.
 >
-> **Why this matters:** Without it, the module is invisible to `retro module` commands. The `type: "core"` field prevents accidental uninstallation of essential desktop environment components. This metadata file is the contract between your module and the module system.
+> **Why this matters:** Without it, the module is invisible to `retro -ls/--list` and other module commands. The `type: "core"` field prevents accidental uninstallation of essential desktop environment components. This metadata file is the contract between your module and the module system.
 ```json
 {
     "title": "Module Name",
@@ -919,10 +919,11 @@ modules/<name>/
 
 ### Module Commands
 
-- `retro module install <name>` - Link config files and install packages
-- `retro module uninstall <name>` - Remove links and optionally packages
-- `retro module mirror <name>` - Copy files instead of symlink
-- `retro module pull <name>` - Pull system changes back to repo
+- `-i, --install <name>` — Install module configs as symlinks, rice via retro CLI vars
+- `-ls, --list` — Browse all repo modules with install status
+- `-m, --mirror <name>` — Copy module configs as physical files, full custom freedom
+- `-p, --pull <name>` — Capture live system config changes back into repo modules for version tracking
+- `-r, --remove <name>` — Remove module configs from system and restore previous backup files
 
 ---
 ## 13. Variable System 🔧
