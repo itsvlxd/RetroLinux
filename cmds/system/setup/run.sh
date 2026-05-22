@@ -32,14 +32,14 @@ run_postinstall() {
     retro wallpaper "static" "true"
     retro wallpaper "set" "car-in-neon-gas-station.mp4"
 
+    source "$RETRO_DIR/cmds/system/setup/modules.sh" && setup_modules
+    source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
+    source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
+
     local root_device=$(findmnt -n -o SOURCE / | grep -oP '^/dev/[^ ]+')
     if [[ -n $root_device ]]; then
         retro timeshift setup -o "device=${root_device},daily=5,weekly=3,monthly=2,boot=true" 2>/dev/null || true
     fi
-
-    source "$RETRO_DIR/cmds/system/setup/modules.sh" && setup_modules
-    source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
-    source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
 
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${BROWSER_CHOICE:-firefox},filemanager=${FILEMANAGER_CHOICE:-thunar},image=loupe,video=mpv"
 
