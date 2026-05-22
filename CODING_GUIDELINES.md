@@ -1036,15 +1036,15 @@ engine:trigger(event_name, ...) -- Manually fire an event
    - Run in the same coroutine context (pcall-wrapped for safety)
 
 4. **Event Commands**:
-   - `retro event start` - Start the daemon in background
-   - `retro event loop` - Internal: run the event loop (called by start)
-   - `retro event stop` - Stop the daemon via stop file signal
-   - `retro event status` - Show daemon PID and uptime
-   - `retro event trigger <name>` - Manually fire an event
-   - `retro event list` - List available watchers
-   - `retro event log [name]` - View watcher logs
-   - `retro event log true/false` - Enable/disable log generation
-   - `retro event log limit <name> <lines>` - Set log line cap
+   - `retro daemon start` - Start the daemon in background
+   - `retro daemon loop` - Internal: run the event loop (called by start)
+   - `retro daemon stop` - Stop the daemon via stop file signal
+   - `retro daemon status` - Show daemon PID and uptime
+   - `retro daemon trigger <name>` - Manually fire an event
+   - `retro daemon list` - List available watchers
+   - `retro daemon log [name]` - View watcher logs
+   - `retro daemon log true/false` - Enable/disable log generation
+   - `retro daemon log limit <name> <lines>` - Set log line cap
 
 ### Available Watchers
 
@@ -1178,10 +1178,10 @@ Each watcher runs in its own coroutine with independent crash tracking:
 
 ### Log Management
 
-- Enable/disable: `retro event log true/false`
-- View: `retro event log <name> [limit]`
-- Set cap: `retro event log limit <name> <lines>` (minimum 10)
-- List all: `retro event log`
+- Enable/disable: `retro daemon log true/false`
+- View: `retro daemon log <name> [limit]`
+- Set cap: `retro daemon log limit <name> <lines>` (minimum 10)
+- List all: `retro daemon log`
 
 ### Adding a New Event Handler
 
