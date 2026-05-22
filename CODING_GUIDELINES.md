@@ -23,81 +23,6 @@ This document serves as the **single source of truth** for all RetroLinux develo
 - Module system (properties.json)
 - Quick reference for common patterns
 
-<style>
-  .callout {
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin: 1em 0;
-    border: 1px solid;
-    font-size: 0.95em;
-    line-height: 1.6;
-  }
-  .callout strong {
-    font-size: 1em;
-    display: inline-block;
-    margin-bottom: 4px;
-  }
-  .callout-note {
-    background-color: #dff0ff;
-    border-color: #08c;
-  }
-  .callout-note strong {
-    color: #08c;
-  }
-  .callout-tip {
-    background-color: #dfd;
-    border-color: #4dcb4d;
-  }
-  .callout-tip strong {
-    color: #2d8a2d;
-  }
-  .callout-warning {
-    background-color: #fdd;
-    border-color: #ff5757;
-  }
-  .callout-warning strong {
-    color: #c00;
-  }
-  .callout-highlight {
-    background-color: #ffffaa;
-    border-color: #fbe779;
-  }
-  .callout-highlight strong {
-    color: #8a7a00;
-  }
-  @media (prefers-color-scheme: dark) {
-    .callout-note {
-      background-color: #08212e;
-      border-color: #08c;
-    }
-    .callout-note strong {
-      color: #5bc0ff;
-    }
-    .callout-tip {
-      background-color: #002400;
-      border-color: #4dcb4d;
-    }
-    .callout-tip strong {
-      color: #4dcb4d;
-    }
-    .callout-warning {
-      background-color: #390009;
-      border-color: #ff5757;
-    }
-    .callout-warning strong {
-      color: #ff5757;
-    }
-    .callout-highlight {
-      background-color: #1f1f00;
-      border-color: #fbe779;
-    }
-    .callout-highlight strong {
-      color: #fbe779;
-    }
-  }
-</style>
-
----
 ## 1. Directory Structure 📁
 
 | Directory | Purpose |
@@ -119,12 +44,10 @@ This document serves as the **single source of truth** for all RetroLinux develo
 | `tests/` | Test suite |
 | `logs/` | Log directory |
 
-<div class="callout callout-warning">
-  <strong>⚠️ Critical Rule:</strong> ALL lib files for anything should stay in <code>./lib/</code> — this is the single source of truth for shared utilities.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> When libraries are scattered across subdirectories like <code>scripts/lib/</code> or <code>cmds/lib/</code>, developers waste time searching for existing utilities and end up duplicating code. A flat <code>lib/</code> structure means one place to check before writing anything new.
-</div>
-
+> [!WARNING]
+> **Critical Rule:** ALL lib files for anything should stay in `./lib/` — this is the single source of truth for shared utilities.
+>
+> **Why this matters:** When libraries are scattered across subdirectories like `scripts/lib/` or `cmds/lib/`, developers waste time searching for existing utilities and end up duplicating code. A flat `lib/` structure means one place to check before writing anything new.
 ---
 ## 2. File Naming Conventions 📝
 
@@ -174,12 +97,10 @@ local result=$myvar1$myvar2  # intentional concatenation
 
 ### Critical Rule: Never Duplicate Functions
 
-<div class="callout callout-highlight">
-  <strong>🔑 Key Rule:</strong> Before creating a new function, check <code>./lib/</code> or <code>./bin/lib/</code> first. If a function already exists that does what you need, use it.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Duplicated functions drift over time — one copy gets a bug fix while the other doesn't, leading to inconsistent behavior across the codebase. When every utility lives in <code>lib/</code>, fixes propagate everywhere automatically. This also reduces the codebase size and makes onboarding easier: new contributors learn one function, not five variants.
-</div>
-
+> [!IMPORTANT]
+> **Key Rule:** Before creating a new function, check `./lib/` or `./bin/lib/` first. If a function already exists that does what you need, use it.
+>
+> **Why this matters:** Duplicated functions drift over time — one copy gets a bug fix while the other doesn't, leading to inconsistent behavior across the codebase. When every utility lives in `lib/`, fixes propagate everywhere automatically. This also reduces the codebase size and makes onboarding easier: new contributors learn one function, not five variants.
 If you need a utility that doesn't exist, add it to the appropriate lib file in `./lib/` or `./bin/lib/`, not in your command file.
 
 ### Example
@@ -262,12 +183,10 @@ RetroLinux is a **multi-language codebase**. The primary language is **Bash** (s
 
 ### The 1:1 Mapping Rule
 
-<div class="callout callout-warning">
-  <strong>⚠️ Critical:</strong> Every function in a shell library must have an equivalent in its Lua port with identical behavior.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Developers constantly switch between shell and Lua code. If <code>rx_format_time(3600)</code> returns <code>"1 hours"</code> in Bash but <code>"60 min"</code> in Lua, the watcher that parses core script output will break silently. This rule eliminates an entire class of subtle bugs where the same function behaves differently depending on which language calls it.
-</div>
-
+> [!WARNING]
+> **Critical:** Every function in a shell library must have an equivalent in its Lua port with identical behavior.
+>
+> **Why this matters:** Developers constantly switch between shell and Lua code. If `rx_format_time(3600)` returns `"1 hours"` in Bash but `"60 min"` in Lua, the watcher that parses core script output will break silently. This rule eliminates an entire class of subtle bugs where the same function behaves differently depending on which language calls it.
 - Same function name (adapted to language conventions: `rx_format_time` → `Helpers.format_time`)
 - Same input parameters
 - Same output format and return values
@@ -339,12 +258,10 @@ This rule exists because:
 
 ### Overview
 
-<div class="callout callout-note">
-  <strong>📝 Why Python:</strong> Shell scripting becomes impractical for DBus-heavy operations.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Python's <code>dbus-python</code> and <code>pygobject</code> libraries provide clean APIs for BlueZ OBEX file transfers, GLib main loops, and structured logging. Python is used <em>only</em> where shell would be fragile — the rest of the codebase stays in Bash/Lua.
-</div>
-
+> [!NOTE]
+> **Why Python:** Shell scripting becomes impractical for DBus-heavy operations.
+>
+> **Why this matters:** Python's `dbus-python` and `pygobject` libraries provide clean APIs for BlueZ OBEX file transfers, GLib main loops, and structured logging. Python is used *only* where shell would be fragile — the rest of the codebase stays in Bash/Lua.
 Python is used for **DBus-heavy operations** (Bluetooth OBEX file transfers) and **structured logging** where shell scripting would be impractical. Python scripts are called from shell commands via `python3` and follow the same 1:1 mapping rule as Lua.
 
 ### Library Files
@@ -512,12 +429,10 @@ All colors are defined in `lib/colors.sh`:
 
 ### Two Logging Functions: rx_log vs rx_log_file
 
-<div class="callout callout-warning">
-  <strong>⚠️ Critical:</strong> There are TWO distinct logging functions with completely different purposes.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Mixing console output with file logging creates two problems. First, core scripts that produce colored console output break the frontend's ability to parse their results. Second, frontend commands that write to log files flood <code>/tmp/retro_logs/</code> with user-facing messages that aren't useful for debugging. The separation ensures core scripts produce clean, parseable output while frontend commands handle all user interaction.
-</div>
-
+> [!WARNING]
+> **Critical:** There are TWO distinct logging functions with completely different purposes.
+>
+> **Why this matters:** Mixing console output with file logging creates two problems. First, core scripts that produce colored console output break the frontend's ability to parse their results. Second, frontend commands that write to log files flood `/tmp/retro_logs/` with user-facing messages that aren't useful for debugging. The separation ensures core scripts produce clean, parseable output while frontend commands handle all user interaction.
 | Function | Location | Purpose | Output |
 |----------|----------|---------|--------|
 | `rx_log` | `lib/log.sh` | **Frontend console output** | Terminal (colored, with icons) |
@@ -615,12 +530,10 @@ rx_log "warn" "Something might be wrong"
 rx_log "error" "Operation failed"
 ```
 
-<div class="callout callout-note">
-  <strong>📝 Important:</strong> When using <code>rx_log "error"</code>, always <code>return 1</code> after it.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Without <code>return 1</code>, the script continues executing after logging an error, which can cause cascading failures or corrupt state. The <code>return 1</code> ensures the calling function knows the operation failed and can handle it appropriately.
-</div>
-
+> [!NOTE]
+> **Important:** When using `rx_log "error"`, always `return 1` after it.
+>
+> **Why this matters:** Without `return 1`, the script continues executing after logging an error, which can cause cascading failures or corrupt state. The `return 1` ensures the calling function knows the operation failed and can handle it appropriately.
 ```bash
 [[ -z $value ]] && rx_log "error" "Value is required" && return 1
 ```
@@ -637,12 +550,10 @@ printf " ${PINK}%-20s${GRAY}- ${RESET}%s\n" "command" "description"
 
 ### Status Table Pattern (Use Centralized Functions)
 
-<div class="callout callout-tip">
-  <strong>💡 Why centralized functions:</strong> When every command formats tables differently, the UI looks inconsistent and maintenance becomes a nightmare.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Centralized functions in <code>lib/help.sh</code> ensure every tool uses the same spacing, colors, and icon alignment. Change the format once, update everywhere. This eliminates visual inconsistencies across the codebase and makes UI improvements a single-point change.
-</div>
-
+> [!TIP]
+> **Why centralized functions:** When every command formats tables differently, the UI looks inconsistent and maintenance becomes a nightmare.
+>
+> **Why this matters:** Centralized functions in `lib/help.sh` ensure every tool uses the same spacing, colors, and icon alignment. Change the format once, update everywhere. This eliminates visual inconsistencies across the codebase and makes UI improvements a single-point change.
 The standard pattern for displaying status information - use centralized functions from `lib/help.sh`:
 
 ```bash
@@ -773,12 +684,10 @@ Icons are Nerd Font glyphs. Common icons by category:
 
 ### register_command
 
-<div class="callout callout-note">
-  <strong>📝 Why register_command:</strong> The command routing system in <code>retro.sh</code> discovers commands by scanning their registrations.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Without <code>register_command</code>, your script exists but <code>retro</code> doesn't know about it — it won't appear in help output or be callable. The GROUP parameter determines which category the command appears under in the help menu. This registration system is the backbone of command discovery.
-</div>
-
+> [!NOTE]
+> **Why register_command:** The command routing system in `retro.sh` discovers commands by scanning their registrations.
+>
+> **Why this matters:** Without `register_command`, your script exists but `retro` doesn't know about it — it won't appear in help output or be callable. The GROUP parameter determines which category the command appears under in the help menu. This registration system is the backbone of command discovery.
 All commands must register themselves using `register_command`:
 
 ```bash
@@ -894,18 +803,16 @@ echo "GPU|nvidia|NVIDIA GeForce RTX 3080|nvidia-open-dkms|nvidia-utils nvidia-se
 
 ### Critical Rules for Core Scripts
 
-<div class="callout callout-warning">
-  <strong>⚠️ Critical:</strong>
-  <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-    <li><strong>NO rx_log</strong> — Core scripts don't produce console output. Use <code>rx_log_file</code> for file logging.</li>
-    <li><strong>NO user-facing echo</strong> — No messages to stdout meant for users (no <code>echo "Success"</code>, <code>echo "Error"</code>, etc.)</li>
-    <li><strong>Only raw data output</strong> — What the frontend parses</li>
-    <li><strong>Exit codes</strong> — 0 for success, 1 for failure (frontend handles messaging)</li>
-  </ol>
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The frontend parses core script output using <code>IFS='|' read</code>. Any extra text (like <code>echo "Success"</code>) becomes a malformed line that breaks the parser. Human-readable messages belong in the frontend, which uses <code>rx_log</code> for colored, formatted output. Mixing console output with data output creates an entire class of subtle parsing bugs.
-</div>
-
+> [!WARNING]
+> **Critical:**
+>
+> 1. **NO rx_log** — Core scripts don't produce console output. Use `rx_log_file` for file logging.
+> 2. **NO user-facing echo** — No messages to stdout meant for users (no `echo "Success"`, `echo "Error"`, etc.)
+> 3. **Only raw data output** — What the frontend parses
+> 4. **Exit codes** — 0 for success, 1 for failure (frontend handles messaging)
+>
+>
+> **Why this matters:** The frontend parses core script output using `IFS='|' read`. Any extra text (like `echo "Success"`) becomes a malformed line that breaks the parser. Human-readable messages belong in the frontend, which uses `rx_log` for colored, formatted output. Mixing console output with data output creates an entire class of subtle parsing bugs.
 ---
 ## 11. Frontend Command Scripts 💻
 
@@ -948,12 +855,10 @@ The `-y/--yes` flag sets `SKIP_PROMPT=true` globally (handled in `retro.sh`).
 
 ### Error Handling Pattern
 
-<div class="callout callout-tip">
-  <strong>💡 Why validate early:</strong> Catching invalid input before any side effects occur prevents partial state changes.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> If a user runs <code>retro tool set</code> without a value, the error should appear instantly — not after the script has already modified files or started services. Early validation ensures atomic operations and gives users immediate feedback.
-</div>
-
+> [!TIP]
+> **Why validate early:** Catching invalid input before any side effects occur prevents partial state changes.
+>
+> **Why this matters:** If a user runs `retro tool set` without a value, the error should appear instantly — not after the script has already modified files or started services. Early validation ensures atomic operations and gives users immediate feedback.
 ```bash
 # Validate input
 [[ -z $value ]] && rx_log "error" "Usage: retro tool action <value>" && return 1
@@ -986,12 +891,10 @@ modules/<name>/
 
 ### properties.json Format
 
-<div class="callout callout-note">
-  <strong>📝 Why properties.json:</strong> The module system reads this file to determine how to install, where to place files, and whether to symlink or copy.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Without it, the module is invisible to <code>retro module</code> commands. The <code>type: "core"</code> field prevents accidental uninstallation of essential desktop environment components. This metadata file is the contract between your module and the module system.
-</div>
-
+> [!NOTE]
+> **Why properties.json:** The module system reads this file to determine how to install, where to place files, and whether to symlink or copy.
+>
+> **Why this matters:** Without it, the module is invisible to `retro module` commands. The `type: "core"` field prevents accidental uninstallation of essential desktop environment components. This metadata file is the contract between your module and the module system.
 ```json
 {
     "title": "Module Name",
@@ -1056,12 +959,10 @@ bash "$RETRO_DIR/scripts/variable_core.sh" --list
 
 ### check_dep Function
 
-<div class="callout callout-tip">
-  <strong>💡 Why check_dep:</strong> Rather than failing mid-operation when a missing command is called, <code>check_dep</code> validates all dependencies upfront.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> This prevents partial state changes and gives users a clear path to resolution. If a script starts modifying files before discovering a missing dependency, the system could be left in a broken state. Validating everything first ensures atomic operations.
-</div>
-
+> [!TIP]
+> **Why check_dep:** Rather than failing mid-operation when a missing command is called, `check_dep` validates all dependencies upfront.
+>
+> **Why this matters:** This prevents partial state changes and gives users a clear path to resolution. If a script starts modifying files before discovering a missing dependency, the system could be left in a broken state. Validating everything first ensures atomic operations.
 Use `check_dep` from `lib/helpers.sh` to prompt for missing dependencies:
 
 ```bash
@@ -1082,12 +983,10 @@ rx_is_pkg_installed() {
 
 ### Overview
 
-<div class="callout callout-note">
-  <strong>📝 Why Lua for the daemon:</strong> Lua is lightweight, embeddable, and has excellent coroutine support for cooperative multitasking.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Unlike shell, Lua can run multiple watchers concurrently without spawning subprocesses. Unlike Python, it has a tiny memory footprint — critical for a background process that runs 24/7. The coroutine-based engine means watchers yield control voluntarily, preventing any single watcher from blocking the entire daemon.
-</div>
-
+> [!NOTE]
+> **Why Lua for the daemon:** Lua is lightweight, embeddable, and has excellent coroutine support for cooperative multitasking.
+>
+> **Why this matters:** Unlike shell, Lua can run multiple watchers concurrently without spawning subprocesses. Unlike Python, it has a tiny memory footprint — critical for a background process that runs 24/7. The coroutine-based engine means watchers yield control voluntarily, preventing any single watcher from blocking the entire daemon.
 The **Daemon System** is a background daemon written in **Lua** that continuously monitors system state and fires events when conditions change. It uses a **coroutine-based engine** (`daemon/engine.lua`) that dynamically loads watchers and event handlers from `daemon/watchers/` and `daemon/events/`.
 
 ### File Structure
@@ -1221,12 +1120,10 @@ return M
    - `M.enabled()` to conditionally load (required)
    - `coroutine.yield()` must be called in the loop
 
-<div class="callout callout-tip">
-  <strong>💡 Tip:</strong> Do NOT use <code>os.execute("sleep ...")</code> — use <code>Watcher.sleep(seconds)</code> or <code>coroutine.yield()</code> instead.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The daemon uses cooperative multitasking via coroutines. <code>os.execute("sleep")</code> blocks the entire Lua process, freezing all watchers and event handlers. <code>Watcher.sleep()</code> and <code>coroutine.yield()</code> yield control back to the engine so other watchers can run.
-</div>
-
+> [!TIP]
+> **Tip:** Do NOT use `os.execute("sleep ...")` — use `Watcher.sleep(seconds)` or `coroutine.yield()` instead.
+>
+> **Why this matters:** The daemon uses cooperative multitasking via coroutines. `os.execute("sleep")` blocks the entire Lua process, freezing all watchers and event handlers. `Watcher.sleep()` and `coroutine.yield()` yield control back to the engine so other watchers can run.
 ### Watcher Utility Module
 
 | Function | Purpose |
@@ -1268,12 +1165,10 @@ end
 
 ### Crash Isolation
 
-<div class="callout callout-tip">
-  <strong>💡 Why crash isolation:</strong> A buggy watcher shouldn't take down the entire daemon.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> With per-watcher crash tracking, a watcher that errors 3 times in a row gets auto-disabled while others continue running. The disabled state persists across restarts so the daemon doesn't keep crashing on boot. Check <code>/tmp/retro_logs/watcher_&lt;name&gt;.disabled</code> to see if a watcher was auto-disabled. This ensures one broken feature doesn't break the entire system.
-</div>
-
+> [!TIP]
+> **Why crash isolation:** A buggy watcher shouldn't take down the entire daemon.
+>
+> **Why this matters:** With per-watcher crash tracking, a watcher that errors 3 times in a row gets auto-disabled while others continue running. The disabled state persists across restarts so the daemon doesn't keep crashing on boot. Check `/tmp/retro_logs/watcher_&lt;name&gt;.disabled` to see if a watcher was auto-disabled. This ensures one broken feature doesn't break the entire system.
 Each watcher runs in its own coroutine with independent crash tracking:
 - Crash count tracked per-watcher
 - After 3 crashes, the watcher is auto-disabled
@@ -1320,21 +1215,18 @@ return M
 
 ### Important Notes
 
-<div class="callout callout-note">
-  <strong>📝 Why these details matter:</strong>
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Understanding the daemon's architecture prevents common mistakes. Coroutines are cooperative — if one watcher doesn't yield, everything stops. The <code>pcall</code> wrapper means event handler errors won't crash the daemon, but they also won't be visible unless you check logs.
-  <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-    <li>Watchers run in <strong>coroutines</strong> — cooperative multitasking, not OS threads</li>
-    <li>Event handlers run in the same context, wrapped in <code>pcall</code> for safety</li>
-    <li>Use <code>Watcher.get_var()</code>/<code>Watcher.set_var()</code> for persistent state</li>
-    <li>Watchers must yield via <code>coroutine.yield()</code> to avoid blocking</li>
-    <li>The daemon auto-starts on login (via <code>retro load</code>)</li>
-    <li>PID stored in <code>/tmp/retro_event_daemon.pid</code></li>
-    <li>Stop signal via <code>/tmp/retro_event_daemon_stop</code> file</li>
-  </ul>
-</div>
-
+> [!NOTE]
+> **Why these details matter:**
+>
+> **Why this matters:** Understanding the daemon's architecture prevents common mistakes. Coroutines are cooperative — if one watcher doesn't yield, everything stops. The `pcall` wrapper means event handler errors won't crash the daemon, but they also won't be visible unless you check logs.
+>
+> - Watchers run in **coroutines** — cooperative multitasking, not OS threads
+> - Event handlers run in the same context, wrapped in `pcall` for safety
+> - Use `Watcher.get_var()`/`Watcher.set_var()` for persistent state
+> - Watchers must yield via `coroutine.yield()` to avoid blocking
+> - The daemon auto-starts on login (via `retro load`)
+> - PID stored in `/tmp/retro_event_daemon.pid`
+> - Stop signal via `/tmp/retro_event_daemon_stop` file
 ---
 ## 16. Walkthrough: Adding a New Tool 🛠️
 
@@ -1456,12 +1348,10 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 
 ### Core Script Logging Rule
 
-<div class="callout callout-warning">
-  <strong>⚠️ Required:</strong> Every core script (<code>scripts/*_core.sh</code>) and daemon engine <strong>MUST</strong> register a log entry.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Without registration, <code>rx_log_file</code> has nowhere to write. The log file won't be created, and debugging becomes impossible. The registration step creates the file in <code>/tmp/retro_logs/</code> and marks it as an active log source visible to <code>retro log list</code>.
-</div>
-
+> [!WARNING]
+> **Required:** Every core script (`scripts/*_core.sh`) and daemon engine **MUST** register a log entry.
+>
+> **Why this matters:** Without registration, `rx_log_file` has nowhere to write. The log file won't be created, and debugging becomes impossible. The registration step creates the file in `/tmp/retro_logs/` and marks it as an active log source visible to `retro log list`.
 ```bash
 #!/bin/bash
 # scripts/my_core.sh
@@ -1480,25 +1370,20 @@ esac
 
 ### Core Script Output Rule
 
-<div class="callout callout-warning">
-  <strong>⚠️ Required:</strong> Core scripts must produce <strong>only machine-parseable output</strong> (pipe-delimited). No user-facing messages.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The frontend parses core script output using <code>IFS='|' read</code>. Any extra text (like <code>echo "Success"</code>) becomes a malformed line that breaks the parser. Human-readable messages belong in the frontend, which uses <code>rx_log</code> for colored, formatted output.
-  <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-    <li>No <code>rx_log</code> calls</li>
-    <li>No <code>echo "Success"</code>, <code>echo "Error"</code>, <code>echo "Warning"</code></li>
-    <li>Only raw data: <code>echo "key=value"</code>, <code>echo "field1|field2|field3"</code></li>
-  </ul>
-</div>
-
+> [!WARNING]
+> **Required:** Core scripts must produce **only machine-parseable output** (pipe-delimited). No user-facing messages.
+>
+> **Why this matters:** The frontend parses core script output using `IFS='|' read`. Any extra text (like `echo "Success"`) becomes a malformed line that breaks the parser. Human-readable messages belong in the frontend, which uses `rx_log` for colored, formatted output.
+>
+> - No `rx_log` calls
+> - No `echo "Success"`, `echo "Error"`, `echo "Warning"`
+> - Only raw data: `echo "key=value"`, `echo "field1|field2|field3"`
 ### Lua Watcher Structure Rules
 
-<div class="callout callout-warning">
-  <strong>⚠️ Required:</strong> Every watcher in <code>daemon/watchers/*.lua</code> <strong>MUST</strong> follow this structure.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The engine discovers watchers by scanning for <code>*.lua</code> files and expects specific fields. Missing <code>M.name</code> means no log source. Missing <code>M.interval</code> means the engine doesn't know when to schedule it. Missing <code>M.enabled()</code> causes a nil error on load. Missing <code>coroutine.yield()</code> blocks the entire daemon loop.
-</div>
-
+> [!WARNING]
+> **Required:** Every watcher in `daemon/watchers/*.lua` **MUST** follow this structure.
+>
+> **Why this matters:** The engine discovers watchers by scanning for `*.lua` files and expects specific fields. Missing `M.name` means no log source. Missing `M.interval` means the engine doesn't know when to schedule it. Missing `M.enabled()` causes a nil error on load. Missing `coroutine.yield()` blocks the entire daemon loop.
 ```lua
 local Watcher = require("watcher")
 
@@ -1519,26 +1404,22 @@ end
 return M
 ```
 
-<div class="callout callout-note">
-  <strong>📝 Required fields:</strong>
-  <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-    <li><code>M.name</code> — unique watcher identifier</li>
-    <li><code>M.interval</code> — check frequency in seconds</li>
-    <li><code>M.enabled()</code> — function that returns true/false</li>
-    <li><code>M.start(engine)</code> — main watcher logic</li>
-  </ul>
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The engine discovers watchers by scanning for <code>*.lua</code> files and expects these specific fields. Missing <code>M.name</code> means no log source. Missing <code>M.interval</code> means the engine doesn't know when to schedule it. Missing <code>M.enabled()</code> causes a nil error on load. Missing <code>coroutine.yield()</code> blocks the entire daemon loop.
-</div>
-
+> [!NOTE]
+> **Required fields:**
+>
+> - `M.name` — unique watcher identifier
+> - `M.interval` — check frequency in seconds
+> - `M.enabled()` — function that returns true/false
+> - `M.start(engine)` — main watcher logic
+>
+>
+> **Why this matters:** The engine discovers watchers by scanning for `*.lua` files and expects these specific fields. Missing `M.name` means no log source. Missing `M.interval` means the engine doesn't know when to schedule it. Missing `M.enabled()` causes a nil error on load. Missing `coroutine.yield()` blocks the entire daemon loop.
 ### Lua Event Handler Structure Rules
 
-<div class="callout callout-warning">
-  <strong>⚠️ Required:</strong> Every event file in <code>daemon/events/*.lua</code> <strong>MUST</strong> follow this structure.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The engine matches emitted event names to handler function names. If your function doesn't start with <code>on_</code>, it won't be recognized as an event handler. The <code>on_</code> prefix is enforced by the test suite (<code>tests/event_naming_test.sh</code>) and ensures consistency across all event files.
-</div>
-
+> [!WARNING]
+> **Required:** Every event file in `daemon/events/*.lua` **MUST** follow this structure.
+>
+> **Why this matters:** The engine matches emitted event names to handler function names. If your function doesn't start with `on_`, it won't be recognized as an event handler. The `on_` prefix is enforced by the test suite (`tests/event_naming_test.sh`) and ensures consistency across all event files.
 ```lua
 local M = {}
 
@@ -1549,21 +1430,18 @@ end
 return M
 ```
 
-<div class="callout callout-note">
-  <strong>📝 Why these details matter:</strong>
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Understanding the daemon's architecture prevents common mistakes. Coroutines are cooperative — if one watcher doesn't yield, everything stops. The <code>pcall</code> wrapper means event handler errors won't crash the daemon, but they also won't be visible unless you check logs. The auto-start on login means any syntax error in a watcher will prevent the daemon from starting at all.
-  <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-    <li>Watchers run in <strong>coroutines</strong> — cooperative multitasking, not OS threads</li>
-    <li>Event handlers run in the same context, wrapped in <code>pcall</code> for safety</li>
-    <li>Use <code>Watcher.get_var()</code>/<code>Watcher.set_var()</code> for persistent state</li>
-    <li>Watchers must yield via <code>coroutine.yield()</code> to avoid blocking</li>
-    <li>The daemon auto-starts on login (via <code>retro load</code>)</li>
-    <li>PID stored in <code>/tmp/retro_event_daemon.pid</code></li>
-    <li>Stop signal via <code>/tmp/retro_event_daemon_stop</code> file</li>
-  </ul>
-</div>
-
+> [!NOTE]
+> **Why these details matter:**
+>
+> **Why this matters:** Understanding the daemon's architecture prevents common mistakes. Coroutines are cooperative — if one watcher doesn't yield, everything stops. The `pcall` wrapper means event handler errors won't crash the daemon, but they also won't be visible unless you check logs. The auto-start on login means any syntax error in a watcher will prevent the daemon from starting at all.
+>
+> - Watchers run in **coroutines** — cooperative multitasking, not OS threads
+> - Event handlers run in the same context, wrapped in `pcall` for safety
+> - Use `Watcher.get_var()`/`Watcher.set_var()` for persistent state
+> - Watchers must yield via `coroutine.yield()` to avoid blocking
+> - The daemon auto-starts on login (via `retro load`)
+> - PID stored in `/tmp/retro_event_daemon.pid`
+> - Stop signal via `/tmp/retro_event_daemon_stop` file
 ### Common Gotchas
 
 2. **Lowercase actions**: Always use `${action,,}` to lowercase user input for consistent case handling.
@@ -1580,12 +1458,10 @@ return M
 
 ### <kbd>Ctrl</kbd> + <kbd>C</kbd> Trap (Graceful Exits)
 
-<div class="callout callout-warning">
-  <strong>⚠️ Why traps matter:</strong> Without a trap, a user pressing <kbd>Ctrl</kbd> + <kbd>C</kbd> mid-installation leaves the system in an unpredictable state.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> Packages half-installed, files partially moved, symlinks broken — these are hard to debug and harder to recover from. The trap ensures cleanup runs regardless of how the script exits, leaving the system in a known state.
-</div>
-
+> [!WARNING]
+> **Why traps matter:** Without a trap, a user pressing Ctrl + C mid-installation leaves the system in an unpredictable state.
+>
+> **Why this matters:** Packages half-installed, files partially moved, symlinks broken — these are hard to debug and harder to recover from. The trap ensures cleanup runs regardless of how the script exits, leaving the system in a known state.
 If your script does destructive actions (moving files, installing packages, creating symlinks), use trap to handle user interruptions:
 
 ```bash
@@ -1605,12 +1481,10 @@ Failing to handle interrupts can leave the system in a broken state (half-instal
 ---
 ## 18. Installer System 💾 (bin/)
 
-<div class="callout callout-note">
-  <strong>📝 Why a separate installer system:</strong> The installer (<code>bin/</code>) is isolated from the main tool system (<code>cmds/</code>, <code>scripts/</code>) because it runs in a fundamentally different environment.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> During Arch Linux installation, before the target system is bootable, the installer has its own libraries (<code>bin/lib/</code>), its own state management (<code>/tmp/retroinstall_state</code>), and its own error handling (QR codes for offline debugging). This separation prevents installer code from leaking into the runtime system and keeps the two environments completely isolated.
-</div>
-
+> [!NOTE]
+> **Why a separate installer system:** The installer (`bin/`) is isolated from the main tool system (`cmds/`, `scripts/`) because it runs in a fundamentally different environment.
+>
+> **Why this matters:** During Arch Linux installation, before the target system is bootable, the installer has its own libraries (`bin/lib/`), its own state management (`/tmp/retroinstall_state`), and its own error handling (QR codes for offline debugging). This separation prevents installer code from leaking into the runtime system and keeps the two environments completely isolated.
 The Installer is a self-contained system that runs during initial system setup. It follows a **modular setup flow architecture**:
 
 ```
@@ -1783,12 +1657,10 @@ done
 
 ### State Management 🔐 (CRITICAL)
 
-<div class="callout callout-warning">
-  <strong>⚠️ Critical:</strong> Setup scripts run as subprocesses of <code>retroinstall</code>. Because subprocesses cannot share variables with their parent, all state is persisted to <code>/tmp/retroinstall_state</code> (exported as <code>$RETRO_STATE</code>).
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> The installer uses <code>exec</code> to restart itself on "go back" (exit code 42). This means the entire process is replaced — no parent process exists to hold state. The file-based state system survives process restarts and enables the go-back mechanism. Without it, going back to disk selection would lose all previously entered values.
-</div>
-
+> [!WARNING]
+> **Critical:** Setup scripts run as subprocesses of `retroinstall`. Because subprocesses cannot share variables with their parent, all state is persisted to `/tmp/retroinstall_state` (exported as `$RETRO_STATE`).
+>
+> **Why this matters:** The installer uses `exec` to restart itself on "go back" (exit code 42). This means the entire process is replaced — no parent process exists to hold state. The file-based state system survives process restarts and enables the go-back mechanism. Without it, going back to disk selection would lose all previously entered values.
 **State Functions** (defined in `bin/lib/handlers.sh`):
 
 | Function | Purpose |
@@ -1865,12 +1737,10 @@ RX_GO_BACK_TO         # Name of step to go back to
 
 **Password hashing**: Uses **yescrypt** via `bin/lib/crypto.sh` (`rx_hash_password`), which calls Python's `archinstall.lib.crypt.crypt_yescrypt`. This replaced the old SHA-512 (`openssl passwd -6`) method.
 
-<div class="callout callout-tip">
-  <strong>💡 Why yescrypt over SHA-512:</strong> Yescrypt is a memory-hard password hashing function designed to resist GPU and ASIC-based attacks.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> SHA-512 is fast, which makes it vulnerable to brute-force attacks on modern hardware. Yescrypt's configurable iteration time (stored as <code>LUKS_ITER_TIME</code>) lets users balance security vs. boot time. This is critical for full-disk encryption where password strength directly determines data security.
-</div>
-
+> [!TIP]
+> **Why yescrypt over SHA-512:** Yescrypt is a memory-hard password hashing function designed to resist GPU and ASIC-based attacks.
+>
+> **Why this matters:** SHA-512 is fast, which makes it vulnerable to brute-force attacks on modern hardware. Yescrypt's configurable iteration time (stored as `LUKS_ITER_TIME`) lets users balance security vs. boot time. This is critical for full-disk encryption where password strength directly determines data security.
 **Setup Scripts and Their Variables**:
 
 | Step | Script | Variables Set |
@@ -2003,12 +1873,10 @@ trap rx_exit_handler EXIT
 
 ### QR Code Error Reporting
 
-<div class="callout callout-tip">
-  <strong>💡 Why QR codes:</strong> During installation, the system has no browser or easy way to copy-paste error details.
-  <hr style="margin: 8px 0; border: none; border-top: 1px solid currentColor; opacity: 0.2;">
-  <strong>Why this matters:</strong> A QR code encodes system specs, disk info, and the exit code into a scannable URL that opens a pre-filled GitHub issue. The user scans it with their phone and immediately has the right context for reporting the bug. This eliminates the frustrating "something went wrong but I can't tell anyone what" scenario during installation.
-</div>
-
+> [!TIP]
+> **Why QR codes:** During installation, the system has no browser or easy way to copy-paste error details.
+>
+> **Why this matters:** A QR code encodes system specs, disk info, and the exit code into a scannable URL that opens a pre-filled GitHub issue. The user scans it with their phone and immediately has the right context for reporting the bug. This eliminates the frustrating "something went wrong but I can't tell anyone what" scenario during installation.
 Errors generate a QR code with system info for GitHub issues:
 
 ```bash
@@ -2172,7 +2040,7 @@ RetroLinux/
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-main-transparent-bg.png" alt="RetroLinux" width="180" style="vertical-align: middle; margin-right: 4px;">
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Palm" width="35" style="vertical-align: middle;">
   
-  <sub>©<img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftimeapi.io%2Fapi%2FTime%2Fcurrent%2Fzone%3FtimeZone%3DUTC&query=%24.year&color=ff007f&style=flat-square&label=" style="vertical-align: middle;" alt="Current Year"> itsvlxd & Contributors • <a href="https://github.com/itsvlxd/RetroLinux/blob/develop/LICENSE">GPL-3.0 License</a> &nbsp;&nbsp;|&nbsp;&nbsp; <a href="https://github.com/itsvlxd/RetroLinux/blob/develop/CONTRIBUTING.md">🤝 Contributing</a> • <a href="https://github.com/itsvlxd/RetroLinux/issues">🐛 Issues</a> • <a href="https://github.com/itsvlxd/RetroLinux/pulls">🔧 Pulls</a></sub>
+  <sub>© 2026 itsvlxd & Contributors • <a href="https://github.com/itsvlxd/RetroLinux/blob/develop/LICENSE">GPL-3.0 License</a> &nbsp;&nbsp;|&nbsp;&nbsp; <a href="https://github.com/itsvlxd/RetroLinux/blob/develop/CONTRIBUTING.md">🤝 Contributing</a> • <a href="https://github.com/itsvlxd/RetroLinux/issues">🐛 Issues</a> • <a href="https://github.com/itsvlxd/RetroLinux/pulls">🔧 Pulls</a></sub>
   <br>
   <sub><i>Licensed under the GNU General Public License v3.0. You are free to share, modify, and redistribute this documentation under the same copyleft terms, provided completely without warranty of any kind.</i></sub>
 </div>

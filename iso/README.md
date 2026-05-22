@@ -4,8 +4,6 @@
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="140" style="vertical-align: middle">
 </p>
 
-<p align="center">
-
 This directory contains everything needed to build the **RetroLinux Live ISO**. The build system uses `archiso` inside Docker to create a reproducible, bootable ISO image with the RetroLinux installer pre-configured.
 
 **What you get:**
@@ -13,8 +11,6 @@ This directory contains everything needed to build the **RetroLinux Live ISO**. 
 - Custom "retropunk" purple/pink theme
 - Pre-configured `retroinstall` TUI installer
 - Pre-installed packages (base, tools, recovery utilities)
-
-</p>
 
 ---
 
@@ -27,28 +23,29 @@ cd iso/
 
 **Output:** `iso/out/retrolinux-YYYY.MM.DD-x86_64.iso`
 
+> [!TIP]
+> Always run `build.sh` from the `iso/` directory. It detects the project root (`RETRO_DIR`) as the parent directory automatically. If you run it from elsewhere, set `RETRO_DIR` manually or symlink the script to your `$PATH`.
+
 ---
 
 ## Build Options
 
 | Flag | Description |
 |------|-------------|
-| `./build.sh build` | Build ISO (default) |
+| `./build.sh` | Build ISO (default) |
 | `./build.sh --yes` | Skip all prompts (CI/CD) |
 | `./build.sh --force` | Force rebuild even if unchanged |
 | `./build.sh --clean` | Clean build artifacts only |
 | `./build.sh --repo` | Include full repo in ISO |
 | `./build.sh --docker` | Build and push Docker image to GHCR |
 
-**Requirements:**
-- `docker`
-- `bc` (Basic Calculator)
-- `convert` (ImageMagick)
-- **4+ CPU cores** (recommended for parallel compilation)
-- **8GB+ RAM** (disk encryption and build need memory)
-- **15GB+ free disk space** (ISO build artifacts)
-
-> Building the ISO is resource-intensive. A beefy machine makes the process much faster.
+> [!WARNING]
+> **Resource requirements:** Building the ISO is resource-intensive. A beefy machine makes the process much faster.
+>
+> - `docker`, `bc` (Basic Calculator), `convert` (ImageMagick) — must be installed on the host
+> - **4+ CPU cores** — recommended for parallel compilation inside the Docker container
+> - **8GB+ RAM** — disk encryption and ISO generation need memory
+> - **15GB+ free disk space** — build artifacts, package cache, and the output ISO
 
 ---
 
@@ -62,6 +59,9 @@ iso/out/
 ├── kernel-version.txt                    # Kernel version (e.g., 6.19.14)
 └── .build-checksum                       # SHA256 of packages for incremental builds
 ```
+
+> [!NOTE]
+> **Incremental builds:** The build script calculates a SHA256 checksum of `packages.x86_64` before building. If the checksum matches the previous build and an ISO already exists, `mkarchiso` is skipped entirely. Use `--force` to override and force a full rebuild.
 
 ---
 
@@ -114,6 +114,12 @@ RUN pacman --noconfirm -Sy archiso git sudo base-devel jq grub bc imagemagick
 
 **Image:** `ghcr.io/itsvlxd/retrolinux-build:latest`
 
+> [!TIP]
+> Use `./build.sh --docker` to build and push the Docker image to GHCR without building the ISO. This is useful for CI/CD or when you only need to update the build environment.
+
+> [!NOTE]
+> **Package caching:** The build uses a named Docker volume (`retrolinux-pkg-cache`) to persist downloaded packages across builds. This means subsequent builds are much faster since packages don't need to be re-downloaded. The volume is created automatically on first run.
+
 ```bash
 # Pull image
 docker pull ghcr.io/itsvlxd/retrolinux-build:latest
@@ -151,7 +157,7 @@ sudo ./build.sh --yes
 4. User logs in (auto-login as root)
 5. .automated_script.sh runs
 6. retroinstall TUI wizard starts
-7. User completes 23 setup steps
+7. User completes 24 setup steps
 8. archinstall runs silently
 9. Reboot into installed RetroLinux
 ```
@@ -162,6 +168,9 @@ sudo ./build.sh --yes
 
 ### Incremental Builds
 The build script checks SHA256 of `packages.x86_64` before rebuilding. If unchanged, skips rebuild. Use `--force` to override.
+
+> [!NOTE]
+> Use `--repo` (`-r`) to include the full RetroLinux repository inside the ISO at `/opt/retrolinux`. This enables live debugging and development from the live environment but increases ISO size by approximately 200MB. The `.git/` directory and `.env` file are excluded automatically.
 
 ### Adding Packages
 Edit `profile/packages.x86_64` - one package per line. Rebuild to update.
@@ -196,3 +205,15 @@ sudo systemctl enable --now docker
 # Or manually
 rm -rf iso/work/ iso/out/*.iso
 ```
+
+<br><br>
+---
+<div align="center">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Palm" width="35" style="vertical-align: middle; margin-right: 4px;">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-main-transparent-bg.png" alt="RetroLinux" width="180" style="vertical-align: middle; margin-right: 4px;">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Palm" width="35" style="vertical-align: middle;">
+  
+  <sub>© 2026 itsvlxd & Contributors • <a href="https://github.com/itsvlxd/RetroLinux/blob/develop/LICENSE">GPL-3.0 License</a> &nbsp;&nbsp;|&nbsp;&nbsp; <a href="https://github.com/itsvlxd/RetroLinux/blob/develop/CONTRIBUTING.md">🤝 Contributing</a> • <a href="https://github.com/itsvlxd/RetroLinux/issues">🐛 Issues</a> • <a href="https://github.com/itsvlxd/RetroLinux/pulls">🔧 Pulls</a></sub>
+  <br>
+  <sub><i>Licensed under the GNU General Public License v3.0. You are free to share, modify, and redistribute this documentation under the same copyleft terms, provided completely without warranty of any kind.</i></sub>
+</div>
