@@ -25,7 +25,10 @@ rx_link() {
     fi
 
     if [[ -e $target_on_system && ! -L $target_on_system ]]; then
-        rx_log "warn" "Found existing data at $target_on_system. Creating backup..."
+        rx_log "warn" "Found existing config at $target_on_system (not a retro symlink)"
+        rx_log "warn" "A backup will be created before installing the retro module"
+        ! rx_confirm "Install retro module here anyway?" "Y" && return 0
+        rx_log "info" "Creating backup at ${target_on_system}.bak"
         mv "$target_on_system" "${target_on_system}.bak"
     fi
 
