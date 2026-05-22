@@ -111,7 +111,7 @@ cmd_event() {
             ;;
 
         "start")
-            rx_log "info" "Starting the event daemon..."
+            rx_log "info" "Starting daemon engine..."
 
             local pid_file="/tmp/retro_event_daemon.pid"
             if [[ -f $pid_file ]]; then
@@ -129,7 +129,7 @@ cmd_event() {
             sleep 0.3
             if kill -0 "$daemon_pid" 2>/dev/null; then
                 echo "$daemon_pid" >"$pid_file"
-                rx_log "success" "Event daemon started in the background."
+                rx_log "success" "Daemon engine started in the background."
             else
                 rx_log "error" "Daemon failed to start."
                 return 1
@@ -180,9 +180,9 @@ cmd_event() {
             rx_help_cmd "trigger <event>" "Fire a system event"
             rx_help_cmd "watchers" "List all event watchers"
             rx_help_cmd "events" "List all available events"
-            rx_help_cmd "start" "Start the event daemon"
-            rx_help_cmd "stop" "Stop the event daemon"
-            rx_help_cmd "restart" "Restart the event daemon"
+            rx_help_cmd "start" "Start daemon engine"
+            rx_help_cmd "stop" "Stop daemon engine"
+            rx_help_cmd "restart" "Restart daemon engine"
             rx_help_cmd "status" "Show daemon status"
             rx_help_cmd "enable <name|all>" "Enable a module or all"
             rx_help_cmd "disable <name>" "Disable a module"
@@ -196,4 +196,4 @@ cmd_event() {
     esac
 }
 
-register_command "TOOLS" "daemon" "Manage system events and hooks" "cmd_event"
+register_command "TOOLS" "daemon" "Manage the daemon engine and event hooks" "cmd_event"
