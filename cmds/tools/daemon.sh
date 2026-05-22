@@ -141,7 +141,7 @@ cmd_event() {
             ;;
 
         "restart")
-            lua "$daemon_script" stop >/dev/null 2>&1
+            cmd_event "stop"
             sleep 0.5
             cmd_event "start"
             ;;
