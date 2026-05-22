@@ -3,7 +3,7 @@ name: Bug report
 about: Report a script failure, installer halt, or crash
 title: '[BUG] '
 labels: bug
-assignees: itsvlxd
+assignees: '' 
 ---
 
 **Describe the bug**
@@ -23,10 +23,10 @@ What you expected to happen instead.
 What actually happened.
 
 **Environment**
-- Execution state: <!-- Live ISO, Stage 2 chroot, installed OS, or other -->
-- Hardware model: <!-- e.g. ThinkPad X1 Carbon Gen 9, custom desktop, VM -->
-- CPU / GPU / Architecture: <!-- e.g. AMD Ryzen 7 / NVIDIA RTX 3060 / x86_64 -->
-- Kernel flavor: <!-- linux, linux-lts, linux-zen, or N/A -->
+- Execution state: (e.g. Live ISO, Stage 2 chroot, installed OS)
+- Hardware model: (e.g. ThinkPad X1 Carbon Gen 9, custom PC, VM)
+- CPU / GPU / Architecture: (e.g. AMD Ryzen 7 / NVIDIA RTX 3060)
+- Kernel flavor: (linux, linux-lts, linux-zen, or N/A)
 
 **Terminal output**
 Paste any relevant console output, error messages, or log excerpts below:

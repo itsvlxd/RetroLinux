@@ -16,9 +16,9 @@ How should the feature work from an end-user or developer perspective? Consider 
 Any workarounds, existing tools, or alternative approaches you have explored.
 
 **Implementation considerations**
-- Component type: <!-- lib/, scripts/, cmds/, daemon/, or other -->
-- New dependencies: <!-- packages, config files, permissions, services -->
-- Compatibility impact: <!-- breaking changes, migration steps, deprecations -->
+- Component type: (lib/, scripts/, cmds/, daemon/, or other)
+- New dependencies: (packages, config files, permissions, services)
+- Compatibility impact: (breaking changes, migration steps, deprecations)
 
 **Additional context**
 Pseudo-code, references to similar features in other projects, wireframes, or any other material that helps communicate the request.
