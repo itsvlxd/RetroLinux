@@ -445,13 +445,19 @@ cmd_xdg() {
             ;;
 
         "setup")
+            local non_interactive=false
             local options=""
             while [[ $# -gt 0 ]]; do
                 case "$1" in
-                    -o|--options) options="$2"; shift 2 ;;
+                    -o|--options) non_interactive=true; options="$2"; [[ -n $2 ]] && shift 2 || shift ;;
                     *) shift ;;
                 esac
             done
+
+            if [[ $non_interactive == true && -z $options ]]; then
+                rx_log "error" "Empty options. Valid keys: editor, browser, filemanager (or fm), image, video"
+                return 1
+            fi
 
             local editor_input=""
             local browser_input=""
@@ -470,6 +476,7 @@ cmd_xdg() {
                         filemanager|fm) fm_input="$val" ;;
                         image) image_input="$val" ;;
                         video) video_input="$val" ;;
+                        *) rx_log "warn" "Unknown key: ${PINK}$key${RESET} (valid: editor, browser, filemanager, image, video)" ;;
                     esac
                 done
             else
