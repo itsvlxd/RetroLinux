@@ -103,11 +103,11 @@ elseif action == "status" then
 		os.exit(1)
 	end
 elseif action == "stop" then
-	Log.info("Stopping the event daemon...")
+	Log.info("Stopping daemon engine...")
 	if engine:stop() then
-		Log.success("Event daemon stopped")
+		Log.success("Daemon engine stopped")
 	else
-		Log.warn("Event daemon was not running")
+		Log.warn("Daemon engine was not running")
 	end
 else
 	Log.error("Unknown command: " .. action .. ". Use: retro daemon --help")
