@@ -85,10 +85,12 @@ get_source_persistent_name() {
 get_sink_id_by_persistent() {
     local name="$1"
     [[ -z $name ]] && return
+    rx_log_file "info" "get_sink_id_by_persistent: looking up '$name'"
     local found_id=""
     wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
         local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
         if [[ "$pw_name" == "$name" ]]; then
+            rx_log_file "info" "get_sink_id_by_persistent: found '$name' -> ID $id"
             echo "$id"
             break
         fi
@@ -98,9 +100,11 @@ get_sink_id_by_persistent() {
 get_source_id_by_persistent() {
     local name="$1"
     [[ -z $name ]] && return
+    rx_log_file "info" "get_source_id_by_persistent: looking up '$name'"
     wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
         local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
         if [[ "$pw_name" == "$name" ]]; then
+            rx_log_file "info" "get_source_id_by_persistent: found '$name' -> ID $id"
             echo "$id"
             break
         fi
@@ -125,6 +129,8 @@ set_volume() {
     local volume="$1"
     local sink=$(get_default_sink)
     [[ -z $sink ]] && return 1
+    local sink_name=$(get_sink_name "$sink")
+    rx_log_file "info" "set_volume: $sink_name (ID $sink) -> ${volume}%"
     wpctl set-volume "$sink" "${volume}%" 2>/dev/null
 }
 
@@ -133,6 +139,9 @@ volume_up() {
     local current=$(get_sink_volume)
     local new=$((current + step))
     [[ $new -gt 100 ]] && new=100
+    local sink=$(get_default_sink)
+    local sink_name=$(get_sink_name "$sink")
+    rx_log_file "info" "volume_up: $sink_name (ID $sink) ${current}% -> ${new}% (+${step})"
     set_volume "$new"
     echo "$new"
 }
@@ -142,6 +151,9 @@ volume_down() {
     local current=$(get_sink_volume)
     local new=$((current - step))
     [[ $new -lt 0 ]] && new=0
+    local sink=$(get_default_sink)
+    local sink_name=$(get_sink_name "$sink")
+    rx_log_file "info" "volume_down: $sink_name (ID $sink) ${current}% -> ${new}% (-${step})"
     set_volume "$new"
     echo "$new"
 }
@@ -149,14 +161,22 @@ volume_down() {
 toggle_mute() {
     local sink=$(get_default_sink)
     [[ -z $sink ]] && return 1
+    local sink_name=$(get_sink_name "$sink")
+    local old_mute=$(get_sink_mute)
     wpctl set-mute "$sink" toggle 2>/dev/null
+    local new_mute=$(get_sink_mute)
+    rx_log_file "info" "toggle_mute: $sink_name (ID $sink) $old_mute -> $new_mute"
     get_sink_mute
 }
 
 toggle_mic_mute() {
     local source=$(get_default_source)
     [[ -z $source ]] && return 1
+    local source_name=$(get_source_name "$source")
+    local old_mute=$(get_source_mute)
     pactl set-source-mute "$source" toggle 2>/dev/null
+    local new_mute=$(get_source_mute)
+    rx_log_file "info" "toggle_mic_mute: $source_name (ID $source) $old_mute -> $new_mute"
     get_source_mute
 }
 
@@ -204,11 +224,15 @@ set_audio_priority() {
             fi
         fi
         if [[ -z $primary_name ]]; then
+            rx_log_file "warn" "set_audio_priority: primary not found for sink ($primary_input)"
             echo "ERR_PRIMARY_NOT_FOUND"
             return 1
         fi
+        local old_primary=$(get_var "AUDIO_PRIMARY_SINK" "")
+        local old_fallback=$(get_var "AUDIO_FALLBACK_SINK" "")
         set_var "AUDIO_PRIMARY_SINK" "$primary_name"
         set_var "AUDIO_FALLBACK_SINK" "${fallback_name:-}"
+        rx_log_file "info" "set_audio_priority: sink primary=$primary_name fallback=${fallback_name:-none} (was primary=$old_primary fallback=$old_fallback)"
         echo "OK|primary=$primary_name|fallback=${fallback_name:-none}"
     elif [[ $type == "source" ]]; then
         if [[ "$primary_input" =~ ^[0-9]+$ ]]; then
@@ -228,13 +252,18 @@ set_audio_priority() {
             fi
         fi
         if [[ -z $primary_name ]]; then
+            rx_log_file "warn" "set_audio_priority: primary not found for source ($primary_input)"
             echo "ERR_PRIMARY_NOT_FOUND"
             return 1
         fi
+        local old_primary=$(get_var "AUDIO_PRIMARY_SOURCE" "")
+        local old_fallback=$(get_var "AUDIO_FALLBACK_SOURCE" "")
         set_var "AUDIO_PRIMARY_SOURCE" "$primary_name"
         set_var "AUDIO_FALLBACK_SOURCE" "${fallback_name:-}"
+        rx_log_file "info" "set_audio_priority: source primary=$primary_name fallback=${fallback_name:-none} (was primary=$old_primary fallback=$old_fallback)"
         echo "OK|primary=$primary_name|fallback=${fallback_name:-none}"
     else
+        rx_log_file "warn" "set_audio_priority: invalid type ($type)"
         echo "ERR_INVALID_TYPE"
         return 1
     fi
@@ -247,10 +276,12 @@ get_audio_priority() {
     if [[ $type == "sink" ]]; then
         local primary=$(get_var "AUDIO_PRIMARY_SINK" "")
         local fallback=$(get_var "AUDIO_FALLBACK_SINK" "")
+        rx_log_file "info" "get_audio_priority: sink primary=$primary fallback=${fallback:-none}"
         echo "primary=$primary|fallback=${fallback:-none}"
     elif [[ $type == "source" ]]; then
         local primary=$(get_var "AUDIO_PRIMARY_SOURCE" "")
         local fallback=$(get_var "AUDIO_FALLBACK_SOURCE" "")
+        rx_log_file "info" "get_audio_priority: source primary=$primary fallback=${fallback:-none}"
         echo "primary=$primary|fallback=${fallback:-none}"
     else
         echo "ERR_INVALID_TYPE"
@@ -263,12 +294,19 @@ clear_audio_priority() {
     [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
 
     if [[ $type == "sink" ]]; then
+        local old_primary=$(get_var "AUDIO_PRIMARY_SINK" "")
+        local old_fallback=$(get_var "AUDIO_FALLBACK_SINK" "")
         set_var "AUDIO_PRIMARY_SINK" ""
         set_var "AUDIO_FALLBACK_SINK" ""
+        rx_log_file "info" "clear_audio_priority: sink (was primary=$old_primary fallback=$old_fallback)"
     elif [[ $type == "source" ]]; then
+        local old_primary=$(get_var "AUDIO_PRIMARY_SOURCE" "")
+        local old_fallback=$(get_var "AUDIO_FALLBACK_SOURCE" "")
         set_var "AUDIO_PRIMARY_SOURCE" ""
         set_var "AUDIO_FALLBACK_SOURCE" ""
+        rx_log_file "info" "clear_audio_priority: source (was primary=$old_primary fallback=$old_fallback)"
     else
+        rx_log_file "warn" "clear_audio_priority: invalid type ($type)"
         echo "ERR_INVALID_TYPE"
         return 1
     fi
@@ -287,6 +325,11 @@ device_exists_by_persistent() {
         current_id=$(get_source_id_by_persistent "$name")
     fi
 
+    if [[ -n $current_id ]]; then
+        rx_log_file "info" "device_exists_by_persistent: $type '$name' exists (ID $current_id)"
+    else
+        rx_log_file "info" "device_exists_by_persistent: $type '$name' not found"
+    fi
     [[ -n $current_id ]]
 }
 
@@ -339,7 +382,7 @@ apply_audio_fallback() {
     fi
 
     if [[ -n $current_name && $current_name != "EasyEffects" ]]; then
-        rx_log_file "debug" "apply_fallback: current still valid $type=$type id=$current_id name=$current_name"
+        rx_log_file "info" "apply_fallback: current still valid $type=$type id=$current_id name=$current_name"
         echo "OK|current_still_valid|$current_name"
         return 0
     fi
@@ -352,7 +395,7 @@ apply_audio_fallback() {
     fi
 
     if [[ -z $fallback_name ]]; then
-        rx_log_file "debug" "apply_fallback: no fallback configured for $type"
+        rx_log_file "info" "apply_fallback: no fallback configured for $type"
         echo "ERR_NO_FALLBACK_CONFIGURED"
         return 1
     fi
@@ -361,7 +404,7 @@ apply_audio_fallback() {
     fallback_id=$(get_current_id_by_persistent "$type" "$fallback_name")
 
     if [[ -z $fallback_id ]]; then
-        rx_log_file "debug" "apply_fallback: fallback not available $type=$type name=$fallback_name"
+        rx_log_file "info" "apply_fallback: fallback not available $type=$type name=$fallback_name"
         echo "ERR_FALLBACK_NOT_AVAILABLE"
         return 1
     fi
@@ -401,7 +444,7 @@ apply_audio_primary() {
     fi
 
     if [[ -z $primary_name ]]; then
-        rx_log_file "debug" "apply_primary: no primary configured for $type"
+        rx_log_file "info" "apply_primary: no primary configured for $type"
         echo "OK|no_primary_configured"
         return 0
     fi
@@ -410,7 +453,7 @@ apply_audio_primary() {
     primary_id=$(get_current_id_by_persistent "$type" "$primary_name")
 
     if [[ -z $primary_id ]]; then
-        rx_log_file "debug" "apply_primary: primary not available for $type ($primary_name)"
+        rx_log_file "info" "apply_primary: primary not available for $type ($primary_name)"
         echo "OK|primary_not_available"
         return 0
     fi
@@ -432,7 +475,7 @@ apply_audio_primary() {
     fi
 
     if [[ "$current_id" == "$primary_id" ]]; then
-        rx_log_file "debug" "apply_primary: already primary $type=$type id=$primary_id name=$current_name"
+        rx_log_file "info" "apply_primary: already primary $type=$type id=$primary_id name=$current_name"
         echo "OK|already_primary|$current_name"
         return 0
     fi
