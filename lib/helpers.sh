@@ -22,6 +22,33 @@ rx_format_time() {
     fi
 }
 
+rx_format_uptime() {
+    local total_seconds=$1
+
+    [[ -z $total_seconds || $total_seconds -lt 60 ]] && echo "Just now" && return
+
+    local minutes=$((total_seconds / 60))
+    local hours=$((minutes / 60))
+    local days=$((hours / 24))
+    local weeks=$((days / 7))
+    local months=$((weeks / 4))
+
+    minutes=$((minutes % 60))
+    hours=$((hours % 24))
+    days=$((days % 7))
+    weeks=$((weeks % 4))
+
+    local result=""
+    [[ $months -gt 0 ]] && result+="${months} months "
+    [[ $weeks -gt 0 ]] && result+="${weeks} weeks "
+    [[ $days -gt 0 ]] && result+="${days} days "
+    [[ $hours -gt 0 ]] && result+="${hours} hours "
+    [[ $minutes -gt 0 ]] && result+="${minutes} min"
+
+    result="${result%" "}"
+    echo "$result"
+}
+
 rx_format_size() {
     local size=$1
     [[ -z $size || $size == "0" ]] && echo "0 B" && return
