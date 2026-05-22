@@ -118,5 +118,4 @@ cmd_list_modules() {
     printf " ${GRAY}%s${RESET}\n" "Legend: 󰘽 core (locked) 󰌆 extra  󰌉 root 󰀇 user"
     rx_table_spacer
 }
-register_command "MODULES" "-ls|--list" "List all available and installed modules" "cmd_list_modules"
-
+register_command "MODULES" "-ls|--list" "Browse all repo modules with install status" "cmd_list_modules"

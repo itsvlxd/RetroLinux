@@ -105,4 +105,4 @@ show_install_help() {
     rx_help_spacer
 }
 
-register_command "MODULES" "-i|--install" "Link repo files to system (Active Ricing)" "cmd_install"
+register_command "MODULES" "-i|--install" "Install module configs as symlinks, rice via retro CLI vars" "cmd_install"

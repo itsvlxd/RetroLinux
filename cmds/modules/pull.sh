@@ -10,4 +10,4 @@ cmd_pull() {
     run_task "pull" "$target"
 }
 
-register_command "MODULES" "-p|--pull" "Capture system changes back to repo" "cmd_pull"
+register_command "MODULES" "-p|--pull" "Capture live system config changes back into repo modules for version tracking" "cmd_pull"
