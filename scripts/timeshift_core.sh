@@ -3,6 +3,23 @@
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "timeshift"
 
+_read_json_field() {
+    local file="$1"
+    local field="$2"
+    grep -o "\"${field}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$file" 2>/dev/null | sed 's/^[^:]*:[[:space:]]*"//; s/"$//'
+}
+
+_write_json_field() {
+    local file="$1"
+    local field="$2"
+    local value="$3"
+    if grep -q "\"${field}\"" "$file" 2>/dev/null; then
+        sudo sed -i "s|\"${field}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"${field}\": \"${value}\"|" "$file"
+    else
+        sudo sed -i "/\"schedule_daily\"/s|$|\n  \"${field}\": \"${value}\",|" "$file"
+    fi
+}
+
 _check_timeshift() {
     if ! command -v timeshift >/dev/null 2>&1; then
         echo "ERROR:not_installed"
@@ -18,21 +35,21 @@ _get_config() {
         return 1
     fi
 
-    local backup_device=$(grep -o '"backup_device_uuid"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local snapshot_dir=$(grep -o '"snapshot_dir"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local btrfs_mode=$(grep -o '"btrfs_mode"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local sched_daily=$(grep -o '"schedule_daily"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local sched_weekly=$(grep -o '"schedule_weekly"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local sched_monthly=$(grep -o '"schedule_monthly"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local sched_hourly=$(grep -o '"schedule_hourly"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local sched_boot=$(grep -o '"schedule_boot"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local count_daily=$(grep -o '"count_daily"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local count_weekly=$(grep -o '"count_weekly"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local count_monthly=$(grep -o '"count_monthly"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local count_hourly=$(grep -o '"count_hourly"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local count_boot=$(grep -o '"count_boot"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local snap_count=$(grep -o '"snapshot_count"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
-    local snap_size=$(grep -o '"snapshot_size"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | grep -o '"[^"]*"$' | tr -d '"')
+    local backup_uuid=$(_read_json_field "$config_file" "backup_device_uuid")
+    local parent_uuid=$(_read_json_field "$config_file" "parent_device_uuid")
+    local btrfs_mode=$(_read_json_field "$config_file" "btrfs_mode")
+    local sched_daily=$(_read_json_field "$config_file" "schedule_daily")
+    local sched_weekly=$(_read_json_field "$config_file" "schedule_weekly")
+    local sched_monthly=$(_read_json_field "$config_file" "schedule_monthly")
+    local sched_hourly=$(_read_json_field "$config_file" "schedule_hourly")
+    local sched_boot=$(_read_json_field "$config_file" "schedule_boot")
+    local count_daily=$(_read_json_field "$config_file" "count_daily")
+    local count_weekly=$(_read_json_field "$config_file" "count_weekly")
+    local count_monthly=$(_read_json_field "$config_file" "count_monthly")
+    local count_hourly=$(_read_json_field "$config_file" "count_hourly")
+    local count_boot=$(_read_json_field "$config_file" "count_boot")
+    local snap_count=$(_read_json_field "$config_file" "snapshot_count")
+    local snap_size=$(_read_json_field "$config_file" "snapshot_size")
 
     [[ $sched_daily == "true" ]] && sched_daily="$count_daily" || sched_daily="0"
     [[ $sched_weekly == "true" ]] && sched_weekly="$count_weekly" || sched_weekly="0"
@@ -40,7 +57,13 @@ _get_config() {
     [[ $sched_hourly == "true" ]] && sched_hourly="$count_hourly" || sched_hourly="0"
     [[ $sched_boot == "true" ]] && sched_boot="$count_boot" || sched_boot="0"
 
-    echo "CONFIG|${backup_device:-none}|${snapshot_dir:-none}|${btrfs_mode:-false}|${sched_daily:-0}|${sched_weekly:-0}|${sched_monthly:-0}|${sched_hourly:-0}|${sched_boot:-0}|${snap_count:-0}|${snap_size:-0}"
+    local device="none"
+    if [[ -n $backup_uuid && $backup_uuid != "none" ]]; then
+        device=$(blkid -U "$backup_uuid" 2>/dev/null | cut -d: -f1)
+        [[ -z $device ]] && device="$backup_uuid"
+    fi
+
+    echo "CONFIG|${device:-none}|${backup_uuid:-none}|${parent_uuid:-none}|${btrfs_mode:-false}|${sched_daily:-0}|${sched_weekly:-0}|${sched_monthly:-0}|${sched_hourly:-0}|${sched_boot:-0}|${snap_count:-0}|${snap_size:-0}"
 }
 
 _list_snapshots() {
@@ -197,8 +220,8 @@ _set_schedule() {
     esac
 
     local count_field="count_${timeframe}"
-    sudo sed -i "s/\"${field}\":[[:space:]]*\"[^\"]*\"/\"${field}\": \"$([ $count -gt 0 ] && echo "true" || echo "false")\"/" "$config_file"
-    sudo sed -i "s/\"${count_field}\":[[:space:]]*\"[^\"]*\"/\"${count_field}\": \"$count\"/" "$config_file"
+    _write_json_field "$config_file" "$field" "$([ $count -gt 0 ] && echo "true" || echo "false")"
+    _write_json_field "$config_file" "$count_field" "$count"
 
     echo "SET|${timeframe}|${count}"
 }
@@ -212,19 +235,24 @@ _set_retention() {
         return 1
     fi
 
-    local daily=$(echo "$retention" | grep -oP 'daily=\K[0-9]+')
-    local weekly=$(echo "$retention" | grep -oP 'weekly=\K[0-9]+')
-    local monthly=$(echo "$retention" | grep -oP 'monthly=\K[0-9]+')
+    IFS=',' read -ra pairs <<<"$retention"
+    for pair in "${pairs[@]}"; do
+        local key="${pair%%=*}"
+        local val="${pair#*=}"
+        case "$key" in
+            daily)
+                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_daily" "true"; _write_json_field "$config_file" "count_daily" "$val"; } || _write_json_field "$config_file" "schedule_daily" "false"
+                ;;
+            weekly)
+                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_weekly" "true"; _write_json_field "$config_file" "count_weekly" "$val"; } || _write_json_field "$config_file" "schedule_weekly" "false"
+                ;;
+            monthly)
+                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_monthly" "true"; _write_json_field "$config_file" "count_monthly" "$val"; } || _write_json_field "$config_file" "schedule_monthly" "false"
+                ;;
+        esac
+    done
 
-    [[ -z $daily ]] && daily=0
-    [[ -z $weekly ]] && weekly=0
-    [[ -z $monthly ]] && monthly=0
-
-    sudo sed -i "s/\"schedule_daily\":[[:space:]]*[0-9]*/\"schedule_daily\": $daily/" "$config_file"
-    sudo sed -i "s/\"schedule_weekly\":[[:space:]]*[0-9]*/\"schedule_weekly\": $weekly/" "$config_file"
-    sudo sed -i "s/\"schedule_monthly\":[[:space:]]*[0-9]*/\"schedule_monthly\": $monthly/" "$config_file"
-
-    echo "SET|daily=${daily},weekly=${weekly},monthly=${monthly}"
+    echo "SET|${retention}"
 }
 
 _set_location() {
@@ -242,9 +270,7 @@ _set_location() {
         return 1
     fi
 
-    sudo sed -i "s/\"snapshot_device\":[[:space:]]*\"[^\"]*\"/\"snapshot_device\": \"$device\"/" "$config_file"
-    sudo sed -i "s/\"snapshot_device_uuid\":[[:space:]]*\"[^\"]*\"/\"snapshot_device_uuid\": \"$uuid\"/" "$config_file"
-
+    _write_json_field "$config_file" "backup_device_uuid" "$uuid"
     echo "SET|${device}|${uuid}"
 }
 
@@ -255,7 +281,7 @@ _get_disk_usage() {
         return 1
     fi
 
-    IFS='|' read -r key device uuid dir daily weekly monthly hourly boot hidden level <<<"$config"
+    IFS='|' read -r key device uuid parent btrfs daily weekly monthly hourly boot hidden level <<<"$config"
 
     if [[ $device != "none" ]]; then
         local total=$(df -h "$device" 2>/dev/null | tail -1 | awk '{print $2}')
@@ -265,6 +291,108 @@ _get_disk_usage() {
         echo "DISK|${device}|${total}|${used}|${avail}|${pct}"
     else
         echo "DISK|none|none|none|none|none"
+    fi
+}
+
+_list_devices() {
+    local found=false
+    while IFS= read -r line; do
+        local dev=$(echo "$line" | awk '{print $1}')
+        local size=$(echo "$line" | awk '{print $2}')
+        local fstype=$(echo "$line" | awk '{print $3}')
+        local mount=$(echo "$line" | awk '{print $4}')
+        [[ -z $dev || $dev == "NAME" ]] && continue
+        echo "DEVICE|${dev}|${size}|${fstype}|${mount}"
+        found=true
+    done < <(lsblk -dpo NAME,SIZE,FSTYPE,MOUNTPOINT 2>/dev/null | grep -v "loop")
+    [[ $found == false ]] && echo "ERROR:no_devices"
+}
+
+_apply_setup() {
+    local config_file="/etc/timeshift/timeshift.json"
+    local initial_setup=false
+
+    if [[ ! -f $config_file ]]; then
+        initial_setup=true
+        echo '{
+  "backup_device_uuid" : "",
+  "parent_device_uuid" : "",
+  "do_first_run" : "false",
+  "btrfs_mode" : "true",
+  "include_btrfs_home_for_backup" : "false",
+  "include_btrfs_home_for_restore" : "false",
+  "stop_cron_emails" : "false",
+  "schedule_monthly" : "false",
+  "schedule_weekly" : "false",
+  "schedule_daily" : "false",
+  "schedule_hourly" : "false",
+  "schedule_boot" : "false",
+  "count_monthly" : "2",
+  "count_weekly" : "3",
+  "count_daily" : "5",
+  "count_hourly" : "6",
+  "count_boot" : "2",
+  "snapshot_size" : "0",
+  "snapshot_count" : "0",
+  "date_format" : "%Y-%m-%d %H:%M:%S",
+  "exclude" : [],
+  "exclude-apps" : []
+}' | sudo tee "$config_file" >/dev/null
+    fi
+
+    local opts="$1"
+    IFS=',' read -ra pairs <<<"$opts"
+    for pair in "${pairs[@]}"; do
+        local key="${pair%%=*}"
+        local val="${pair#*=}"
+        case "$key" in
+            device)
+                local uuid=$(blkid -s UUID -o value "$val" 2>/dev/null)
+                [[ -n $uuid ]] && _write_json_field "$config_file" "backup_device_uuid" "$uuid"
+                ;;
+            btrfs) _write_json_field "$config_file" "btrfs_mode" "$val" ;;
+            daily)
+                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_daily" "true"; _write_json_field "$config_file" "count_daily" "$val"; } || _write_json_field "$config_file" "schedule_daily" "false"
+                ;;
+            weekly)
+                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_weekly" "true"; _write_json_field "$config_file" "count_weekly" "$val"; } || _write_json_field "$config_file" "schedule_weekly" "false"
+                ;;
+            monthly)
+                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_monthly" "true"; _write_json_field "$config_file" "count_monthly" "$val"; } || _write_json_field "$config_file" "schedule_monthly" "false"
+                ;;
+            boot)
+                [[ $val == "true" || $val == "on" ]] && { _write_json_field "$config_file" "schedule_boot" "true"; _write_json_field "$config_file" "count_boot" "${boot_count:-2}"; } || _write_json_field "$config_file" "schedule_boot" "false"
+                ;;
+            boot_count) _write_json_field "$config_file" "count_boot" "$val" ;;
+            exclude_home)
+                _write_json_field "$config_file" "include_btrfs_home_for_backup" "$([ "$val" == "true" ] && echo "false" || echo "true")"
+                _write_json_field "$config_file" "include_btrfs_home_for_restore" "$([ "$val" == "true" ] && echo "false" || echo "true")"
+                ;;
+        esac
+    done
+
+    echo "OK|setup_applied"
+}
+
+_set_boot() {
+    local value="$1"
+    local config_file="/etc/timeshift/timeshift.json"
+
+    if [[ ! -f $config_file ]]; then
+        echo "ERROR:not_configured"
+        return 1
+    fi
+
+    if [[ $value == "true" || $value == "on" || $value == "enable" ]]; then
+        _write_json_field "$config_file" "schedule_boot" "true"
+        local current_count=$(_read_json_field "$config_file" "count_boot")
+        [[ -z $current_count || $current_count == "0" ]] && _write_json_field "$config_file" "count_boot" "2"
+        echo "SET|boot|true"
+    elif [[ $value == "false" || $value == "off" || $value == "disable" ]]; then
+        _write_json_field "$config_file" "schedule_boot" "false"
+        echo "SET|boot|false"
+    else
+        [[ $value =~ ^[0-9]+$ ]] && _write_json_field "$config_file" "count_boot" "$value" && echo "SET|boot_count|${value}" || echo "ERROR:invalid_value"
     fi
 }
 
@@ -283,46 +411,12 @@ _get_stats() {
     echo "STATS|${count}|${total_size}|${oldest}|${newest}"
 }
 
-_setup_wizard() {
-    local check=$(_check_timeshift)
-    if [[ $check == "ERROR"* ]]; then
-        echo "ERROR:not_installed"
-        return 1
-    fi
-
-    local config=$(_get_config)
-    if [[ $config != "ERROR"* ]]; then
-        echo "ALREADY_CONFIGURED"
-        return 0
-    fi
-
-    echo "WIZARD|start"
-
-    local devices=$(lsblk -dnpo NAME,SIZE,TYPE | grep -E "disk|part" | grep -v "loop")
-    echo "DEVICES|${devices}"
-
-    echo "WIZARD|complete"
-}
-
 _open_gui() {
     local check=$(_check_timeshift)
     [[ $check == "ERROR"* ]] && echo "$check" && return 1
 
     if command -v timeshift-gtk >/dev/null 2>&1; then
-        local user="${SUDO_USER:-$USER}"
-
         timeshift-gtk &>/dev/null &
-
-        sleep 2
-
-        if command -v hyprctl >/dev/null 2>&1; then
-            local win_addr=$(hyprctl clients -j 2>/dev/null | grep -oP '"address":"0x[^"]*"[^}]*"class":"timeshift-gtk"' | grep -oP '"address":"\K0x[^"]*')
-            if [[ -n $win_addr ]]; then
-                hyprctl dispatch togglefloating address:"$win_addr" 2>/dev/null
-                hyprctl dispatch focuswindow address:"$win_addr" 2>/dev/null
-            fi
-        fi
-
         echo "OPENED|timeshift-gtk"
     elif command -v timeshift >/dev/null 2>&1; then
         echo "ERROR:no_gui"
@@ -341,11 +435,13 @@ case "$1" in
     "--restore") _restore_snapshot "$2" ;;
     "--delete") _delete_snapshot "$2" ;;
     "--delete-oldest") _delete_oldest ;;
-    "--schedule") _set_schedule "$2" ;;
+    "--schedule") _set_schedule "$2" "$3" ;;
     "--retention") _set_retention "$2" ;;
     "--location") _set_location "$2" ;;
+    "--list-devices") _list_devices ;;
+    "--apply-setup") _apply_setup "$2" ;;
+    "--set-boot") _set_boot "$2" ;;
     "--disk-usage") _get_disk_usage ;;
     "--stats") _get_stats ;;
-    "--setup-wizard") _setup_wizard ;;
     "--gui") _open_gui ;;
 esac
