@@ -4,13 +4,13 @@ source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/menu.sh"
+source "$RETRO_DIR/lib/setup.sh"
 source "$RETRO_DIR/scripts/grub_core.sh"
 
 cmd_grub() {
     local driver_script="$RETRO_DIR/scripts/driver_core.sh"
     local action="${1,,}"
     shift
-    local setup_args=("$@")
     local pending_file="/tmp/retro_grub_pending"
 
     _grub_add_pending() {
@@ -525,178 +525,153 @@ cmd_grub() {
             ;;
 
         "setup")
-            local interactive=true
-            local opts=""
+            rx_setup_parse "$@"
+            rx_setup_validate "theme,resolution,timeout,os-prober,snapshots,kernel" || return 1
 
-            for arg in "${setup_args[@]}"; do
-                case "$arg" in
-                    -o | --options)
-                        interactive=false
-                        ;;
-                    *)
-                        if [[ $interactive == false ]]; then
-                            opts="$arg"
-                        fi
-                        ;;
-                esac
-            done
+            local grub_theme=$(get_var "GRUB_THEME_CHOICE")
+            local grub_resolution=$(get_var "BOOT_VIDEO_GRUB")
+            local grub_timeout=$(get_var "GRUB_TIMEOUT")
+            local grub_os_prober=$(get_var "GRUB_OS_PROBER")
+            local grub_snapshots=$(get_var "GRUB_SNAPSHOTS_ENABLED")
+            local grub_kernel=$(get_var "GRUB_KERNEL")
+            local config_exists=false
+            [[ -n $grub_theme || -n $grub_resolution || -n $grub_timeout ]] && config_exists=true
 
-            if [[ $interactive == false && -z $opts ]]; then
-                rx_log "error" "Empty options. Valid keys: theme, resolution, timeout, os-prober, snapshots, kernel"
-                return 1
-            fi
+            rx_setup_check_needed "$config_exists" && return 0
 
-            if [[ $interactive == false && -n $opts ]]; then
-                IFS=',' read -ra pairs <<<"$opts"
-                for pair in "${pairs[@]}"; do
-                    local key="${pair%%=*}"
-                    local val="${pair#*=}"
+            if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+                local theme=$(rx_setup_get_opt "theme" "retropunk")
+                local resolution=$(rx_setup_get_opt "resolution" "1920x1080")
+                local timeout=$(rx_setup_get_opt "timeout" "10")
+                local os_prober=$(rx_setup_get_opt "os-prober")
+                [[ -z $os_prober ]] && os_prober=$(rx_setup_get_opt "os_prober")
+                local snapshots=$(rx_setup_get_opt "snapshots" "true")
+                local kernel=$(rx_setup_get_opt "kernel" "")
 
-                    case "$key" in
-                        theme) set_var "GRUB_THEME_CHOICE" "$val" ;;
-                        resolution) set_var "BOOT_VIDEO_GRUB" "$val" ;;
-                        timeout) set_var "GRUB_TIMEOUT" "$val" ;;
-                        os-prober | os_prober)
-                            [[ $val == "true" || $val == "on" ]] && val="true" || val="false"
-                            set_var "GRUB_OS_PROBER" "$val"
-                            ;;
-                        snapshots)
-                            [[ $val == "true" || $val == "on" ]] && val="true" || val="false"
-                            set_var "GRUB_SNAPSHOTS_ENABLED" "$val"
-                            ;;
-                        kernel) set_var "GRUB_KERNEL" "$val" ;;
-                        *) rx_log "warn" "Unknown key: ${PINK}$key${RESET} (valid: theme, resolution, timeout, os-prober, snapshots, kernel)" ;;
-                    esac
-                done
+                set_var "GRUB_THEME_CHOICE" "$theme"
+                set_var "BOOT_VIDEO_GRUB" "$resolution"
+                set_var "GRUB_TIMEOUT" "$timeout"
+                [[ $os_prober == "true" || $os_prober == "on" ]] && os_prober="true" || os_prober="false"
+                set_var "GRUB_OS_PROBER" "$os_prober"
+                [[ $snapshots == "true" || $snapshots == "on" ]] && snapshots="true" || snapshots="false"
+                set_var "GRUB_SNAPSHOTS_ENABLED" "$snapshots"
+                [[ -n $kernel ]] && set_var "GRUB_KERNEL" "$kernel"
 
-                rx_log "info" "GRUB configured (non-interactive mode)"
                 rx_log "info" "Creating Timeshift backup..."
                 create_timeshift_backup
-            update_grub_config
-
-            local snap_enabled=$(get_var "GRUB_SNAPSHOTS_ENABLED" "true")
-            if [[ $snap_enabled == "false" ]]; then
-                regenerate_grub true
+                update_grub_config
+                if [[ $snapshots == "false" ]]; then
+                    regenerate_grub true
+                else
+                    regenerate_grub
+                fi
+                [[ -f $pending_file ]] && rm -f "$pending_file"
             else
+                local current_theme=$(get_var "GRUB_THEME_CHOICE" "retropunk")
+
+                if [[ $config_exists == true ]]; then
+                    rx_setup_current "󰂕" "Current GRUB Configuration" \
+                        "Theme" "${grub_theme^}" \
+                        "Resolution" "$grub_resolution" \
+                        "Timeout" "${grub_timeout}s" \
+                        "OS Prober" "$([ "$grub_os_prober" == "true" ] && echo "Enabled" || echo "Disabled")" \
+                        "Snapshots" "$([ "$grub_snapshots" == "true" ] && echo "Enabled" || echo "Disabled")" \
+                        "Kernel" "$grub_kernel" || true
+
+                    if ! rx_confirm "Reconfigure?" "N"; then
+                        rx_log "info" "Setup cancelled."
+                        return 0
+                    fi
+                fi
+
+                local theme_choice=$(rx_menu "󰀻" "Select GRUB theme:" "retropunk" "retrolinux")
+                set_var "GRUB_THEME_CHOICE" "$theme_choice"
+
+                local res_x=1920 res_y=1080
+                if command -v xrandr &>/dev/null; then
+                    local detected_res=$(xrandr 2>/dev/null | grep '*' | head -1 | awk '{print $1}')
+                    if [[ -n $detected_res && $detected_res =~ ^[0-9]+x[0-9]+$ ]]; then
+                        res_x=${detected_res%%x*}
+                        res_y=${detected_res##*x}
+                    fi
+                fi
+
+                _gcd() { local a=$1 b=$2; while [[ $b -ne 0 ]]; do local t=$b; b=$((a % b)); a=$t; done; echo $a; }
+
+                local gcd=$(_gcd $res_x $res_y)
+                local ar_x=$((res_x / gcd)) ar_y=$((res_y / gcd))
+                local aspect="${ar_x}:${ar_y}"
+
+                local res_options=()
+                for scale in 100 80 75 70 60 50 40; do
+                    local sx=$((res_x * scale / 100)) sy=$((res_y * scale / 100))
+                    [[ $sx -lt 320 || $sy -lt 240 ]] && continue
+                    local g=$(_gcd $sx $sy)
+                    [[ $((sx / g)) -eq $ar_x && $((sy / g)) -eq $ar_y ]] && res_options+=("${sx}x${sy}")
+                done
+
+                for alt in "1920x1080" "1280x720" "1024x768" "800x600"; do
+                    local ax=${alt%%x*} ay=${alt##*x}
+                    local g=$(_gcd $ax $ay)
+                    local exists=false
+                    for existing in "${res_options[@]}"; do [[ "$existing" == "$alt" ]] && exists=true && break; done
+                    [[ $exists == false && $((ax / g)) -le 16 && $((ay / g)) -le 10 ]] && res_options+=("$alt")
+                done
+
+                local native="${res_x}x${res_y}"
+                local final_options=("$native (Native)")
+                for opt in "${res_options[@]}"; do
+                    [[ "$opt" == "$native" ]] && continue
+                    local g=$(_gcd ${opt%%x*} ${opt##*x})
+                    final_options+=("$opt ($((${opt%%x*} / g)):$((${opt##*x} / g)))")
+                done
+
+                local selected_res=$(rx_menu "󰍹" "Select GRUB resolution (${aspect}):" "${final_options[@]}")
+                local gfxmode=$(echo "$selected_res" | cut -d' ' -f1)
+                set_var "BOOT_VIDEO_GRUB" "$gfxmode"
+
+                if rx_confirm "Enable OS prober for dual-boot detection?"; then
+                    set_var "GRUB_OS_PROBER" "true"
+                else
+                    set_var "GRUB_OS_PROBER" "false"
+                fi
+
+                if rx_confirm "Enable BTRFS snapshot boot for easy rollback?" "Y"; then
+                    set_var "GRUB_SNAPSHOTS_ENABLED" "true"
+                    sudo systemctl enable --now grub-btrfsd 2>/dev/null
+                else
+                    set_var "GRUB_SNAPSHOTS_ENABLED" "false"
+                    sudo systemctl disable --now grub-btrfsd 2>/dev/null
+                fi
+
+                local timeout=$(rx_input_numeric "Boot timeout seconds" "10")
+                set_var "GRUB_TIMEOUT" "$timeout"
+
+                local kernel_options=("linux" "linux-zen" "linux-lts" "linux-hardened")
+                local kernel_input=$(rx_menu "󰏗" "Select default kernel:" "${kernel_options[@]}")
+                set_var "GRUB_KERNEL" "$kernel_input"
+                _grub_add_pending "kernel" "$kernel_input"
+                _grub_show_pending
+
+                local os_prober_val=$(get_var "GRUB_OS_PROBER" "false")
+                local snapshots_val=$(get_var "GRUB_SNAPSHOTS_ENABLED" "true")
+
+                rx_setup_summary "󰂕" "GRUB Setup Summary" \
+                    "Theme" "${theme_choice^}" \
+                    "Resolution" "$gfxmode" \
+                    "OS Prober" "$([ "$os_prober_val" == "true" ] && echo "Enabled" || echo "Disabled")" \
+                    "Snapshots" "$([ "$snapshots_val" == "true" ] && echo "Enabled" || echo "Disabled")" \
+                    "Timeout" "${timeout}s" \
+                    "Kernel" "$kernel_input"
+
+                rx_setup_confirm || return 0
+
+                rx_log "info" "Creating Timeshift backup..."
+                create_timeshift_backup
+                rx_log "info" "Applying GRUB configuration..."
+                update_grub_config
                 regenerate_grub
             fi
-                if [[ -f $pending_file ]]; then
-                    rm -f "$pending_file"
-                fi
-                return $?
-            fi
-
-            local current_theme=$(get_var "GRUB_THEME_CHOICE" "retropunk")
-            local theme_choice=$(rx_menu "󰀻" "Select GRUB theme:" "retropunk" "retrolinux")
-            set_var "GRUB_THEME_CHOICE" "$theme_choice"
-
-            local res_x=1920
-            local res_y=1080
-            if command -v xrandr &>/dev/null; then
-                local detected_res=$(xrandr 2>/dev/null | grep '*' | head -1 | awk '{print $1}')
-                if [[ -n $detected_res && $detected_res =~ ^[0-9]+x[0-9]+$ ]]; then
-                    res_x=${detected_res%%x*}
-                    res_y=${detected_res##*x}
-                fi
-            fi
-
-            _gcd() {
-                local a=$1 b=$2
-                while [[ $b -ne 0 ]]; do
-                    local t=$b
-                    b=$((a % b))
-                    a=$t
-                done
-                echo $a
-            }
-
-            local gcd=$(_gcd $res_x $res_y)
-            local ar_x=$((res_x / gcd))
-            local ar_y=$((res_y / gcd))
-            local aspect="${ar_x}:${ar_y}"
-
-            local res_options=()
-            local scales=(100 80 75 70 60 50 40)
-            for scale in "${scales[@]}"; do
-                local sx=$((res_x * scale / 100))
-                local sy=$((res_y * scale / 100))
-                [[ $sx -lt 320 || $sy -lt 240 ]] && continue
-                local g=$(_gcd $sx $sy)
-                local ax=$((sx / g))
-                local ay=$((sy / g))
-                if [[ $ax -eq $ar_x && $ay -eq $ar_y ]]; then
-                    res_options+=("${sx}x${sy}")
-                fi
-            done
-
-            local common_alternatives=(
-                "1920x1080" "1280x720" "1024x768" "800x600"
-            )
-            for alt in "${common_alternatives[@]}"; do
-                local ax=${alt%%x*}
-                local ay=${alt##*x}
-                local g=$(_gcd $ax $ay)
-                local cx=$((ax / g))
-                local cy=$((ay / g))
-                local exists=false
-                for existing in "${res_options[@]}"; do
-                    [[ "$existing" == "$alt" ]] && exists=true && break
-                done
-                if [[ $exists == false && $cx -le 16 && $cy -le 10 ]]; then
-                    res_options+=("$alt")
-                fi
-            done
-
-            local native="${res_x}x${res_y}"
-            local final_options=("$native (Native)")
-            for opt in "${res_options[@]}"; do
-                [[ "$opt" == "$native" ]] && continue
-                local g=$(_gcd ${opt%%x*} ${opt##*x})
-                local ax=$((${opt%%x*} / g))
-                local ay=$((${opt##*x} / g))
-                final_options+=("$opt (${ax}:${ay})")
-            done
-
-            local selected_res=$(rx_menu "󰍹" "Select GRUB resolution (${aspect}):" "${final_options[@]}")
-            local gfxmode=$(echo "$selected_res" | cut -d' ' -f1)
-            set_var "BOOT_VIDEO_GRUB" "$gfxmode"
-
-            if rx_confirm "Enable OS prober for dual-boot detection?"; then
-                set_var "GRUB_OS_PROBER" "true"
-            else
-                set_var "GRUB_OS_PROBER" "false"
-            fi
-
-            if rx_confirm "Enable BTRFS snapshot boot for easy rollback?"; then
-                set_var "GRUB_SNAPSHOTS_ENABLED" "true"
-                sudo systemctl enable --now grub-btrfsd 2>/dev/null
-            else
-                set_var "GRUB_SNAPSHOTS_ENABLED" "false"
-                sudo systemctl disable --now grub-btrfsd 2>/dev/null
-            fi
-
-            echo ""
-            echo -ne " ${PINK}󰄾${RESET} Boot timeout seconds ${MUTE}[default: 10]${RESET}: "
-            local timeout_input
-            read -r timeout_input
-            if [[ "$timeout_input" =~ ^[0-9]+$ && $timeout_input -gt 0 ]]; then
-                set_var "GRUB_TIMEOUT" "$timeout_input"
-            else
-                set_var "GRUB_TIMEOUT" "10"
-            fi
-
-            local kernel_options=("linux" "linux-zen" "linux-lts" "linux-hardened")
-            local kernel_input=$(rx_menu "󰏗" "Select default kernel:" "${kernel_options[@]}")
-            set_var "GRUB_KERNEL" "$kernel_input"
-            _grub_add_pending "kernel" "$kernel_input"
-            _grub_show_pending
-
-            rx_log "info" "Creating Timeshift backup..."
-            create_timeshift_backup
-            rx_log "info" "Applying GRUB configuration..."
-            update_grub_config
-            regenerate_grub
-            rx_log "success" "GRUB setup complete"
             ;;
 
         *)

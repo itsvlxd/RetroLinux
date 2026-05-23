@@ -3,13 +3,13 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/menu.sh"
+source "$RETRO_DIR/lib/setup.sh"
 source "$RETRO_DIR/scripts/timeshift_core.sh"
 
 cmd_timeshift() {
     local ts_script="$RETRO_DIR/scripts/timeshift_core.sh"
     local action="${1,,}"
     shift 2>/dev/null || true
-    local setup_args=("$@")
 
     case "$action" in
         "status")
@@ -217,20 +217,6 @@ cmd_timeshift() {
             ;;
 
         "setup")
-            local non_interactive=false
-            local options=""
-            while [[ $# -gt 0 ]]; do
-                case "$1" in
-                    -o|--options) non_interactive=true; options="$2"; [[ -n $2 ]] && shift 2 || shift ;;
-                    *) shift ;;
-                esac
-            done
-
-            if [[ $non_interactive == true && -z $options ]]; then
-                rx_log "error" "Empty options. Valid keys: device, btrfs, daily, weekly, monthly, boot, boot_count, exclude_home"
-                return 1
-            fi
-
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
                 rx_confirm "Timeshift is not installed. Would you like to install it?" "Y" || {
@@ -252,6 +238,15 @@ cmd_timeshift() {
                 fi
             fi
 
+            rx_setup_parse "$@"
+            rx_setup_validate "device,btrfs,daily,weekly,monthly,boot,boot_count,exclude_home" || return 1
+
+            local config=$(bash "$ts_script" --config 2>/dev/null || echo "ERROR")
+            local config_exists=false
+            [[ $config != "ERROR"* ]] && config_exists=true
+
+            rx_setup_check_needed "$config_exists" && return 0
+
             local device_choice=""
             local btrfs_mode="true"
             local daily_count="5"
@@ -261,48 +256,31 @@ cmd_timeshift() {
             local boot_count="2"
             local exclude_home="false"
 
-            if [[ -n $options ]]; then
-                IFS=',' read -ra opts_array <<<"$options"
-                for pair in "${opts_array[@]}"; do
-                    local key="${pair%%=*}"
-                    local val="${pair#*=}"
-                    case "$key" in
-                        device) device_choice="$val" ;;
-                        btrfs) btrfs_mode="$val" ;;
-                        daily) daily_count="$val" ;;
-                        weekly) weekly_count="$val" ;;
-                        monthly) monthly_count="$val" ;;
-                        boot) boot_enabled="$val" ;;
-                        boot_count) boot_count="$val" ;;
-                        exclude_home) exclude_home="$val" ;;
-                        *) rx_log "warn" "Unknown key: ${PINK}$key${RESET} (valid: device, btrfs, daily, weekly, monthly, boot, boot_count, exclude_home)" ;;
-                    esac
-                done
+            if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+                device_choice=$(rx_setup_get_opt "device")
+                btrfs_mode=$(rx_setup_get_opt "btrfs" "true")
+                daily_count=$(rx_setup_get_opt "daily" "5")
+                weekly_count=$(rx_setup_get_opt "weekly" "3")
+                monthly_count=$(rx_setup_get_opt "monthly" "2")
+                boot_enabled=$(rx_setup_get_opt "boot" "true")
+                boot_count=$(rx_setup_get_opt "boot_count" "2")
+                exclude_home=$(rx_setup_get_opt "exclude_home" "false")
             else
-                local config=$(bash "$ts_script" --config 2>/dev/null || echo "ERROR")
-                if [[ $config != "ERROR"* ]]; then
+                if [[ $config_exists == true ]]; then
                     IFS='|' read -r ckey cur_device cur_uuid cur_parent cur_btrfs cur_daily cur_weekly cur_monthly cur_hourly cur_boot cur_snap_count cur_snap_size <<<"$config"
 
-                    rx_table_header "󰕰" "Current Timeshift Configuration"
-                    rx_table_row "󰏗" "Device:" "$cur_device" "$PINK" "20"
-                    rx_table_row "󰏗" "Type:" "$([ "$cur_btrfs" == "true" ] && echo "BTRFS" || echo "RSYNC")" "$PINK" "20"
-                    rx_table_row "󰓅" "Daily:" "$cur_daily" "$PINK" "20"
-                    rx_table_row "󰓅" "Weekly:" "$cur_weekly" "$PINK" "20"
-                    rx_table_row "󰓅" "Monthly:" "$cur_monthly" "$PINK" "20"
-                    rx_table_row "󰀧" "Boot:" "$cur_boot" "$PINK" "20"
-                    rx_table_separator
-                    rx_table_spacer
-
-                    if ! rx_confirm "Reconfigure Timeshift?" "N"; then
-                        rx_log "info" "Aborted."
-                        return 0
-                    fi
+                    rx_setup_prompt_reconfigure "󰕰" "Current Timeshift Configuration" \
+                        "Device" "$cur_device" \
+                        "Type" "$([ "$cur_btrfs" == "true" ] && echo "BTRFS" || echo "RSYNC")" \
+                        "Daily" "$cur_daily" \
+                        "Weekly" "$cur_weekly" \
+                        "Monthly" "$cur_monthly" \
+                        "Boot" "$cur_boot" || return 0
                 fi
 
-                rx_table_header "󰕰" "Timeshift Setup"
+                rx_log "info" "Timeshift setup"
 
-                local devices=()
-                local device_labels=()
+                local devices=() device_labels=()
                 while IFS= read -r line; do
                     IFS='|' read -r key dev size fstype mount <<<"$line"
                     [[ -z $dev || $key != "DEVICE" ]] && continue
@@ -312,8 +290,6 @@ cmd_timeshift() {
 
                 if [[ ${#devices[@]} -eq 0 ]]; then
                     rx_log "error" "No writable devices found"
-                    rx_table_separator
-                    rx_table_spacer
                     return 1
                 fi
 
@@ -337,23 +313,13 @@ cmd_timeshift() {
                 fi
                 rx_log "info" "Backup type: ${PINK}${type_label}${RESET}"
 
-                rx_table_separator
-                rx_table_spacer
-
-                echo ""
-                echo -ne " ${PINK}󰄾${RESET} Daily snapshots ${MUTE}[default: 5, 0=off]${RESET}: "
-                read -r input; [[ -n $input && $input =~ ^[0-9]+$ ]] && daily_count="$input"
-
-                echo -ne " ${PINK}󰄾${RESET} Weekly snapshots ${MUTE}[default: 3, 0=off]${RESET}: "
-                read -r input; [[ -n $input && $input =~ ^[0-9]+$ ]] && weekly_count="$input"
-
-                echo -ne " ${PINK}󰄾${RESET} Monthly snapshots ${MUTE}[default: 2, 0=off]${RESET}: "
-                read -r input; [[ -n $input && $input =~ ^[0-9]+$ ]] && monthly_count="$input"
+                daily_count=$(rx_input_numeric "Daily snapshots" "5")
+                weekly_count=$(rx_input_numeric "Weekly snapshots" "3")
+                monthly_count=$(rx_input_numeric "Monthly snapshots" "2")
 
                 if rx_confirm "Enable boot snapshots (before package updates)?" "Y"; then
                     boot_enabled="true"
-                    echo -ne " ${PINK}󰄾${RESET} Boot snapshots to keep ${MUTE}[default: 2]${RESET}: "
-                    read -r input; [[ -n $input && $input =~ ^[0-9]+$ ]] && boot_count="$input"
+                    boot_count=$(rx_input_numeric "Boot snapshots to keep" "2")
                 else
                     boot_enabled="false"
                 fi
@@ -367,39 +333,37 @@ cmd_timeshift() {
                 local monthly_label="$([ $monthly_count -gt 0 ] && echo "$monthly_count" || echo "off")"
                 local boot_label="$([ $boot_enabled == "true" ] && echo "$boot_count boot snaps" || echo "off")"
 
-                rx_table_header "󰕰" "Setup Summary"
-                rx_table_row "󰏗" "Device:" "$device_choice" "$PINK" "20"
-                rx_table_row "󰏗" "Type:" "$([ "$btrfs_mode" == "true" ] && echo "BTRFS" || echo "RSYNC")" "$PINK" "20"
-                rx_table_separator
-                rx_table_row "󰓅" "Daily:" "$daily_label" "$PINK" "20"
-                rx_table_row "󰓅" "Weekly:" "$weekly_label" "$PINK" "20"
-                rx_table_row "󰓅" "Monthly:" "$monthly_label" "$PINK" "20"
-                rx_table_row "󰀧" "Boot:" "$boot_label" "$PINK" "20"
-                rx_table_row "󰉋" "Exclude Home:" "$exclude_home" "$PINK" "20"
-                rx_table_separator
-                rx_table_spacer
+                rx_setup_summary "󰕰" "Setup Summary" \
+                    "Device" "$device_choice" \
+                    "Type" "$([ "$btrfs_mode" == "true" ] && echo "BTRFS" || echo "RSYNC")" \
+                    "Daily" "$daily_label" \
+                    "Weekly" "$weekly_label" \
+                    "Monthly" "$monthly_label" \
+                    "Boot" "$boot_label" \
+                    "Exclude Home" "$exclude_home"
 
-                if ! rx_confirm "Apply this configuration?" "N"; then
-                    rx_log "info" "Setup cancelled."
-                    return 0
-                fi
+                rx_setup_confirm || return 0
             fi
 
-            local opts="device=${device_choice},btrfs=${btrfs_mode},daily=${daily_count},weekly=${weekly_count},monthly=${monthly_count},boot=${boot_enabled},boot_count=${boot_count},exclude_home=${exclude_home}"
-            local result=$(sudo bash "$ts_script" --apply-setup "$opts" 2>&1)
+            local result=$(sudo bash "$ts_script" --apply-setup \
+                "device=${device_choice}" \
+                "btrfs=${btrfs_mode}" \
+                "daily=${daily_count}" \
+                "weekly=${weekly_count}" \
+                "monthly=${monthly_count}" \
+                "boot=${boot_enabled}" \
+                "boot_count=${boot_count}" \
+                "exclude_home=${exclude_home}" 2>&1)
 
             if echo "$result" | grep -q "^OK|"; then
-                rx_table_header "󱗼" "Timeshift Configured"
-                rx_table_row "󰏗" "Device:" "$device_choice" "$SUCCESS" "20"
-                rx_table_row "󰏗" "Type:" "$([ "$btrfs_mode" == "true" ] && echo "BTRFS" || echo "RSYNC")" "$SUCCESS" "20"
-                rx_table_row "󰓅" "Daily:" "$daily_count" "$SUCCESS" "20"
-                rx_table_row "󰓅" "Weekly:" "$weekly_count" "$SUCCESS" "20"
-                rx_table_row "󰓅" "Monthly:" "$monthly_count" "$SUCCESS" "20"
-                rx_table_row "󰀧" "Boot:" "$boot_count" "$SUCCESS" "20"
-                rx_table_separator
-                rx_table_spacer
-
-                rx_log "success" "Timeshift setup complete"
+                rx_setup_success "󱗼" "Timeshift Configured" \
+                    "Device" "$device_choice" \
+                    "Type" "$([ "$btrfs_mode" == "true" ] && echo "BTRFS" || echo "RSYNC")" \
+                    "Daily" "$daily_label" \
+                    "Weekly" "$weekly_label" \
+                    "Monthly" "$monthly_label" \
+                    "Boot" "$boot_label" \
+                    "Exclude Home" "$exclude_home"
             else
                 rx_log "error" "Failed to apply Timeshift configuration: $result"
                 return 1

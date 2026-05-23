@@ -3,6 +3,7 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/menu.sh"
+source "$RETRO_DIR/lib/setup.sh"
 
 cmd_font() {
     local font_core="$RETRO_DIR/scripts/font_core.sh"
@@ -147,8 +148,10 @@ cmd_font() {
                 rx_log "warn" "'$type' doesn't look like a font. Searching for alternatives..."
                 val="1"
             else
+                local needed_flag=""
+                [[ $RX_SETUP_NEEDED == true ]] && needed_flag="--needed"
                 rx_log "info" "Attempting direct install of ${PINK}$type${RESET}..."
-                $helper -S --noconfirm "$type" && exit_code=$? || exit_code=$?
+                $helper -S --noconfirm $needed_flag "$type" && exit_code=$? || exit_code=$?
 
                 if [[ $exit_code -ne 0 ]]; then
                     rx_log "warn" "Direct install failed. Falling back to search..."
@@ -297,6 +300,8 @@ cmd_font() {
             ;;
 
         "setup")
+            rx_setup_parse "$type" $value
+
             local helper=$(get_var "PKG_HELPER")
             [[ -z $helper ]] && helper="sudo pacman"
 
@@ -304,12 +309,30 @@ cmd_font() {
                 export SKIP_PROMPT=true
             fi
 
+            local main_conf=$(get_var "RETRO_FONT_MAIN")
+            local nerd_conf=$(get_var "RETRO_FONT_NERD")
+            local emoji_conf=$(get_var "RETRO_FONT_EMOJI")
+            local config_exists=false
+            [[ -n $main_conf && -n $nerd_conf && -n $emoji_conf ]] && config_exists=true
+
+            rx_setup_check_needed "$config_exists" && return 0
+
+            if [[ $config_exists == true && $SKIP_PROMPT != "true" ]]; then
+                rx_setup_current "󰄈" "Current Font Configuration" \
+                    "Main" "$main_conf" \
+                    "Nerd" "$nerd_conf" \
+                    "Emoji" "$emoji_conf" || true
+
+                if ! rx_confirm "Reconfigure?" "N"; then
+                    rx_log "info" "Setup cancelled."
+                    return 0
+                fi
+            fi
+
             if [[ $SKIP_PROMPT == "true" ]]; then
                 cmd_font "install" "inter-font"
                 cmd_font "install" "ttf-jetbrains-mono-nerd"
                 cmd_font "install" "ttf-apple-emoji"
-
-                local installed_fonts=$(bash "$font_core" --list-installed)
 
                 set_var "RETRO_FONT_MAIN" "Inter"
                 set_var "RETRO_FONT_NERD" "JetBrainsMono Nerd Font"
@@ -320,52 +343,44 @@ cmd_font() {
                 return 0
             fi
 
-            if [[ -z $(get_var "RETRO_FONT_MAIN") ]]; then
-                rx_log "info" "Enter the main font package name ${PINK}[Default: inter-font]${RESET}: "
-                read -r input_pkg
-                local main_pkg="${input_pkg:-inter-font}"
+            local main_name="" nerd_name="" emoji_name=""
 
+            if [[ -n $main_conf ]]; then
+                main_name=$(rx_input "Which main font would you like to use?" "$main_conf")
+                set_var "RETRO_FONT_MAIN" "$main_name"
+            else
+                local main_pkg=$(rx_input "Main font package" "inter-font")
                 cmd_font "install" "$main_pkg"
-
                 local installed_fonts=$(bash "$font_core" --list-installed)
                 local match=$(echo "$installed_fonts" | grep -i "inter" | head -1)
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
-
                 if [[ -n $match ]]; then
                     rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || {
-                        rx_log "info" "Enter the exact font family name: "
-                        read -r font_name
-                        set_var "RETRO_FONT_MAIN" "${font_name:-$match}"
-                        return 0
+                        main_name=$(rx_input "Exact font family name" "$match")
                     }
-                    set_var "RETRO_FONT_MAIN" "$match"
+                    [[ -z $main_name ]] && main_name="$match"
+                    set_var "RETRO_FONT_MAIN" "$main_name"
                 fi
             fi
 
-            if [[ -z $(get_var "RETRO_FONT_NERD") ]]; then
-                rx_log "info" "Enter the nerd font package name ${PINK}[Default: ttf-jetbrains-mono-nerd]${RESET}: "
-                read -r input_pkg
-                local nerd_pkg="${input_pkg:-ttf-jetbrains-mono-nerd}"
-
+            if [[ -n $nerd_conf ]]; then
+                nerd_name=$(rx_input "Which nerd font would you like to use?" "$nerd_conf")
+                set_var "RETRO_FONT_NERD" "$nerd_name"
+            else
+                local nerd_pkg=$(rx_input "Nerd font package" "ttf-jetbrains-mono-nerd")
                 cmd_font "install" "$nerd_pkg"
-
                 local installed_fonts=$(bash "$font_core" --list-installed)
                 local match=$(echo "$installed_fonts" | grep -i "jetbrains" | head -1)
                 [[ -z $match ]] && match=$(echo "$installed_fonts" | tail -1)
-
                 if [[ -n $match ]]; then
                     rx_confirm "Detected font family: ${PINK}$match${RESET}. Use this?" "Y" || {
-                        rx_log "info" "Enter the exact font family name: "
-                        read -r font_name
-                        set_var "RETRO_FONT_NERD" "${font_name:-$match}"
-                        return 0
+                        nerd_name=$(rx_input "Exact font family name" "$match")
                     }
-                    set_var "RETRO_FONT_NERD" "$match"
+                    [[ -z $nerd_name ]] && nerd_name="$match"
+                    set_var "RETRO_FONT_NERD" "$nerd_name"
                 fi
             fi
-
-            if [[ -z $(get_var "RETRO_FONT_EMOJI") ]]; then
-                local styles=(
+            local styles=(
                     "apple|ttf-apple-emoji|Apple Color Emoji|Glossy iOS vibe"
                     "google|noto-fonts-emoji|Noto Color Emoji|Flat Android vibe"
                     "twemoji|ttf-twemoji|Twemoji|Classic Discord look"
@@ -374,30 +389,35 @@ cmd_font() {
                     "samsung|ttf-samsung-emojis|Samsung Color Emoji|Bubbly lines"
                     "openmoji|ttf-openmoji|OpenMoji|Artistic outlines"
                     "blob|noto-fonts-emoji-blob|Blobmoji|Noodle blobs"
-                )
+            )
 
-                rx_log "info" "Select Emoji Style:${RESET}"
-                for i in "${!styles[@]}"; do
-                    IFS='|' read -r k p n v <<<"${styles[$i]}"
-                    printf "  ${PINK}%d)${RESET} %s\n" "$((i + 1))" "$n"
-                done
+            local e_labels=()
+            for s in "${styles[@]}"; do
+                IFS='|' read -r k p n v <<<"$s"
+                e_labels+=("$n - $v")
+            done
 
-                rx_log "info" "Choice ${PINK}[Default: 1]${RESET}: "
-                read -r e_choice
+            local e_selection=$(rx_input_choice "󰄾" "Select Emoji Style" "1" "${e_labels[@]}")
+            local e_idx=0
+            for i in "${!e_labels[@]}"; do
+                [[ "${e_labels[$i]}" == "$e_selection" ]] && e_idx=$i && break
+            done
 
-                local idx=$((${e_choice:-1} - 1))
-                [[ $idx -lt 0 || $idx -ge ${#styles[@]} ]] && idx=0
+            IFS='|' read -r e_key e_pkg e_name e_vibe <<<"${styles[$e_idx]}"
 
-                IFS='|' read -r e_key e_pkg e_name e_vibe <<<"${styles[$idx]}"
-
-                rx_log "info" "Installing $e_name..."
-                $helper -S --noconfirm "$e_pkg"
-
-                set_var "RETRO_FONT_EMOJI" "$e_name"
-            fi
+            rx_log "info" "Installing ${PINK}$e_name${RESET}..."
+            local needed_flag=""
+            [[ $RX_SETUP_NEEDED == true ]] && needed_flag="--needed"
+            $helper -S --noconfirm $needed_flag "$e_pkg"
+            set_var "RETRO_FONT_EMOJI" "$e_name"
+            emoji_name="$e_name"
 
             bash "$font_core" --sync
-            rx_log "success" "All fonts installed and configured"
+
+            rx_setup_success "󰄈" "Fonts Configured" \
+                "Main" "${main_name:-Inter}" \
+                "Nerd" "${nerd_name:-JetBrainsMono Nerd Font}" \
+                "Emoji" "${emoji_name:-Apple Color Emoji}"
             ;;
 
         *)

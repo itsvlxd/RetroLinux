@@ -602,6 +602,16 @@ cmd_audio() {
             rx_setup_parse "$@"
             rx_setup_validate "sink_primary,sink_fallback,source_primary,source_fallback" || return 1
 
+            local config_exists=false
+            local current_sink_pri=$(bash "$audio_core" --audio-priority-get "sink" 2>/dev/null)
+            local current_source_pri=$(bash "$audio_core" --audio-priority-get "source" 2>/dev/null)
+            if (echo "$current_sink_pri" | grep -q "primary=" && ! echo "$current_sink_pri" | grep -q "primary=none") || \
+               (echo "$current_source_pri" | grep -q "primary=" && ! echo "$current_source_pri" | grep -q "primary=none"); then
+                config_exists=true
+            fi
+
+            rx_setup_check_needed "$config_exists" && return 0
+
             local sink_primary_input=""
             local sink_fallback_input=""
             local source_primary_input=""
@@ -617,8 +627,6 @@ cmd_audio() {
                 source_primary_input=$(rx_setup_get_opt "source_primary")
                 source_fallback_input=$(rx_setup_get_opt "source_fallback")
             else
-                local current_sink_pri=$(bash "$audio_core" --audio-priority-get "sink")
-                local current_source_pri=$(bash "$audio_core" --audio-priority-get "source")
                 IFS='|' read -r cur_sp cur_sf <<<"$current_sink_pri"
                 IFS='|' read -r cur_rp cur_rf <<<"$current_source_pri"
                 local cur_sp_name="${cur_sp#primary=}"
