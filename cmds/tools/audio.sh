@@ -703,7 +703,7 @@ cmd_audio() {
                 local fallback_sink_label=$(rx_menu "󰕿" "Select fallback output device:" "${fallback_options[@]}")
                 if [[ "$fallback_sink_label" != "None (no fallback)" ]]; then
                     for i in "${!sink_labels[@]}"; do
-                        [[ "${sink_labels[$i]}" == "$fallback_sink_label" ]] && fallback_sink_id="${sink_ids[$i]}" && fallback_sink_pw=$(bash "$audio_core" --get-sink-persistent-name "$fallback_sink_id" 2>/dev/null) && fallback_sink_name="${fallback_sink_label%% [*}" && break
+                        [[ "${sink_labels[$i]}" == "$fallback_sink_label" ]] && fallback_sink_id="${sink_ids[$i]}" && fallback_sink_pw=$(bash "$audio_core" --get-sink-persistent-name "$fallback_sink_id" 2>/dev/null) && sink_fallback_name="${fallback_sink_label%% [*}" && break
                     done
                     sink_fallback_input="$fallback_sink_pw"
                 fi
