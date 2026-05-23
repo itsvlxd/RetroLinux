@@ -231,6 +231,11 @@ set_audio_priority() {
         local old_fallback=$(get_var "AUDIO_FALLBACK_SINK" "")
         set_var "AUDIO_PRIMARY_SINK" "$primary_name"
         set_var "AUDIO_FALLBACK_SINK" "${fallback_name:-}"
+        local primary_id=$(get_sink_id_by_persistent "$primary_name")
+        if [[ -n $primary_id ]]; then
+            wpctl set-default "$primary_id" 2>/dev/null
+            rx_log_file "info" "set_audio_priority: applied primary sink ID $primary_id immediately"
+        fi
         rx_log_file "info" "set_audio_priority: sink primary=$primary_name fallback=${fallback_name:-none} (was primary=$old_primary fallback=$old_fallback)"
         echo "OK|primary=$primary_name|fallback=${fallback_name:-none}"
     elif [[ $type == "source" ]]; then
@@ -259,6 +264,11 @@ set_audio_priority() {
         local old_fallback=$(get_var "AUDIO_FALLBACK_SOURCE" "")
         set_var "AUDIO_PRIMARY_SOURCE" "$primary_name"
         set_var "AUDIO_FALLBACK_SOURCE" "${fallback_name:-}"
+        local primary_id=$(get_source_id_by_persistent "$primary_name")
+        if [[ -n $primary_id ]]; then
+            wpctl set-default "$primary_id" 2>/dev/null
+            rx_log_file "info" "set_audio_priority: applied primary source ID $primary_id immediately"
+        fi
         rx_log_file "info" "set_audio_priority: source primary=$primary_name fallback=${fallback_name:-none} (was primary=$old_primary fallback=$old_fallback)"
         echo "OK|primary=$primary_name|fallback=${fallback_name:-none}"
     else
@@ -327,7 +337,7 @@ device_exists_by_persistent() {
     if [[ -n $current_id ]]; then
         rx_log_file "info" "device_exists_by_persistent: $type '$name' exists (ID $current_id)"
     else
-        rx_log_file "info" "device_exists_by_persistent: $type '$name' not found"
+        rx_log_file "warn" "device_exists_by_persistent: $type '$name' not found"
     fi
     [[ -n $current_id ]]
 }
@@ -403,7 +413,7 @@ apply_audio_fallback() {
     fallback_id=$(get_current_id_by_persistent "$type" "$fallback_name")
 
     if [[ -z $fallback_id ]]; then
-        rx_log_file "info" "apply_fallback: fallback not available $type=$type name=$fallback_name"
+        rx_log_file "warn" "apply_fallback: fallback not available $type=$type name=$fallback_name"
         echo "ERR_FALLBACK_NOT_AVAILABLE"
         return 1
     fi
@@ -452,7 +462,7 @@ apply_audio_primary() {
     primary_id=$(get_current_id_by_persistent "$type" "$primary_name")
 
     if [[ -z $primary_id ]]; then
-        rx_log_file "info" "apply_primary: primary not available for $type ($primary_name)"
+        rx_log_file "warn" "apply_primary: primary not available for $type ($primary_name)"
         echo "OK|primary_not_available"
         return 0
     fi
