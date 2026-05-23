@@ -16,6 +16,10 @@ base-devel
 pacman-contrib
 xdg-desktop-portal-gtk
 
+# Auth
+polkit-gnome
+fprintd
+
 # Apps
 loupe
 mpv
@@ -50,7 +54,3 @@ glmark2
 vkmark
 speedtest-cli
 pciutils
-
-# Polkit
-polkit-gnome
-fprintd
