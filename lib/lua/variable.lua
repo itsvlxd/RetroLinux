@@ -1,8 +1,8 @@
 local Variable = {}
 
-local _vars_cache = {}
 local _vars_file = nil
-local _vars_mtime = 0
+local _vars_file_mtime = 0
+local _retro_vars_cache = {}
 
 local function _get_vars_file()
     if _vars_file then return _vars_file end
@@ -15,33 +15,28 @@ local function _get_vars_file()
     return _vars_file
 end
 
-local function _get_mtime(path)
-    local f = io.open(path, "r")
-    if not f then return 0 end
-    f:close()
-    local result = io.popen("stat -c %Y '" .. path .. "' 2>/dev/null")
-    if not result then return 0 end
-    local mtime = result:read("*l")
-    result:close()
-    return tonumber(mtime) or 0
+local function _get_file_mtime(path)
+    local handle = io.popen("stat -c %Y '" .. path .. "' 2>/dev/null || echo 0")
+    if not handle then return 0 end
+    local mtime = handle:read("*a")
+    handle:close()
+    return tonumber(mtime:gsub("%s+$", "")) or 0
 end
 
 local function _parse_vars_file()
     local path = _get_vars_file()
-    local current_mtime = _get_mtime(path)
-    if current_mtime == _vars_mtime and current_mtime ~= 0 then return end
-    _vars_mtime = current_mtime
-    _vars_cache = {}
-
+    local current_mtime = _get_file_mtime(path)
+    if current_mtime == _vars_file_mtime then return end
+    _vars_file_mtime = current_mtime
+    _retro_vars_cache = {}
     local f = io.open(path, "r")
     if not f then return end
-
     for line in f:lines() do
         local key, val = line:match('^export%s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$')
         if key then
             val = val:gsub('^"', ''):gsub('"$', '')
             val = val:gsub("^'", ""):gsub("'$", "")
-            _vars_cache[key] = val
+            _retro_vars_cache[key] = val
         end
     end
     f:close()
@@ -49,7 +44,7 @@ end
 
 function Variable.get_var(key, default)
     _parse_vars_file()
-    local val = _vars_cache[key]
+    local val = _retro_vars_cache[key]
     if val == nil then
         return default or ""
     end
@@ -58,12 +53,10 @@ end
 
 function Variable.set_var(key, value)
     if not key or key == "" then return false end
-    _vars_cache[key] = value
-
+    _retro_vars_cache[key] = value
     local path = _get_vars_file()
     local dir = path:match("(.+)/")
     if dir then os.execute("mkdir -p '" .. dir .. "'") end
-
     local lines = {}
     local found = false
     local f = io.open(path, "r")
@@ -78,11 +71,9 @@ function Variable.set_var(key, value)
         end
         f:close()
     end
-
     if not found then
         table.insert(lines, 'export ' .. key .. '="' .. value .. '"')
     end
-
     f = io.open(path, "w")
     if f then
         for _, line in ipairs(lines) do
@@ -90,13 +81,12 @@ function Variable.set_var(key, value)
         end
         f:close()
     end
-
-    _vars_mtime = _get_mtime(path)
+    _vars_file_mtime = _get_file_mtime(path)
     return true
 end
 
 function Variable.reload_vars()
-    _vars_mtime = 0
+    _vars_file_mtime = 0
     _parse_vars_file()
 end
 
