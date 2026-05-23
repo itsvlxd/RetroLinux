@@ -6,13 +6,12 @@ return {
     end,
     start = function(engine)
         local Watcher = require("watcher")
-        local log = function(msg) Watcher.log("usb", msg) end
 
-        log("USB watcher starting")
+        Watcher.log("usb", "USB watcher starting", "info")
 
         local mount_root = os.getenv("HOME") .. "/Mounts"
         os.execute("mkdir -p '" .. mount_root .. "'")
-        log("Mount root: " .. mount_root)
+        Watcher.log("usb", "Mount root: " .. mount_root, "info")
 
         local function get_usb_parts()
             local raw = Watcher.run_cmd("lsblk -nlo NAME,RM,TYPE 2>/dev/null")
@@ -27,7 +26,7 @@ return {
         local last_usb = get_usb_parts()
         local dev_list = {}
         for d, _ in pairs(last_usb) do table.insert(dev_list, d) end
-        log("Initial USB state: " .. (#dev_list > 0 and table.concat(dev_list, ", ") or "no devices"))
+        Watcher.log("usb", "Initial USB state: " .. (#dev_list > 0 and table.concat(dev_list, ", ") or "no devices"), "info")
 
         local function process_changes()
             Watcher.reload_vars()
@@ -38,60 +37,60 @@ return {
                     local dev_path = "/dev/" .. dev
                     local label = Watcher.run_cmd("lsblk -nlo LABEL '" .. dev_path .. "' 2>/dev/null"):gsub("%s+$", "")
                     if label == "" then label = "USB_" .. dev end
-                    log("New USB device: " .. dev .. " (label: " .. label .. ")")
+                    Watcher.log("usb", "New USB device: " .. dev .. " (label: " .. label .. ")", "info")
 
                     local actual_mount = Watcher.run_cmd("findmnt -nlo TARGET '" .. dev_path .. "' 2>/dev/null"):gsub("%s+$", "")
                     if actual_mount == "" then
-                        log("Not mounted, attempting mount via udisksctl...")
+                        Watcher.log("usb", "Not mounted, attempting mount via udisksctl...", "info")
                         local mount_out = Watcher.run_cmd("udisksctl mount -b '" .. dev_path .. "' --no-user-interaction 2>&1")
-                        log("udisksctl output: " .. mount_out)
+                        Watcher.log("usb", "udisksctl output: " .. mount_out, "info")
                         Watcher.sleep(1)
                         actual_mount = Watcher.run_cmd("findmnt -nlo TARGET '" .. dev_path .. "' 2>/dev/null"):gsub("%s+$", "")
                         if actual_mount ~= "" then
-                            log("Mount successful: " .. actual_mount)
+                            Watcher.log("usb", "Mount successful: " .. actual_mount, "info")
                         else
-                            log("Mount failed for " .. dev_path)
+                            Watcher.log("usb", "Mount failed for " .. dev_path, "warn")
                         end
                     else
-                        log("Already mounted at: " .. actual_mount)
+                        Watcher.log("usb", "Already mounted at: " .. actual_mount, "info")
                     end
 
                     if actual_mount ~= "" then
-                        log("Mounted at: " .. actual_mount)
+                        Watcher.log("usb", "Mounted at: " .. actual_mount, "info")
                         local symlink = mount_root .. "/" .. label
                         Watcher.run_cmd("ln -sfn '" .. actual_mount .. "' '" .. symlink .. "'")
-                        log("Symlink created: " .. symlink .. " -> " .. actual_mount)
+                        Watcher.log("usb", "Symlink created: " .. symlink .. " -> " .. actual_mount, "info")
 
                         Watcher.reload_vars()
                         local ignore_list = Watcher.get_var("USB_IGNORE_DRIVES", "")
-                        log("Ignore list: [" .. ignore_list .. "]")
+                        Watcher.log("usb", "Ignore list: [" .. ignore_list .. "]", "info")
                         local ignored = false
                         if ignore_list ~= "" and ignore_list ~= "null" then
                             for item in ignore_list:gmatch("[^|]+") do
-                                log("Checking ignore: '" .. item .. "' == '" .. label .. "'")
+                                Watcher.log("usb", "Checking ignore: '" .. item .. "' == '" .. label .. "'", "info")
                                 if item == label then
                                     ignored = true
-                                    log("Drive '" .. label .. "' matched ignore list")
+                                    Watcher.log("usb", "Drive '" .. label .. "' matched ignore list", "info")
                                     break
                                 end
                             end
                         end
 
                         if not ignored then
-                            log("Emitting on_usb_connected: " .. label)
+                            Watcher.log("usb", "Emitting on_usb_connected: " .. label, "info")
                             engine:emit("on_usb_connected", label, symlink)
                         else
-                            log("Ignored drive: " .. label)
+                            Watcher.log("usb", "Ignored drive: " .. label, "info")
                         end
                     else
-                        log("Mount failed for " .. dev_path)
+                        Watcher.log("usb", "Mount failed for " .. dev_path, "warn")
                     end
                 end
             end
 
             for dev, _ in pairs(last_usb) do
                 if not current[dev] then
-                    log("USB removed: " .. dev)
+                    Watcher.log("usb", "USB removed: " .. dev, "info")
                     engine:emit("on_usb_disconnected", dev, mount_root)
                 end
             end

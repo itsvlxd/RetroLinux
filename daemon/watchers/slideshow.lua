@@ -6,7 +6,6 @@ return {
     end,
     start = function(engine)
         local Watcher = require("watcher")
-        local log = function(msg) Watcher.log("slideshow", msg) end
 
         local slideshow_tick = 0
         local current_rand_target = 0
@@ -22,13 +21,13 @@ return {
                 if interval == "random" then
                     if current_rand_target == 0 then
                         current_rand_target = math.random(300, 1200)
-                        log("Random interval set to " .. current_rand_target .. "s")
+                        Watcher.log("slideshow", "Random interval set to " .. current_rand_target .. "s", "info")
                     end
                     target_ticks = current_rand_target
                 end
 
                 if slideshow_tick >= target_ticks then
-                    log("Slideshow tick fired (interval: " .. target_ticks .. "s, tick: " .. slideshow_tick .. ")")
+                    Watcher.log("slideshow", "Slideshow tick fired (interval: " .. target_ticks .. "s, tick: " .. slideshow_tick .. ")", "info")
                     engine:emit("on_slideshow_tick")
                     slideshow_tick = 0
                     current_rand_target = 0
