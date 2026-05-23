@@ -1,12 +1,12 @@
 local Watcher = {}
 
-local _vars_cache = {}
 local _vars_file = nil
-local _vars_mtime = 0
 
 local _log_caps = {}
 local _log_enabled = nil
 local _log_dir = "/tmp/retro_logs"
+
+local _log_core = nil
 
 os.execute("mkdir -p " .. _log_dir)
 
@@ -21,41 +21,28 @@ local function _get_vars_file()
     return _vars_file
 end
 
-local function _get_mtime(path)
-    local f = io.open(path, "r")
-    if not f then return 0 end
-    f:close()
-    local result = io.popen("stat -c %Y '" .. path .. "' 2>/dev/null")
-    if not result then return 0 end
-    local mtime = result:read("*l")
-    result:close()
-    return tonumber(mtime) or 0
-end
-
 local function _parse_vars_file()
     local path = _get_vars_file()
-    local current_mtime = _get_mtime(path)
-    if current_mtime == _vars_mtime and current_mtime ~= 0 then return end
-    _vars_mtime = current_mtime
-    _vars_cache = {}
+    local vars = {}
 
     local f = io.open(path, "r")
-    if not f then return end
+    if not f then return vars end
 
     for line in f:lines() do
         local key, val = line:match('^export%s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$')
         if key then
             val = val:gsub('^"', ''):gsub('"$', '')
             val = val:gsub("^'", ""):gsub("'$", "")
-            _vars_cache[key] = val
+            vars[key] = val
         end
     end
     f:close()
+    return vars
 end
 
 function Watcher.get_var(key, default)
-    _parse_vars_file()
-    local val = _vars_cache[key]
+    local vars = _parse_vars_file()
+    local val = vars[key]
     if val == nil then
         return default or ""
     end
@@ -64,7 +51,6 @@ end
 
 function Watcher.set_var(key, value)
     if not key or key == "" then return false end
-    _vars_cache[key] = value
 
     local path = _get_vars_file()
     local dir = path:match("(.+)/")
@@ -97,13 +83,11 @@ function Watcher.set_var(key, value)
         f:close()
     end
 
-    _vars_mtime = _get_mtime(path)
     return true
 end
 
 function Watcher.reload_vars()
-    _vars_mtime = 0
-    _parse_vars_file()
+    -- no-op: get_var always reads fresh now
 end
 
 function Watcher.run_cmd(cmd)
@@ -189,39 +173,18 @@ function Watcher.is_log_disabled(name)
     return false
 end
 
-function Watcher.log(name, msg)
+function Watcher.log(name, msg, level)
     if not Watcher.is_log_enabled() then return end
     if Watcher.is_log_disabled(name) then return end
 
-    local log_path = Watcher.get_log_path(name)
-    local cap = Watcher.get_log_cap(name)
-
-    local f = io.open(log_path, "a")
-    if not f then return end
-
-    local ts = os.date("%Y-%m-%d %H:%M:%S")
-    f:write(string.format("[%s] [INFO] %s\n", ts, msg))
-    f:close()
-
-    local lines = {}
-    local lf = io.open(log_path, "r")
-    if lf then
-        for line in lf:lines() do
-            table.insert(lines, line)
-        end
-        lf:close()
+    if not _log_core then
+        local script_dir = debug.getinfo(1, "S").source:match("@(.+)/[^/]+$") or "."
+        local retro_dir = script_dir .. "/.."
+        _log_core = dofile(retro_dir .. "/scripts/lua/log_core.lua")
     end
-
-    if #lines > cap then
-        local start = #lines - cap + 1
-        lf = io.open(log_path, "w")
-        if lf then
-            for i = start, #lines do
-                lf:write(lines[i] .. "\n")
-            end
-            lf:close()
-        end
-    end
+    local log_id = "watcher_" .. name
+    _log_core.register(log_id)
+    _log_core.log(level or "info", msg, log_id)
 end
 
 function Watcher.tail_log(name, limit)

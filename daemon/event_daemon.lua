@@ -11,6 +11,7 @@ package.path = table.concat({
 	retro_dir .. "/lib/lua/?.lua",
 	retro_dir .. "/daemon/?.lua",
 	retro_dir .. "/daemon/watchers/?.lua",
+	retro_dir .. "/scripts/lua/?.lua",
 	package.path,
 }, ";")
 
