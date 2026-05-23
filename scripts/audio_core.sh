@@ -86,12 +86,11 @@ get_sink_id_by_persistent() {
     local name="$1"
     [[ -z $name ]] && return
     rx_log_file "info" "get_sink_id_by_persistent: looking up '$name'"
-    local found_id=""
-    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
-        local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sinks:/,/Sources:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r dev_id; do
+        local pw_name=$(wpctl inspect "$dev_id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
         if [[ "$pw_name" == "$name" ]]; then
-            rx_log_file "info" "get_sink_id_by_persistent: found '$name' -> ID $id"
-            echo "$id"
+            rx_log_file "info" "get_sink_id_by_persistent: found '$name' -> ID $dev_id"
+            echo "$dev_id"
             break
         fi
     done
@@ -101,11 +100,11 @@ get_source_id_by_persistent() {
     local name="$1"
     [[ -z $name ]] && return
     rx_log_file "info" "get_source_id_by_persistent: looking up '$name'"
-    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r id; do
-        local pw_name=$(wpctl inspect "$id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/) {gsub(/\./,"",$i); print $i}}' | while read -r dev_id; do
+        local pw_name=$(wpctl inspect "$dev_id" 2>/dev/null | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
         if [[ "$pw_name" == "$name" ]]; then
-            rx_log_file "info" "get_source_id_by_persistent: found '$name' -> ID $id"
-            echo "$id"
+            rx_log_file "info" "get_source_id_by_persistent: found '$name' -> ID $dev_id"
+            echo "$dev_id"
             break
         fi
     done
