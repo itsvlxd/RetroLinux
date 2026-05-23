@@ -28,7 +28,8 @@ This document serves as the **single source of truth** for all RetroLinux develo
 | Directory | Purpose |
 |-----------|---------|
 | `retro.sh` | Main entry point, command routing, global state |
-| `lib/` | **Internal** core libraries (colors, logging, fs, driver detection, etc.) |
+| `lib/` | **Internal** core libraries (colors, logging, fs, driver detection, setup wizard, etc.) |
+| `lib/setup.sh` | **Setup wizard library** — two-mode (interactive/`-o key=val`) config flow with validation, summary, confirm, and success stages |
 | `lib/lua/` | Lua libraries for the event daemon (help.lua, colors.lua, log.lua) |
 | `lib/python/` | Python libraries (log.py, env.py, obex.py) |
 | `scripts/python/` | Python backend scripts (bluetooth_receive.py, log_core.py) |
@@ -222,7 +223,7 @@ This rule exists because:
 | `xdg.sh` | `xdg.lua` | — | XDG directory handling |
 | `power.sh` | `power.lua` | — | Power profile management |
 | `icons.sh` | `icons.lua` | — | Nerd Font icon definitions |
-| `notify.lua` | `notify.lua` | — | Desktop notifications (Lua only) |
+| `—` | `notify.lua` | — | Desktop notifications (Lua only) |
 
 </details>
 
@@ -289,12 +290,12 @@ warn("Something might be wrong")
 error("Operation failed")
 ```
 
-**Output format** (identical to shell `rx_log`):
+**Output format** (identical to shell `rx_log` — colors applied internally, shown clean here):
 ```
-[PINK][ INFO][RESET] Starting process...
-[PINK][ SUCCESS][RESET] Operation completed
-[PINK][ WARN][RESET] Something might be wrong
-[PINK][󰅙 ERROR][RESET] Operation failed
+[ INFO] Starting process...
+[ SUCCESS] Operation completed
+[ WARN] Something might be wrong
+[󰅙 ERROR] Operation failed
 ```
 
 ### env.py — Environment and Variables
@@ -874,7 +875,436 @@ rx_log "success" "Action completed"
 ```
 
 ---
-## 12. Module System 🧩
+## 12. Setup Wizard Pattern (`lib/setup.sh`) 🗡️
+
+The setup wizard pattern is a reusable interactive/non-interactive configuration flow used by tools that need guided setup. It lives in `lib/setup.sh` (sourced by frontend command scripts).
+
+### When to Use This Pattern
+
+> [!NOTE]
+> **Use the setup wizard when:** Your tool needs to collect multiple configuration values from the user, validate them, show a summary, and apply changes atomically.
+>
+> **Don't use it for:** Simple single-action commands (use `rx_confirm` directly) or tools that don't persist configuration.
+
+**Examples of tools that SHOULD use setup:**
+- `retro timeshift setup` — collects backup device, snapshot counts, boot snapshots
+- `retro xdg setup` — collects default apps (editor, browser, file manager, etc.)
+- `retro grub setup` — collects theme, resolution, timeout, kernel options
+
+**Examples of tools that SHOULD NOT use setup:**
+- `retro audio status` — read-only, no config collection
+- `retro network wifi on` — single action, no multi-step form
+
+### The Pattern (Why)
+
+Instead of each tool implementing its own prompts, validation, and confirmation logic, `lib/setup.sh` provides a standardized pipeline:
+
+1. **Parse** CLI flags (`-o key=val,...` and `--needed`)
+2. **Validate** options against declared keys and rules
+3. **Check needed** — skip if `--needed` and already configured
+4. **Branch** — collect values from `-o` flags (non-interactive) or prompt user (interactive)
+5. **Summary** — show all values in a table  
+6. **Confirm** — ask "Apply these settings?"
+7. **Apply** — tool-specific changes
+8. **Success** — show final table
+
+This gives you two-mode behavior by default:
+- **Non-interactive**: `retro tool setup -o key1=val1,key2=val2` — for automation/scripts
+- **Interactive**: `retro tool setup` — guided prompts with defaults  
+- **Combined**: `retro tool setup --needed` — only run setup if not yet configured (`-o` optional)
+
+### Step-by-Step Implementation Guide
+
+#### Step 1: Source the Library
+
+At the top of your command file, source `lib/setup.sh` alongside other libs:
+
+```bash
+source "$RETRO_DIR/lib/setup.sh"
+source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/colors.sh"
+```
+
+> [!WARNING]
+> **Source order matters:** Source `setup.sh` BEFORE your command function is called. The library declares global variables (`RX_SETUP_MODE`, `RX_SETUP_OPTS`) that your function will read.
+
+#### Step 2: Add the Setup Subcommand
+
+Inside your command's `case` statement, add a `"setup")` branch:
+
+```bash
+cmd_mytool() {
+    local action="${1,,}"
+    
+    case "$action" in
+        setup)
+            # Setup logic goes here
+            ;;
+        status)
+            # Status logic
+            ;;
+        help|"")
+            rx_log "info" "Usage: retro mytool <command>"
+            ;;
+        *)
+            rx_log "error" "Unknown command: $action"
+            return 1
+            ;;
+    esac
+}
+```
+
+#### Step 3: Parse CLI Flags
+
+Always call `rx_setup_parse` as the FIRST setup function:
+
+```bash
+"setup")
+    rx_setup_parse "$@"
+    # ... rest of setup logic
+```
+
+> [!TIP]
+> **What this does:** `rx_setup_parse "$@"` scans `$@` for `-o key=val,...` and `--needed` flags, then:
+> - Sets `RX_SETUP_MODE="non-interactive"` if `-o` was provided
+> - Sets `RX_SETUP_NEEDED=true` if `--needed` was provided
+> - Populates `RX_SETUP_OPTS` associative array with parsed key-value pairs
+> - Strips these flags from consideration in your remaining logic
+
+#### Step 4: Declare Valid Keys and Validation Rules
+
+Tell the setup system what options you accept and how to validate them:
+
+```bash
+rx_setup_validate "editor,browser,filemanager" "editor:required,browser:required,filemanager:in=thunar,nautilus,dolphin"
+```
+
+**Validation rule syntax:**
+```
+key1:rule1|rule2,key2:rule1|rule2
+```
+
+| Rule | Example | Effect |
+|------|---------|--------|
+| `required` | `editor:required` | Value must be non-empty |
+| `numeric` | `count:numeric` | Must be an integer |
+| `min=N` | `timeout:min=0` | Must be >= N |
+| `max=N` | `timeout:max=300` | Must be <= N |
+| `pattern=REGEX` | `name:pattern=^[a-z]+$` | Must match regex |
+| `in=val1,val2` | `theme:in=dark,light` | Must be one of the listed values |
+| `eq=VAL` | `mode:eq=advanced` | Must equal VAL |
+| `ne=VAL` | `mode:ne=basic` | Must not equal VAL |
+
+> [!NOTE]
+> **Validation happens immediately:** If any rule fails, `rx_setup_validate` logs an error and returns 1. Your script should `|| return 1` to exit early.
+
+#### Step 5: Check if Already Configured (for --needed)
+
+Detect existing configuration and skip if `--needed` was passed:
+
+```bash
+local config=$(bash "$mytool_core" --config 2>/dev/null || echo "ERROR")
+local config_exists=false
+[[ $config != "ERROR"* ]] && config_exists=true
+
+rx_setup_check_needed "$config_exists" && return 0
+```
+
+> [!TIP]
+> **How --needed works:** When a user runs `retro mytool setup --needed`:
+> - If config exists (`config_exists=true`): `rx_setup_check_needed` returns 0, script exits early
+> - If config doesn't exist: `rx_setup_check_needed` returns 1, script continues
+>
+> **Use case:** Installers call `retro mytool setup --needed` to auto-configure tools that weren't set up yet, without re-running setup on already-configured tools.
+
+#### Step 6: Collect Values (Branch on Mode)
+
+Collect configuration values differently based on interactive vs non-interactive mode:
+
+```bash
+local editor="" browser="" filemanager=""
+
+if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+    # Read from -o flags
+    editor=$(rx_setup_get_opt "editor")
+    browser=$(rx_setup_get_opt "browser")
+    filemanager=$(rx_setup_get_opt "filemanager" "thunar")  # with default
+else
+    # Interactive: prompt user
+    editor=$(rx_input "Default editor" "nvim")
+    browser=$(rx_input_choice "󰇩" "Select browser:" "firefox" firefox chrome chromium)
+    filemanager=$(rx_input "File manager" "thunar")
+fi
+```
+
+**Input function quick reference:**
+
+| Function | Use Case | Example |
+|----------|----------|---------|
+| `rx_input "label" "default"` | Free text input | `editor=$(rx_input "Editor" "nvim")` |
+| `rx_input_numeric "label" "default" min max` | Numbers with range | `count=$(rx_input_numeric "Count" "5" 1 10)` |
+| `rx_input_choice "icon" "label" "default" opt1 opt2` | Numbered menu | `choice=$(rx_input_choice "󰇩" "Pick:" "opt1" opt1 opt2 opt3)` |
+| `rx_menu "icon" "label" options...` | Gum-style menu | `device=$(rx_menu "󰏗" "Select:" "${devices[@]}")` |
+| `rx_setup_get_opt "key" "default"` | Non-interactive read | `val=$(rx_setup_get_opt "key" "default")` |
+
+> [!WARNING]
+> **Always use the same variable names in both branches:** The rest of your setup code should reference `$editor`, `$browser`, etc. regardless of how they were collected. This keeps the apply logic identical for both modes.
+
+#### Step 7: Show Summary and Confirm
+
+Display what will be applied and ask for confirmation:
+
+```bash
+rx_setup_summary "󰒓" "MyTool Setup Summary" \
+    "Editor" "$editor" \
+    "Browser" "$browser" \
+    "File Manager" "$filemanager"
+
+rx_setup_confirm || return 0
+```
+
+> [!TIP]
+> **User experience:** The summary table shows values in pink highlight. The confirm prompt asks "Apply these settings? [y/N]". If user declines, `rx_setup_confirm` returns 1 and your script should exit cleanly with `return 0`.
+
+#### Step 8: Apply Changes
+
+Execute your tool-specific configuration logic:
+
+```bash
+local result=$(bash "$mytool_core" --apply-setup \
+    "editor=${editor}" \
+    "browser=${browser}" \
+    "filemanager=${filemanager}" 2>&1)
+
+if echo "$result" | grep -q "^OK|"; then
+    # Success
+else
+    rx_log "error" "Failed to apply configuration: $result"
+    return 1
+fi
+```
+
+> [!WARNING]
+> **Apply logic must be identical for both modes:** Whether values came from `-o` flags or interactive prompts, the apply step should be the same. Don't branch on `RX_SETUP_MODE` here.
+
+#### Step 9: Show Success
+
+Display the final configuration and log success:
+
+```bash
+rx_setup_success "󰒓" "MyTool Configured" \
+    "Editor" "$editor" \
+    "Browser" "$browser" \
+    "File Manager" "$filemanager"
+```
+
+> [!NOTE]
+> **What this does:** `rx_setup_success` shows a summary table (same format as `rx_setup_summary`) and logs "Setup complete" with a success icon. This is the user's confirmation that their configuration was applied.
+
+### Complete Example: Minimal Setup Subcommand
+
+```bash
+"setup")
+    # Step 1: Parse CLI flags
+    rx_setup_parse "$@"
+    
+    # Step 2: Validate keys and rules
+    rx_setup_validate "editor,browser" "editor:required,browser:required" || return 1
+    
+    # Step 3: Check existing config
+    local config_exists=false
+    [[ -f "$HOME/.config/mytool/config.sh" ]] && config_exists=true
+    rx_setup_check_needed "$config_exists" && return 0
+    
+    # Step 4: Collect values
+    local editor="" browser=""
+    
+    if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+        editor=$(rx_setup_get_opt "editor")
+        browser=$(rx_setup_get_opt "browser")
+    else
+        # Show current config if exists
+        if [[ $config_exists == true ]]; then
+            source "$HOME/.config/mytool/config.sh"
+            rx_setup_prompt_reconfigure "󰒓" "Current MyTool Config" \
+                "Editor" "$MYTOOL_EDITOR" \
+                "Browser" "$MYTOOL_BROWSER" || return 0
+        fi
+        
+        editor=$(rx_input "Default editor" "nvim")
+        browser=$(rx_input_choice "󰇩" "Select browser:" "firefox" firefox chrome chromium)
+    fi
+    
+    # Step 5: Summary + confirm
+    rx_setup_summary "󰒓" "Setup Summary" \
+        "Editor" "$editor" \
+        "Browser" "$browser"
+    rx_setup_confirm || return 0
+    
+    # Step 6: Apply
+    cat > "$HOME/.config/mytool/config.sh" <<EOF
+MYTOOL_EDITOR="$editor"
+MYTOOL_BROWSER="$browser"
+EOF
+    
+    # Step 7: Success
+    rx_setup_success "󰒓" "MyTool Configured" \
+        "Editor" "$editor" \
+        "Browser" "$browser"
+    ;;
+```
+
+### Function Reference
+
+| Function | Signature | Purpose |
+|----------|-----------|---------|
+| `rx_setup_parse` | `"$@"` | Parse `-o key=val,...` and `--needed`; sets `RX_SETUP_MODE` global |
+| `rx_setup_validate` | `"keys" "rules"` | Validate provided `-o` values; warn on unknown keys |
+| `rx_setup_get_opt` | `"key" "default"` | Read a parsed option value (non-interactive mode) |
+| `rx_setup_current` | `icon title key val...` | Show current config table (returns 0 if anything configured) |
+| `rx_setup_check_needed` | `config_exists` | Return 0 if `--needed` + config exists (skip setup) |
+| `rx_setup_prompt_reconfigure` | `icon title key val...` | Show current config + ask "Reconfigure?" |
+| `rx_setup_summary` | `icon title key val...` | Show setup summary table |
+| `rx_setup_confirm` | — | "Apply these settings?" prompt; returns 1 if cancelled |
+| `rx_setup_success` | `icon title key val...` | Show success table + log "Setup complete" |
+| `rx_input` | `"label" "default" "pattern" "err"` | Text input with optional regex validation |
+| `rx_input_numeric` | `"label" "default" [min] [max]` | Numeric input with optional range (min/max are optional) |
+| `rx_input_choice` | `icon "label" "default" opt1 opt2 ...` | Numbered choice menu |
+| `rx_menu` | `icon "label" options...` | Gum-style menu selection (returns selected option) |
+
+### Validation Rules
+
+Passed as the second argument to `rx_setup_validate` in pipe-delimited format:
+
+```
+key1:required|numeric,key2:in=val1,val2|min=1,key3:pattern=^[a-z]+$
+```
+
+| Rule | Description |
+|------|------|
+| `required` | Value must be non-empty |
+| `numeric` | Must be an integer |
+| `min=N` | Must be >= N |
+| `max=N` | Must be <= N |
+| `pattern=REGEX` | Must match regex |
+| `in=val1,val2` | Must be one of the listed values |
+| `eq=VAL` | Must equal VAL |
+| `ne=VAL` | Must not equal VAL |
+
+### Common Pitfalls and Gotchas
+
+#### Pitfall 1: Forgetting to Source the Library
+
+```bash
+# WRONG: rx_setup_parse not defined
+"setup")
+    rx_setup_parse "$@"  # Error: command not found
+```
+
+```bash
+# CORRECT: Source before use
+source "$RETRO_DIR/lib/setup.sh"
+
+"setup")
+    rx_setup_parse "$@"  # Works
+```
+
+#### Pitfall 2: Not Checking rx_setup_validate Return
+
+```bash
+# WRONG: Continues even if validation fails
+rx_setup_validate "editor" "editor:required"
+# Script continues with invalid input
+
+# CORRECT: Exit early on validation failure
+rx_setup_validate "editor" "editor:required" || return 1
+```
+
+#### Pitfall 3: Using Different Variable Names in Branches
+
+```bash
+# WRONG: Different names for each mode
+if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+    editor_from_opt=$(rx_setup_get_opt "editor")
+else
+    editor_input=$(rx_input "Editor" "nvim")
+fi
+# Which variable do I use in apply?!
+
+# CORRECT: Same variable name in both branches
+if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+    editor=$(rx_setup_get_opt "editor")
+else
+    editor=$(rx_input "Editor" "nvim")
+fi
+# Use $editor in apply logic
+```
+
+#### Pitfall 4: Skipping the Confirm Step
+
+```bash
+# WRONG: Applies without confirmation
+rx_setup_summary "Icon" "Summary" "Key" "$val"
+# Immediately applies - user had no chance to review
+
+# CORRECT: Always confirm before apply
+rx_setup_summary "Icon" "Summary" "Key" "$val"
+rx_setup_confirm || return 0
+# User sees "Apply these settings? [y/N]"
+```
+
+#### Pitfall 5: Not Handling --needed Correctly
+
+```bash
+# WRONG: Ignores --needed flag
+local config_exists=true
+# Missing: rx_setup_check_needed "$config_exists" && return 0
+
+# CORRECT: Check needed before collecting values
+local config_exists=false
+[[ -f "$CONFIG_FILE" ]] && config_exists=true
+rx_setup_check_needed "$config_exists" && return 0  # Exit early if --needed and configured
+```
+
+### Alternative Flow: Manual Reconfigure Prompt
+
+`cmds/tools/xdg.sh` uses a manual pattern instead of `rx_setup_prompt_reconfigure` when the tool needs more control over the reconfigure prompt. It shows the current config with `rx_setup_current` and asks explicitly with `rx_confirm`:
+
+```bash
+if [[ $config_exists == true ]]; then
+    rx_setup_current "Icon" "Current Default Applications" \
+        "Editor" "$cur_editor" \
+        "Browser" "$detected_browser" \
+        "File Manager" "$cur_fm" \
+        "Image Viewer" "$detected_image" \
+        "Video Player" "$detected_video" || true
+
+    if ! rx_confirm "Reconfigure?" "N"; then
+        rx_log "info" "Setup cancelled."
+        return 0
+    fi
+fi
+```
+
+This pattern gives you more control over the message and default answer compared to `rx_setup_prompt_reconfigure`.
+
+### Best Practices for New Tools
+
+When adding a `setup` subcommand to a new tool:
+
+1. **Always source `lib/setup.sh`** at the top of your command file.
+2. **Use `rx_setup_parse "$@"` as the first setup call** — it strips `-o` and `--needed` from `$@` and populates globals.
+3. **Declare all valid keys** in `rx_setup_validate` — this documents your options and rejects typos automatically.
+4. **Add validation rules** for non-optional fields and type constraints (use `required` for must-have options).
+5. **Always call `rx_setup_check_needed`** before collecting values — this gives `--needed` behavior for free.
+6. **Branch on `$RX_SETUP_MODE`** — use `rx_setup_get_opt` for non-interactive, `rx_input*` / `rx_confirm` / `rx_menu` for interactive.
+7. **Always show `rx_setup_summary` + `rx_setup_confirm`** — users must see what will be applied before it happens.
+8. **Always end with `rx_setup_success`** on success or `rx_log "error"` on failure — consistent UX.
+9. **Keep apply logic identical for both modes** — don't branch on `RX_SETUP_MODE` in the apply step.
+10. **Test both modes** — run `retro tool setup` (interactive) and `retro tool setup -o key=val` (non-interactive) before committing.
+
+---
+## 13. Module System 🧩
 
 ### Module Structure
 
@@ -926,11 +1356,11 @@ modules/<name>/
 - `-r, --remove <name>` — Remove module configs from system and restore previous backup files
 
 ---
-## 13. Variable System 🔧
+## 14. Variable System 🔧
 
 ### Storage
 
-Variables are stored in `$RETRO_CACHE/variables.sh` (typically `~/.cache/retro/variables.sh`).
+Variables are stored in `$RETRO_CONFIG/variables.sh` (typically `~/.config/retro/variables.sh`).
 
 ### Usage
 
@@ -956,7 +1386,7 @@ bash "$RETRO_DIR/scripts/variable_core.sh" --list
 | `RETRO_OPACITY` | Global opacity multiplier |
 
 ---
-## 14. Dependency Management 📦
+## 15. Dependency Management 📦
 
 ### check_dep Function
 
@@ -980,7 +1410,7 @@ rx_is_pkg_installed() {
 ```
 
 ---
-## 15. Daemon System 🖥️ (Lua Background Daemon)
+## 16. Daemon System 🖥️ (Lua Background Daemon)
 
 ### Overview
 
@@ -1099,16 +1529,18 @@ function M.enabled()
 end
 
 function M.start(engine)
-    local temp = Watcher.read_sysfs("/sys/class/thermal/thermal_zone0/temp")
-    local temp_c = math.floor(temp / 1000)
+    while true do
+        local temp = Watcher.read_sys("/sys/class/thermal/thermal_zone0/temp")
+        local temp_c = math.floor(temp / 1000)
 
-    if temp_c >= 80 then
-        engine:emit("on_temperature_critical", temp_c)
-    elseif temp_c >= 70 then
-        engine:emit("on_temperature_high", temp_c)
+        if temp_c >= 80 then
+            engine:emit("on_temperature_critical", temp_c)
+        elseif temp_c >= 70 then
+            engine:emit("on_temperature_high", temp_c)
+        end
+
+        coroutine.yield()  -- REQUIRED: must yield to avoid blocking the scheduler
     end
-
-    coroutine.yield()  -- REQUIRED: must yield to avoid blocking the scheduler
 end
 
 return M
@@ -1119,7 +1551,11 @@ return M
    - Set `M.name` for unique identifier
    - Set `M.interval` for check frequency (default: 15s)
    - `M.enabled()` to conditionally load (required)
-   - `coroutine.yield()` must be called in the loop
+   - Wrap logic in `while true do ... end` loop
+   - `coroutine.yield()` must be called inside the loop
+
+> [!WARNING]
+> **Critical:** Watcher functions MUST use `while true do` loops. Without it, the coroutine runs once, yields, then enters a 'dead' state on the next resume (function body ends). The scheduler cannot revive dead coroutines — the watcher will run exactly once then break silently.
 
 > [!TIP]
 > **Tip:** Do NOT use `os.execute("sleep ...")` — use `Watcher.sleep(seconds)` or `coroutine.yield()` instead.
@@ -1169,7 +1605,7 @@ end
 > [!TIP]
 > **Why crash isolation:** A buggy watcher shouldn't take down the entire daemon.
 >
-> **Why this matters:** With per-watcher crash tracking, a watcher that errors 3 times in a row gets auto-disabled while others continue running. The disabled state persists across restarts so the daemon doesn't keep crashing on boot. Check `/tmp/retro_logs/watcher_&lt;name&gt;.disabled` to see if a watcher was auto-disabled. This ensures one broken feature doesn't break the entire system.
+> **Why this matters:** With per-watcher crash tracking, a watcher that errors 3 times in a row gets auto-disabled while others continue running. The disabled state persists across restarts so the daemon doesn't keep crashing on boot. Check `` `watcher_<name>.disabled` `` in `/tmp/retro_logs/` to see if a watcher was auto-disabled. This ensures one broken feature doesn't break the entire system.
 Each watcher runs in its own coroutine with independent crash tracking:
 - Crash count tracked per-watcher
 - After 3 crashes, the watcher is auto-disabled
@@ -1229,7 +1665,7 @@ return M
 > - PID stored in `/tmp/retro_event_daemon.pid`
 > - Stop signal via `/tmp/retro_event_daemon_stop` file
 ---
-## 16. Walkthrough: Adding a New Tool 🛠️
+## 17. Walkthrough: Adding a New Tool 🛠️
 
 Now that you know ALL the rules, let's add a hypothetical `temperature` tool:
 
@@ -1314,7 +1750,7 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 ```
 
 ---
-## 17. Best Practices and Gotchas ✅
+## 18. Best Practices and Gotchas ✅
 
 ### Do
 
@@ -1480,7 +1916,7 @@ trap - INT TERM  # clear trap on success
 Failing to handle interrupts can leave the system in a broken state (half-installed packages, incomplete symlinks, broken database entries).
 
 ---
-## 18. Installer System 💾 (bin/)
+## 19. Installer System 💾 (bin/)
 
 > [!NOTE]
 > **Why a separate installer system:** The installer (`bin/`) is isolated from the main tool system (`cmds/`, `scripts/`) because it runs in a fundamentally different environment.
@@ -1628,9 +2064,9 @@ rx_run_step() {
     local exit_code=$?
     rx_load_state                    # Reload state after step
 
-    # Exit code 42 = go back (skip to step 6 = timezone, then restart)
+    # Exit code 42 = go back (skip to disk.sh at index 10, then restart)
     if [[ $exit_code -eq 42 ]]; then
-        RX_SKIP_STEP=6
+        RX_SKIP_STEP=9
         rx_save_state
         exec /opt/retrolinux/bin/retroinstall  # Restart installer
     elif [[ $exit_code -ne 0 ]]; then
@@ -1653,8 +2089,8 @@ done
 
 **Go-back mechanism:**
 - `disk.sh` returns exit code `42` when user declines disk wipe confirmation
-- On `42`: Sets `RX_SKIP_STEP=6`, saves state, restarts installer via `exec`
-- The installer loops, skipping steps 0-6, resumes from disk.sh (index 10)
+- On `42`: Sets `RX_SKIP_STEP=9`, saves state, restarts installer via `exec`
+- The installer loops, skipping steps 0-9, resumes from `disk.sh` (index 10)
 
 ### State Management 🔐 (CRITICAL)
 
@@ -1903,7 +2339,7 @@ rx_generate_error_qr() {
 | 240 | Dark gray | Unselected items background |
 
 ---
-## 19. Quick Reference 📚
+## 20. Quick Reference 📚
 
 ### File Locations
 
@@ -2020,7 +2456,7 @@ RetroLinux/
 | Python log | `from lib.python.log import info, error` |
 | Python log (file) | `from scripts.python.log_core import register, rx_log_file` |
 | Python get/set var | `from lib.python.env import get_var, set_var` |
-| Python run cmd | `subprocess.run(["cmd", "arg"], capture_output=True, text=True)` |
+| Python run cmd | `run_shell_cmd("command", "--args", capture=True)` |
 | Python import lib | `from lib.python.obex import BUS_NAME, run_shell_cmd` |
 | Installer clear | `rx_clear_logo` in `bin/lib/display.sh` |
 | Installer error | `rx_retry_or_exit "message"` in `bin/lib/errors.sh` |
