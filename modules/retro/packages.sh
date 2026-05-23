@@ -8,7 +8,6 @@ grep
 rsync
 unzip
 expect
-fprintd
 udisks2
 usbutils
 net-tools
@@ -51,3 +50,7 @@ glmark2
 vkmark
 speedtest-cli
 pciutils
+
+# Polkit
+polkit-gnome
+fprintd
