@@ -32,11 +32,12 @@ rx_log() {
     local stripped_msg
     stripped_msg="$(echo "$message" | sed 's/'$'\033''\[[0-9;]*m//g')"
 
-    if [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]:[[:space:]]* ]] ||
+    if [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]:[[:space:]]*$ ]] ||
         [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]$ ]] ||
-        [[ $stripped_msg =~ \[Default: ]]; then
-        printf "${color}[${icon}${level}]${RESET} ${message}"
+        [[ $stripped_msg =~ \[Default: ]] ||
+        [[ $stripped_msg =~ \[.*\]:[[:space:]]*$ ]]; then
+        printf "${color}[${icon}${level}]${RESET} ${message}" >&2
     else
-        printf "${color}[${icon}${level}]${RESET} ${message}\n"
+        printf "${color}[${icon}${level}]${RESET} ${message}\n" >&2
     fi
 }

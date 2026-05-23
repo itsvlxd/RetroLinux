@@ -340,9 +340,7 @@ _apply_setup() {
 }' | sudo tee "$config_file" >/dev/null
     fi
 
-    local opts="$1"
-    IFS=',' read -ra pairs <<<"$opts"
-    for pair in "${pairs[@]}"; do
+    for pair in "$@"; do
         local key="${pair%%=*}"
         local val="${pair#*=}"
         case "$key" in

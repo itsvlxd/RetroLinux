@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/setup.sh"
 
 # TODO: Find a way in the future if we can implement it inside SDDM
 
@@ -49,31 +50,64 @@ cmd_fingerprint() {
 
     case "$action" in
         "setup" | "enroll")
+            rx_setup_parse "${@:2}"
+
             [[ -z $has_fprintd ]] && rx_log "error" "fprintd is not installed." && return 1
+
+            local enrolled_data=$(sudo fprintd-list "$target_user" 2>/dev/null)
+            local -a enrolled_fingers=()
+            while IFS= read -r line; do
+                local fname=$(echo "$line" | sed -n '/finger/s/.*:\s*//p' | xargs)
+                [[ -n $fname ]] && enrolled_fingers+=("$fname")
+            done <<< "$enrolled_data"
+            local config_exists=false
+            [[ ${#enrolled_fingers[@]} -gt 0 ]] && config_exists=true
+
+            rx_setup_check_needed "$config_exists" && return 0
+
+            if [[ $config_exists == true ]]; then
+                local display_fingers=""
+                for f in "${enrolled_fingers[@]}"; do
+                    display_fingers+="${display_fingers:+, }$(echo "$f" | sed 's/-/ /g')"
+                done
+                rx_setup_current "󰟀" "Enrolled Fingers" \
+                    "Fingers" "$display_fingers" || true
+
+                if ! rx_confirm "Reconfigure?" "N"; then
+                    rx_log "info" "Setup cancelled."
+                    return 0
+                fi
+            fi
 
             sudo pkill -f fprintd
 
-            rx_help_header "󰟀" "Choose a finger to enroll"
             local fingers=("left-thumb" "left-index-finger" "left-middle-finger" "left-ring-finger" "left-little-finger" "right-thumb" "right-index-finger" "right-middle-finger" "right-ring-finger" "right-little-finger")
 
-            for i in "${!fingers[@]}"; do
-                printf " ${PINK}%2d)${RESET} %s\n" $((i + 1)) "${fingers[$i]//-/ }"
+            local finger_labels=()
+            for f in "${fingers[@]}"; do
+                finger_labels+=("${f//-/ }")
             done
 
-            echo -ne "\n ${PINK}󰄾 Select (1-10): ${RESET}"
-            read -r choice
-            local selected_finger="${fingers[$((choice - 1))]}"
+            local selected_label=$(rx_menu "󰟀" "Choose a finger to enroll" "${finger_labels[@]}")
 
+            local selected_finger=""
+            for i in "${!finger_labels[@]}"; do
+                if [[ "${finger_labels[$i]}" == "$selected_label" ]]; then
+                    selected_finger="${fingers[$i]}"
+                    break
+                fi
+            done
             [[ -z $selected_finger ]] && rx_log "error" "Invalid selection." && return 1
 
             rx_log "info" "Starting enrollment for ${PINK}$selected_finger${RESET}..."
             rx_log "warn" "Place your finger on the sensor when it blinks."
 
             if sudo fprintd-enroll -f "$selected_finger" "$target_user"; then
-                rx_log "success" "Fingerprint registered!"
+                rx_setup_success "󰟀" "Fingerprint Registered" \
+                    "Finger" "$selected_finger"
 
                 if ! grep -q "pam_fprintd.so" /etc/pam.d/sudo; then
-                    rx_yesno "Enable biometric auth for sudo/login?" || return 0
+                    rx_confirm "Enable biometric auth for sudo/login?" "Y" || return 0
                     setup_pam_auth
                 fi
             else

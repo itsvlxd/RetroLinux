@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/setup.sh"
 source "$RETRO_DIR/lib/xdg.sh"
 
 cmd_xdg() {
@@ -445,19 +446,18 @@ cmd_xdg() {
             ;;
 
         "setup")
-            local non_interactive=false
-            local options=""
-            while [[ $# -gt 0 ]]; do
-                case "$1" in
-                    -o|--options) non_interactive=true; options="$2"; [[ -n $2 ]] && shift 2 || shift ;;
-                    *) shift ;;
-                esac
-            done
+            rx_setup_parse "$@"
+            rx_setup_validate "editor,browser,filemanager,fm,image,video" || return 1
 
-            if [[ $non_interactive == true && -z $options ]]; then
-                rx_log "error" "Empty options. Valid keys: editor, browser, filemanager (or fm), image, video"
-                return 1
-            fi
+            local default_count=0
+            while IFS='|' read -r mime desktop app; do
+                [[ -z $mime ]] && continue
+                ((default_count++))
+            done < <(bash "$xdg_script" --list-defaults 2>/dev/null)
+            local config_exists=false
+            [[ $default_count -gt 0 ]] && config_exists=true
+
+            rx_setup_check_needed "$config_exists" && return 0
 
             local editor_input=""
             local browser_input=""
@@ -465,20 +465,13 @@ cmd_xdg() {
             local image_input=""
             local video_input=""
 
-            if [[ -n $options ]]; then
-                IFS=',' read -ra opts_array <<< "$options"
-                for pair in "${opts_array[@]}"; do
-                    local key="${pair%%=*}"
-                    local val="${pair#*=}"
-                    case "$key" in
-                        editor) editor_input="$val" ;;
-                        browser) browser_input="$val" ;;
-                        filemanager|fm) fm_input="$val" ;;
-                        image) image_input="$val" ;;
-                        video) video_input="$val" ;;
-                        *) rx_log "warn" "Unknown key: ${PINK}$key${RESET} (valid: editor, browser, filemanager, image, video)" ;;
-                    esac
-                done
+            if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+                editor_input=$(rx_setup_get_opt "editor")
+                browser_input=$(rx_setup_get_opt "browser")
+                fm_input=$(rx_setup_get_opt "filemanager")
+                [[ -z $fm_input ]] && fm_input=$(rx_setup_get_opt "fm")
+                image_input=$(rx_setup_get_opt "image")
+                video_input=$(rx_setup_get_opt "video")
             else
                 local cur_editor=$(get_var "RETRO_EDITOR_CMD" "nvim")
                 local cur_fm=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
@@ -495,47 +488,43 @@ cmd_xdg() {
                 rx_xdg_validate_desktop "loupe.desktop" || detected_image="viewnior"
                 rx_xdg_validate_desktop "$detected_image.desktop" || detected_image="feh"
 
-            _rx_xdg_input() {
-                local icon="$1"
-                local label="$2"
-                local default="$3"
+                local detected_video="mpv"
 
-                echo "" >&2
-                echo -e " ${PINK}$icon  Configure $label${RESET}" >&2
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}" >&2
+                if [[ $config_exists == true ]]; then
+                    rx_setup_current "󱗼" "Current Default Applications" \
+                        "Editor" "$cur_editor" \
+                        "Browser" "$detected_browser" \
+                        "File Manager" "$cur_fm" \
+                        "Image Viewer" "$detected_image" \
+                        "Video Player" "$detected_video" || true
 
-                while true; do
-                    echo -ne " ${PINK}󰄾${RESET} ${label} ${MUTE}[$default]${RESET}: " >&2
-                    read -r input
-                    [[ -z $input ]] && input="$default"
-
-                    local desktop
-                    desktop=$(rx_xdg_resolve_desktop "$input")
-                    if [[ -n $desktop ]]; then
-                        echo "$input"
+                    if ! rx_confirm "Reconfigure?" "N"; then
+                        rx_log "info" "Setup cancelled."
                         return 0
                     fi
+                fi
 
-                    echo -e "\n ${WARN}✗${RESET} Desktop file not found for: ${PINK}$input${RESET}" >&2
-                    echo -e " ${GRAY}Try again or press Enter for default ($default)${RESET}" >&2
-                done
-            }
+                _rx_xdg_desktop_input() {
+                    local icon="$1" label="$2" default="$3"
+                    while true; do
+                        local input
+                        input=$(rx_input "$label" "$default")
+                        local desktop
+                        desktop=$(rx_xdg_resolve_desktop "$input")
+                        if [[ -n $desktop ]]; then
+                            echo "$input"
+                            return 0
+                        fi
+                        rx_log "warn" "Desktop file not found: ${PINK}${input}${RESET}"
+                        rx_log "info" "Try again or press Enter for default (${PINK}${default}${RESET})"
+                    done
+                }
 
-            rx_table_header "󱗼" "Configure Default Applications"
-            rx_table_row "󰓅" "Editor:" "$cur_editor" "$PINK" "16"
-            rx_table_row "󰤨" "Browser:" "$detected_browser" "$PINK" "16"
-            rx_table_row "󰉋" "File Manager:" "$cur_fm" "$PINK" "16"
-            rx_table_row "󰋩" "Image Viewer:" "$detected_image" "$PINK" "16"
-            rx_table_row "󰎁" "Video Player:" "mpv" "$PINK" "16"
-            rx_table_row "󰆍" "Terminal:" "kitty.desktop" "$PINK" "16"
-            rx_table_separator
-            rx_table_spacer
-
-            editor_input=$(_rx_xdg_input "󰓅" "Editor" "$cur_editor")
-            browser_input=$(_rx_xdg_input "󰤨" "Browser" "$detected_browser")
-            fm_input=$(_rx_xdg_input "󰉋" "File Manager" "$cur_fm")
-            image_input=$(_rx_xdg_input "󰋩" "Image Viewer" "$detected_image")
-            video_input=$(_rx_xdg_input "󰎁" "Video Player" "mpv")
+                editor_input=$(_rx_xdg_desktop_input "󰓅" "What editor would you like to use?" "$cur_editor")
+                browser_input=$(_rx_xdg_desktop_input "󰤨" "What browser would you like to use?" "$detected_browser")
+                fm_input=$(_rx_xdg_desktop_input "󰉋" "What file manager would you like to use?" "$cur_fm")
+                image_input=$(_rx_xdg_desktop_input "󰋩" "What image viewer would you like to use?" "$detected_image")
+                video_input=$(_rx_xdg_desktop_input "󰎁" "What video player would you like to use?" "$detected_video")
             fi
 
             local editor_desktop=$(rx_xdg_resolve_desktop "$editor_input")
@@ -550,34 +539,27 @@ cmd_xdg() {
             local image_count=13
             local video_count=11
 
-            if [[ -z $options ]]; then
-                rx_table_header "󰈔" "Summary"
-                rx_table_row "󰓅" "Editor:" "${editor_count} MIME types" "$PINK" "16"
-                rx_table_row "󰤨" "Browser:" "${browser_count} MIME types" "$PINK" "16"
-                rx_table_row "󰉋" "File Manager:" "${fm_count} MIME types" "$PINK" "16"
-                rx_table_row "󰋩" "Image Viewer:" "${image_count} MIME types" "$PINK" "16"
-                rx_table_row "󰎁" "Video Player:" "${video_count} MIME types" "$PINK" "16"
-                rx_table_row "󰆍" "Terminal:" "1 MIME type" "$PINK" "16"
-                rx_table_separator
-                rx_table_spacer
+            if [[ $RX_SETUP_MODE == "interactive" ]]; then
+                rx_setup_summary "󰈔" "Summary" \
+                    "Editor" "$editor_input (${editor_count} types)" \
+                    "Browser" "$browser_input (${browser_count} types)" \
+                    "File Manager" "$fm_input (${fm_count} types)" \
+                    "Image Viewer" "$image_input (${image_count} types)" \
+                    "Video Player" "$video_input (${video_count} types)" \
+                    "Terminal" "kitty.desktop (1 type)"
 
-                if ! rx_confirm "Apply these defaults?" "N"; then
-                    rx_log "info" "Setup cancelled."
-                    return 0
-                fi
+                rx_setup_confirm || return 0
             fi
 
             local result=$(bash "$xdg_script" --setup "$editor_input" "$browser_input" "$fm_input" "$image_input" "$video_input" 2>&1)
             if echo "$result" | grep -q "^OK|"; then
-                rx_table_header "󱗼" "XDG Defaults Configured"
-                rx_table_row "󰓅" "Editor:" "$editor_desktop (${editor_count} types)" "$SUCCESS" "16"
-                rx_table_row "󰤨" "Browser:" "$browser_desktop (${browser_count} types)" "$SUCCESS" "16"
-                rx_table_row "󰉋" "File Manager:" "$fm_desktop (${fm_count} types)" "$SUCCESS" "16"
-                rx_table_row "󰋩" "Image Viewer:" "$image_desktop (${image_count} types)" "$SUCCESS" "16"
-                rx_table_row "󰎁" "Video Player:" "$video_desktop (${video_count} types)" "$SUCCESS" "16"
-                rx_table_row "󰆍" "Terminal:" "kitty.desktop (1 type)" "$SUCCESS" "16"
-                rx_table_separator
-                rx_table_spacer
+                rx_setup_success "󱗼" "XDG Defaults Configured" \
+                    "Editor" "$editor_desktop (${editor_count} types)" \
+                    "Browser" "$browser_desktop (${browser_count} types)" \
+                    "File Manager" "$fm_desktop (${fm_count} types)" \
+                    "Image Viewer" "$image_desktop (${image_count} types)" \
+                    "Video Player" "$video_desktop (${video_count} types)" \
+                    "Terminal" "kitty.desktop (1 type)"
             else
                 rx_log "error" "Failed to configure XDG defaults."
                 return 1
