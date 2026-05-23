@@ -25,6 +25,17 @@ local function _get_log_path(id)
     return _log_dir .. "/" .. id .. ".log"
 end
 
+local function _get_disabled_path(id)
+    return _log_dir .. "/" .. id .. ".disabled"
+end
+
+local function _is_disabled(id)
+    local path = _get_disabled_path(id)
+    local f = io.open(path, "r")
+    if f then f:close(); return true end
+    return false
+end
+
 local function _rotate(path, max_lines)
     max_lines = max_lines or 500
     local f = io.open(path, "r")
@@ -37,14 +48,28 @@ local function _rotate(path, max_lines)
     f:close()
 
     if #lines > max_lines then
+        local tmp = {}
+        local start = #lines - max_lines + 1
+        for i = start, #lines do
+            table.insert(tmp, lines[i])
+        end
         f = io.open(path, "w")
         if f then
-            for i = #lines - max_lines + 1, #lines do
-                f:write(lines[i] .. "\n")
+            for _, line in ipairs(tmp) do
+                f:write(line .. "\n")
             end
             f:close()
         end
     end
+end
+
+local function _write_to_log(id, log_line)
+    local path = _get_log_path(id)
+    local f = io.open(path, "a")
+    if not f then return end
+    f:write(log_line .. "\n")
+    f:close()
+    _rotate(path)
 end
 
 function Log.register(id)
@@ -59,8 +84,18 @@ function Log.register(id)
     return true
 end
 
-function Log.log(level, message)
+function Log.log(level, message, target_id)
     level = string.upper(level or "info")
+    local ts = os.date("%Y-%m-%d %H:%M:%S")
+    local log_line = string.format("[%s] [%s] %s", ts, level, message)
+
+    if target_id then
+        if not _is_disabled(target_id) then
+            _write_to_log(target_id, log_line)
+        end
+        return
+    end
+
     local icon = ICONS[level] or "󰀦 "
     local color = COLORS[level] or Colors.RESET
 
@@ -77,16 +112,9 @@ function Log.log(level, message)
         io.write(string.format("%s[%s%s]%s %s\n", color, icon, level, Colors.RESET, message))
     end
 
-    local ts = os.date("%Y-%m-%d %H:%M:%S")
-    local log_line = string.format("[%s] [%s] %s", ts, level, message)
-
     for id, _ in pairs(_registered) do
-        local path = _get_log_path(id)
-        local f = io.open(path, "a")
-        if f then
-            f:write(log_line .. "\n")
-            f:close()
-            _rotate(path)
+        if not _is_disabled(id) then
+            _write_to_log(id, log_line)
         end
     end
 end
@@ -95,6 +123,20 @@ function Log.info(message) Log.log("info", message) end
 function Log.success(message) Log.log("success", message) end
 function Log.warn(message) Log.log("warn", message) end
 function Log.error(message) Log.log("error", message) end
+
+function Log.disable(id)
+    local path = _get_disabled_path(id)
+    local f = io.open(path, "w")
+    if f then f:close() end
+end
+
+function Log.enable(id)
+    os.remove(_get_disabled_path(id))
+end
+
+function Log.is_disabled(id)
+    return _is_disabled(id)
+end
 
 function Log.list()
     local result = {}
