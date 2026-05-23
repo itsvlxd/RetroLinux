@@ -6,7 +6,6 @@ return {
     end,
     start = function(engine)
         local Watcher = require("watcher")
-        local log = function(msg) Watcher.log("timers", msg) end
 
         local last_pkg_check = 0
         local last_retro_check = 0
@@ -19,7 +18,7 @@ return {
 
         local retro_dir = os.getenv("RETRO_DIR")
 
-        log(string.format("Package check every %dm, Retro check every %dm", pkg_min, retro_min))
+        Watcher.log("timers", string.format("Package check every %dm, Retro check every %dm", pkg_min, retro_min), "info")
 
         while true do
             Watcher.reload_vars()
@@ -49,10 +48,10 @@ return {
                         if count > 1 then sample = sample .. ", " end
                         sample = sample .. pkg
                     end
-                    log(string.format("%d updates available (pac=%d, aur=%d, thresh=%d): %s", total, pac_count, aur_count, thresh, sample))
+                    Watcher.log("timers", string.format("%d updates available (pac=%d, aur=%d, thresh=%d): %s", total, pac_count, aur_count, thresh, sample), "info")
                     engine:emit("on_pkg_updates_available", tostring(total), sample)
                 else
-                    log(string.format("Package check: %d updates (pac=%d, aur=%d, thresh=%d) - below threshold", total, pac_count, aur_count, thresh))
+                    Watcher.log("timers", string.format("Package check: %d updates (pac=%d, aur=%d, thresh=%d) - below threshold", total, pac_count, aur_count, thresh), "info")
                 end
 
                 last_pkg_check = now
@@ -67,10 +66,10 @@ return {
                     local behind = tonumber(behind_str) or 0
 
                     if behind > 0 then
-                        log(string.format("%d Retro commits behind (branch: %s)", behind, branch))
+                        Watcher.log("timers", string.format("%d Retro commits behind (branch: %s)", behind, branch), "info")
                         engine:emit("on_retro_update_available", tostring(behind))
                     else
-                        log("Retro is up to date (branch: " .. branch .. ")")
+                        Watcher.log("timers", "Retro is up to date (branch: " .. branch .. ")", "info")
                     end
                 end
 

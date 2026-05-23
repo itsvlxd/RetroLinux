@@ -7,7 +7,6 @@ return {
     start = function(engine)
         local Watcher = require("watcher")
         local Wallpaper = require("wallpaper")
-        local log = function(msg) Watcher.log("wallpaper", msg) end
 
         local was_paused = false
         local was_static = false
@@ -26,7 +25,7 @@ return {
             local should_be_static = force_static == "true" or (saver_active == "true" and static_on_saver == "true") or (on_battery == "yes" and static_on_bat == "true")
 
             if was_static and not should_be_static then
-                log("Static mode disabled, resuming live wallpaper")
+                Watcher.log("wallpaper", "Static mode disabled, resuming live wallpaper", "info")
                 Watcher.set_var("WALL_PAUSED", "false")
                 wall_paused = "false"
             end
@@ -34,12 +33,12 @@ return {
             if not should_be_static and wall_paused == "true" then
                 Watcher.set_var("WALL_PAUSED", "false")
                 wall_paused = "false"
-                log("Resetting WALL_PAUSED (static mode inactive)")
+                Watcher.log("wallpaper", "Resetting WALL_PAUSED (static mode inactive)", "info")
             end
 
             if should_be_static then
                 if mpvpaper_running == "yes" then
-                    log("Static mode active, stopping mpvpaper")
+                    Watcher.log("wallpaper", "Static mode active, stopping mpvpaper", "info")
                     Wallpaper.pause_wallpaper()
                 end
                 if was_paused then
@@ -60,7 +59,7 @@ return {
                         if current ~= "" and current ~= "null" then
                             local video = Wallpaper.find_video_version(current)
                             if video then
-                                log("mpvpaper not running, launching with " .. video)
+                                Watcher.log("wallpaper", "mpvpaper not running, launching with " .. video, "warn")
                                 Wallpaper.start(video, true)
                             end
                         end
@@ -70,11 +69,11 @@ return {
                 local should_pause = Wallpaper.should_pause()
 
                 if should_pause and not was_paused then
-                    log("Fullscreen or blocked process detected, pausing wallpaper")
+                    Watcher.log("wallpaper", "Fullscreen or blocked process detected, pausing wallpaper", "info")
                     Wallpaper.pause_wallpaper()
                     was_paused = true
                 elseif not should_pause and was_paused then
-                    log("Fullscreen cleared, resuming wallpaper")
+                    Watcher.log("wallpaper", "Fullscreen cleared, resuming wallpaper", "info")
                     local current = Watcher.get_var("WALL_CURRENT", "")
                     if current ~= "" and current ~= "null" then
                         local video = Wallpaper.find_video_version(current)
