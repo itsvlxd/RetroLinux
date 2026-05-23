@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/setup.sh"
 
 cmd_bw() {
     local action="${1,,}"
@@ -202,9 +203,36 @@ cmd_bw() {
             rx_log "success" "Bitwarden integration reset."
             ;;
         "setup")
+            rx_setup_parse "$@"
+
+            local config_exists=false
+            [[ $(get_var "CLIP_BITWARDEN") == "true" ]] && config_exists=true
+
+            rx_setup_check_needed "$config_exists" && return 0
+
+            if [[ $config_exists == true ]]; then
+                local cur_vault=$(get_var "CLIP_WARDEN_SERVER")
+                local cur_sync=$(get_var "CLIP_WARDEN_SYNC" "1800")
+                local cur_timeout=$(get_var "CLIP_WARDEN_TIMEOUT" "900")
+                local cur_destruct=$(get_var "CLIP_WARDEN_DESTRUCT" "30")
+
+                local cur_email=$(rbw config show | grep "email" | awk -F'"' '{print $4}')
+                rx_setup_current "" "Current Bitwarden Configuration" \
+                    "Vault" "$cur_vault" \
+                    "Email" "$cur_email" \
+                    "Sync" "${cur_sync}s" \
+                    "Lock" "${cur_timeout}s" \
+                    "Wipe" "${cur_destruct}s" || true
+
+                if ! rx_confirm "Reconfigure?" "N"; then
+                    rx_log "info" "Setup cancelled."
+                    return 0
+                fi
+            fi
+
             mkdir -p ~/.cache/rbw
 
-            rx_help_header "" "Bitwarden Setup Instructions"
+            rx_help_header "" "Bitwarden Setup Instructions"
             echo -e " ${PINK}1.${RESET} Open the API Settings directly: "
             echo -e "     ${PINK}https://vault.bitwarden.com/#/settings/security/security-keys${RESET}"
             echo -e " ${PINK}2.${RESET} Scroll down to the ${PINK}API KEY${RESET} section."
@@ -212,65 +240,54 @@ cmd_bw() {
             rx_help_separator
             rx_help_spacer
 
-            if [[ "$SKIP_PROMPT" != "true" ]]; then
-                rx_log "info" "Do you have your keys and wish to continue? ${PINK}[y/N]${RESET}: "
-                read -r ready
-                [[ ! $ready =~ ^[Yy]$ ]] && return 0
-            fi
+            [[ "$SKIP_PROMPT" == "true" ]] || rx_confirm "Do you have your keys and wish to continue?" "Y" || return 0
 
-            rx_log "info" "Which Bitwarden instance are you using?"
-            rx_help_option "1)" "Global (.com)"
-            rx_help_option "2)" "Europe (.eu)"
-            rx_help_option "8)" "Custom / Self-Hosted"
-            echo -ne "\n ${PINK}󰄾 ${RESET}Choice [1-3]: "
-            read -r srv_choice
+            rx_log "info" "Bitwarden server selection"
+            local srv_options=("Global (.com)" "Europe (.eu)" "Custom / Self-Hosted")
+            local srv_choice=$(rx_menu "" "Which Bitwarden instance?" "${srv_options[@]}")
 
             case "$srv_choice" in
-                1)
+                "Global (.com)")
                     rbw config set base_url "https://vault.bitwarden.com"
                     rbw config set identity_url "https://identity.bitwarden.com"
                     ;;
-                2)
+                "Europe (.eu)")
                     rbw config set base_url "https://api.bitwarden.eu"
                     rbw config set identity_url "https://identity.bitwarden.eu"
                     ;;
-                3)
-                    rx_log "info" "Enter your Custom Vault URL (e.g., https://vault.domain.com): "
-                    read -r custom_vault
-                    rx_log "info" "Enter your Custom Identity URL (e.g., https://identity.domain.com): "
-                    read -r custom_identity
+                "Custom / Self-Hosted")
+                    local custom_vault=$(rx_input "Custom Vault URL" "https://vault.example.com")
+                    local custom_identity=$(rx_input "Custom Identity URL" "https://identity.example.com")
                     rbw config set base_url "$custom_vault"
                     rbw config set identity_url "$custom_identity"
-                    ;;
-                *)
-                    rbw config set base_url "https://vault.bitwarden.com"
-                    rbw config set identity_url "https://identity.bitwarden.com"
                     ;;
             esac
 
             local current_vault=$(rbw config show | grep "base_url" | awk -F'"' '{print $4}')
             set_var "CLIP_WARDEN_SERVER" "$current_vault"
 
-            rx_log "info" "Launching registration. Please follow the terminal prompts:"
+            local bw_email=""
+            if [[ "$SKIP_PROMPT" == "true" ]]; then
+                bw_email=$(rbw config show | grep "email" | awk -F'"' '{print $4}')
+            else
+                rx_log "info" "Email configuration"
+                bw_email=$(rx_input "Enter your Bitwarden account email" "")
+                [[ -n $bw_email ]] && rbw config set email "$bw_email"
+            fi
+
+            rx_log "info" "Launching registration. Follow the terminal prompts:"
 
             if rbw register; then
                 set_var "CLIP_BITWARDEN" "true"
 
                 if [[ "$SKIP_PROMPT" == "true" ]]; then
-                    local val_sync=1800
-                    local val_timeout=900
-                    local val_destruct=30
+                    local val_sync=1800 val_timeout=900 val_destruct=30
                     rx_log "info" "Using defaults: sync=${val_sync}s, lock=${val_timeout}s, wipe=${val_destruct}s"
                 else
-                    rx_log "info" "How often should I pull fresh data from the server? (seconds) ${PINK}[Default: 1800]${RESET}: "
-                    read -r input_sync
-                    local val_sync=${input_sync:-1800}
-                    rx_log "info" "How long should the vault stay unlocked before requiring a PIN? (seconds) ${PINK}[Default: 900]${RESET}: "
-                    read -r input_timeout
-                    local val_timeout=${input_timeout:-900}
-                    rx_log "info" "How many seconds before a copied password is wiped from the clipboard? ${PINK}[Default: 30]${RESET}: "
-                    read -r input_destruct
-                    local val_destruct=${input_destruct:-30}
+                    rx_log "info" "Timer configuration"
+                    local val_sync=$(rx_input_numeric "Sync interval (seconds)" "1800")
+                    local val_timeout=$(rx_input_numeric "Lock timeout (seconds)" "900")
+                    local val_destruct=$(rx_input_numeric "Clipboard destruct (seconds)" "30")
                 fi
                 rbw config set sync_interval "$val_sync"
                 set_var "CLIP_WARDEN_SYNC" "$val_sync"
@@ -278,7 +295,12 @@ cmd_bw() {
                 set_var "CLIP_WARDEN_TIMEOUT" "$val_timeout"
                 set_var "CLIP_WARDEN_DESTRUCT" "$val_destruct"
 
-                rx_log "success" "Bitwarden integration and security policies enabled!"
+                rx_setup_success "" "Bitwarden Configured" \
+                    "Vault" "$current_vault" \
+                    "Email" "$bw_email" \
+                    "Sync" "${val_sync}s" \
+                    "Lock" "${val_timeout}s" \
+                    "Wipe" "${val_destruct}s"
             else
                 rx_log "error" "Registration failed. Check your keys or server URLs."
                 return 1
