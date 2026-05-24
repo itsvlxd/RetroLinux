@@ -17,8 +17,11 @@ pacman-contrib
 xdg-desktop-portal-gtk
 
 # Auth
-polkit-gnome
 fprintd
+seahorse
+libsecret
+polkit-gnome
+gnome-keyring
 
 # Apps
 loupe

@@ -587,6 +587,69 @@ printf " ${PINK}󰿅${RESET} %-14s ${GRAY}%s${RESET}\n" "PipeWire:" "$pw_ver"
 # ... etc
 ```
 
+### Status State Display Pattern (Active/Inactive, On/Off, True/False)
+
+When displaying binary states (service status, configuration states, toggles), use consistent colors and Nerd Font icons:
+
+| State | Color | Icon | Display Text |
+|-------|-------|------|--------------|
+| Active/On/True | `$SUCCESS` | `●` | "● Active" |
+| Inactive/Off/False | `$MUTE` | `○` | "○ Inactive" |
+| Warning/Locked | `$WARN` | `○` | "○ Locked" |
+| Error/Failed | `$ERROR` | `○` | "○ Failed" |
+
+**Pattern:**
+```bash
+# Service status example
+local service_color="$MUTE"
+[[ $service_gk == "active" ]] && service_color="$SUCCESS"
+
+local gk_status="${service_gk^}"
+[[ $service_gk == "active" ]] && gk_status="● Active" || gk_status="○ Inactive"
+
+rx_table_row "󰒓" "Service:" "$gk_status" "$service_color"
+```
+
+**Real example** (from `cmds/tools/bitwarden.sh`):
+```bash
+# PAM authentication status
+local pam_auth_display="${pam_auth^}"
+local pam_auth_color="$MUTE"
+[[ $pam_auth == "configured" ]] && pam_auth_color="$SUCCESS"
+
+rx_table_row "󰒓" "PAM Auth:" "$pam_auth_display" "$pam_auth_color"
+
+# Vault/keyring status
+local vault_color="$MUTE"
+local vault_display="${keyring_state^}"
+[[ $keyring_state == "unlocked" ]] && vault_color="$SUCCESS" && vault_display="● Unlocked"
+[[ $keyring_state == "locked" ]] && vault_color="$WARN" && vault_display="○ Locked"
+
+rx_table_row "󰒓" "Vault:" "$vault_display" "$vault_color"
+```
+
+**Key rules:**
+1. **Always use `$MUTE` (gray) for inactive/disabled states** — never use `$PINK` or default color
+2. **Use `$SUCCESS` for active/enabled states** — signals "working as expected"
+3. **Use `$WARN` for warning states** (e.g., "locked", "pending") — signals "attention needed"
+4. **Use `$ERROR` for error states** (e.g., "failed", "broken") — signals "action required"
+5. **Use `●` (filled circle) for active states** — visually indicates "on"
+6. **Use `○` (empty circle) for inactive/warning/error states** — visually indicates "off" or "caution"
+7. **Capitalize with `${var^}`** — consistent title case for display text
+8. **Set color FIRST, then compute display text** — keeps logic clear and maintainable
+
+**Common patterns table:**
+
+| State Variable | Color Logic | Display Logic |
+|----------------|-------------|---------------|
+| Service (active/inactive) | `[[ $state == "active" ]] && color="$SUCCESS" \|\| color="$MUTE"` | `[[ $state == "active" ]] && display="● Active" \|\| display="○ Inactive"` |
+| Config (configured/missing) | `[[ $state == "configured" ]] && color="$SUCCESS" \|\| color="$MUTE"` | `[[ $state == "configured" ]] && display="● Configured" \|\| display="○ Not configured"` |
+| Lock (unlocked/locked) | `[[ $state == "unlocked" ]] && color="$SUCCESS" \|\| color="$WARN"` | `[[ $state == "unlocked" ]] && display="● Unlocked" \|\| display="○ Locked"` |
+| Sync (synced/syncing/error) | `[[ $state == "synced" ]] && color="$SUCCESS" \|\| [[ $state == "syncing" ]] && color="$WARN" \|\| color="$ERROR"` | `[[ $state == "synced" ]] && display="● Synced" \|\| [[ $state == "syncing" ]] && display="○ Syncing..." \|\| display="○ Sync failed"` |
+
+> [!NOTE]
+> **`$PINK` is for labels and important values, NOT for state indicators.** Use state colors (`$SUCCESS`, `$MUTE`, `$WARN`, `$ERROR`) to communicate status at a glance. `$PINK` draws attention to configuration values (e.g., volume percentages, file paths), while state colors communicate health (e.g., active/inactive, locked/unlocked).
+
 ### Help Message Pattern
 
 ```bash
