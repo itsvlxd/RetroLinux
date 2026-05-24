@@ -13,10 +13,12 @@ cmd_load() {
         "retro bluetooth restore|Initializing bluetooth radio cards"
         "retro audio easyeffects start|Initializing audio drivers"
         "retro daemon start|Initializing retro daemon engine and watchers"
+        "retro polkit start|Starting auth agent and keyring daemon"
         "retro power restore|Restoring hardware power profiles"
         "retro wallpaper restore|Applying last used wallpaper"
         "retro xdg dirs reset|Ensuring XDG user directories exist"
         "retro xdg portal inject|Injecting session env into XDG portal daemon"
+        "retro xdg flatpak|Bridging host MIME defaults into Flatpak sandbox"
 
         "retro benchmark hud load|Loads mangohud and benchmark variables"
 
@@ -25,7 +27,6 @@ cmd_load() {
 
         "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
-        "retro xdg flatpak|Bridging host MIME defaults into Flatpak sandbox"
     )
 
     local auto_load=$(get_var "RETRO_SESSION_AUTOLOAD")
