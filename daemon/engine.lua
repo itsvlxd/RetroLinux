@@ -207,12 +207,26 @@ function Engine:run_loop()
 
             if now >= self.watcher_next_run[i] then
                 local status = coroutine.status(co)
-                if status == "suspended" or status == "normal" then
+                if status == "dead" then
+                    w.crashes = w.crashes + 1
+                    if w.crashes >= self.max_crashes then
+                        w.disabled = true
+                    else
+                        self.watcher_co[i] = coroutine.create(function()
+                            self:run_watcher(w)
+                        end)
+                    end
+                    self.watcher_next_run[i] = now + w.interval
+                elseif status == "suspended" or status == "normal" then
                     local ok = coroutine.resume(co)
                     if not ok then
                         w.crashes = w.crashes + 1
                         if w.crashes >= self.max_crashes then
                             w.disabled = true
+                        else
+                            self.watcher_co[i] = coroutine.create(function()
+                                self:run_watcher(w)
+                            end)
                         end
                     end
                     self.watcher_next_run[i] = now + w.interval
