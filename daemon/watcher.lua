@@ -6,8 +6,6 @@ local _log_caps = {}
 local _log_enabled = nil
 local _log_dir = "/tmp/retro_logs"
 
-local _log_core = nil
-
 os.execute("mkdir -p " .. _log_dir)
 
 local function _get_vars_file()
@@ -173,18 +171,45 @@ function Watcher.is_log_disabled(name)
     return false
 end
 
+local function _rotate_log(name)
+    local log_path = _log_dir .. "/watcher_" .. name .. ".log"
+    local f = io.open(log_path, "r")
+    if not f then return end
+    local lines = {}
+    for line in f:lines() do
+        table.insert(lines, line)
+    end
+    f:close()
+    if #lines > 500 then
+        local tmp = {}
+        for i = #lines - 499, #lines do
+            table.insert(tmp, lines[i])
+        end
+        f = io.open(log_path, "w")
+        if f then
+            for _, l in ipairs(tmp) do
+                f:write(l .. "\n")
+            end
+            f:close()
+        end
+    end
+end
+
+local function _write_log(name, msg, level)
+    local log_path = _log_dir .. "/watcher_" .. name .. ".log"
+    local ts = os.date("%Y-%m-%d %H:%M:%S")
+    local log_line = string.format("[%s] [%s] %s", ts, string.upper(level or "info"), msg)
+    local f = io.open(log_path, "a")
+    if not f then return end
+    f:write(log_line .. "\n")
+    f:close()
+    _rotate_log(name)
+end
+
 function Watcher.log(name, msg, level)
     if not Watcher.is_log_enabled() then return end
     if Watcher.is_log_disabled(name) then return end
-
-    if not _log_core then
-        local script_dir = debug.getinfo(1, "S").source:match("@(.+)/[^/]+$") or "."
-        local retro_dir = script_dir .. "/.."
-        _log_core = dofile(retro_dir .. "/scripts/lua/log_core.lua")
-    end
-    local log_id = "watcher_" .. name
-    _log_core.register(log_id)
-    _log_core.log(level or "info", msg, log_id)
+    _write_log(name, msg, level or "info")
 end
 
 function Watcher.tail_log(name, limit)
