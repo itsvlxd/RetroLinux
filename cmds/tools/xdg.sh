@@ -553,6 +553,14 @@ cmd_xdg() {
 
             local result=$(bash "$xdg_script" --setup "$editor_input" "$browser_input" "$fm_input" "$image_input" "$video_input" 2>&1)
             if echo "$result" | grep -q "^OK|"; then
+                check_dep "xdg-terminal-exec" "xdg-terminal-exec" || return 1
+                mkdir -p "$HOME/.config/xdg-terminal-exec"
+                cat > "$HOME/.config/xdg-terminal-exec/config" << EOF
+[General]
+terminal=kitty.desktop
+EOF
+                rx_log "success" "Terminal executor configured (kitty)"
+
                 rx_setup_success "󱗼" "XDG Defaults Configured" \
                     "Editor" "$editor_desktop (${editor_count} types)" \
                     "Browser" "$browser_desktop (${browser_count} types)" \
