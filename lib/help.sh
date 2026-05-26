@@ -148,7 +148,7 @@ rx_confirm() {
     local default="${2:-N}"
     local skip="${3:-false}"
 
-    if [[ $skip == "true" ]]; then
+    if [[ $skip == "true" || ${RX_SETUP_YES:-false} == "true" ]]; then
         return 0
     fi
 
