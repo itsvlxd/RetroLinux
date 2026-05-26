@@ -539,8 +539,39 @@ remove_snapshot_entry() {
     rm -f "$temp_cfg"
 }
 
+_grub_ensure_kernel() {
+    local kernel="$1"
+    [[ -z $kernel || $kernel == "linux" ]] && return 0
+
+    local img="/boot/vmlinuz-${kernel}"
+    local initrd="/boot/initramfs-${kernel}.img"
+
+    if [[ -f $img && -f $initrd ]]; then
+        rx_log_file "info" "Kernel ${kernel} already present"
+        return 0
+    fi
+
+    rx_log_file "info" "Kernel ${kernel} missing, installing..."
+    $SUDO_CMD pacman -S --needed --noconfirm "${kernel}" "${kernel}-headers" || {
+        rx_log_file "error" "Failed to install kernel ${kernel}"
+        return 1
+    }
+    $SUDO_CMD mkinitcpio -P 2>/dev/null || true
+
+    if [[ -f $img && -f $initrd ]]; then
+        rx_log_file "success" "Kernel ${kernel} installed and initramfs rebuilt"
+        return 0
+    fi
+    rx_log_file "error" "Kernel ${kernel} files still missing after install"
+    return 1
+}
+
 regenerate_grub() {
     local remove_snapshots="${1:-false}"
+
+    local target_kernel=$(get_var "GRUB_KERNEL" "linux")
+    _grub_ensure_kernel "$target_kernel" || return 1
+
     rx_log_file "info" "Regenerating GRUB configuration..."
 
     if command -v grub-mkconfig >/dev/null 2>&1; then
