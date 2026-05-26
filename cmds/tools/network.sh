@@ -191,29 +191,68 @@ cmd_network() {
         status)
             local net_result=$(bash "$RETRO_DIR/scripts/network_core.sh" --network-status)
 
-            rx_table_header "󰤪" "Network Status"
+            local conn_type=$(echo "$net_result" | grep -oP "connection_type=\K[^|]+")
+            local conn_iface=$(echo "$net_result" | grep -oP "conn_interface=\K[^|]+")
+            local conn_ip=$(echo "$net_result" | grep -oP "conn_ip=\K[^|]+")
+            local conn_gw=$(echo "$net_result" | grep -oP "conn_gateway=\K[^|]+")
+            local conn_dns=$(echo "$net_result" | grep -oP "conn_dns=\K[^|]+")
+            local conn_mac=$(echo "$net_result" | grep -oP "conn_mac=\K[^|]+")
+            local internet=$(echo "$net_result" | grep -oP "internet=\K[^|]+")
 
             local wifi_if=$(echo "$net_result" | grep -oP "wifi_iface=\K[^|]+")
+            local w_ssid=$(echo "$net_result" | grep -oP "wifi_ssid=\K[^|]+")
             local eth_if=$(echo "$net_result" | grep -oP "eth_iface=\K[^|]+")
+            local e_state=$(echo "$net_result" | grep -oP "eth_state=\K[^|]+")
 
-            if [[ -n "$wifi_if" && "$wifi_if" != "none" ]]; then
+            rx_table_header "󰤪" "Network Status"
+
+            if [[ $conn_type == "wifi" ]]; then
                 local w_state=$(echo "$net_result" | grep -oP "wifi_state=\K[^|]+")
-                local w_ssid=$(echo "$net_result" | grep -oP "wifi_ssid=\K[^|]+")
-                
-                rx_table_row "󰤨" "WiFi:" "$wifi_if (${w_state:-down})" "$PINK" "20"
-                if [[ -n "$w_ssid" && "$w_ssid" != "none" ]]; then
-                    rx_table_row "󰤨" "  Connected:" "$w_ssid" "$GRAY" "20"
+                local state_color="$SUCCESS"; [[ $w_state != "UP" ]] && state_color="$MUTE"
+                rx_table_row "󰀐" "Connection:" "WiFi" "$PINK" "22"
+                rx_table_row "󰤨" "Interface:" "$conn_iface" "$PINK" "22"
+                rx_table_row "󰈐" "Status:" "${w_state^^}" "$state_color" "22"
+                if [[ -n $w_ssid && $w_ssid != "none" ]]; then
+                    rx_table_row "󰤨" "Connected to:" "$w_ssid" "$PINK" "22"
+                fi
+                rx_table_row_gray "󰈐" "IP Address:" "$conn_ip" "22"
+                rx_table_row_gray "󰈐" "Gateway:" "${conn_gw:-none}" "22"
+                rx_table_row_gray "󰈐" "DNS:" "${conn_dns:-none}" "22"
+                rx_table_row_gray "󰈐" "MAC Address:" "$conn_mac" "22"
+            elif [[ $conn_type == "ethernet" ]]; then
+                local state_color="$SUCCESS"; [[ $e_state != "UP" ]] && state_color="$MUTE"
+                rx_table_row "󰀐" "Connection:" "Ethernet" "$PINK" "22"
+                rx_table_row "󰈊" "Interface:" "$conn_iface" "$PINK" "22"
+                rx_table_row "󰈐" "Status:" "${e_state^^}" "$state_color" "22"
+                rx_table_row_gray "󰈐" "IP Address:" "$conn_ip" "22"
+                rx_table_row_gray "󰈐" "Gateway:" "${conn_gw:-none}" "22"
+                rx_table_row_gray "󰈐" "DNS:" "${conn_dns:-none}" "22"
+                rx_table_row_gray "󰈐" "MAC Address:" "$conn_mac" "22"
+            else
+                rx_table_row "󰀐" "Connection:" "None" "$MUTE" "22"
+                if [[ -n $wifi_if && $wifi_if != "none" ]]; then
+                    local w_state=$(echo "$net_result" | grep -oP "wifi_state=\K[^|]+")
+                    rx_table_row "󰤨" "WiFi:" "$wifi_if (${w_state:-down})" "$MUTE" "22"
+                fi
+                if [[ -n $eth_if && $eth_if != "none" ]]; then
+                    rx_table_row "󰈊" "Ethernet:" "$eth_if (${e_state:-down})" "$MUTE" "22"
                 fi
             fi
 
-            if [[ -n "$eth_if" && "$eth_if" != "none" ]]; then
-                local e_state=$(echo "$net_result" | grep -oP "eth_state=\K[^|]+")
-                rx_table_row "󰈊" "Ethernet:" "$eth_if (${e_state:-down})" "$PINK" "20"
-            fi
+            local inet_color="$SUCCESS"
+            local inet_display="● Online"
+            [[ $internet != "online" ]] && inet_color="$ERROR" && inet_display="● Offline"
+            rx_table_row "󰅀" "Internet:" "$inet_display" "$inet_color" "22"
 
-            local primary=$(echo "$net_result" | grep -oP "primary_connection=\K[^|]+")
-            if [[ -n "$primary" && "$primary" != "none" ]]; then
-                rx_table_row_gray "󰈐" "Primary:" "$primary" "20"
+            if [[ $conn_type == "wifi" && -n $eth_if && $eth_if != "none" ]]; then
+                rx_table_separator
+                rx_table_row "󰈊" "Ethernet:" "$eth_if (${e_state:-down})" "$MUTE" "22"
+            fi
+            if [[ $conn_type == "ethernet" && -n $wifi_if && $wifi_if != "none" ]]; then
+                local w_state=$(echo "$net_result" | grep -oP "wifi_state=\K[^|]+")
+                rx_table_separator
+                rx_table_row "󰤨" "WiFi:" "$wifi_if (${w_state:-down})" "$MUTE" "22"
+                [[ -n $w_ssid && $w_ssid != "none" ]] && rx_table_row "󰤨" "  SSID:" "$w_ssid" "$MUTE" "22"
             fi
 
             rx_table_separator
