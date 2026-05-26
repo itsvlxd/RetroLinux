@@ -210,6 +210,8 @@ cmd_bw() {
 
             rx_setup_check_needed "$config_exists" && return 0
 
+            local saved_email=""
+
             if [[ $config_exists == true ]]; then
                 local cur_vault=$(get_var "CLIP_WARDEN_SERVER")
                 local cur_sync=$(get_var "CLIP_WARDEN_SYNC" "1800")
@@ -217,7 +219,8 @@ cmd_bw() {
                 local cur_destruct=$(get_var "CLIP_WARDEN_DESTRUCT" "30")
 
                 local cur_email=$(rbw config show | grep "email" | awk -F'"' '{print $4}')
-                rx_setup_current "" "Current Bitwarden Configuration" \
+                saved_email="$cur_email"
+                rx_setup_current "" "Current Bitwarden Configuration" \
                     "Vault" "$cur_vault" \
                     "Email" "$cur_email" \
                     "Sync" "${cur_sync}s" \
@@ -228,23 +231,26 @@ cmd_bw() {
                     rx_log "info" "Setup cancelled."
                     return 0
                 fi
+
+                rbw stop-agent 2>/dev/null || true
+                rbw purge 2>/dev/null || true
+                rm -rf ~/.cache/rbw ~/.config/rbw ~/.local/share/rbw
             fi
 
             mkdir -p ~/.cache/rbw
 
             rx_help_header "" "Bitwarden Setup Instructions"
-            echo -e " ${PINK}1.${RESET} Open the API Settings directly: "
+            echo -e " ${PINK}󰀫${RESET} Open the API Settings directly: "
             echo -e "     ${PINK}https://vault.bitwarden.com/#/settings/security/security-keys${RESET}"
-            echo -e " ${PINK}2.${RESET} Scroll down to the ${PINK}API KEY${RESET} section."
-            echo -e " ${PINK}3.${RESET} View and copy your ${PINK}Client ID${RESET} and ${PINK}Client Secret${RESET}."
+            echo -e " ${PINK}󰑂${RESET} Scroll down to the ${PINK}API KEY${RESET} section."
+            echo -e " ${PINK}󰇮${RESET} View and copy your ${PINK}Client ID${RESET} and ${PINK}Client Secret${RESET}."
             rx_help_separator
             rx_help_spacer
 
             [[ "$SKIP_PROMPT" == "true" ]] || rx_confirm "Do you have your keys and wish to continue?" "Y" || return 0
 
-            rx_log "info" "Bitwarden server selection"
             local srv_options=("Global (.com)" "Europe (.eu)" "Custom / Self-Hosted")
-            local srv_choice=$(rx_menu "" "Which Bitwarden instance?" "${srv_options[@]}")
+            local srv_choice=$(rx_menu "󰆟" "Which Bitwarden instance?" "${srv_options[@]}")
 
             case "$srv_choice" in
                 "Global (.com)")
@@ -266,16 +272,8 @@ cmd_bw() {
             local current_vault=$(rbw config show | grep "base_url" | awk -F'"' '{print $4}')
             set_var "CLIP_WARDEN_SERVER" "$current_vault"
 
-            local bw_email=""
-            if [[ "$SKIP_PROMPT" == "true" ]]; then
-                bw_email=$(rbw config show | grep "email" | awk -F'"' '{print $4}')
-            else
-                rx_log "info" "Email configuration"
-                bw_email=$(rx_input "Enter your Bitwarden account email" "")
-                [[ -n $bw_email ]] && rbw config set email "$bw_email"
-            fi
-
-            rx_log "info" "Launching registration. Follow the terminal prompts:"
+            local bw_email=$(rx_input "Enter your Bitwarden account email" "${saved_email:-Empty}")
+            rbw config set email "$bw_email"
 
             if rbw register; then
                 set_var "CLIP_BITWARDEN" "true"
@@ -284,7 +282,6 @@ cmd_bw() {
                     local val_sync=1800 val_timeout=900 val_destruct=30
                     rx_log "info" "Using defaults: sync=${val_sync}s, lock=${val_timeout}s, wipe=${val_destruct}s"
                 else
-                    rx_log "info" "Timer configuration"
                     local val_sync=$(rx_input_numeric "Sync interval (seconds)" "1800")
                     local val_timeout=$(rx_input_numeric "Lock timeout (seconds)" "900")
                     local val_destruct=$(rx_input_numeric "Clipboard destruct (seconds)" "30")
@@ -295,7 +292,7 @@ cmd_bw() {
                 set_var "CLIP_WARDEN_TIMEOUT" "$val_timeout"
                 set_var "CLIP_WARDEN_DESTRUCT" "$val_destruct"
 
-                rx_setup_success "" "Bitwarden Configured" \
+                rx_setup_success "" "Bitwarden Configured" \
                     "Vault" "$current_vault" \
                     "Email" "$bw_email" \
                     "Sync" "${val_sync}s" \
