@@ -971,10 +971,11 @@ Instead of each tool implementing its own prompts, validation, and confirmation 
 7. **Apply** — tool-specific changes
 8. **Success** — show final table
 
-This gives you two-mode behavior by default:
+This gives you flexible behavior for different use cases:
 - **Non-interactive**: `retro tool setup -o key1=val1,key2=val2` — for automation/scripts
 - **Interactive**: `retro tool setup` — guided prompts with defaults  
-- **Combined**: `retro tool setup --needed` — only run setup if not yet configured (`-o` optional)
+- **Skip prompts**: `retro tool setup -y` or `retro tool setup --yes` — auto-confirms all prompts
+- **Combined**: `retro tool setup --needed -y` — auto-configure missing tools without prompts
 
 ### Step-by-Step Implementation Guide
 
@@ -1028,9 +1029,10 @@ Always call `rx_setup_parse` as the FIRST setup function:
 ```
 
 > [!TIP]
-> **What this does:** `rx_setup_parse "$@"` scans `$@` for `-o key=val,...` and `--needed` flags, then:
+> **What this does:** `rx_setup_parse "$@"` scans `$@` for `-o key=val,...`, `--needed`, and `-y/--yes` flags, then:
 > - Sets `RX_SETUP_MODE="non-interactive"` if `-o` was provided
 > - Sets `RX_SETUP_NEEDED=true` if `--needed` was provided
+> - Sets `RX_SETUP_YES=true` if `-y` or `--yes` was provided
 > - Populates `RX_SETUP_OPTS` associative array with parsed key-value pairs
 > - Strips these flags from consideration in your remaining logic
 
@@ -1123,11 +1125,64 @@ rx_setup_summary "󰒓" "MyTool Setup Summary" \
     "Browser" "$browser" \
     "File Manager" "$filemanager"
 
-rx_setup_confirm || return 0
+# Auto-confirm if --yes flag provided
+if [[ $RX_SETUP_YES == true ]]; then
+    rx_log "info" "Auto-confirming (--yes flag provided)"
+else
+    rx_setup_confirm || return 0
+fi
 ```
 
 > [!TIP]
-> **User experience:** The summary table shows values in pink highlight. The confirm prompt asks "Apply these settings? [y/N]". If user declines, `rx_setup_confirm` returns 1 and your script should exit cleanly with `return 0`.
+> **User experience:** The summary table shows values in pink highlight. The confirm prompt asks "Apply these settings? [y/N]". If user declines, `rx_setup_confirm` returns 1 and your script should exit cleanly with `return 0`. When `RX_SETUP_YES=true`, skip the prompt and proceed automatically.
+
+### Using -y/--yes to Skip Prompts
+
+The `-y/--yes` flag sets `RX_SETUP_YES=true`, which your tool can use to automatically confirm prompts without user interaction:
+
+**Common usage patterns:**
+
+| Command | Behavior | Use Case |
+|---------|----------|----------|
+| `retro tool setup` | Prompts for all values + confirms | First-time interactive setup |
+| `retro tool setup -y` | Prompts for values, auto-confirms | Interactive but trust defaults |
+| `retro tool setup -o key=val` | No prompts, asks to confirm | Automation with review |
+| `retro tool setup -o key=val -y` | No prompts, auto-confirms | Fully automated (CI/CD, scripts) |
+| `retro tool setup --needed -y` | Skips if configured, else auto-setup | Installer post-install hooks |
+
+**Example: Conditional confirm pattern**
+```bash
+# Check RX_SETUP_YES before prompting
+if [[ $RX_SETUP_YES == true ]]; then
+    rx_log "info" "Auto-confirming (--yes flag provided)"
+    # Skip confirmation, proceed directly
+else
+    rx_setup_confirm || return 0
+    # User pressed Y to confirm
+fi
+```
+
+**Real-world examples:**
+```bash
+# Interactive setup with auto-confirm (user reviews summary, no Y/N prompt)
+retro timeshift setup -y
+
+# Fully automated setup (no prompts at all)
+retro timeshift setup -o device=/dev/sda1,daily=5,weekly=3 -y
+
+# Installer-friendly: only setup if not configured, no prompts
+retro timeshift setup --needed -y
+
+# CI/CD pipeline: fully automated with explicit values
+retro grub setup -o theme=retro,resolution=1920x1080,timeout=5 -y
+```
+
+> [!NOTE]
+> **`RX_SETUP_YES` vs `RX_SETUP_MODE`:** 
+> - `RX_SETUP_MODE` controls **how values are collected** (interactive prompts vs `-o` flags)
+> - `RX_SETUP_YES` controls **whether to skip confirmation prompts**
+> - They work independently: you can have interactive + auto-confirm (`-y`) or non-interactive + confirm (just `-o`)
+> - For full automation, combine both: `retro tool setup -o key=val -y`
 
 #### Step 8: Apply Changes
 
@@ -1221,7 +1276,7 @@ EOF
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
-| `rx_setup_parse` | `"$@"` | Parse `-o key=val,...` and `--needed`; sets `RX_SETUP_MODE` global |
+| `rx_setup_parse` | `"$@"` | Parse `-o key=val,...`, `--needed`, and `-y/--yes`; sets `RX_SETUP_MODE`, `RX_SETUP_NEEDED`, `RX_SETUP_YES` globals |
 | `rx_setup_validate` | `"keys" "rules"` | Validate provided `-o` values; warn on unknown keys |
 | `rx_setup_get_opt` | `"key" "default"` | Read a parsed option value (non-interactive mode) |
 | `rx_setup_current` | `icon title key val...` | Show current config table (returns 0 if anything configured) |

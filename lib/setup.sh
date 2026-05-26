@@ -6,6 +6,7 @@ source "$RETRO_DIR/lib/colors.sh"
 declare -g RX_SETUP_MODE="interactive"
 declare -g RX_SETUP_OPTIONS=""
 declare -g RX_SETUP_NEEDED=false
+declare -g RX_SETUP_YES=false
 declare -A RX_SETUP_OPTS
 
 rx_setup_parse() {
@@ -13,6 +14,7 @@ rx_setup_parse() {
     RX_SETUP_OPTIONS=""
     RX_SETUP_OPTIONS_RAW=""
     RX_SETUP_NEEDED=false
+    RX_SETUP_YES=false
     unset RX_SETUP_OPTS
     declare -gA RX_SETUP_OPTS
 
@@ -30,6 +32,10 @@ rx_setup_parse() {
                 ;;
             --needed)
                 RX_SETUP_NEEDED=true
+                shift
+                ;;
+            -y|--yes)
+                RX_SETUP_YES=true
                 shift
                 ;;
             *)
