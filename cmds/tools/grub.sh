@@ -374,7 +374,6 @@ cmd_grub() {
         "kernel")
             local kname="${1:-}"
 
-            # Strip optional "set" subcommand for backward compatibility
             if [[ $kname == "set" ]]; then
                 kname="${2:-}"
             fi
@@ -470,16 +469,12 @@ cmd_grub() {
             create_timeshift_backup
 
             if [[ $has_kernel == true && -n $pending_kernel ]]; then
-                local kernel_pkg="$pending_kernel"
-                local headers_pkg="${pending_kernel}-headers"
-                rx_log "info" "Installing kernel: ${PINK}${kernel_pkg}${RESET} + ${PINK}${headers_pkg}${RESET}"
-                sudo pacman -S --needed --noconfirm "$kernel_pkg" "$headers_pkg" 2>&1 | tail -3
-                if [[ $? -eq 0 ]]; then
-                    rx_log "success" "Kernel ${PINK}${kernel_pkg}${RESET} installed"
-                else
+                rx_log "info" "Installing kernel: ${PINK}${pending_kernel}${RESET}"
+                _grub_ensure_kernel "$pending_kernel" || {
                     rx_log "error" "Kernel installation failed"
                     return 1
-                fi
+                }
+                rx_log "success" "Kernel ${PINK}${pending_kernel}${RESET} verified"
             fi
 
             if [[ -f $pending_file ]]; then
