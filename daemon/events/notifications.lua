@@ -139,6 +139,96 @@ function Events.on_pkg_updates_available(count, sample)
     end
 end
 
+function Events.on_ssh_login(username, ip, method)
+    log("Login: " .. username .. "@" .. ip .. " (" .. (method or "unknown") .. ")")
+    local action = Notify.send(
+        "SSH Login",
+        "<b>" .. username .. "</b> logged in from " .. ip .. " (" .. (method or "unknown") .. ")",
+        {
+            icon = "network-server-symbolic",
+            urgency = "normal",
+            timeout = "10000",
+            app_name = "retro_ssh_login_" .. ip,
+            wait = true,
+            actions = {
+                { key = "trust", label = "Trust IP" },
+                { key = "block", label = "Block IP" },
+            },
+        }
+    )
+    if action == "trust" then
+        local current = Watcher.get_var("SSH_TRUSTED_IPS", "")
+        if current == "" or current == "null" then
+            Watcher.set_var("SSH_TRUSTED_IPS", ip)
+        else
+            Watcher.set_var("SSH_TRUSTED_IPS", current .. "|" .. ip)
+        end
+        log("Trusted: " .. ip)
+        Notify.send("IP Trusted", ip .. " has been added to trusted IPs.", { icon = "security-high-symbolic", timeout = "3000", app_name = "retro_ssh" })
+    elseif action == "block" then
+        local current = Watcher.get_var("SSH_BLOCKED_IPS", "")
+        if current == "" or current == "null" then
+            Watcher.set_var("SSH_BLOCKED_IPS", ip)
+        else
+            Watcher.set_var("SSH_BLOCKED_IPS", current .. "|" .. ip)
+        end
+        log("Blocked: " .. ip)
+        local retro_dir = os.getenv("RETRO_DIR")
+        local lib = retro_dir .. "/scripts/lib/firewall_lib.sh"
+        Watcher.run_cmd("hyprctl dispatch exec '[float; size 800 250; center] kitty -- bash -c \"echo Blocking " .. ip .. "...;sudo bash \\\"" .. lib .. "\\\" --block " .. ip .. ";sudo bash \\\"" .. lib .. "\\\" --kill-ssh " .. ip .. ";echo;echo Press Enter to close.;read\"' &")
+        Notify.send("IP Blocked", ip .. " has been blocked and its SSH sessions terminated.", { icon = "security-low-symbolic", timeout = "3000", app_name = "retro_ssh" })
+    end
+end
+
+function Events.on_ssh_failed(username, ip)
+    log("Failed attempt: " .. username .. "@" .. ip)
+    local failed_count_key = "SSH_FAILED_" .. ip:gsub("%.", "_")
+    local current_count = tonumber(Watcher.get_var(failed_count_key, "0")) or 0
+    current_count = current_count + 1
+    Watcher.set_var(failed_count_key, tostring(current_count))
+
+    if current_count >= 5 then
+        local action = Notify.send(
+            "SSH Brute Force",
+            "<b>" .. current_count .. "</b> failed attempts from " .. ip .. " (user: " .. username .. ")",
+            {
+                icon = "dialog-warning-symbolic",
+                urgency = "critical",
+                timeout = "15000",
+                app_name = "retro_ssh_brute_" .. ip,
+                wait = true,
+                actions = {
+                    { key = "block", label = "Block IP" },
+                },
+            }
+        )
+        Watcher.set_var(failed_count_key, "0")
+        if action == "block" then
+            local current = Watcher.get_var("SSH_BLOCKED_IPS", "")
+            if current == "" or current == "null" then
+                Watcher.set_var("SSH_BLOCKED_IPS", ip)
+            else
+                Watcher.set_var("SSH_BLOCKED_IPS", current .. "|" .. ip)
+            end
+            log("Brute force blocked: " .. ip)
+            local retro_dir = os.getenv("RETRO_DIR")
+            local lib = retro_dir .. "/scripts/lib/firewall_lib.sh"
+            Watcher.run_cmd("hyprctl dispatch exec '[float; size 800 250; center] kitty -- bash -c \"echo Blocking " .. ip .. "...;sudo bash \\\"" .. lib .. "\\\" --block " .. ip .. ";sudo bash \\\"" .. lib .. "\\\" --kill-ssh " .. ip .. ";echo;echo Press Enter to close.;read\"' &")
+            Notify.send("IP Blocked", ip .. " has been blocked for brute force and its sessions terminated.", { icon = "security-low-symbolic", timeout = "3000", app_name = "retro_ssh" })
+        end
+    end
+end
+
+function Events.on_ssh_disconnect(host)
+    log("Disconnect: " .. host)
+    Notify.send("SSH Disconnect", "<b>" .. host .. "</b> disconnected.", {
+        icon = "network-offline-symbolic",
+        urgency = "low",
+        timeout = "5000",
+        app_name = "retro_ssh_disconnect_" .. host,
+    })
+end
+
 function Events.on_retro_update_available(commits)
     local action = Notify.retro_update(commits)
     if action == "update" then
