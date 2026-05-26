@@ -190,33 +190,66 @@ ethernet_status() {
 }
 
 network_status() {
-    local wifi_iface
+    local wifi_iface eth_iface
     wifi_iface=$(get_wifi_interfaces | head -1)
-    local eth_iface
     eth_iface=$(get_ethernet_interfaces | head -1)
 
-    echo "wifi_iface=${wifi_iface:-none}|eth_iface=${eth_iface:-none}"
+    local conn_type="none" conn_iface="" conn_ip="" conn_gw="" conn_dns=""
+    local wifi_state="down" wifi_ssid="none" eth_state="down"
 
     if [[ -n $wifi_iface ]]; then
-        local wifi_state=$(ip link show "$wifi_iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
-        local wifi_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$wifi_iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
-
+        wifi_state=$(ip link show "$wifi_iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
+        wifi_state="${wifi_state:-down}"
+        wifi_ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$wifi_iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
         if [[ -z $wifi_ssid || $wifi_ssid == "--" ]]; then
-            if command -v iwd >/dev/null 2>&1; then
-                wifi_ssid=$(iwd station "$wifi_iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
+            command -v iwd >/dev/null 2>&1 && wifi_ssid=$(iwd station "$wifi_iface" show 2>/dev/null | grep "Connected network" | sed 's/.*: //')
+        fi
+        wifi_ssid="${wifi_ssid:-none}"
+        if [[ $wifi_state == "UP" ]]; then
+            local wip
+            wip=$(ip -4 addr show "$wifi_iface" 2>/dev/null | grep -oP 'inet \K[\d.]+/\d+')
+            if [[ -n $wip ]]; then
+                conn_type="wifi"
+                conn_iface="$wifi_iface"
+                conn_ip="$wip"
             fi
         fi
-
-        echo "wifi_state=${wifi_state:-down}|wifi_ssid=${wifi_ssid:-none}"
     fi
 
     if [[ -n $eth_iface ]]; then
-        local eth_state=$(ip link show "$eth_iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
-        echo "eth_state=${eth_state:-down}"
+        eth_state=$(ip link show "$eth_iface" 2>/dev/null | grep -o "state \w*" | awk '{print $2}')
+        eth_state="${eth_state:-down}"
+        if [[ $conn_type == "none" && $eth_state == "UP" ]]; then
+            local eip
+            eip=$(ip -4 addr show "$eth_iface" 2>/dev/null | grep -oP 'inet \K[\d.]+/\d+')
+            if [[ -n $eip ]]; then
+                conn_type="ethernet"
+                conn_iface="$eth_iface"
+                conn_ip="$eip"
+            fi
+        fi
     fi
 
-    local primary=$(nmcli -t -f name,type,device connection show --active 2>/dev/null | grep ethernet | head -1 | cut -d: -f1)
-    echo "primary_connection=${primary:-none}"
+    if [[ $conn_type != "none" ]]; then
+        conn_gw=$(ip route 2>/dev/null | grep "^default" | head -1 | awk '{print $3}')
+        conn_gw="${conn_gw:-none}"
+        conn_dns=$(grep "^nameserver" /etc/resolv.conf 2>/dev/null | head -1 | awk '{print $2}')
+        conn_dns="${conn_dns:-none}"
+    fi
+
+    local conn_mac
+    if [[ -n $conn_iface ]]; then
+        conn_mac=$(ip link show "$conn_iface" 2>/dev/null | grep -oP 'link/ether \K[\da-f:]+')
+    fi
+    conn_mac="${conn_mac:-none}"
+
+    local internet="offline"
+    ping -c1 -W2 1.1.1.1 &>/dev/null && internet="online"
+
+    echo "wifi_iface=${wifi_iface:-none}|eth_iface=${eth_iface:-none}|connection_type=${conn_type}|conn_interface=${conn_iface:-none}|conn_ip=${conn_ip:-none}|conn_gateway=${conn_gw:-none}|conn_dns=${conn_dns:-none}|conn_mac=${conn_mac:-none}|internet=${internet}"
+
+    [[ -n $wifi_iface ]] && echo "wifi_state=${wifi_state}|wifi_ssid=${wifi_ssid}"
+    [[ -n $eth_iface ]] && echo "eth_state=${eth_state}"
 }
 
 manual_ip() {
