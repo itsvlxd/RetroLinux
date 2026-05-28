@@ -30,7 +30,10 @@ cmd_fans() {
             case "$engine" in
                 liquidctl) eng_icon="󰣆" ;;
                 lm-sensors) eng_icon="󰔏" ;;
-                sysfs) eng_icon="󰈐" ; eng_color="$MUTE" ;;
+                sysfs)
+                    eng_icon="󰈐"
+                    eng_color="$MUTE"
+                    ;;
             esac
 
             rx_table_header "󰈐" "Cooling Detection"
@@ -143,7 +146,7 @@ cmd_fans() {
             local profile="$subarg"
             [[ -z $profile ]] && rx_log "error" "Usage: retro fans profile <quiet|balanced|performance>" && return 1
             case "$profile" in
-                quiet|balanced|performance) ;;
+                quiet | balanced | performance) ;;
                 *) rx_log "error" "Invalid profile: ${PINK}$profile${RESET}. Use: quiet, balanced, performance" && return 1 ;;
             esac
 
@@ -172,9 +175,18 @@ cmd_fans() {
                 local e_color="$PINK"
                 local e_icon="󱠝"
                 case "$eng" in
-                    liquidctl) e_icon="󰣆" ; e_color="$SUCCESS" ;;
-                    lm-sensors) e_icon="󰔏" ; e_color="$SUCCESS" ;;
-                    sysfs) e_icon="󰈐" ; e_color="$MUTE" ;;
+                    liquidctl)
+                        e_icon="󰣆"
+                        e_color="$SUCCESS"
+                        ;;
+                    lm-sensors)
+                        e_icon="󰔏"
+                        e_color="$SUCCESS"
+                        ;;
+                    sysfs)
+                        e_icon="󰈐"
+                        e_color="$MUTE"
+                        ;;
                 esac
                 rx_table_row "$e_icon" "$eng" "" "$e_color" "18"
             done <<<"$engines"
@@ -300,4 +312,4 @@ cmd_fans() {
     esac
 }
 
-register_command "TOOLS" "fans|fan" "Fan and cooling management (liquidctl, lm-sensors, sysfs)" "cmd_fans"
+register_command "TOOLS" "fans" "Fan and cooling management (liquidctl, lm-sensors, sysfs)" "cmd_fans"
