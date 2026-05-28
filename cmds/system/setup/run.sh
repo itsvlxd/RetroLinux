@@ -9,8 +9,6 @@ source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/module.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 
-RETRO_COMPLETE="$HOME/.retro"
-
 register_command() {
     local empty=1
 }
@@ -30,27 +28,26 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
 
     retro wallpaper "static" "true"
-    retro wallpaper "set" "car-in-neon-gas-station.mp4"
+    retro wallpaper "set" "Car In Neon Gas Station"
 
     source "$RETRO_DIR/cmds/system/setup/modules.sh" && setup_modules
-    source "$RETRO_DIR/cmds/system/setup/xdg.sh" && setup_xdg
-    source "$RETRO_DIR/cmds/system/setup/keyring.sh" && setup_keyring
+
+    retro keyring setup --needed
+    retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${BROWSER_CHOICE:-firefox},filemanager=${FILEMANAGER_CHOICE:-thunar},image=loupe,video=mpv"
+    retro wallpaper setup --needed -o "theme=retro"
+    retro power setup --needed -o "profile=recommended"
+    retro font setup -y
+    retro audio setup
+    retro polkit setup --needed -y
+    retro firewall setup --needed -o "engine=${FIREWALL_ENGINE:-nftables}"
+
+    [[ $FINGERPRINT_ENABLED == true ]] && retro fingerprint setup --needed
+    [[ $SSH_ENABLED == true ]] && retro ssh setup --needed -o "port=${SSH_PORT:-22},password=${SSH_PASSWORD_LOGIN:-false},pubkey=${SSH_KEY_LOGIN:-true},root=${SSH_ROOT_LOGIN:-false}"
 
     local root_device=$(findmnt -n -o SOURCE / | grep -oP '^/dev/[^ ]+')
     if [[ -n $root_device ]]; then
         retro timeshift setup -o "device=${root_device},daily=5,weekly=3,monthly=2,boot=true" 2>/dev/null || true
     fi
-
-    retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${BROWSER_CHOICE:-firefox},filemanager=${FILEMANAGER_CHOICE:-thunar},image=loupe,video=mpv"
-
-    source "$RETRO_DIR/cmds/system/setup/ssh.sh" && setup_ssh
-    source "$RETRO_DIR/cmds/system/setup/terminal.sh" && setup_terminal
-    source "$RETRO_DIR/cmds/system/setup/wallpaper.sh" && setup_wallpaper
-    source "$RETRO_DIR/cmds/system/setup/fonts.sh" && setup_fonts
-    source "$RETRO_DIR/cmds/system/setup/fingerprint.sh" && setup_fingerprint
-    source "$RETRO_DIR/cmds/system/setup/power.sh" && setup_power
-    source "$RETRO_DIR/cmds/system/setup/browser.sh" && setup_browser
-    source "$RETRO_DIR/cmds/system/setup/audio.sh" && setup_audio
 
     retro wallpaper "static" "false"
 
