@@ -36,6 +36,7 @@ export GRUB_OS_PROBER=${GRUB_OS_PROBER:-false}
 export GRUB_SNAPSHOTS_ENABLED=${GRUB_SNAPSHOTS_ENABLED:-true}
 export GRUB_TIMEOUT=${GRUB_TIMEOUT:-10}
 export GRUB_KERNEL=${GRUB_KERNEL:-linux}
+export FIREWALL_ENGINE=${FIREWALL_ENGINE:-nftables}
 EOF
         arch-chroot /mnt chown "1000:1000" "$home_dir/.retro_install"
         gum style --foreground 2 "State saved to ${home_dir}/.retro_install"
