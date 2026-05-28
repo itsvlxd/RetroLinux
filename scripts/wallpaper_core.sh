@@ -500,7 +500,7 @@ sync_wallpapers() {
         done
     done
 
-    echo "synced=$synced|skipped=$skipped"
+    rx_log_file "info" "Wallpaper sync: ${synced} new, ${skipped} skipped"
 }
 
 case "$1" in
@@ -585,4 +585,43 @@ case "$1" in
         gpu_wallpaper "$2"
         ;;
     "--picker") launch_picker ;;
+    "--setup-get")
+        local theme=$(get_var "RETRO_THEME" "retro")
+        local current=$(get_var "WALL_CURRENT" "")
+        echo "theme=${theme}"
+        echo "wallpaper=$(basename "$current")"
+        ;;
+    "--setup-apply")
+        local theme="${2:-retro}"
+        sync_wallpapers
+        set_var "RETRO_THEME" "$theme"
+
+        declare -A default_walls=(
+            ["retro"]="car-in-neon-gas-station.mp4"
+            ["black_and_white"]="monochrome-spider-man.mp4"
+        )
+        local def_wall="${default_walls[$theme]}"
+        if [[ -z $def_wall || ! -f "$WALL_DIR/$theme/$def_wall" ]]; then
+            def_wall=$(ls -1 "$WALL_DIR/$theme" 2>/dev/null | grep -vE '\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$' | head -n 1)
+        fi
+
+        if [[ -n $def_wall ]]; then
+            rx_wallpaper_start "$WALL_DIR/$theme/$def_wall" "true" &>/dev/null &
+        fi
+
+        # TODO: Auto-detect per-monitor resolution and pre-configure WALL_RES_MAP
+        # TODO: Generate theme-specific matugen color template on setup
+        # TODO: Add size-optimized video re-encoding to target resolution
+        # TODO: Build a proper theme management tool (themes folder, icon packs, qtile/gtk integration)
+        # TODO: Add animated preview thumbnail generation for all wallpapers in the theme pool
+        rm -rf "$FRAME_CACHE"
+        mkdir -p "$FRAME_CACHE"
+        local target_dir="$WALL_DIR/$theme"
+        for f in "$target_dir"/*; do
+            [[ -f $f || -L $f ]] && rx_wallpaper_generate_cache "$f" >/dev/null
+        done
+
+        echo "OK|configured|theme=${theme}|wallpaper=${def_wall:-none}"
+        rx_log_file "success" "Wallpaper configured (theme=${theme})"
+        ;;
 esac
