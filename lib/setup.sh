@@ -440,10 +440,19 @@ rx_input_choice() {
     done
 
     while true; do
-        rx_log "info" "Select ${MUTE}[1-${num_options}]${RESET} (default: ${default}): "
+        rx_log "info" "select ${MUTE}[1-${num_options}]${RESET} ${MUTE}[${default}]${RESET}: "
         read -r choice
 
-        [[ -z $choice ]] && choice="$default"
+        if [[ -z $choice ]]; then
+            for i in "${!options[@]}"; do
+                if [[ "${options[$i]}" == "$default" ]]; then
+                    echo "$default"
+                    return 0
+                fi
+            done
+            echo "${options[0]}"
+            return 0
+        fi
 
         if [[ $choice =~ ^[0-9]+$ && $choice -ge 1 && $choice -le $num_options ]]; then
             echo "${options[$((choice - 1))]}"

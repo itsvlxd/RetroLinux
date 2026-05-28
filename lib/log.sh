@@ -36,8 +36,8 @@ rx_log() {
         [[ $stripped_msg =~ \[[[:space:]]*[Yy]/[Nn][[:space:]]*\]$ ]] ||
         [[ $stripped_msg =~ \[Default: ]] ||
         [[ $stripped_msg =~ \[.*\]:[[:space:]]*$ ]]; then
-        printf "${color}[${icon}${level}]${RESET} ${message}" >&2
+        printf "${color}[${icon}${level}]${RESET} %s" "$message" >&2
     else
-        printf "${color}[${icon}${level}]${RESET} ${message}\n" >&2
+        printf "${color}[${icon}${level}]${RESET} %s\n" "$message" >&2
     fi
 }
