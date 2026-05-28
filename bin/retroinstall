@@ -48,6 +48,7 @@ SETUP_SCRIPTS=(
     "editor.sh"
     "filemanager.sh"
     "browser.sh"
+    "firewall.sh"
     "network.sh"
     "config.sh"
 )
@@ -89,6 +90,10 @@ else
     EDITOR_CHOICE=""
     FILEMANAGER_CHOICE=""
     FINGERPRINT_ENABLED=""
+    FIREWALL_ENGINE=""
+    BROWSER_CHOICE=""
+    DISPLAY_ASPECT_RATIO=""
+    WALLPAPER_RES=""
     NETWORK_TYPE=""
     WIFI_SSID=""
     RX_SKIP_STEP=""
