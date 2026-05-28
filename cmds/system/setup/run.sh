@@ -40,6 +40,7 @@ run_postinstall() {
     retro audio setup
     retro polkit setup --needed -y
     retro firewall setup --needed -o "engine=${FIREWALL_ENGINE:-nftables}"
+    retro fans setup -o "engine=lm-sensors,profile=balanced"
 
     [[ $FINGERPRINT_ENABLED == true ]] && retro fingerprint setup --needed
     [[ $SSH_ENABLED == true ]] && retro ssh setup --needed -o "port=${SSH_PORT:-22},password=${SSH_PASSWORD_LOGIN:-false},pubkey=${SSH_KEY_LOGIN:-true},root=${SSH_ROOT_LOGIN:-false}"
