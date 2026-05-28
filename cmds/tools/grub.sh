@@ -521,7 +521,7 @@ cmd_grub() {
 
         "setup")
             rx_setup_parse "$@"
-            rx_setup_validate "theme,resolution,timeout,os-prober,snapshots,kernel" || return 1
+            rx_setup_validate "theme,resolution,timeout,os-prober,snapshots,kernel" "theme:in=retropunk,retrolinux|resolution:in=1920x1080,1024x768,auto|timeout:numeric|os-prober:in=true,false|snapshots:in=true,false|kernel:in=linux,linux-zen,linux-lts,linux-hardened" || return 1
 
             local grub_theme=$(get_var "GRUB_THEME_CHOICE")
             local grub_resolution=$(get_var "BOOT_VIDEO_GRUB")

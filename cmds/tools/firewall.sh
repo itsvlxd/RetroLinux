@@ -39,8 +39,8 @@ cmd_firewall() {
 
             local policy_color="$MUTE"
             case "${default_policy,,}" in
-                drop|deny) policy_color="$SUCCESS" ;;
-                accept|allow) policy_color="$WARN" ;;
+                drop | deny) policy_color="$SUCCESS" ;;
+                accept | allow) policy_color="$WARN" ;;
             esac
 
             local ports_color="$MUTE"
@@ -58,6 +58,7 @@ cmd_firewall() {
 
         "setup")
             rx_setup_parse "$@"
+            rx_setup_validate "engine" "engine:in=nftables,ufw,firewalld,iptables" || return 1
 
             local config_data
             config_data=$(bash "$core" --setup-get 2>/dev/null)
@@ -126,8 +127,8 @@ cmd_firewall() {
                     local i=0
                     while [[ $i -lt ${#port_inputs[@]} ]]; do
                         [[ -n $ports_preview ]] && ports_preview+=", "
-                        ports_preview+="${port_inputs[$i]}/${port_inputs[$((i+1))]}"
-                        i=$((i+2))
+                        ports_preview+="${port_inputs[$i]}/${port_inputs[$((i + 1))]}"
+                        i=$((i + 2))
                     done
                 fi
 
@@ -324,7 +325,7 @@ cmd_firewall() {
             bash "$core" --logs "$lines" 2>/dev/null
             ;;
 
-        "help"|"")
+        "help" | "")
             rx_help_usage "retro firewall <command>"
             rx_help_commands "Available commands"
             rx_help_cmd "status" "Show firewall engine, status, rules, and open ports" 24
@@ -360,4 +361,4 @@ cmd_firewall() {
     esac
 }
 
-register_command "TOOLS" "firewall|fw" "Multi-engine firewall management (nftables, ufw, firewalld, iptables)" "cmd_firewall"
+register_command "TOOLS" "firewall" "Multi-engine firewall management (nftables, ufw, firewalld, iptables)" "cmd_firewall"
