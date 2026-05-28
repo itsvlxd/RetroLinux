@@ -202,7 +202,7 @@ _sysfs_set_speed() {
             local raw_label
             raw_label=$(cat "$hw/fan${idx}_label" 2>/dev/null || echo "Fan ${idx}")
             local full_label="${hw_name}/${raw_label}"
-            if [[ "$raw_label" == "$fan_name" || "$full_label" == "$fan_name" ]]; then
+            if [[ "$raw_label" == "$fan_name" || "$full_label" == "$fan_name" || "$raw_label" == "${fan_name//_/ }" || "$full_label" == "${fan_name//_/ }" || "$raw_label" == "${fan_name// /_}" || "$full_label" == "${fan_name// /_}" ]]; then
                 local pwm_file="$hw/pwm${idx}"
                 if [[ -f $pwm_file ]]; then
                     $SUDO_CMD bash -c "echo 1 > '$hw/pwm${idx}_enable' 2>/dev/null; echo ${pwm_val} > '$pwm_file' 2>/dev/null" 2>/dev/null && {
@@ -232,7 +232,7 @@ _sysfs_set_curve() {
             local raw_label
             raw_label=$(cat "$hw/fan${idx}_label" 2>/dev/null || echo "Fan ${idx}")
             local full_label="${hw_name}/${raw_label}"
-            if [[ "$raw_label" == "$fan_name" || "$full_label" == "$fan_name" ]]; then
+            if [[ "$raw_label" == "$fan_name" || "$full_label" == "$fan_name" || "$raw_label" == "${fan_name//_/ }" || "$full_label" == "${fan_name//_/ }" || "$raw_label" == "${fan_name// /_}" || "$full_label" == "${fan_name// /_}" ]]; then
                 local current_temp
                 current_temp=$(_get_coretemp)
                 [[ -z $current_temp || $current_temp -eq 0 ]] && current_temp=30
@@ -399,18 +399,6 @@ case "$1" in
         _sysfs_set_curve "$fan_name" "$curve"
         ;;
 
-    "--reset")
-        engine=$(_detect_engine)
-        if [[ $engine == "liquidctl" ]]; then
-            _liquidctl_reset
-        else
-            _sysfs_reset
-        fi
-        set_var "FAN_PROFILE" "auto"
-        set_var "FAN_ENABLED" "false"
-        rx_log_file "success" "All fans reset to defaults"
-        ;;
-
     "--profile")
         profile="$2"
         curve=""
@@ -421,16 +409,16 @@ case "$1" in
             devices=""
             devices=$(_get_liquidctl_devices)
             count=0
+            current_temp=$(_get_coretemp)
+            [[ -z $current_temp || $current_temp -eq 0 ]] && current_temp=30
             while IFS= read -r dev; do
                 [[ -z $dev ]] && continue
-                _liquidctl_set_speed "fan${count}" "50" 2>/dev/null
+                target_pct=$(_parse_curve "$curve" "$current_temp")
+                _liquidctl_set_speed "fan${count}" "$target_pct" 2>/dev/null
                 count=$((count + 1))
             done <<<"$devices"
         else
-            rx_log_file "info" "sysfs: applying profile '${profile}' (curve: ${curve}) to fans..."
             while IFS='|' read -r hw label rpm pct temp writable; do
-                rx_log_file "info" "sysfs: fan ${label} (rpm=${rpm}, pct=${pct})"
-                [[ $rpm -eq 0 ]] && continue
                 safe_label="${label// /_}"
                 _sysfs_set_curve "$label" "$curve"
                 set_var "FAN_CURVE_${safe_label}" "$curve"
@@ -443,25 +431,44 @@ case "$1" in
         echo "OK|profile=${profile}"
         ;;
 
-    "--setup-get")
-        engine=""
+    "--reset")
+        engine=$(_detect_engine)
+        if [[ $engine == "liquidctl" ]]; then
+            _liquidctl_reset
+        else
+            _sysfs_reset
+        fi
+        set_var "FAN_PROFILE" "auto"
+        set_var "FAN_ENABLED" "false"
+        rx_log_file "success" "All fans reset to defaults"
+        ;;
+
+    "--daemon-tick")
+        enabled=$(get_var "FAN_ENABLED" "false")
+        [[ $enabled != "true" ]] && exit 0
+
         engine=$(get_var "FAN_ENGINE" "auto")
         [[ $engine == "auto" ]] && engine=$(_detect_engine)
-        profile=""
+
         profile=$(get_var "FAN_PROFILE" "balanced")
-        enabled=""
-        enabled=$(get_var "FAN_ENABLED" "false")
+        curve=$(_get_default_curve "$profile")
 
-        echo "engine=${engine}"
-        echo "profile=${profile}"
-        echo "enabled=${enabled}"
+        current_temp=$(_get_coretemp)
+        [[ -z $current_temp || $current_temp -eq 0 ]] && exit 0
 
+        fan_count=0
         while IFS='|' read -r hw label rpm pct temp writable; do
             safe_label="${label// /_}"
-            curve=""
-            curve=$(get_var "FAN_CURVE_${safe_label}" "")
-            [[ -n $curve ]] && echo "curve_${safe_label}=${curve}"
+            custom_curve=$(get_var "FAN_CURVE_${safe_label}" "")
+            use_curve="${custom_curve:-$curve}"
+            target_pct=$(_parse_curve "$use_curve" "$current_temp")
+            [[ $target_pct -gt 100 ]] && target_pct=100
+            [[ $target_pct -lt 0 ]] && target_pct=0
+            _sysfs_set_speed "$label" "$target_pct" 2>/dev/null
+            fan_count=$((fan_count + 1))
         done < <(_sysfs_fans)
+
+        echo "${current_temp}C: ${fan_count} fans → ${profile}"
         ;;
 
     "--setup-apply")
@@ -486,7 +493,6 @@ case "$1" in
 
         fan_count=0
         while IFS='|' read -r hw label rpm pct temp writable; do
-            [[ $rpm -eq 0 ]] && continue
             safe_label="${label// /_}"
             custom_curve=$(get_var "FAN_CURVE_${safe_label}" "")
             use_curve="${custom_curve:-$curve}"
