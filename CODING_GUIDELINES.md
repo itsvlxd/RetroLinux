@@ -976,6 +976,7 @@ This gives you flexible behavior for different use cases:
 - **Interactive**: `retro tool setup` — guided prompts with defaults  
 - **Skip prompts**: `retro tool setup -y` or `retro tool setup --yes` — auto-confirms all prompts
 - **Combined**: `retro tool setup --needed -y` — auto-configure missing tools without prompts
+- **Display options**: `retro tool setup -o` — shows valid keys and their validation rules (useful for help/discovery)
 
 ### Step-by-Step Implementation Guide
 
@@ -1030,11 +1031,12 @@ Always call `rx_setup_parse` as the FIRST setup function:
 
 > [!TIP]
 > **What this does:** `rx_setup_parse "$@"` scans `$@` for `-o key=val,...`, `--needed`, and `-y/--yes` flags, then:
-> - Sets `RX_SETUP_MODE="non-interactive"` if `-o` was provided
+> - Sets `RX_SETUP_MODE="non-interactive"` if `-o key=val` was provided, or `RX_SETUP_MODE="display"` if bare `-o` was given
 > - Sets `RX_SETUP_NEEDED=true` if `--needed` was provided
 > - Sets `RX_SETUP_YES=true` if `-y` or `--yes` was provided
 > - Populates `RX_SETUP_OPTS` associative array with parsed key-value pairs
 > - Strips these flags from consideration in your remaining logic
+> - Sets `RX_SETUP_VALID_KEYS` when `rx_setup_validate` is called later
 
 #### Step 4: Declare Valid Keys and Validation Rules
 
@@ -1062,6 +1064,8 @@ key1:rule1|rule2,key2:rule1|rule2
 
 > [!NOTE]
 > **Validation happens immediately:** If any rule fails, `rx_setup_validate` logs an error and returns 1. Your script should `|| return 1` to exit early.
+>
+> **Display mode:** If `RX_SETUP_MODE` is `"display"` (bare `-o` flag), `rx_setup_validate` automatically calls `rx_setup_show_options` and returns 1. Your `|| return 1` exits cleanly after showing the options table — no further setup logic runs.
 
 #### Step 5: Check if Already Configured (for --needed)
 
@@ -1289,6 +1293,7 @@ EOF
 | `rx_input_numeric` | `"label" "default" [min] [max]` | Numeric input with optional range (min/max are optional) |
 | `rx_input_choice` | `icon "label" "default" opt1 opt2 ...` | Numbered choice menu |
 | `rx_menu` | `icon "label" options...` | Gum-style menu selection (returns selected option) |
+| `rx_setup_show_options` | `"keys" "rules"` | Show valid keys and their validation rules in a table (used by display mode) |
 
 ### Validation Rules
 
