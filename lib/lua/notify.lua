@@ -7,31 +7,38 @@ function Notify.send(summary, body, opts)
 	local timeout = opts.timeout or "5000"
 	local app_name = opts.app_name or "retro"
 
-	local cmd =
-		string.format("notify-send -a '%s' -u %s -t %s '%s' '%s'", app_name, urgency, timeout, summary, body or "")
-
-	if icon ~= "" then
-		cmd = cmd .. " -i '" .. icon .. "'"
-	end
-
-	if opts.wait then
-		cmd = "notify-send -a '" .. app_name .. "' -u " .. urgency .. " -t " .. timeout .. " -w"
-		if icon ~= "" then
-			cmd = cmd .. " -i '" .. icon .. "'"
+	local function build_base_cmd(with_wait)
+		local base = string.format("notify-send -a '%s' -u %s", app_name, urgency)
+		if with_wait then
+			base = base .. " -t " .. timeout .. " -w"
+		else
+			base = base .. " -t " .. timeout
 		end
-		cmd = cmd .. " '" .. summary .. "' '" .. (body or "") .. "'"
+		if icon ~= "" then
+			base = base .. " -i '" .. icon .. "'"
+		end
+		base = base .. " '" .. summary .. "' '" .. (body or "") .. "'"
 		if opts.actions then
 			for _, a in ipairs(opts.actions) do
-				cmd = cmd .. " -A '" .. a.key .. "=" .. a.label .. "'"
+				base = base .. " -A '" .. a.key .. "=" .. a.label .. "'"
 			end
 		end
+		return base
 	end
 
-	if opts.actions and not opts.wait then
-		for _, a in ipairs(opts.actions) do
-			cmd = cmd .. " -A '" .. a.key .. "=" .. a.label .. "'"
+	if opts.background then
+		local cmd = build_base_cmd(true)
+		local bg = "action=$(" .. cmd .. " 2>/dev/null); "
+		if opts.action_handlers then
+			for _, h in ipairs(opts.action_handlers) do
+				bg = bg .. string.format('if [[ "$action" == "%s" ]]; then %s & fi; ', h.key, h.cmd)
+			end
 		end
+		os.execute(bg .. " &")
+		return nil
 	end
+
+	local cmd = build_base_cmd(opts.wait)
 
 	if opts.async then
 		os.execute(cmd .. " &")
@@ -204,42 +211,48 @@ function Notify.bluetooth_pairing_request(name, mac, icon)
 	return action
 end
 
-function Notify.pkg_updates(count, sample)
-	local action = Notify.send(
+function Notify.pkg_updates(count, sample, extra_opts)
+	extra_opts = extra_opts or {}
+	local opts = {
+		icon = "software-update-available-symbolic",
+		urgency = "normal",
+		timeout = "20000",
+		background = true,
+		actions = {
+			{ key = "update", label = "Update Now" },
+			{ key = "later", label = "Remind Later" },
+		},
+	}
+	for k, v in pairs(extra_opts) do
+		opts[k] = v
+	end
+	return Notify.send(
 		"System Updates Available",
 		"<b>" .. count .. "</b> packages have pending updates.\nIncluding: <i>" .. sample .. "</i>",
-		{
-			icon = "software-update-available-symbolic",
-			urgency = "normal",
-			timeout = "20000",
-			app_name = "retro",
-			wait = true,
-			actions = {
-				{ key = "update", label = "Update Now" },
-				{ key = "later", label = "Remind Later" },
-			},
-		}
+		opts
 	)
-	return action
 end
 
-function Notify.retro_update(commits)
-	local action = Notify.send(
+function Notify.retro_update(commits, extra_opts)
+	extra_opts = extra_opts or {}
+	local opts = {
+		icon = "software-update-available-symbolic",
+		urgency = "normal",
+		timeout = "20000",
+		background = true,
+		actions = {
+			{ key = "update", label = "Update" },
+			{ key = "later", label = "Remind me later" },
+		},
+	}
+	for k, v in pairs(extra_opts) do
+		opts[k] = v
+	end
+	return Notify.send(
 		"Retro Update Available",
 		"RetroLinux has some new updates. \n<b>" .. commits .. "</b> new commits have been added.",
-		{
-			icon = "software-update-available-symbolic",
-			urgency = "normal",
-			timeout = "20000",
-			app_name = "retro",
-			wait = true,
-			actions = {
-				{ key = "update", label = "Update" },
-				{ key = "later", label = "Remind me later" },
-			},
-		}
+		opts
 	)
-	return action
 end
 
 return Notify
