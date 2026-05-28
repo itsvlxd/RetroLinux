@@ -132,11 +132,13 @@ function Events.on_bluetooth_pairing_request(name, mac)
 end
 
 function Events.on_pkg_updates_available(count, sample)
-    local action = Notify.pkg_updates(count, sample)
-    if action == "update" then
-        local retro_dir = os.getenv("RETRO_DIR")
-        Watcher.run_cmd("hyprctl dispatch exec '[float; size 1000 700; center] kitty -- bash " .. retro_dir .. "/scripts/lib/system_update.sh " .. count .. " " .. sample .. "' &")
-    end
+    local retro_dir = os.getenv("RETRO_DIR")
+    local update_cmd = "hyprctl dispatch exec '[float; size 1000 700; center] kitty -- bash " .. retro_dir .. "/scripts/lib/system_update.sh " .. count .. " " .. sample .. "'"
+    Notify.pkg_updates(count, sample, {
+        action_handlers = {
+            { key = "update", cmd = update_cmd },
+        },
+    })
 end
 
 function Events.on_ssh_login(username, ip, method)
@@ -230,11 +232,13 @@ function Events.on_ssh_disconnect(host)
 end
 
 function Events.on_retro_update_available(commits)
-    local action = Notify.retro_update(commits)
-    if action == "update" then
-        local retro_dir = os.getenv("RETRO_DIR")
-        Watcher.run_cmd("hyprctl dispatch exec '[float; size 1000 700; center] kitty -- bash -c \"cd " .. retro_dir .. " && bash retro.sh --update; echo; echo Press Enter to close.; read\"' &")
-    end
+    local retro_dir = os.getenv("RETRO_DIR")
+    local update_cmd = "hyprctl dispatch exec '[float; size 1000 700; center] kitty -- bash -c \"cd " .. retro_dir .. " && bash retro.sh --update; echo; echo Press Enter to close.; read\"'"
+    Notify.retro_update(commits, {
+        action_handlers = {
+            { key = "update", cmd = update_cmd },
+        },
+    })
 end
 
 return Events

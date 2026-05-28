@@ -10,10 +10,10 @@ return {
         local last_pkg_check = 0
         local last_retro_check = 0
 
-        local pkg_min = tonumber(Watcher.get_var("RETRO_PKG_UPDATE_MIN", "60")) or 60
+        local pkg_min = tonumber(Watcher.get_var("RETRO_PKG_UPDATE_MIN", "20")) or 20
         local pkg_interval = pkg_min * 60
 
-        local retro_min = tonumber(Watcher.get_var("RETRO_UPDATE_CHECK_MIN", "15")) or 15
+        local retro_min = tonumber(Watcher.get_var("RETRO_UPDATE_CHECK_MIN", "30")) or 30
         local retro_interval = retro_min * 60
 
         local retro_dir = os.getenv("RETRO_DIR")
