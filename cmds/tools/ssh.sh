@@ -69,11 +69,7 @@ cmd_ssh() {
         "setup")
             rx_setup_parse "$@"
 
-            if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
-                rx_setup_validate "port,password,pubkey,root" "port:numeric|min=1|max=65535|required|password:required|pubkey:required|root:required" || return 1
-            else
-                rx_setup_validate "port,password,pubkey,root" || return 1
-            fi
+            rx_setup_validate "port,password,pubkey,root" "port:numeric|min=1|max=65535|required|password:required|pubkey:required|root:required" || return 1
 
             local config_data
             config_data=$(bash "$core" --setup-get 2>/dev/null)

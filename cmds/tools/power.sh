@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/setup.sh"
 
 cmd_power() {
     local pwr_script="$RETRO_DIR/scripts/power_core.sh"
@@ -160,6 +161,111 @@ cmd_power() {
             fi
             ;;
 
+        "setup")
+            rx_setup_parse "$@"
+            rx_setup_validate "ac_saver,ac_balanced,ac_performance,bat_saver,bat_balanced,bat_performance,profile" "ac_saver:numeric|ac_balanced:numeric|ac_performance:numeric|bat_saver:numeric|bat_balanced:numeric|bat_performance:numeric|profile" || return 1
+
+            config_data=$(bash "$pwr_script" --setup-get 2>/dev/null)
+            while IFS='=' read -r key val; do
+                case "$key" in
+                    cpu_model) cu_cpu="$val" ;;
+                    ac_saver) cu_as="$val" ;;
+                    ac_balanced) cu_ab="$val" ;;
+                    ac_performance) cu_ap="$val" ;;
+                    bat_saver) cu_bs="$val" ;;
+                    bat_balanced) cu_bb="$val" ;;
+                    bat_performance) cu_bp="$val" ;;
+                esac
+            done <<<"$config_data"
+
+            config_exists=true
+            [[ -z $cu_as || $cu_as == "null" ]] && config_exists=false
+
+            rx_setup_check_needed "$config_exists" && return 0
+
+            if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+                fw_ac_s=$(rx_setup_get_opt "ac_saver" "")
+                fw_ac_b=$(rx_setup_get_opt "ac_balanced" "")
+                fw_ac_p=$(rx_setup_get_opt "ac_performance" "")
+                fw_bat_s=$(rx_setup_get_opt "bat_saver" "")
+                fw_bat_b=$(rx_setup_get_opt "bat_balanced" "")
+                fw_bat_p=$(rx_setup_get_opt "bat_performance" "")
+                fw_profile=$(rx_setup_get_opt "profile" "")
+
+                if [[ -n $fw_ac_s && -n $fw_ac_b && -n $fw_ac_p && -n $fw_bat_s && -n $fw_bat_b && -n $fw_bat_p ]]; then
+                    result=$(bash "$pwr_script" --setup-apply "$fw_ac_s" "$fw_ac_b" "$fw_ac_p" "$fw_bat_s" "$fw_bat_b" "$fw_bat_p" 2>/dev/null)
+                else
+                    result=$(bash "$pwr_script" --setup-apply 2>/dev/null)
+                fi
+
+                if echo "$result" | grep -q "^OK|"; then
+                    ok_line=$(echo "$result" | grep "^OK|")
+                    s_cpu=$(echo "$ok_line" | sed -n 's/.*cpu_model=\([^|]*\).*/\1/p')
+                    s_ac=$(echo "$ok_line" | sed -n 's/.*ac_saver=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*ac_balanced=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*ac_performance=\([^|]*\).*/\1/p')"W"
+                    s_bat=$(echo "$ok_line" | sed -n 's/.*bat_saver=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*bat_balanced=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*bat_performance=\([^|]*\).*/\1/p')"W"
+                    rx_setup_success "󰐋" "Power Configured" \
+                        "CPU" "$s_cpu" \
+                        "AC Limits" "$s_ac" \
+                        "BAT Limits" "$s_bat"
+                else
+                    rx_log "error" "Failed to apply power config"
+                    return 1
+                fi
+            else
+                if [[ $config_exists == true ]]; then
+                    rx_setup_prompt_reconfigure "󰐋" "Current Power Configuration" \
+                        "CPU" "${cu_cpu:-unknown}" \
+                        "AC Limits" "${cu_as}W / ${cu_ab}W / ${cu_ap}W" \
+                        "BAT Limits" "${cu_bs}W / ${cu_bb}W / ${cu_bp}W" || return 0
+                fi
+
+                cpu_name=$(bash "$pwr_script" --cpu-name 2>/dev/null)
+                match=$(bash "$pwr_script" --optimize 2>/dev/null)
+                IFS='|' read -r _ ac_csv bat_csv <<<"$match"
+                IFS=',' read -r sg_ac sg_bal sg_perf <<<"$ac_csv"
+                IFS=',' read -r sg_bats sg_batb sg_batp <<<"$bat_csv"
+
+                rx_log "info" "Detected CPU: ${PINK}${cpu_name}${RESET}"
+
+                if rx_confirm "Use these optimized presets for your CPU?" "Y"; then
+                    use_ac_s="$sg_ac"; use_ac_b="$sg_bal"; use_ac_p="$sg_perf"
+                    use_bat_s="$sg_bats"; use_bat_b="$sg_batb"; use_bat_p="$sg_batp"
+                else
+                    rx_log "info" "Configure custom wattage limits:"
+                    use_ac_s=$(rx_input_numeric "AC Saver (W)" "$sg_ac" 1 200)
+                    use_ac_b=$(rx_input_numeric "AC Balanced (W)" "$sg_bal" 1 200)
+                    use_ac_p=$(rx_input_numeric "AC Performance (W)" "$sg_perf" 1 200)
+                    use_bat_s=$(rx_input_numeric "BAT Saver (W)" "$sg_bats" 1 200)
+                    use_bat_b=$(rx_input_numeric "BAT Balanced (W)" "$sg_batb" 1 200)
+                    use_bat_p=$(rx_input_numeric "BAT Performance (W)" "$sg_batp" 1 200)
+                fi
+
+                rx_setup_summary "󰐋" "Power Setup Summary" \
+                    "CPU" "$cpu_name" \
+                    "AC Limits" "${use_ac_s}W / ${use_ac_b}W / ${use_ac_p}W" \
+                    "BAT Limits" "${use_bat_s}W / ${use_bat_b}W / ${use_bat_p}W"
+
+                rx_setup_confirm || return 0
+
+                rx_log "info" "Applying power optimizations..."
+                result=$(bash "$pwr_script" --setup-apply "$use_ac_s" "$use_ac_b" "$use_ac_p" "$use_bat_s" "$use_bat_b" "$use_bat_p" 2>/dev/null)
+
+                if echo "$result" | grep -q "^OK|"; then
+                    ok_line=$(echo "$result" | grep "^OK|")
+                    s_cpu=$(echo "$ok_line" | sed -n 's/.*cpu_model=\([^|]*\).*/\1/p')
+                    s_ac=$(echo "$ok_line" | sed -n 's/.*ac_saver=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*ac_balanced=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*ac_performance=\([^|]*\).*/\1/p')"W"
+                    s_bat=$(echo "$ok_line" | sed -n 's/.*bat_saver=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*bat_balanced=\([^|]*\).*/\1/p')"W / "$(echo "$ok_line" | sed -n 's/.*bat_performance=\([^|]*\).*/\1/p')"W"
+                    rx_setup_success "󰐋" "Power Configured" \
+                        "CPU" "$s_cpu" \
+                        "AC Limits" "$s_ac" \
+                        "BAT Limits" "$s_bat"
+                else
+                    rx_log "error" "Failed to apply power config"
+                    return 1
+                fi
+            fi
+            ;;
+
         *)
             rx_help_usage "retro power <command>"
             rx_help_commands "Available commands"
@@ -171,6 +277,7 @@ cmd_power() {
             rx_help_cmd "status" "Show CPU, clock, and power cap info"
             rx_help_cmd "optimize" "Auto-detect CPU and suggest settings"
             rx_help_cmd "permissions" "Configure kernel power permissions"
+            rx_help_cmd "setup" "Run power optimization wizard"
             rx_help_examples
             rx_help_example "retro power status" "Show power status and info"
             rx_help_example "retro power set balanced" "Set balanced power profile"

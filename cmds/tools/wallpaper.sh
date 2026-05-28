@@ -3,6 +3,7 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/wallpaper.sh"
+source "$RETRO_DIR/lib/setup.sh"
 
 cmd_wallpaper() {
     local wall_script="$RETRO_DIR/scripts/wallpaper_core.sh"
@@ -404,6 +405,81 @@ cmd_wallpaper() {
             rx_table_spacer
             ;;
 
+        "setup")
+            rx_setup_parse "$@"
+            rx_setup_validate "theme" || return 1
+
+            local config_data
+            config_data=$(bash "$wall_script" --setup-get 2>/dev/null)
+            local current_theme current_wallpaper
+            while IFS='=' read -r key val; do
+                case "$key" in
+                    theme) current_theme="$val" ;;
+                    wallpaper) current_wallpaper="$val" ;;
+                esac
+            done <<<"$config_data"
+
+            : "${current_theme:=retro}"
+            : "${current_wallpaper:=Not set}"
+
+            local config_exists=true
+            [[ -z $current_theme || $current_theme == "null" ]] && config_exists=false
+
+            rx_setup_check_needed "$config_exists" && return 0
+
+            local theme_input=""
+
+            if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
+                theme_input=$(rx_setup_get_opt "theme" "$current_theme")
+            else
+                if [[ $config_exists == true ]]; then
+                    rx_setup_prompt_reconfigure "󰸮" "Current Wallpaper Configuration" \
+                        "Theme" "$current_theme" \
+                        "Active Wallpaper" "$current_wallpaper" || return 0
+                fi
+
+                local -a themes=()
+                for dir in "$REPO_WALLS"/*/; do
+                    [[ -d $dir ]] && themes+=("$(basename "$dir")")
+                done
+
+                if [[ ${#themes[@]} -eq 1 ]]; then
+                    theme_input="${themes[0]}"
+                    rx_log "info" "Using only available theme: ${PINK}${theme_input}${RESET}"
+                else
+                    theme_input=$(rx_input_choice "󰸮" "Select Theme" "${current_theme}" "${themes[@]}")
+                fi
+
+                rx_setup_summary "󰸮" "Wallpaper Setup" \
+                    "Theme" "${theme_input^}"
+
+                rx_setup_confirm || return 0
+            fi
+
+            # TODO: Add wallpaper preview picker (rofi/fzf-based) before confirming apply
+            # TODO: Add per-resolution video optimization step during setup
+
+            rx_log "info" "Applying wallpaper configuration..."
+            local result
+            result=$(bash "$wall_script" --setup-apply "$theme_input" 2>/dev/null)
+
+            if echo "$result" | grep -q "^OK|"; then
+                local ok_line res_theme res_wallpaper
+                ok_line=$(echo "$result" | grep "^OK|")
+                res_theme=$(echo "$ok_line" | sed -n 's/.*theme=\([^|]*\).*/\1/p')
+                res_wallpaper=$(echo "$ok_line" | sed -n 's/.*wallpaper=\([^|]*\).*/\1/p')
+
+                rx_setup_success "󰸮" "Wallpaper Configured" \
+                    "Theme" "${res_theme^}" \
+                    "Active Wallpaper" "$res_wallpaper"
+            else
+                local error_reason
+                error_reason=$(echo "$result" | grep -oP 'error=\K[^|]+' || echo "unknown")
+                rx_log "error" "Failed to apply wallpaper config: ${error_reason}"
+                return 1
+            fi
+            ;;
+
         *)
             rx_help_usage "retro wallpaper <command>"
             rx_help_commands "Available commands"
@@ -420,6 +496,7 @@ cmd_wallpaper() {
             rx_help_cmd "optimize" "Optimize video feeds for resolution"
             rx_help_cmd "status" "Show active wallpaper info"
             rx_help_cmd "gpu [mode]" "Configure GPU offloading for mpvpaper"
+            rx_help_cmd "setup" "Run wallpaper theme setup"
             rx_help_examples
             rx_help_example "retro wallpaper set bmw-m760" "Set wallpaper by name"
             rx_help_example "retro wallpaper slideshow on 300" "Enable slideshow 5min"

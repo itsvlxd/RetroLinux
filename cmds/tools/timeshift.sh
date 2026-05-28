@@ -239,7 +239,7 @@ cmd_timeshift() {
             fi
 
             rx_setup_parse "$@"
-            rx_setup_validate "device,btrfs,daily,weekly,monthly,boot,boot_count,exclude_home" || return 1
+            rx_setup_validate "device,btrfs,daily,weekly,monthly,boot,boot_count,exclude_home" "device:required|btrfs:in=true,false|daily:numeric|weekly:numeric|monthly:numeric|boot:in=true,false|boot_count:numeric|exclude_home:in=true,false" || return 1
 
             local config=$(bash "$ts_script" --config 2>/dev/null || echo "ERROR")
             local config_exists=false
