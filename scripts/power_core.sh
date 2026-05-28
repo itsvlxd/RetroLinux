@@ -389,4 +389,49 @@ case "$1" in
     "--optimize") optimize_cpu ;;
     "--permissions") apply_permissions ;;
     "--model") grep -m 1 'model name' /proc/cpuinfo | sed 's/model name\s*:\s*//' ;;
+    "--setup-get")
+        as=$(get_var "PWR_AC_SAVER" "15")
+        ab=$(get_var "PWR_AC_BALANCED" "28")
+        ap=$(get_var "PWR_AC_PERFORMANCE" "65")
+        bs=$(get_var "PWR_BAT_SAVER" "7")
+        bb=$(get_var "PWR_BAT_BALANCED" "14")
+        bp=$(get_var "PWR_BAT_PERFORMANCE" "35")
+        cpu=$(grep -m 1 'model name' /proc/cpuinfo | sed 's/model name\s*:\s*//')
+        echo "ac_saver=${as}"
+        echo "ac_balanced=${ab}"
+        echo "ac_performance=${ap}"
+        echo "bat_saver=${bs}"
+        echo "bat_balanced=${bb}"
+        echo "bat_performance=${bp}"
+        echo "cpu_model=${cpu}"
+        ;;
+    "--setup-apply")
+        apply_permissions
+
+        if [[ $# -ge 7 ]]; then
+            s_ac="$2"; s_bal="$3"; s_perf="$4"
+            s_bats="$5"; s_batb="$6"; s_batp="$7"
+            cpu_name=$(grep -m 1 'model name' /proc/cpuinfo | sed 's/model name\s*:\s*//')
+        else
+            match=$(optimize_cpu)
+            IFS='|' read -r cpu_name ac_csv bat_csv <<<"$match"
+            IFS=',' read -r s_ac s_bal s_perf <<<"$ac_csv"
+            IFS=',' read -r s_bats s_batb s_batp <<<"$bat_csv"
+        fi
+
+        set_var "PWR_AC_SAVER" "$s_ac"
+        set_var "PWR_AC_BALANCED" "$s_bal"
+        set_var "PWR_AC_PERFORMANCE" "$s_perf"
+        set_var "PWR_BAT_SAVER" "$s_bats"
+        set_var "PWR_BAT_BALANCED" "$s_batb"
+        set_var "PWR_BAT_PERFORMANCE" "$s_batp"
+
+        set_profile "balanced"
+
+        echo "OK|configured|cpu_model=${cpu_name}|ac_saver=${s_ac}|ac_balanced=${s_bal}|ac_performance=${s_perf}|bat_saver=${s_bats}|bat_balanced=${s_batb}|bat_performance=${s_batp}"
+        rx_log_file "success" "Power configured: ${cpu_name} (${s_ac}/${s_bal}/${s_perf} AC, ${s_bats}/${s_batb}/${s_batp} BAT)"
+        ;;
+    "--cpu-name")
+        grep -m 1 'model name' /proc/cpuinfo | sed 's/model name\s*:\s*//'
+        ;;
 esac
