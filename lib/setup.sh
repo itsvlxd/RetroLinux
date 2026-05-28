@@ -15,18 +15,21 @@ rx_setup_parse() {
     RX_SETUP_OPTIONS_RAW=""
     RX_SETUP_NEEDED=false
     RX_SETUP_YES=false
+    RX_SETUP_VALID_KEYS=""
     unset RX_SETUP_OPTS
     declare -gA RX_SETUP_OPTS
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -o|--options)
-                RX_SETUP_MODE="non-interactive"
-                RX_SETUP_OPTIONS_RAW="${2:-}"
-                if [[ -n $2 ]]; then
+                if [[ -n $2 && $2 != -* ]]; then
+                    RX_SETUP_MODE="non-interactive"
+                    RX_SETUP_OPTIONS_RAW="$2"
                     RX_SETUP_OPTIONS="$2"
                     shift 2
                 else
+                    RX_SETUP_MODE="display"
+                    RX_SETUP_OPTIONS=""
                     shift
                 fi
                 ;;
@@ -54,16 +57,96 @@ rx_setup_parse() {
     fi
 }
 
+_rx_setup_get_rules_for_key() {
+    local target_key="$1"
+    local validation_rules="$2"
+
+    if [[ -z $validation_rules ]]; then
+        return
+    fi
+
+    IFS='|' read -ra pieces <<< "$validation_rules"
+    local in_key=false
+    local result=""
+
+    for piece in "${pieces[@]}"; do
+        if [[ "$piece" == "$target_key:"* ]]; then
+            in_key=true
+            local rule="${piece#*:}"
+            [[ -n $rule ]] && result+="$rule|"
+        elif [[ "$piece" != *:* ]]; then
+            [[ $in_key == true ]] && result+="$piece|"
+        else
+            in_key=false
+        fi
+    done
+
+    echo "${result%|}"
+}
+
+_rx_setup_describe_rules() {
+    local rules_string="$1"
+
+    if [[ -z $rules_string ]]; then
+        echo "${MUTE}any value${RESET}"
+        return
+    fi
+
+    IFS='|' read -ra rules <<< "$rules_string"
+    local parts=()
+    for rule in "${rules[@]}"; do
+        case "$rule" in
+            required) parts+=("required") ;;
+            numeric) parts+=("number") ;;
+            min=*) parts+=("min:${rule#min=}") ;;
+            max=*) parts+=("max:${rule#max=}") ;;
+            in=*) parts+=("in:${rule#in=}") ;;
+            eq=*) parts+=("eq:${rule#eq=}") ;;
+            ne=*) parts+=("ne:${rule#ne=}") ;;
+            pattern=*) parts+=("pattern:${rule#pattern=}") ;;
+        esac
+    done
+
+    local IFS=', '
+    echo "${parts[*]}"
+}
+
+rx_setup_show_options() {
+    local valid_keys="$1"
+    local validation_rules="${2:-}"
+
+    rx_table_header "󰇝" "Setup Options"
+
+    IFS=',' read -ra keys_array <<< "$valid_keys"
+    for key in "${keys_array[@]}"; do
+        key=$(echo "$key" | xargs)
+        local rules_raw
+        rules_raw=$(_rx_setup_get_rules_for_key "$key" "$validation_rules")
+        local desc
+        desc=$(_rx_setup_describe_rules "$rules_raw")
+        rx_table_row "󰇝" "$key" "$desc" "$MUTE" "24"
+    done
+
+    rx_table_separator
+    rx_log "info" "Usage: ${PINK}retro <tool> setup -o \"key1=val1,key2=val2,...\"${RESET}"
+}
+
 rx_setup_validate() {
     local valid_keys="$1"
     local validation_rules="${2:-}"
+    RX_SETUP_VALID_KEYS="$valid_keys"
+
+    if [[ $RX_SETUP_MODE == "display" ]]; then
+        rx_setup_show_options "$valid_keys" "$validation_rules"
+        return 1
+    fi
 
     if [[ $RX_SETUP_MODE == "non-interactive" && -z $RX_SETUP_OPTIONS ]]; then
         rx_log "error" "Empty options. Valid keys: ${PINK}${valid_keys}${RESET}"
         return 1
     fi
 
-    if [[ -n $validation_rules ]]; then
+    if [[ $RX_SETUP_MODE == "non-interactive" && -n $validation_rules ]]; then
         IFS='|' read -ra rules_array <<< "$validation_rules"
         for rule in "${rules_array[@]}"; do
             local key="${rule%%:*}"
@@ -224,6 +307,10 @@ rx_setup_prompt_reconfigure() {
 
     if [[ $current_status -eq 1 ]]; then
         return 0
+    fi
+
+    if [[ $RX_SETUP_MODE == "display" ]]; then
+        return 1
     fi
 
     if ! rx_confirm "Reconfigure?" "N"; then
