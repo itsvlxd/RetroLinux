@@ -13,6 +13,7 @@ usbutils
 net-tools
 inetutils
 base-devel
+lm_sensors
 pacman-contrib
 xdg-desktop-portal-gtk
 
