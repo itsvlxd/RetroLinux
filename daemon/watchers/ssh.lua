@@ -30,9 +30,6 @@ return {
             return output, cursor
         end
 
-        local blocked_ips = {}
-        local trusted_ips = {}
-
         while true do
             local logs, cursor = get_new_logs()
             if logs ~= "" then
@@ -59,10 +56,43 @@ return {
                         goto continue
                     end
 
-                    user = line:match("Connection closed by (%S+) port")
-                    if user then
-                        Watcher.log("ssh", "Disconnect: " .. user, "info")
-                        engine:emit("on_ssh_disconnect", user)
+                    local close_user, close_ip, close_reason
+
+                    close_user, close_ip = line:match("Connection closed by authenticating user (%S+) (%S+) port")
+                    if close_user then
+                        close_reason = "auth_fail"
+                    end
+                    if not close_user then
+                        close_user, close_ip = line:match("Disconnected from user (%S+) (%S+) port")
+                        if close_user then
+                            close_reason = "disconnected"
+                        end
+                    end
+                    if not close_user then
+                        close_ip = line:match("Received disconnect from (%S+) port")
+                        if close_ip then
+                            close_reason = "user_disconnect"
+                        end
+                    end
+                    if not close_user and not close_ip then
+                        close_user = line:match("Connection closed by (%S+) port")
+                        if close_user then
+                            close_reason = "closed"
+                        end
+                    end
+                    if not close_user and not close_ip then
+                        close_ip = line:match("(%d+%.%d+%.%d+%.%d+).*port.*disconnect")
+                        if close_ip then
+                            close_reason = "disconnected"
+                        end
+                    end
+
+                    if close_user or close_ip then
+                        local entity = close_ip or close_user or "unknown"
+                        local log_user = close_user or ""
+                        local log_ip = close_ip or close_user or "unknown"
+                        Watcher.log("ssh", "Close: " .. (log_user ~= "" and (log_user .. "@") or "") .. entity .. " (" .. (close_reason or "unknown") .. ")", close_reason == "auth_fail" and "warn" or "info")
+                        engine:emit("on_ssh_close", log_user, log_ip, close_reason or "unknown")
                         goto continue
                     end
 
