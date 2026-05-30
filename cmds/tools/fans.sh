@@ -71,11 +71,8 @@ cmd_fans() {
             [[ -z $profile ]] && profile="auto" && prof_color="$MUTE"
 
             local temp_color="$SUCCESS"
-            local temp_val="${cpu_temp%C}"
-            [[ -n $temp_val ]] && [[ $temp_val -gt 80 ]] && temp_color="$WARN"
-            [[ -n $temp_val ]] && [[ $temp_val -gt 90 ]] && temp_color="$ERROR"
-
-            rx_table_header "󱠝" "Cooling Status"
+            [[ -n $temp_val ]] && [[ $temp_val -gt 50 ]] && temp_color="$WARN"
+            [[ -n $temp_val ]] && [[ $temp_val -gt 70 ]] && temp_color="$ERROR"
             rx_table_row "󰔏" "CPU Temp:" "$cpu_temp" "$temp_color" "24"
             rx_table_row "󰈐" "Engine:" "${engine}" "$engine_color" "24"
             rx_table_row "󰥲" "Profile:" "${profile}" "$prof_color" "24"
@@ -133,9 +130,8 @@ cmd_fans() {
             rx_table_header "󰔏" "Temperature Sensors"
             while IFS='|' read -r hw label temp; do
                 local t_color="$SUCCESS"
-                local t_val="${temp%C}"
-                [[ -n $t_val ]] && [[ $t_val -gt 80 ]] && t_color="$WARN"
-                [[ -n $t_val ]] && [[ $t_val -gt 90 ]] && t_color="$ERROR"
+                [[ -n $t_val ]] && [[ $t_val -gt 50 ]] && t_color="$WARN"
+                [[ -n $t_val ]] && [[ $t_val -gt 70 ]] && t_color="$ERROR"
                 rx_table_row "󰔏" "${label}:" "$temp" "$t_color" "24"
             done <<<"$data"
             rx_table_separator
