@@ -220,13 +220,17 @@ cmd_firewall() {
             fi
 
             rx_table_header "󰦝" "Firewall Rules: ${count} rules"
-            local entry chain port proto action
+            local entry chain port proto action ip
             while IFS='|' read -r part; do
                 if [[ $part =~ ^entry=([0-9]+) ]]; then
                     entry="${BASH_REMATCH[1]}"
+                    chain=""; port=""; proto=""; ip=""
                 fi
                 if [[ $part =~ chain=([a-z_]+) ]]; then
                     chain="${BASH_REMATCH[1]}"
+                fi
+                if [[ $part =~ ip=([0-9.]+) ]]; then
+                    ip="${BASH_REMATCH[1]}"
                 fi
                 if [[ $part =~ port=([0-9]+) ]]; then
                     port="${BASH_REMATCH[1]}"
@@ -239,7 +243,16 @@ cmd_firewall() {
                     local action_color="$PINK"
                     [[ $action == "drop" || $action == "deny" ]] && action_color="$WARN"
                     [[ $action == "accept" || $action == "allow" ]] && action_color="$SUCCESS"
-                    rx_table_row "󰦝" "#${entry}" "${chain}:${port}/${proto} → ${action}" "$action_color" "20"
+                    local rule_desc
+                    if [[ -n $ip && -n $port ]]; then
+                        rule_desc="ip:${ip}:${port}/${proto} → ${action}"
+                    elif [[ -n $ip ]]; then
+                        rule_desc="ip:${ip} → ${action}"
+                    else
+                        rule_desc="${chain}:${port}/${proto} → ${action}"
+                    fi
+                    rx_table_row "󰦝" "#${entry}" "$rule_desc" "$action_color" "4"
+                    ip=""; port=""; proto=""
                 fi
             done <<<"$data"
             rx_table_separator
@@ -247,43 +260,68 @@ cmd_firewall() {
             ;;
 
         "allow")
+            local ip=""
             local port="$1"
             local proto="${2:-tcp}"
             [[ -z $port ]] && rx_log "error" "Usage: retro firewall allow <port> [tcp|udp]" && return 1
+            if [[ $port =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
+                ip="${port%:*}"
+                port="${port#*:}"
+            fi
             local result
-            result=$(bash "$core" --allow "$port" "$proto" 2>/dev/null)
-            if echo "$result" | grep -q "^OK|"; then
-                rx_log "success" "Port ${PINK}${port}/${proto}${RESET} allowed"
+            if [[ -n $ip ]]; then
+                result=$(bash "$core" --allow-ip-port "$ip" "$port" "$proto" 2>/dev/null)
             else
-                rx_log "error" "Failed to allow port ${port}/${proto}"
+                result=$(bash "$core" --allow "$port" "$proto" 2>/dev/null)
+            fi
+            if echo "$result" | grep -q "^OK|"; then
+                if [[ -n $ip ]]; then
+                    rx_log "success" "IP ${PINK}${ip}${RESET} allowed on port ${PINK}${port}/${proto}${RESET}"
+                else
+                    rx_log "success" "Port ${PINK}${port}/${proto}${RESET} allowed"
+                fi
+            else
+                rx_log "error" "Failed to allow ${ip:+$ip:}${port}/${proto}"
                 return 1
             fi
             ;;
 
         "deny")
+            local ip=""
             local port="$1"
             local proto="${2:-tcp}"
             [[ -z $port ]] && rx_log "error" "Usage: retro firewall deny <port> [tcp|udp]" && return 1
+            if [[ $port =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
+                ip="${port%:*}"
+                port="${port#*:}"
+            fi
             local result
-            result=$(bash "$core" --deny "$port" "$proto" 2>/dev/null)
-            if echo "$result" | grep -q "^OK|"; then
-                rx_log "success" "Port ${PINK}${port}/${proto}${RESET} denied"
+            if [[ -n $ip ]]; then
+                result=$(bash "$core" --deny-ip-port "$ip" "$port" "$proto" 2>/dev/null)
             else
-                rx_log "error" "Failed to deny port ${port}/${proto}"
+                result=$(bash "$core" --deny "$port" "$proto" 2>/dev/null)
+            fi
+            if echo "$result" | grep -q "^OK|"; then
+                if [[ -n $ip ]]; then
+                    rx_log "success" "IP ${PINK}${ip}${RESET} blocked on port ${PINK}${port}/${proto}${RESET}"
+                else
+                    rx_log "success" "Port ${PINK}${port}/${proto}${RESET} denied"
+                fi
+            else
+                rx_log "error" "Failed to deny ${ip:+$ip:}${port}/${proto}"
                 return 1
             fi
             ;;
 
         "delete")
-            local port="$1"
-            local proto="${2:-tcp}"
-            [[ -z $port ]] && rx_log "error" "Usage: retro firewall delete <port> [tcp|udp]" && return 1
+            local id="$1"
+            [[ -z $id || ! $id =~ ^[0-9]+$ ]] && rx_log "error" "Usage: retro firewall delete <rule_number>" && return 1
             local result
-            result=$(bash "$core" --delete "$port" "$proto" 2>/dev/null)
+            result=$(bash "$core" --delete-id "$id" 2>/dev/null)
             if echo "$result" | grep -q "^OK|"; then
-                rx_log "success" "Rule deleted for ${PINK}${port}/${proto}${RESET}"
+                rx_log "success" "Rule #${PINK}${id}${RESET} deleted"
             else
-                rx_log "error" "Failed to delete rule for ${port}/${proto}"
+                rx_log "error" "Failed to delete rule #${id}"
                 return 1
             fi
             ;;
