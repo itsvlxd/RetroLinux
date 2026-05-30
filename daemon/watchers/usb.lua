@@ -4,14 +4,19 @@ local last_usb = {}
 
 local function run(cmd)
 	local h = io.popen("timeout 10 " .. cmd .. " 2>/dev/null")
-	if not h then return "" end
-	local r = h:read("*a"); h:close()
+	if not h then
+		return ""
+	end
+	local r = h:read("*a")
+	h:close()
 	return r:gsub("%s+$", "")
 end
 
 local function get_usb_parts()
 	local raw = run("lsblk -nlo NAME,RM,TYPE,TRAN")
-	if raw == "" then return nil end
+	if raw == "" then
+		return nil
+	end
 	local usb_disks = {}
 	local parts = {}
 	for line in raw:gmatch("[^\n]+") do
@@ -25,7 +30,8 @@ local function get_usb_parts()
 		if name and rm == "1" and typ == "part" then
 			for disk, _ in pairs(usb_disks) do
 				if name:sub(1, #disk) == disk then
-					parts[name] = true; break
+					parts[name] = true
+					break
 				end
 			end
 		end
@@ -35,8 +41,10 @@ end
 
 return {
 	name = "usb",
-	interval = 1,
-	enabled = function() return true end,
+	interval = 0,
+	enabled = function()
+		return true
+	end,
 	start = function(engine)
 		local Watcher = require("watcher")
 		local home = os.getenv("HOME") or "/tmp"
@@ -51,13 +59,17 @@ return {
 		local Watcher = require("watcher")
 
 		local current = get_usb_parts()
-		if not current then return end
+		if not current then
+			return
+		end
 
 		for dev, _ in pairs(current) do
 			if not last_usb[dev] then
 				local dev_path = "/dev/" .. dev
 				local label = run("lsblk -nlo LABEL '" .. dev_path .. "'")
-				if label == "" then label = "USB_" .. dev end
+				if label == "" then
+					label = "USB_" .. dev
+				end
 				device_labels[dev] = label
 				Watcher.log("usb", "new: " .. dev .. " (" .. label .. ")", "info")
 
@@ -76,7 +88,10 @@ return {
 					local ignored = false
 					if ignore ~= "" and ignore ~= "null" then
 						for item in ignore:gmatch("[^|]+") do
-							if item == label then ignored = true; break end
+							if item == label then
+								ignored = true
+								break
+							end
 						end
 					end
 					if not ignored then
