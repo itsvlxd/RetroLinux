@@ -110,14 +110,31 @@ _nft_rules() {
     while IFS= read -r line; do
         line="${line#"${line%%[![:space:]]*}"}"
         [[ -z $line ]] && continue
-        local proto port action
-        proto=$(echo "$line" | awk '{print $1}')
-        port=$(echo "$line" | awk '{print $3}')
-        action=$(echo "$line" | awk '{print $4}')
-        [[ -z $port || ! $port =~ ^[0-9]+$ ]] && continue
+        local proto port action ip
+        if [[ $line == ip\ saddr* ]]; then
+            ip=$(awk '{print $3}' <<<"$line")
+            action=$(awk '{print $NF}' <<<"$line")
+            if [[ $line == *dport* ]]; then
+                proto=$(awk '{print $4}' <<<"$line")
+                port=$(awk '{print $6}' <<<"$line")
+            fi
+        else
+            proto=$(awk '{print $1}' <<<"$line")
+            port=$(awk '{print $3}' <<<"$line")
+            action=$(awk '{print $4}' <<<"$line")
+            [[ -z $port || ! $port =~ ^[0-9]+$ ]] && continue
+        fi
         ((count++))
-        echo "entry=${count}|chain=input|port=${port}|proto=${proto}|action=${action}"
-    done < <($SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -E '^\s+(tcp|udp) dport ')
+        if [[ -n $ip ]]; then
+            if [[ -n $port ]]; then
+                echo "entry=${count}|chain=input|ip=${ip}|port=${port}|proto=${proto}|action=${action}"
+            else
+                echo "entry=${count}|chain=input|ip=${ip}|action=${action}"
+            fi
+        else
+            echo "entry=${count}|chain=input|port=${port}|proto=${proto}|action=${action}"
+        fi
+    done < <($SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -E '^\s+(tcp|udp) dport |^\s+ip saddr ')
     echo "count=${count}"
 }
 
@@ -129,10 +146,12 @@ _nft_open_ports() {
     local ports=()
     while IFS= read -r line; do
         line="${line#"${line%%[![:space:]]*}"}"
-        local proto port
+        local proto port action
         proto=$(echo "$line" | awk '{print $1}')
         port=$(echo "$line" | awk '{print $3}')
+        action=$(echo "$line" | awk '{print $4}')
         [[ -z $port || ! $port =~ ^[0-9]+$ ]] && continue
+        [[ $action != "accept" ]] && continue
         ports+=("${port}/${proto}")
     done < <($SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -E '^\s+(tcp|udp) dport ')
     local IFS=","
@@ -140,20 +159,35 @@ _nft_open_ports() {
 }
 
 _nft_default_policy() {
-    $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -oP 'policy \K\w+' || echo "unknown"
+    $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -oP 'policy \K\w+' || echo "drop"
 }
 
 _nft_allow() {
     local port="$1" proto="${2:-tcp}"
     _nft_ensure_basic
+    _nft_delete "$port" "$proto"
     $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "${proto}\\s+dport\\s+${port}\\s+accept" || {
         $SUDO_CMD nft add rule inet filter input "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+    }
+}
+
+_nft_allow_ip_port() {
+    local ip="$1" port="$2" proto="${3:-tcp}"
+    _nft_ensure_basic
+    local handle
+    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep "${proto} dport ${port}.*ip saddr ${ip}.*drop" | grep -oP 'handle \K[0-9]+' | head -1)
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
+    fi
+    $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "ip saddr ${ip}.*${proto} dport ${port}.*accept" || {
+        $SUDO_CMD nft add rule inet filter input ip saddr "${ip}" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
     }
 }
 
 _nft_deny() {
     local port="$1" proto="${2:-tcp}"
     _nft_ensure_basic
+    _nft_delete "$port" "$proto"
     $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "${proto}\\s+dport\\s+${port}\\s+drop" || {
         $SUDO_CMD nft add rule inet filter input "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
     }
@@ -166,6 +200,30 @@ _nft_delete() {
     if [[ -n $handle ]]; then
         $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
     fi
+}
+
+_nft_delete_by_id() {
+    local id="$1"
+    local handle
+    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep -E '^\s+(tcp|udp) dport |^\s+ip saddr ' | sed -n "${id}p" | grep -oP 'handle \K[0-9]+')
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
+        return $?
+    fi
+    return 1
+}
+
+_nft_deny_ip_port() {
+    local ip="$1" port="$2" proto="${3:-tcp}"
+    _nft_ensure_basic
+    local handle
+    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep "${proto} dport ${port}.*ip saddr ${ip}.*accept" | grep -oP 'handle \K[0-9]+' | head -1)
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
+    fi
+    $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "ip saddr ${ip}.*${proto} dport ${port}.*drop" || {
+        $SUDO_CMD nft add rule inet filter input ip saddr "${ip}" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+    }
 }
 
 _nft_block() {
@@ -485,7 +543,7 @@ case "$1" in
             nftables)
                 _nft_shell=$($SUDO_CMD nft list chain inet filter input 2>/dev/null)
                 rule_count=$(echo "$_nft_shell" | grep -cE '^\s+(tcp|udp)\s+dport' || true)
-                default_policy=$(echo "$_nft_shell" | grep -oP 'policy \K\w+' || echo "unknown")
+                default_policy=$(_nft_default_policy)
                 open_ports=$(echo "$_nft_shell" | grep -E '^\s+(tcp|udp)\s+dport' | awk '{printf "%s/%s,", $3, $1}' | sed 's/,$//')
                 ;;
             ufw) rule_count=$(_ufw_rule_count); default_policy=$(_ufw_default_policy); open_ports=$(_ufw_open_ports) ;;
@@ -672,6 +730,23 @@ case "$1" in
         rx_log_file "success" "Port allowed: ${port}/${proto} (${engine})"
         ;;
 
+    --allow-ip-port)
+        ip="$2" port="$3" proto="${4:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_allow_ip_port "$ip" "$port" "$proto" ;;
+            ufw) _ufw_allow "$port" "$proto" ;;
+            firewalld) _fwd_allow "$port" "$proto" ;;
+            iptables) _ipt_allow "$port" "$proto" ;;
+        esac
+        echo "OK|allowed|ip=${ip}|port=${port}|proto=${proto}"
+        rx_log_file "success" "IP:Port allowed: ${ip}:${port}/${proto} (${engine})"
+        ;;
+
     --deny)
         port="$2" proto="${3:-tcp}"
         engine=$(_engine_get)
@@ -688,6 +763,23 @@ case "$1" in
         rx_log_file "success" "Port denied: ${port}/${proto} (${engine})"
         ;;
 
+    --deny-ip-port)
+        ip="$2" port="$3" proto="${4:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_deny_ip_port "$ip" "$port" "$proto" ;;
+            ufw) _ufw_block "$ip" ;;
+            firewalld) _fwd_block "$ip" ;;
+            iptables) _ipt_block "$ip" ;;
+        esac
+        echo "OK|denied|ip=${ip}|port=${port}|proto=${proto}"
+        rx_log_file "success" "IP:Port denied: ${ip}:${port}/${proto} (${engine})"
+        ;;
+
     --delete)
         port="$2" proto="${3:-tcp}"
         engine=$(_engine_get)
@@ -702,6 +794,22 @@ case "$1" in
         esac
         echo "OK|deleted|port=${port}|proto=${proto}"
         rx_log_file "success" "Rule deleted: ${port}/${proto} (${engine})"
+        ;;
+
+    --delete-id)
+        id="$2"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $id || ! $id =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_id"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_delete_by_id "$id" || { echo "result=error|reason=not_found"; exit 1; } ;;
+            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
+            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
+            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
+        esac
+        echo "OK|deleted|id=${id}"
+        rx_log_file "success" "Rule #${id} deleted (${engine})"
         ;;
 
     --block)
