@@ -152,7 +152,7 @@ cmd_firewall() {
 
             if echo "$result" | grep -q "^OK|"; then
                 if [[ -n $default_input ]]; then
-                    bash "$core" --default "$default_input" 2>/dev/null || true
+                    bash "$core" --default "$default_input" >/dev/null 2>&1 || true
                 fi
 
                 local sudoers_file="/etc/sudoers.d/99-retro-firewall"
