@@ -163,7 +163,7 @@ function Engine:run_loop()
 			::continue::
 		end
 
-		os.execute("sleep 1")
+		os.execute("sleep 0.5")
 	end
 end
 
