@@ -9,17 +9,16 @@ setup_firewall() {
 
     local engines=("nftables" "ufw" "firewalld" "iptables")
     local engine_choice
-    engine_choice=$(gum choose --header "Firewall Engine" --cursor.foreground "#ff79c6" --selected.foreground "#ff79c6" --unselected.foreground "#6272a4" "${engines[@]}") || {
-        rx_step_error "Firewall engine selection failed"
-        rx_retry_or_exit "Firewall engine is required" || rx_abort
-        return 1
-    }
+    engine_choice=$(gum choose --header "Firewall Engine" --padding "$GUM_CHOOSE_PADDING" "${engines[@]}")
+
+    if [[ -z "$engine_choice" ]]; then
+        gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "No engine selected, defaulting to nftables"
+        engine_choice="nftables"
+    fi
 
     FIREWALL_ENGINE="$engine_choice"
     rx_save_state
     return 0
 }
 
-if ! setup_firewall; then
-    rx_setup_fail "Firewall"
-fi
+setup_firewall
