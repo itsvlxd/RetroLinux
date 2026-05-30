@@ -76,7 +76,7 @@ return {
 				local mount = run("findmnt -nlo TARGET '" .. dev_path .. "'")
 				if mount == "" then
 					run("udisksctl mount -b '" .. dev_path .. "' --no-user-interaction 2>&1")
-					os.execute("sleep 1")
+					Watcher.sleep(1)
 					mount = run("findmnt -nlo TARGET '" .. dev_path .. "'")
 				end
 

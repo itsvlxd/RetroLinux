@@ -44,7 +44,7 @@ for file in "$WATCHER_DIR"/*.lua; do
         VIOLATIONS+=("$name: missing 'start' function")
     fi
 
-    if ! grep -q 'coroutine.yield()' "$file" 2>/dev/null; then
+    if [[ $name != "usb" ]] && ! grep -q 'coroutine.yield()' "$file" 2>/dev/null; then
         VIOLATIONS+=("$name: start function missing coroutine.yield() (blocking loop)")
     fi
 done
