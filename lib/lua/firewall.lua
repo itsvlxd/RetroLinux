@@ -1,9 +1,14 @@
 local Firewall = {}
 
 local retro_dir = os.getenv("RETRO_DIR") or os.getenv("HOME") .. "/.essentials/retro-arch"
+local core = retro_dir .. "/scripts/firewall_core.sh"
+
+local function run_bg(cmd)
+    os.execute("timeout 10 " .. cmd .. " </dev/null >/dev/null 2>&1 &")
+end
 
 local function run_cmd(cmd)
-    local handle = io.popen(cmd .. " 2>/dev/null")
+    local handle = io.popen("timeout 10 " .. cmd)
     if not handle then return "" end
     local result = handle:read("*a")
     handle:close()
@@ -11,15 +16,15 @@ local function run_cmd(cmd)
 end
 
 function Firewall.block_ip(ip)
-    run_cmd("bash '" .. retro_dir .. "/scripts/lib/firewall_lib.sh' --block '" .. ip .. "'")
+    run_bg("bash '" .. core .. "' --insert-block '" .. ip .. "' 1")
 end
 
 function Firewall.kill_ssh_sessions(ip)
-    run_cmd("bash '" .. retro_dir .. "/scripts/lib/firewall_lib.sh' --kill-ssh '" .. ip .. "'")
+    run_bg("bash '" .. core .. "' --kill-ssh '" .. ip .. "'")
 end
 
 function Firewall.get_engine()
-    return run_cmd("bash '" .. retro_dir .. "/scripts/lib/firewall_lib.sh' --engine")
+    return run_cmd("bash '" .. core .. "' --engine")
 end
 
 return Firewall
