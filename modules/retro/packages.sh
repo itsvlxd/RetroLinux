@@ -15,6 +15,7 @@ inetutils
 base-devel
 lm_sensors
 pacman-contrib
+xdg-terminal-exec
 xdg-desktop-portal-gtk
 
 # Auth
