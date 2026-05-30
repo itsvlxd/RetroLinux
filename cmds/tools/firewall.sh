@@ -154,6 +154,20 @@ cmd_firewall() {
                 if [[ -n $default_input ]]; then
                     bash "$core" --default "$default_input" 2>/dev/null || true
                 fi
+
+                local sudoers_file="/etc/sudoers.d/99-retro-firewall"
+                if [[ ! -f $sudoers_file ]]; then
+                    local engine_bin
+                    case "${engine_input,,}" in
+                        nftables) engine_bin="/usr/bin/nft" ;;
+                        ufw) engine_bin="/usr/bin/ufw" ;;
+                        firewalld) engine_bin="/usr/bin/firewall-cmd" ;;
+                        iptables) engine_bin="/usr/bin/iptables" ;;
+                    esac
+                    local rule="%wheel ALL=(ALL) NOPASSWD: ${engine_bin}, /usr/bin/ss, /usr/bin/kill"
+                    echo "$rule" | sudo tee "$sudoers_file" >/dev/null 2>&1 && sudo chmod 440 "$sudoers_file" 2>/dev/null || true
+                fi
+
                 local result_data
                 result_data=$(bash "$core" --status 2>/dev/null)
                 local res_engine res_status res_rules res_policy res_ports
@@ -269,82 +283,148 @@ cmd_firewall() {
             rx_table_spacer
             ;;
 
-        "allow")
-            local ip=""
-            local port="$1"
-            local proto="${2:-tcp}"
-            [[ -z $port ]] && rx_log "error" "Usage: retro firewall allow <port> [tcp|udp]" && return 1
-            if [[ $port =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
-                ip="${port%:*}"
-                port="${port#*:}"
-            fi
-            local result
-            if [[ -n $ip ]]; then
-                result=$(bash "$core" --allow-ip-port "$ip" "$port" "$proto" 2>/dev/null)
+        "add")
+            local action="${1,,}" target="$2" proto="${3:-tcp}"
+            [[ -z $action || ! $action =~ ^(deny|accept)$ ]] && \
+                rx_log "error" "Usage: retro firewall add <deny|accept> <port|ip> [tcp|udp|all]" && return 1
+            [[ -z $target ]] && \
+                rx_log "error" "Usage: retro firewall add <deny|accept> <port|ip> [tcp|udp|all]" && return 1
+            [[ ! $proto =~ ^(tcp|udp|all)$ ]] && \
+                rx_log "error" "Invalid protocol '${proto}'. Use tcp, udp, or all." && return 1
+
+            local ip="" port="" is_ip_only=false
+            if [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
+                ip="${target%:*}"; port="${target#*:}"
+            elif [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+                ip="$target"; is_ip_only=true
             else
-                result=$(bash "$core" --allow "$port" "$proto" 2>/dev/null)
+                port="$target"
             fi
-            if echo "$result" | grep -q "^OK|"; then
-                if [[ -n $ip ]]; then
-                    rx_log "success" "IP ${PINK}${ip}${RESET} allowed on port ${PINK}${port}/${proto}${RESET}"
+
+            if [[ -n $port ]]; then
+                [[ ! $port =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && \
+                    rx_log "error" "Invalid port '${port}'. Must be a number 1-65535." && return 1
+            fi
+
+            if [[ $is_ip_only == true && $action == "accept" ]]; then
+                rx_log "error" "Cannot accept an entire IP. Use a specific port or 'deny' to block."
+                return 1
+            fi
+
+            if [[ $is_ip_only == true ]]; then
+                local result
+                result=$(bash "$core" --add-block "$ip" 2>/dev/null)
+                if echo "$result" | grep -q "^OK|"; then
+                    rx_log "success" "Rule added: deny ${ip}"
                 else
-                    rx_log "success" "Port ${PINK}${port}/${proto}${RESET} allowed"
+                    rx_log "error" "Failed to add deny for ${ip}"
+                    return 1
                 fi
             else
-                rx_log "error" "Failed to allow ${ip:+$ip:}${port}/${proto}"
-                return 1
+                local -a protos=("$proto")
+                [[ $proto == "all" ]] && protos=("tcp" "udp")
+                for p in "${protos[@]}"; do
+                    local result
+                    if [[ -n $ip ]]; then
+                        if [[ $action == "deny" ]]; then
+                            result=$(bash "$core" --add-deny-ip-port "$ip" "$port" "$p" 2>/dev/null)
+                        else
+                            result=$(bash "$core" --allow-ip-port "$ip" "$port" "$p" 2>/dev/null)
+                        fi
+                    else
+                        if [[ $action == "deny" ]]; then
+                            result=$(bash "$core" --deny "$port" "$p" 2>/dev/null)
+                        else
+                            result=$(bash "$core" --allow "$port" "$p" 2>/dev/null)
+                        fi
+                    fi
+                    if ! echo "$result" | grep -q "^OK|"; then
+                        rx_log "error" "Failed to add ${action} for ${target}/${p}"
+                        return 1
+                    fi
+                done
+                rx_log "success" "Rule added: ${action} ${target}/${proto}"
             fi
             ;;
 
-        "deny")
-            local ip=""
-            local port="$1"
-            local proto="${2:-tcp}"
-            [[ -z $port ]] && rx_log "error" "Usage: retro firewall deny <port> [tcp|udp]" && return 1
-            if [[ $port =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
-                ip="${port%:*}"
-                port="${port#*:}"
-            fi
-            local result
-            if [[ -n $ip ]]; then
-                result=$(bash "$core" --deny-ip-port "$ip" "$port" "$proto" 2>/dev/null)
+        "insert")
+            local action="${1,,}" target="$2" position="$3" proto="${4:-tcp}"
+            [[ -z $action || ! $action =~ ^(deny|accept)$ ]] && \
+                rx_log "error" "Usage: retro firewall insert <deny|accept> <port|ip> <pos> [tcp|udp|all]" && return 1
+            [[ -z $target ]] && \
+                rx_log "error" "Usage: retro firewall insert <deny|accept> <port|ip> <pos> [tcp|udp|all]" && return 1
+            [[ -z $position || ! $position =~ ^[0-9]+$ || $position -eq 0 ]] && \
+                rx_log "error" "Invalid position '${position}'. Must be a positive number." && return 1
+            [[ ! $proto =~ ^(tcp|udp|all)$ ]] && \
+                rx_log "error" "Invalid protocol '${proto}'. Use tcp, udp, or all." && return 1
+
+            local ip="" port="" is_ip_only=false
+            if [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
+                ip="${target%:*}"; port="${target#*:}"
+            elif [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+                ip="$target"; is_ip_only=true
             else
-                result=$(bash "$core" --deny "$port" "$proto" 2>/dev/null)
+                port="$target"
             fi
-            if echo "$result" | grep -q "^OK|"; then
-                if [[ -n $ip ]]; then
-                    rx_log "success" "IP ${PINK}${ip}${RESET} blocked on port ${PINK}${port}/${proto}${RESET}"
+
+            if [[ -n $port ]]; then
+                [[ ! $port =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && \
+                    rx_log "error" "Invalid port '${port}'. Must be a number 1-65535." && return 1
+            fi
+
+            if [[ $is_ip_only == true && $action == "accept" ]]; then
+                rx_log "error" "Cannot accept an entire IP. Use a specific port or 'deny' to block."
+                return 1
+            fi
+
+            if [[ $is_ip_only == true ]]; then
+                local result
+                result=$(bash "$core" --insert-block "$ip" "$position" 2>/dev/null)
+                if echo "$result" | grep -q "^OK|"; then
+                    rx_log "success" "Rule inserted: deny ${ip} at ${position}"
                 else
-                    rx_log "success" "Port ${PINK}${port}/${proto}${RESET} denied"
+                    rx_log "error" "Failed to insert deny for ${ip} at ${position}"
+                    return 1
                 fi
             else
-                rx_log "error" "Failed to deny ${ip:+$ip:}${port}/${proto}"
-                return 1
+                local -a protos=("$proto")
+                [[ $proto == "all" ]] && protos=("tcp" "udp")
+                local p_idx="$position"
+                for p in "${protos[@]}"; do
+                    local result
+                    if [[ -n $ip ]]; then
+                        if [[ $action == "deny" ]]; then
+                            result=$(bash "$core" --insert-deny-ip-port "$ip" "$port" "$p_idx" "$p" 2>/dev/null)
+                        else
+                            result=$(bash "$core" --insert-accept-ip-port "$ip" "$port" "$p_idx" "$p" 2>/dev/null)
+                        fi
+                    else
+                        if [[ $action == "deny" ]]; then
+                            result=$(bash "$core" --insert-deny "$port" "$p_idx" "$p" 2>/dev/null)
+                        else
+                            result=$(bash "$core" --insert-accept "$port" "$p_idx" "$p" 2>/dev/null)
+                        fi
+                    fi
+                    if ! echo "$result" | grep -q "^OK|"; then
+                        rx_log "error" "Failed to insert ${action} for ${target}/${p} at ${p_idx}"
+                        return 1
+                    fi
+                    [[ ${#protos[@]} -gt 1 ]] && p_idx=$((p_idx + 1))
+                done
+                rx_log "success" "Rule inserted: ${action} ${target}/${proto} at ${position}"
             fi
             ;;
 
         "delete")
             local id="$1"
-            [[ -z $id || ! $id =~ ^[0-9]+$ ]] && rx_log "error" "Usage: retro firewall delete <rule_number>" && return 1
+            [[ -z $id || ! $id =~ ^[0-9]+$ || $id -eq 0 ]] && \
+                rx_log "error" "Usage: retro firewall delete <rule_number>" && return 1
             local result
             result=$(bash "$core" --delete-id "$id" 2>/dev/null)
             if echo "$result" | grep -q "^OK|"; then
                 rx_log "success" "Rule #${PINK}${id}${RESET} deleted"
             else
-                rx_log "error" "Failed to delete rule #${id}"
-                return 1
-            fi
-            ;;
-
-        "block")
-            local ip="$1"
-            [[ -z $ip ]] && rx_log "error" "Usage: retro firewall block <ip>" && return 1
-            local result
-            result=$(bash "$core" --block "$ip" 2>/dev/null)
-            if echo "$result" | grep -q "^OK|"; then
-                rx_log "success" "IP ${PINK}${ip}${RESET} blocked"
-            else
-                rx_log "error" "Failed to block IP ${ip}"
+                rx_log "error" "Failed to delete rule #${id}. Does it exist?"
                 return 1
             fi
             ;;
@@ -376,29 +456,32 @@ cmd_firewall() {
         "help" | "")
             rx_help_usage "retro firewall <command>"
             rx_help_commands "Available commands"
-            rx_help_cmd "status" "Show firewall engine, status, rules, and open ports" 24
-            rx_help_cmd "setup" "Run firewall setup wizard" 24
-            rx_help_cmd "on" "Enable and start firewall" 24
-            rx_help_cmd "off" "Disable and stop firewall" 24
-            rx_help_cmd "restart" "Restart firewall" 24
-            rx_help_cmd "rules" "List all firewall rules" 24
-            rx_help_cmd "allow <port> [tcp|udp]" "Open a port" 24
-            rx_help_cmd "deny <port> [tcp|udp]" "Close a port" 24
-            rx_help_cmd "delete <port> [tcp|udp]" "Delete a rule" 24
-            rx_help_cmd "block <ip>" "Block an IP address" 24
-            rx_help_cmd "default <drop|accept>" "Set default input policy" 24
-            rx_help_cmd "engine" "Show current firewall engine" 24
-            rx_help_cmd "logs [lines]" "Show firewall daemon logs" 24
+            rx_help_cmd "status" "Show firewall engine, status, rules, and open ports" 50
+            rx_help_cmd "setup" "Run firewall setup wizard" 50
+            rx_help_cmd "on" "Enable and start firewall" 50
+            rx_help_cmd "off" "Disable and stop firewall" 50
+            rx_help_cmd "restart" "Restart firewall" 50
+            rx_help_cmd "rules" "List all firewall rules" 50
+            rx_help_cmd "delete <id>" "Delete rule by ID" 50
+            rx_help_cmd "default <drop|accept>" "Set default input policy" 50
+            rx_help_cmd "engine" "Show current firewall engine" 50
+            rx_help_cmd "logs [lines]" "Show firewall daemon logs" 50
+            rx_help_cmd "add deny <port|ip> [tcp|udp|all]" "Append a deny rule" 50
+            rx_help_cmd "add accept <port|ip> [tcp|udp|all]" "Append an accept rule" 50
+            rx_help_cmd "insert deny <port|ip> <pos> [tcp|udp|all]" "Insert a deny at position" 50
+            rx_help_cmd "insert accept <port|ip> <pos> [tcp|udp|all]" "Insert an accept at position" 50
             rx_help_spacer
             rx_help_examples
-            rx_help_example "retro firewall status" "Show full firewall status" "38"
-            rx_help_example "retro firewall setup" "Run interactive firewall setup" "38"
-            rx_help_example "retro firewall on" "Enable and start firewall" "38"
-            rx_help_example "retro firewall allow 80" "Open HTTP port" "38"
-            rx_help_example "retro firewall deny 443" "Close HTTPS port" "38"
-            rx_help_example "retro firewall block 10.0.0.5" "Block suspicious IP" "38"
-            rx_help_example "retro firewall default drop" "Drop all incoming by default" "38"
-            rx_help_example "retro firewall rules" "List active rules" "38"
+            rx_help_example "retro firewall status" "Show full firewall status" "44"
+            rx_help_example "retro firewall setup" "Run interactive firewall setup" "44"
+            rx_help_example "retro firewall add deny 10.0.0.5" "Block IP (append)" "44"
+            rx_help_example "retro firewall add deny 8080" "Deny port 8080 (append)" "44"
+            rx_help_example "retro firewall add accept 80" "Allow port 80 (append)" "44"
+            rx_help_example "retro firewall add deny 10.0.0.5:22" "Deny IP on specific port" "44"
+            rx_help_example "retro firewall insert deny 10.0.0.5 1" "Block IP at position 1" "44"
+            rx_help_example "retro firewall insert accept 80 2" "Allow port 80 at position 2" "44"
+            rx_help_example "retro firewall default drop" "Drop all incoming by default" "44"
+            rx_help_example "retro firewall rules" "List active rules" "44"
             rx_help_spacer
             ;;
 

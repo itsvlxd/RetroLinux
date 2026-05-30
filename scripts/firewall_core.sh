@@ -213,7 +213,87 @@ _nft_delete_by_id() {
     return 1
 }
 
+_nft_handle_at_index() {
+    local idx="$1"
+    $SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep -E '^\s+(tcp|udp) dport |^\s+ip saddr ' | sed -n "${idx}p" | grep -oP 'handle \K[0-9]+'
+}
+
+_nft_insert_block() {
+    local ip="$1" idx="$2"
+    _nft_ensure_basic
+    local handle
+    handle=$(_nft_handle_at_index "$idx")
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft add rule inet filter input position "$handle" ip saddr "${ip}" drop 2>/dev/null && _nft_commit
+    fi
+}
+
+_nft_insert_deny() {
+    local port="$1" idx="$2" proto="${3:-tcp}"
+    _nft_ensure_basic
+    _nft_delete "$port" "$proto"
+    local handle
+    handle=$(_nft_handle_at_index "$idx")
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft add rule inet filter input position "$handle" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+    fi
+}
+
+_nft_insert_accept() {
+    local port="$1" idx="$2" proto="${3:-tcp}"
+    _nft_ensure_basic
+    _nft_delete "$port" "$proto"
+    local handle
+    handle=$(_nft_handle_at_index "$idx")
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft add rule inet filter input position "$handle" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+    fi
+}
+
+_nft_insert_deny_ip_port() {
+    local ip="$1" port="$2" idx="$3" proto="${4:-tcp}"
+    _nft_ensure_basic
+    local handle
+    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep "${proto} dport ${port}.*ip saddr ${ip}.*accept" | grep -oP 'handle \K[0-9]+' | head -1)
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
+    fi
+    local target_handle
+    target_handle=$(_nft_handle_at_index "$idx")
+    if [[ -n $target_handle ]]; then
+        $SUDO_CMD nft add rule inet filter input position "$target_handle" ip saddr "${ip}" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+    fi
+}
+
+_nft_insert_accept_ip_port() {
+    local ip="$1" port="$2" idx="$3" proto="${4:-tcp}"
+    _nft_ensure_basic
+    local handle
+    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep "${proto} dport ${port}.*ip saddr ${ip}.*drop" | grep -oP 'handle \K[0-9]+' | head -1)
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
+    fi
+    local target_handle
+    target_handle=$(_nft_handle_at_index "$idx")
+    if [[ -n $target_handle ]]; then
+        $SUDO_CMD nft add rule inet filter input position "$target_handle" ip saddr "${ip}" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+    fi
+}
+
 _nft_deny_ip_port() {
+    local ip="$1" port="$2" proto="${3:-tcp}"
+    _nft_ensure_basic
+    local handle
+    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep "${proto} dport ${port}.*ip saddr ${ip}.*accept" | grep -oP 'handle \K[0-9]+' | head -1)
+    if [[ -n $handle ]]; then
+        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
+    fi
+    $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "ip saddr ${ip}.*${proto} dport ${port}.*drop" || {
+        $SUDO_CMD nft insert rule inet filter input ip saddr "${ip}" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+    }
+}
+
+_nft_add_deny_ip_port() {
     local ip="$1" port="$2" proto="${3:-tcp}"
     _nft_ensure_basic
     local handle
@@ -227,6 +307,14 @@ _nft_deny_ip_port() {
 }
 
 _nft_block() {
+    local ip="$1"
+    _nft_ensure_basic
+    $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "ip\\s+saddr\\s+${ip}\\s+drop" || {
+        $SUDO_CMD nft insert rule inet filter input ip saddr "${ip}" drop 2>/dev/null && _nft_commit
+    }
+}
+
+_nft_add_block() {
     local ip="$1"
     _nft_ensure_basic
     $SUDO_CMD nft list chain inet filter input 2>/dev/null | grep -qE "ip\\s+saddr\\s+${ip}\\s+drop" || {
@@ -836,6 +924,126 @@ case "$1" in
         rx_log_file "success" "IP blocked: ${ip} (${engine})"
         ;;
 
+    --add-block)
+        ip="$2"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_add_block "$ip" ;;
+            ufw) _ufw_block "$ip" ;;
+            firewalld) _fwd_block "$ip" ;;
+            iptables) _ipt_block "$ip" ;;
+        esac
+        echo "OK|blocked|ip=${ip}|mode=add"
+        rx_log_file "success" "IP blocked (add): ${ip} (${engine})"
+        ;;
+
+    --add-deny-ip-port)
+        ip="$2" port="$3" proto="${4:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_add_deny_ip_port "$ip" "$port" "$proto" ;;
+            ufw) _ufw_block "$ip" ;;
+            firewalld) _fwd_block "$ip" ;;
+            iptables) _ipt_block "$ip" ;;
+        esac
+        echo "OK|denied|ip=${ip}|port=${port}|proto=${proto}|mode=add"
+        rx_log_file "success" "IP:Port denied (add): ${ip}:${port}/${proto} (${engine})"
+        ;;
+
+    --insert-block)
+        ip="$2" idx="$3"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_insert_block "$ip" "$idx" ;;
+            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
+            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
+            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
+        esac
+        echo "OK|blocked|ip=${ip}|position=${idx}|mode=insert"
+        rx_log_file "success" "IP blocked (insert): ${ip} at ${idx} (${engine})"
+        ;;
+
+    --insert-deny)
+        port="$2" idx="$3" proto="${4:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+        [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_insert_deny "$port" "$idx" "$proto" ;;
+            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
+            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
+            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
+        esac
+        echo "OK|denied|port=${port}|proto=${proto}|position=${idx}|mode=insert"
+        rx_log_file "success" "Port denied (insert): ${port}/${proto} at ${idx} (${engine})"
+        ;;
+
+    --insert-accept)
+        port="$2" idx="$3" proto="${4:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+        [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_insert_accept "$port" "$idx" "$proto" ;;
+            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
+            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
+            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
+        esac
+        echo "OK|allowed|port=${port}|proto=${proto}|position=${idx}|mode=insert"
+        rx_log_file "success" "Port allowed (insert): ${port}/${proto} at ${idx} (${engine})"
+        ;;
+
+    --insert-deny-ip-port)
+        ip="$2" port="$3" idx="$4" proto="${5:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+        [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_insert_deny_ip_port "$ip" "$port" "$idx" "$proto" ;;
+            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
+            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
+            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
+        esac
+        echo "OK|denied|ip=${ip}|port=${port}|proto=${proto}|position=${idx}|mode=insert"
+        rx_log_file "success" "IP:Port denied (insert): ${ip}:${port}/${proto} at ${idx} (${engine})"
+        ;;
+
+    --insert-accept-ip-port)
+        ip="$2" port="$3" idx="$4" proto="${5:-tcp}"
+        engine=$(_engine_get)
+        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
+        [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
+
+        case "$engine" in
+            nftables) _nft_insert_accept_ip_port "$ip" "$port" "$idx" "$proto" ;;
+            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
+            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
+            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
+        esac
+        echo "OK|allowed|ip=${ip}|port=${port}|proto=${proto}|position=${idx}|mode=insert"
+        rx_log_file "success" "IP:Port allowed (insert): ${ip}:${port}/${proto} at ${idx} (${engine})"
+        ;;
+
     --default)
         policy="$2"
         engine=$(_engine_get)
@@ -850,6 +1058,18 @@ case "$1" in
         esac
         echo "OK|default|policy=${policy}"
         rx_log_file "success" "Default policy set: ${policy} (${engine})"
+        ;;
+
+    --kill-ssh)
+        ip="$2"
+        [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
+        local pids
+        pids=$(ss -tnp 2>/dev/null | grep ":22 " | grep "$ip" | grep -oP 'pid=\K[0-9]+' | sort -u)
+        for pid in $pids; do
+            $SUDO_CMD kill "$pid" 2>/dev/null || true
+        done
+        echo "OK|killed|ip=${ip}"
+        rx_log_file "success" "SSH sessions killed: ${ip}"
         ;;
 
     --logs)
