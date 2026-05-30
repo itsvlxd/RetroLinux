@@ -206,7 +206,7 @@ function Events.on_ssh_failed(username, ip)
 			"<b>" .. current_count .. "</b> failed attempts from " .. ip .. " (user: " .. username .. ")",
 			{
 				icon = "dialog-warning-symbolic",
-				urgency = "critical",
+				urgency = "normal",
 				timeout = "15000",
 				app_name = "retro_ssh_brute_" .. ip,
 				wait = true,
