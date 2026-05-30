@@ -551,15 +551,21 @@ cmd_xdg() {
                 rx_setup_confirm || return 0
             fi
 
+            bash "$xdg_script" --ensure-dirs >/dev/null 2>&1 || true
+
             local result=$(bash "$xdg_script" --setup "$editor_input" "$browser_input" "$fm_input" "$image_input" "$video_input" 2>&1)
             if echo "$result" | grep -q "^OK|"; then
-                check_dep "xdg-terminal-exec" "xdg-terminal-exec" || return 1
-                mkdir -p "$HOME/.config/xdg-terminal-exec"
-                cat > "$HOME/.config/xdg-terminal-exec/config" << EOF
+                check_dep "xdg-terminal-exec" "xdg-terminal-exec" 2>/dev/null || true
+                mkdir -p "$HOME/.config/xdg-terminal-exec" 2>/dev/null || true
+                cat > "$HOME/.config/xdg-terminal-exec/config" 2>/dev/null << EOF || true
 [General]
 terminal=kitty.desktop
 EOF
-                rx_log "success" "Terminal executor configured (kitty)"
+                if [[ -f $HOME/.config/xdg-terminal-exec/config ]]; then
+                    rx_log "success" "Terminal executor configured (kitty)"
+                else
+                    rx_log "warn" "Could not write terminal executor config"
+                fi
 
                 rx_setup_success "󱗼" "XDG Defaults Configured" \
                     "Editor" "$editor_desktop (${editor_count} types)" \
