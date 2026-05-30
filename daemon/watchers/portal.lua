@@ -16,7 +16,6 @@ return {
         local backend_warning_shown = {}
 
         while true do
-            Watcher.reload_vars()
 
             local portal_pid = Watcher.run_cmd("pgrep -x 'xdg-desktop-portal' | head -1")
             local backend = XDG.get_portal_backend()

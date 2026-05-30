@@ -47,7 +47,6 @@ return {
                     engine:emit("on_power_connect", tostring(cap))
                 end
                 last_on_battery = current
-                Watcher.reload_vars()
                 last_pwr_profile = Watcher.get_var("PWR_CURRENT", "")
             end
 

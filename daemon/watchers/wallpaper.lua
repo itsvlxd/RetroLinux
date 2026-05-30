@@ -12,7 +12,6 @@ return {
         local was_static = false
 
         while true do
-            Watcher.reload_vars()
 
             local force_static = Watcher.get_var("WALL_STATIC_FORCED", "false")
             local saver_active = Watcher.get_var("BAT_SAVER_ACTIVE", "false")

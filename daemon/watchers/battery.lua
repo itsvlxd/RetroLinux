@@ -32,7 +32,6 @@ return {
 
         while true do
             if tick_counter % 10 == 0 then
-                Watcher.reload_vars()
                 saver_thresh = tonumber(Watcher.get_var("BAT_SAVER_THRESHOLD", "20")) or 20
                 low_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_THRESHOLD", "20")) or 20
                 crit_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_CRITICAL_THRESHOLD", "5")) or 5

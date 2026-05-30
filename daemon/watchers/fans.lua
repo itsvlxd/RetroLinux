@@ -26,14 +26,12 @@ return {
         Watcher.log("fans", "Fan curve daemon started", "info")
 
         while true do
-            Watcher.reload_vars()
 
             local enabled = Watcher.get_var("FAN_ENABLED", "false")
             if enabled ~= "true" then
                 Watcher.log("fans", "Fan control disabled, pausing", "info")
                 while true do
                     Watcher.sleep(30)
-                    Watcher.reload_vars()
                     enabled = Watcher.get_var("FAN_ENABLED", "false")
                     if enabled == "true" then
                         Watcher.log("fans", "Fan control re-enabled, resuming", "info")

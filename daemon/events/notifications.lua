@@ -60,25 +60,19 @@ function Events.on_usb_connected(label, mount_path)
     end
 end
 
-function Events.on_usb_disconnected(dev_name, mount_root)
+function Events.on_usb_disconnected(dev_name, label, mount_root)
     local ignore_list = Watcher.get_var("USB_IGNORE_DRIVES", "")
-    local links = Watcher.run_cmd("ls -1 '" .. mount_root .. "' 2>/dev/null")
-    for label in links:gmatch("[^\n]+") do
-        local link_path = mount_root .. "/" .. label
-        local target = Watcher.run_cmd("readlink '" .. link_path .. "' 2>/dev/null")
-        if target ~= "" and Watcher.run_cmd("test -e '" .. target .. "' && echo yes") ~= "yes" then
-            local ignored = false
-            if ignore_list ~= "" and ignore_list ~= "null" then
-                for item in ignore_list:gmatch("[^|]+") do
-                    if item == label then ignored = true; break end
-                end
-            end
-            if not ignored then
-                Notify.usb_disconnected(dev_name, label)
-            end
-            Watcher.run_cmd("rm '" .. link_path .. "'")
+    local ignored = false
+    if ignore_list ~= "" and ignore_list ~= "null" then
+        for item in ignore_list:gmatch("[^|]+") do
+            if item == label then ignored = true; break end
         end
     end
+    if not ignored then
+        Notify.usb_disconnected(dev_name, label)
+    end
+    local link_path = mount_root .. "/" .. label
+    Watcher.run_cmd("rm -f '" .. link_path .. "'")
 end
 
 function Events.on_bluetooth_connected(name, mac)

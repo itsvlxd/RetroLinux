@@ -34,7 +34,6 @@ return {
         local trusted_ips = {}
 
         while true do
-            Watcher.reload_vars()
             local logs, cursor = get_new_logs()
             if logs ~= "" then
                 if cursor ~= "" then

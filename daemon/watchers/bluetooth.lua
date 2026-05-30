@@ -77,7 +77,6 @@ return {
 
         local tick = 0
         while true do
-            Watcher.reload_vars()
             local ignored_macs = Watcher.get_var("BT_MAC_IGNORE", "")
             local currently_pairing = Watcher.get_var("BT_PAIRING_IN_PROGRESS", "")
 

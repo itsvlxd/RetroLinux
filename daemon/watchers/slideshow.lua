@@ -11,7 +11,6 @@ return {
         local current_rand_target = 0
 
         while true do
-            Watcher.reload_vars()
             local slideshow_active = Watcher.get_var("WALL_SLIDESHOW_ACTIVE", "false")
 
             if slideshow_active == "true" then
