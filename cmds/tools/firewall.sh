@@ -62,11 +62,12 @@ cmd_firewall() {
 
             local config_data
             config_data=$(bash "$core" --setup-get 2>/dev/null)
-            local current_engine current_status
+            local current_engine current_status current_policy
             while IFS='=' read -r key val; do
                 case "$key" in
                     engine) current_engine="$val" ;;
                     daemon_status) current_status="$val" ;;
+                    default_policy) current_policy="$val" ;;
                 esac
             done <<<"$config_data"
 
@@ -98,7 +99,8 @@ cmd_firewall() {
                 if [[ $config_exists == true ]]; then
                     rx_setup_prompt_reconfigure "󰦝" "Current Firewall Configuration" \
                         "Engine" "${current_engine^}" \
-                        "Status" "${current_status^}" || return 0
+                        "Status" "${current_status^}" \
+                        "Default Policy" "${current_policy^}" || return 0
                 fi
 
                 if [[ ${#engines[@]} -eq 1 ]]; then
