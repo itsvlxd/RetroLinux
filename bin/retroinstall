@@ -208,6 +208,8 @@ rx_install_system() {
 
     local browser_info="${BROWSER_CHOICE:-zen-browser-bin}"
 
+    local firewall_info="${FIREWALL_ENGINE:-nftables}"
+
     local boot_info="GRUB ${GRUB_THEME_CHOICE:-retropunk} ${BOOT_VIDEO_GRUB:-1920x1080}"
     if [[ $GRUB_OS_PROBER == "true" ]]; then
         boot_info="$boot_info + OS Prober"
@@ -253,6 +255,7 @@ AUR Helper,${aur_info}
 Editor,${editor_info}
 File Manager,${filemanager_info}
 Browser,${browser_info}
+Firewall,${firewall_info}
 Network,${network_info}"
 
     echo "$table_data" | gum table -s "," -c "Field,Value" -p | sed "s/^/${PADDING_LEFT_SPACES}/"
