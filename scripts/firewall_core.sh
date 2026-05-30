@@ -574,8 +574,16 @@ case "$1" in
             firewalld) firewall-cmd --state 2>/dev/null | grep -qi "running" && status="active" ;;
             iptables) $SUDO_CMD iptables -L -n &>/dev/null && status="active" ;;
         esac
+        local policy=""
+        case "$engine" in
+            nftables) policy=$(_nft_default_policy) ;;
+            ufw) policy=$(_ufw_default_policy) ;;
+            firewalld) policy=$(_fwd_default_policy) ;;
+            iptables) policy=$(_ipt_default_policy) ;;
+        esac
         echo "engine=${engine}"
         echo "daemon_status=${status}"
+        echo "default_policy=${policy}"
         ;;
 
     --setup-apply)
