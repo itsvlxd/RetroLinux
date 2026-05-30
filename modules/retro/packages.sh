@@ -24,6 +24,9 @@ libsecret
 polkit-gnome
 gnome-keyring
 
+# Disk
+smartmontools
+
 # Apps
 loupe
 mpv
