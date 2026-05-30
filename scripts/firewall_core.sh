@@ -69,6 +69,27 @@ _nft_ensure_basic() {
         $SUDO_CMD nft add rule inet filter input ip protocol icmp icmp type echo-request accept 2>/dev/null || true
     echo "$_chain_rules" | grep -q "icmpv6 type echo-request" || \
         $SUDO_CMD nft add rule inet filter input ip6 nexthdr icmpv6 icmpv6 type echo-request accept 2>/dev/null || true
+
+    $SUDO_CMD sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
+    echo "net.ipv4.ip_forward=1" | $SUDO_CMD tee /etc/sysctl.d/99-retro-docker.conf >/dev/null 2>&1 || true
+
+    $SUDO_CMD nft list tables 2>/dev/null | grep -q "inet nat" || \
+        $SUDO_CMD nft add table inet nat 2>/dev/null || true
+    $SUDO_CMD nft list chain inet nat postrouting &>/dev/null || \
+        $SUDO_CMD nft add chain inet nat postrouting '{ type nat hook postrouting priority 100; }' 2>/dev/null || true
+    local _nat_rules
+    _nat_rules=$($SUDO_CMD nft list chain inet nat postrouting 2>/dev/null)
+    echo "$_nat_rules" | grep -q "172.17.0.0/16" || \
+        $SUDO_CMD nft add rule inet nat postrouting ip saddr 172.17.0.0/16 oif != docker0 masquerade 2>/dev/null || true
+
+    local _fwd_rules
+    _fwd_rules=$($SUDO_CMD nft list chain inet filter forward 2>/dev/null)
+    echo "$_fwd_rules" | grep -q "ct state established,related" || \
+        $SUDO_CMD nft add rule inet filter forward ct state established,related accept 2>/dev/null || true
+    echo "$_fwd_rules" | grep -q "iif docker0 oif != docker0" || \
+        $SUDO_CMD nft add rule inet filter forward iif docker0 oif != docker0 accept 2>/dev/null || true
+    echo "$_fwd_rules" | grep -q "oif docker0" || \
+        $SUDO_CMD nft add rule inet filter forward oif docker0 iif != docker0 accept 2>/dev/null || true
 }
 
 _nft_commit() {
