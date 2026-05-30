@@ -15,8 +15,15 @@ inetutils
 base-devel
 lm_sensors
 pacman-contrib
+
+# XDG
+xdg-utils
+xdg-user-dirs
+xdg-dbus-proxy
 xdg-terminal-exec
+xdg-desktop-portal
 xdg-desktop-portal-gtk
+xdg-desktop-portal-hyprland
 
 # Auth
 fprintd

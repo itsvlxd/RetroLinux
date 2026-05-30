@@ -7,8 +7,17 @@ XDG_MIMEAPPS_FILE="$HOME/.config/mimeapps.list"
 XDG_PORTAL_CONF="$RETRO_CONFIG/portal.conf"
 
 rx_xdg_ensure_dirs() {
+    local dirs_config="$HOME/.config/user-dirs.dirs"
+
     if command -v xdg-user-dirs-update >/dev/null 2>&1; then
-        xdg-user-dirs-update 2>/dev/null
+        xdg-user-dirs-update --force 2>/dev/null
+
+        if [[ -f $dirs_config ]] && grep -q 'DIR="$HOME/"' "$dirs_config" 2>/dev/null; then
+            sed -i 's|DIR="$HOME/"|DIR="$HOME/Desktop"|' "$dirs_config" 2>/dev/null
+            xdg-user-dirs-update --force 2>/dev/null
+        fi
+
+        systemctl --user enable xdg-user-dirs-update.service 2>/dev/null || true
     fi
 
     local dirs=(DESKTOP DOWNLOAD DOCUMENTS MUSIC PICTURES VIDEOS TEMPLATES PUBLICSHARE)
@@ -16,7 +25,7 @@ rx_xdg_ensure_dirs() {
     for dir in "${dirs[@]}"; do
         local path=$(rx_xdg_get_dir "$dir")
         if [[ -n $path && $path != '$HOME' ]]; then
-            [[ ! -d $path ]] && mkdir -p "$path" && ((created++))
+            [[ ! -d $path ]] && mkdir -p "$path" 2>/dev/null && ((created++))
         fi
     done
     echo "created=$created"
