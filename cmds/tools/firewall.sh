@@ -58,7 +58,7 @@ cmd_firewall() {
 
         "setup")
             rx_setup_parse "$@"
-            rx_setup_validate "engine" "engine:in=nftables,ufw,firewalld,iptables" || return 1
+            rx_setup_validate "engine,default" "engine:in=nftables,ufw,firewalld,iptables|default:in=drop,accept" || return 1
 
             local config_data
             config_data=$(bash "$core" --setup-get 2>/dev/null)
@@ -81,8 +81,10 @@ cmd_firewall() {
             local engine_input=""
             local -a port_inputs=()
 
+            local default_input="drop"
             if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
                 engine_input=$(rx_setup_get_opt "engine" "$current_engine")
+                default_input=$(rx_setup_get_opt "default" "drop")
             else
                 local available
                 available=$(bash "$core" --list-engines 2>/dev/null)
@@ -132,8 +134,11 @@ cmd_firewall() {
                     done
                 fi
 
+                default_input=$(rx_menu "󰦝" "Default Input Policy" "drop" "accept")
+
                 rx_setup_summary "󰦝" "Firewall Setup Summary" \
                     "Engine" "${engine_input^}" \
+                    "Default Policy" "${default_input^}" \
                     "Open Ports" "$ports_preview"
 
                 rx_setup_confirm || return 0
@@ -144,6 +149,9 @@ cmd_firewall() {
             result=$(bash "$core" --setup-apply "$engine_input" "${port_inputs[@]}" 2>/dev/null)
 
             if echo "$result" | grep -q "^OK|"; then
+                if [[ -n $default_input ]]; then
+                    bash "$core" --default "$default_input" 2>/dev/null || true
+                fi
                 local result_data
                 result_data=$(bash "$core" --status 2>/dev/null)
                 local res_engine res_status res_rules res_policy res_ports
