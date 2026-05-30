@@ -39,7 +39,7 @@ run_postinstall() {
     retro font setup -y
     retro audio setup
     retro polkit setup --needed -y
-    retro firewall setup --needed -o "engine=${FIREWALL_ENGINE:-nftables}"
+    retro firewall setup --needed -o "engine=${FIREWALL_ENGINE:-nftables},default=drop"
     retro fans setup -o "engine=lm-sensors,profile=balanced"
 
     [[ $FINGERPRINT_ENABLED == true ]] && retro fingerprint setup --needed
