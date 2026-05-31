@@ -22,11 +22,9 @@ _ensure_polkit_agent() {
         return 1
     }
     rx_log "info" "Installing..."
-    $helper -S polkit-gnome
-    if [[ ! -x $binary ]] && ! pacman -Qi polkit-gnome &>/dev/null; then
-        rx_log "error" "Installation failed or aborted."
-        return 1
-    fi
+
+    check_dep "polkit-gnome" "polkit-gnome"
+
     return 0
 }
 
