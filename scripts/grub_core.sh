@@ -387,28 +387,6 @@ menuentry 'System restart' --class reboot --class restart {
 }
 UEFI_ENTRY
 
-        local os_prober_enabled=$(get_var "GRUB_OS_PROBER" "false")
-        if [[ $os_prober_enabled == "true" ]] && command -v os-prober >/dev/null 2>&1; then
-            while IFS= read -r line; do
-                local efi_path="${line%%:*}"
-                efi_path="${efi_path#*@}"
-                local os_name=$(echo "$line" | cut -d: -f3)
-                if [[ $os_name == "Windows" ]]; then
-                    local efi_file="${efi_path#/}"
-cat >>"$temp_grub" <<WINDOWS_ENTRY
-menuentry "Windows Boot Manager" --class windows --class os {
-    insmod part_gpt
-    insmod fat
-    search --file --no-floppy --set=root /${efi_file}
-    chainloader /${efi_file}
-}
-WINDOWS_ENTRY
-                    added_entries+="windows "
-                    break
-                fi
-            done < <(sudo os-prober 2>/dev/null || true)
-        fi
-
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
         rm -f "$temp_grub"
 
@@ -511,7 +489,6 @@ patch_snapshot_entry() {
 
     while IFS= read -r line; do
         if [[ $in_snapshot == false && $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
-            line="${line/submenu/menuentry}"
             line="${line/\{/--class retrolinux \{}"
             line="${line/\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
             line="${line/\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
@@ -526,7 +503,30 @@ patch_snapshot_entry() {
             snapshot_depth=$((snapshot_depth + open_b - close_b))
             echo "$line" >>"$temp_cfg"
             if [[ $snapshot_depth -le 0 && $memtest_injected == false ]]; then
+                memtest_injected=true
+                local os_prober_enabled=$(get_var "GRUB_OS_PROBER" "false")
+                if [[ $os_prober_enabled == "true" ]] && command -v os-prober >/dev/null 2>&1; then
+                    while IFS= read -r probe_line; do
+                        local efi_path="${probe_line%%:*}"
+                        efi_path="${efi_path#*@}"
+                        local os_name=$(echo "$probe_line" | cut -d: -f3)
+                        if [[ $os_name == "Windows" ]]; then
+                            local efi_file="${efi_path#/}"
+                            cat >>"$temp_cfg" <<WINDOWS_ENTRY
+
+menuentry "Windows Boot Manager" --class windows --class os {
+    insmod part_gpt
+    insmod fat
+    search --file --no-floppy --set=root /${efi_file}
+    chainloader /${efi_file}
+}
+WINDOWS_ENTRY
+                            break
+                        fi
+                    done < <(timeout 10 sudo os-prober 2>/dev/null || true)
+                fi
                 cat >>"$temp_cfg" <<'MEMTEST'
+
 menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
     set gfxpayload=1920x1080,1024x768
     if [ -f "/boot/memtest86+/memtest.efi" ]; then
@@ -536,7 +536,6 @@ menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class 
     fi
 }
 MEMTEST
-                memtest_injected=true
             fi
         else
             echo "$line" >>"$temp_cfg"
