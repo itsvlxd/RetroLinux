@@ -183,6 +183,8 @@ cmd_grub() {
 
                         if [[ $entry_name =~ [Mm]emtest ]]; then
                             detail="Memtest86+"
+                        elif [[ $entry_name =~ [Ww]indows ]]; then
+                            detail="Windows"
                         elif [[ $entry_name =~ (UEFI|firmware) ]]; then
                             detail="UEFI"
                         fi
