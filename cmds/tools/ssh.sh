@@ -371,7 +371,7 @@ cmd_ssh() {
                 return 0
             fi
 
-            rx_table_header "󰋚" "Known Hosts"
+            rx_table_header "󰋚" "Known Hosts" "${count} total" "40"
             while IFS='|' read -r part; do
                 if [[ $part =~ ^host=([^|]+) ]]; then
                     local host="${BASH_REMATCH[1]}"
@@ -382,7 +382,6 @@ cmd_ssh() {
                 fi
             done <<<"$data"
             rx_table_separator
-            rx_table_row "" "Total:" "${count} hosts" "$PINK" "40"
             rx_table_spacer
             ;;
 
