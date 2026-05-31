@@ -181,7 +181,7 @@ cmd_grub() {
                         local entry_name="${BASH_REMATCH[1]}"
                         local detail=""
 
-                        if [[ $entry_name =~ (memtest|Memory) ]]; then
+                        if [[ $entry_name =~ [Mm]emtest ]]; then
                             detail="Memtest86+"
                         elif [[ $entry_name =~ (UEFI|firmware) ]]; then
                             detail="UEFI"
@@ -212,7 +212,7 @@ cmd_grub() {
                     local icon="󰓅"
                     local color="$PINK"
                     if [[ $entry == "${indent}"* ]]; then
-                        icon="  󰓅"
+                        icon="󰓅"
                         color="$GRAY"
                     fi
                     printf " ${PINK}${icon}${RESET} %-32s ${GRAY}%s${RESET}\n" "$entry" "$detail"
