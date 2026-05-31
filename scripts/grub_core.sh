@@ -257,11 +257,13 @@ add_shutdown_reboot_entries() {
         local skip_shutdown=false
         local skip_reboot=false
         local skip_memtest=false
+        local skip_windows=false
         local if_depth=0
         local removed_uefi=false
         local removed_shutdown=false
         local removed_reboot=false
         local removed_memtest=false
+        local removed_windows=false
 
         while IFS= read -r line; do
             if [[ $line =~ ^if.*grub_platform.*efi ]] && [[ $skip_uefi == false ]]; then
@@ -338,6 +340,24 @@ add_shutdown_reboot_entries() {
                 continue
             fi
 
+            if [[ $line =~ ^[[:space:]]*menuentry.*[Ww]indows ]]; then
+                skip_windows=true
+                skip_block=0
+                removed_windows=true
+                continue
+            fi
+
+            if [[ $skip_windows == true ]]; then
+                local open_braces=$(echo "$line" | tr -cd '{' | wc -c)
+                local close_braces=$(echo "$line" | tr -cd '}' | wc -c)
+                skip_block=$((skip_block + open_braces - close_braces))
+
+                if [[ $skip_block -le 0 ]]; then
+                    skip_windows=false
+                fi
+                continue
+            fi
+
             echo "$line" >>"$temp_grub"
         done <"$grub_cfg"
 
@@ -346,6 +366,7 @@ add_shutdown_reboot_entries() {
         [[ $removed_shutdown == true ]] && added_entries+="shutdown "
         [[ $removed_reboot == true ]] && added_entries+="reboot "
         [[ $removed_memtest == true ]] && added_entries+="memtest86+ "
+        [[ $removed_windows == true ]] && added_entries+="windows "
 
         cat >>"$temp_grub" <<'UEFI_ENTRY'
 
@@ -364,16 +385,29 @@ menuentry 'System restart' --class reboot --class restart {
     echo 'System rebooting...'
     reboot
 }
-
-menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
-    set gfxpayload=1920x1080,1024x768
-    if [ -f "/boot/memtest86+/memtest.efi" ]; then
-        linux /boot/memtest86+/memtest.efi
-    else
-        linux /boot/memtest86+/memtest
-    fi
-}
 UEFI_ENTRY
+
+        local os_prober_enabled=$(get_var "GRUB_OS_PROBER" "false")
+        if [[ $os_prober_enabled == "true" ]] && command -v os-prober >/dev/null 2>&1; then
+            while IFS= read -r line; do
+                local efi_path="${line%%:*}"
+                efi_path="${efi_path#*@}"
+                local os_name=$(echo "$line" | cut -d: -f3)
+                if [[ $os_name == "Windows" ]]; then
+                    local efi_file="${efi_path#/}"
+cat >>"$temp_grub" <<WINDOWS_ENTRY
+menuentry "Windows Boot Manager" --class windows --class os {
+    insmod part_gpt
+    insmod fat
+    search --file --no-floppy --set=root /${efi_file}
+    chainloader /${efi_file}
+}
+WINDOWS_ENTRY
+                    added_entries+="windows "
+                    break
+                fi
+            done < <(sudo os-prober 2>/dev/null || true)
+        fi
 
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
         rm -f "$temp_grub"
@@ -470,16 +504,40 @@ patch_snapshot_entry() {
     rx_log_file "info" "Patching snapshot submenu entry..."
 
     local patched=false
+    local in_snapshot=false
+    local snapshot_depth=0
+    local memtest_injected=false
     local temp_cfg=$(mktemp)
 
     while IFS= read -r line; do
-        if [[ $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
+        if [[ $in_snapshot == false && $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
             line="${line/submenu/menuentry}"
             line="${line/\{/--class retrolinux \{}"
             line="${line/\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
             line="${line/\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
             echo "$line" >>"$temp_cfg"
+            in_snapshot=true
+            snapshot_depth=$(echo "$line" | tr -cd '{' | wc -c)
+            snapshot_depth=$((snapshot_depth - $(echo "$line" | tr -cd '}' | wc -c)))
             patched=true
+        elif [[ $in_snapshot == true ]]; then
+            local open_b=$(echo "$line" | tr -cd '{' | wc -c)
+            local close_b=$(echo "$line" | tr -cd '}' | wc -c)
+            snapshot_depth=$((snapshot_depth + open_b - close_b))
+            echo "$line" >>"$temp_cfg"
+            if [[ $snapshot_depth -le 0 && $memtest_injected == false ]]; then
+                cat >>"$temp_cfg" <<'MEMTEST'
+menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
+    set gfxpayload=1920x1080,1024x768
+    if [ -f "/boot/memtest86+/memtest.efi" ]; then
+        linux /boot/memtest86+/memtest.efi
+    else
+        linux /boot/memtest86+/memtest
+    fi
+}
+MEMTEST
+                memtest_injected=true
+            fi
         else
             echo "$line" >>"$temp_cfg"
         fi
@@ -587,6 +645,16 @@ regenerate_grub() {
         local os_prober=$(get_var "GRUB_OS_PROBER" "false")
         if [[ $os_prober == "true" ]]; then
             check_dep os-prober os-prober
+            local os_prober_path
+            os_prober_path=$(command -v os-prober 2>/dev/null)
+            if [[ -n $os_prober_path ]]; then
+                local sudoers_file="/etc/sudoers.d/99-os-prober"
+                local rule="%wheel ALL=(ALL) NOPASSWD: ${os_prober_path}"
+                if [[ ! -f $sudoers_file ]]; then
+                    export RULE="$rule" SUDO_CMD
+                    timeout 10 bash -c 'echo "$RULE" | $SUDO_CMD tee "$1" >/dev/null 2>&1 && $SUDO_CMD chmod 0440 "$1"' _ "$sudoers_file" 2>/dev/null || true
+                fi
+            fi
         fi
 
         rx_log_file "info" "Running grub-mkconfig -o /boot/grub/grub.cfg"
