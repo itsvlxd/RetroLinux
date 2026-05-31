@@ -6,6 +6,44 @@ XDG_USER_DIRS_FILE="$HOME/.config/user-dirs.dirs"
 XDG_MIMEAPPS_FILE="$HOME/.config/mimeapps.list"
 XDG_PORTAL_CONF="$RETRO_CONFIG/portal.conf"
 
+XDG_EDITOR_MIMES=(
+    "text/plain" "text/x-shellscript" "text/x-lua" "text/x-c" "text/x-c++src"
+    "text/x-c++hdr" "text/x-java" "text/x-python" "text/javascript" "text/typescript"
+    "text/x-ruby" "text/x-rust" "text/x-go" "text/x-scala" "text/x-kotlin"
+    "text/x-swift" "text/markdown" "text/x-yaml" "text/x-toml" "text/xml"
+    "application/json" "text/css" "text/x-scss" "text/x-sass" "text/x-sql"
+    "text/x-diff" "text/csv" "text/x-perl" "text/x-php" "text/x-haskell"
+    "text/x-erlang" "text/x-latex" "text/x-objc" "text/x-fortran" "text/x-pascal"
+    "text/x-asm" "text/x-dockerfile" "text/x-properties" "text/x-ini"
+    "application/x-desktop" "text/x-makefile" "text/x-cmake" "text/x-gradle"
+    "text/x-zig" "text/x-nim" "application/x-shellscript"
+)
+
+XDG_FM_MIMES=(
+    "inode/directory" "application/x-directory"
+    "x-scheme-handler/file" "x-scheme-handler/trash"
+)
+
+XDG_BROWSER_MIMES=(
+    "x-scheme-handler/http" "x-scheme-handler/https" "x-scheme-handler/about"
+    "x-scheme-handler/chrome" "text/html" "application/xhtml+xml"
+    "application/x-extension-htm" "application/x-extension-html"
+    "application/x-extension-shtml" "application/x-extension-xhtml"
+    "application/x-extension-xht"
+)
+
+XDG_IMAGE_MIMES=(
+    "image/png" "image/jpeg" "image/gif" "image/webp" "image/svg+xml"
+    "image/bmp" "image/tiff" "image/x-xcf" "image/x-ico" "image/x-psd"
+    "image/avif" "image/heic" "image/heif"
+)
+
+XDG_VIDEO_MIMES=(
+    "video/mp4" "video/x-matroska" "video/webm" "video/x-msvideo"
+    "video/x-flv" "video/quicktime" "video/x-ms-wmv" "video/ogg"
+    "video/mpeg" "video/3gpp" "video/x-m4v"
+)
+
 rx_xdg_ensure_dirs() {
     local dirs_config="$HOME/.config/user-dirs.dirs"
 
@@ -184,15 +222,8 @@ rx_xdg_reset_defaults() {
     local fm=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
     local terminal=$(get_var "RETRO_TERMINAL_CMD" "kitty")
 
-    local editor_desktop="${editor}.desktop"
-    local fm_desktop=""
-    case "$fm" in
-        thunar) fm_desktop="thunar.desktop" ;;
-        nemo) fm_desktop="nemo.desktop" ;;
-        nautilus) fm_desktop="org.gnome.Nautilus.desktop" ;;
-        yazi) fm_desktop="yazi.desktop" ;;
-        *) fm_desktop="thunar.desktop" ;;
-    esac
+    local editor_desktop=$(rx_xdg_resolve_desktop "$editor")
+    local fm_desktop=$(rx_xdg_resolve_desktop "$fm")
 
     local browser_desktop="firefox.desktop"
     for b in zen firefox chromium floorp thorium nyxt google-chrome; do
@@ -202,19 +233,31 @@ rx_xdg_reset_defaults() {
         fi
     done
 
+    local image_desktop=$(rx_xdg_resolve_desktop "loupe")
+    local video_desktop=$(rx_xdg_resolve_desktop "mpv")
+    local terminal_desktop="${terminal}.desktop"
+
     mkdir -p "$(dirname "$XDG_MIMEAPPS_FILE")"
     cat >"$XDG_MIMEAPPS_FILE" <<EOF
 [Default Applications]
-text/plain=${editor_desktop}
-inode/directory=${fm_desktop}
-application/x-directory=${fm_desktop}
-x-scheme-handler/file=${fm_desktop}
-x-scheme-handler/trash=${fm_desktop}
-x-scheme-handler/http=${browser_desktop}
-x-scheme-handler/https=${browser_desktop}
-x-scheme-handler/about=${browser_desktop}
-x-scheme-handler/terminal=${terminal}.desktop
 EOF
+
+    for mime in "${XDG_EDITOR_MIMES[@]}"; do
+        echo "${mime}=${editor_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${XDG_FM_MIMES[@]}"; do
+        echo "${mime}=${fm_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${XDG_BROWSER_MIMES[@]}"; do
+        echo "${mime}=${browser_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${XDG_IMAGE_MIMES[@]}"; do
+        echo "${mime}=${image_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    for mime in "${XDG_VIDEO_MIMES[@]}"; do
+        echo "${mime}=${video_desktop}" >>"$XDG_MIMEAPPS_FILE"
+    done
+    echo "x-scheme-handler/terminal=${terminal_desktop}" >>"$XDG_MIMEAPPS_FILE"
 
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
@@ -300,62 +343,24 @@ rx_xdg_setup() {
     [[ $fm_desktop == "thunar.desktop" ]] && ! rx_xdg_validate_desktop "thunar.desktop" && fm_desktop=$(rx_xdg_resolve_desktop "nemo")
     [[ $image_desktop == "loupe.desktop" ]] && ! rx_xdg_validate_desktop "loupe.desktop" && image_desktop=$(rx_xdg_resolve_desktop "viewnior")
 
-    local editor_mimes=(
-        "text/plain" "text/x-shellscript" "text/x-lua" "text/x-c" "text/x-c++src"
-        "text/x-c++hdr" "text/x-java" "text/x-python" "text/javascript" "text/typescript"
-        "text/x-ruby" "text/x-rust" "text/x-go" "text/x-scala" "text/x-kotlin"
-        "text/x-swift" "text/markdown" "text/x-yaml" "text/x-toml" "text/xml"
-        "application/json" "text/css" "text/x-scss" "text/x-sass" "text/x-sql"
-        "text/x-diff" "text/csv" "text/x-perl" "text/x-php" "text/x-haskell"
-        "text/x-erlang" "text/x-latex" "text/x-objc" "text/x-fortran" "text/x-pascal"
-        "text/x-asm" "text/x-dockerfile" "text/x-properties" "text/x-ini"
-        "application/x-desktop" "text/x-makefile" "text/x-cmake" "text/x-gradle"
-        "text/x-zig" "text/x-nim" "application/x-shellscript"
-    )
-
-    local fm_mimes=(
-        "inode/directory" "application/x-directory"
-        "x-scheme-handler/file" "x-scheme-handler/trash"
-    )
-
-    local browser_mimes=(
-        "x-scheme-handler/http" "x-scheme-handler/https" "x-scheme-handler/about"
-        "x-scheme-handler/chrome" "text/html" "application/xhtml+xml"
-        "application/x-extension-htm" "application/x-extension-html"
-        "application/x-extension-shtml" "application/x-extension-xhtml"
-        "application/x-extension-xht"
-    )
-
-    local image_mimes=(
-        "image/png" "image/jpeg" "image/gif" "image/webp" "image/svg+xml"
-        "image/bmp" "image/tiff" "image/x-xcf" "image/x-ico" "image/x-psd"
-        "image/avif" "image/heic" "image/heif"
-    )
-
-    local video_mimes=(
-        "video/mp4" "video/x-matroska" "video/webm" "video/x-msvideo"
-        "video/x-flv" "video/quicktime" "video/x-ms-wmv" "video/ogg"
-        "video/mpeg" "video/3gpp" "video/x-m4v"
-    )
-
     mkdir -p "$(dirname "$XDG_MIMEAPPS_FILE")"
     cat >"$XDG_MIMEAPPS_FILE" <<EOF
 [Default Applications]
 EOF
 
-    for mime in "${editor_mimes[@]}"; do
+    for mime in "${XDG_EDITOR_MIMES[@]}"; do
         echo "${mime}=${editor_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done
-    for mime in "${fm_mimes[@]}"; do
+    for mime in "${XDG_FM_MIMES[@]}"; do
         echo "${mime}=${fm_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done
-    for mime in "${browser_mimes[@]}"; do
+    for mime in "${XDG_BROWSER_MIMES[@]}"; do
         echo "${mime}=${browser_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done
-    for mime in "${image_mimes[@]}"; do
+    for mime in "${XDG_IMAGE_MIMES[@]}"; do
         echo "${mime}=${image_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done
-    for mime in "${video_mimes[@]}"; do
+    for mime in "${XDG_VIDEO_MIMES[@]}"; do
         echo "${mime}=${video_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done
     echo "x-scheme-handler/terminal=${terminal_desktop}" >>"$XDG_MIMEAPPS_FILE"
