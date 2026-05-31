@@ -25,7 +25,7 @@ setup_cronie() {
 
 retro_fix_permissions() {
     rx_log "info" "Fixing RetroLinux permissions..."
-    find "$RETRO_DIR" -name "*.sh" -type f -exec chmod 755 {} \;
+    find "$RETRO_DIR" -path "*/iso/work" -prune -o -name "*.sh" -type f -exec chmod 755 {} \;
     git config --global --add safe.directory "$RETRO_DIR"
     rx_log "success" "Permissions and git safe.directory configured"
 }
