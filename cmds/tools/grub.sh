@@ -88,11 +88,11 @@ cmd_grub() {
             local os_prober_status="Disabled"
             local os_prober_color="$MUTE"
             if [[ $os_prober == "false" ]]; then
-                os_prober_status="Disabled"
-                os_prober_color="$PINK"
-            else
                 os_prober_status="Enabled"
                 os_prober_color="$PINK"
+            else
+                os_prober_status="Disabled"
+                os_prober_color="$MUTE"
             fi
 
             local hw_info=""
