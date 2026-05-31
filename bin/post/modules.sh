@@ -25,7 +25,7 @@ rx_post_install_modules() {
     local install_type="${INSTALL_TYPE:-complete}"
 
     local type_flag=""
-    if [[ "$install_type" == "minimal" ]]; then
+    if [[ $install_type == "minimal" ]]; then
         type_flag="-t core"
         gum style "Installing minimal set (core modules only)..."
     else
@@ -33,28 +33,24 @@ rx_post_install_modules() {
         gum style "Installing complete set (all modules)..."
     fi
 
+    local home_dir=$(arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
+
+    if [[ -n $home_dir ]]; then
+        arch-chroot /mnt bash -c "
+            mkdir -p \"$home_dir/.config\" 2>/dev/null
+            chown \"$username:$username\" \"$home_dir/.config\" 2>/dev/null
+        "
+    fi
+
     echo
 
     gum style "Installing root modules..."
 
-    arch-chroot /mnt bash -c "RETRO_CHROOT=true /opt/retrolinux/retro.sh -i all -a root $type_flag -y" 2>&1
+    arch-chroot /mnt su - "$username" -c "RETRO_CHROOT=true /opt/retrolinux/retro.sh -i all -a root $type_flag -y" 2>&1
 
     gum style "Installing user modules..."
 
-    local home_dir=$(arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
-    arch-chroot /mnt bash -c "RETRO_CHROOT=true HOME=$home_dir USER=$username /opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
-
-    # Fix ownership of user config dirs that were installed as root
-    if [[ -n $home_dir ]]; then
-        arch-chroot /mnt bash -c "
-            for d in \"$home_dir\"/.config/*/; do
-                [[ -d \$d ]] && chown -R \"$username:\" \"\$d\" 2>/dev/null
-            done
-            for f in \"$home_dir\"/.config/*; do
-                [[ -f \$f ]] && chown \"$username:\" \"\$f\" 2>/dev/null
-            done
-        " 2>/dev/null
-    fi
+    arch-chroot /mnt su - "$username" -c "RETRO_CHROOT=true /opt/retrolinux/retro.sh -i all -a user $type_flag -y" 2>&1
 
     gum style --foreground 2 "Module installation complete"
     echo
