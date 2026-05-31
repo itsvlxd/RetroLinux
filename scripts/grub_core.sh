@@ -318,7 +318,7 @@ add_shutdown_reboot_entries() {
                 continue
             fi
 
-            if [[ $line =~ ^if.*memtest ]] || [[ $line =~ ^menuentry.*Memtest ]]; then
+            if [[ $line =~ ^[[:space:]]*(if|elif).*[Mm]emtest ]] || [[ $line =~ ^[[:space:]]*menuentry.*[Mm]emtest ]]; then
                 skip_memtest=true
                 skip_block=0
                 removed_memtest=true
@@ -363,17 +363,14 @@ menuentry 'System restart' --class reboot --class restart {
     reboot
 }
 
-if [ -f "/boot/memtest86+/memtest.efi" ]; then
-    menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
-        set gfxpayload=1920x1080,1024x768
+menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
+    set gfxpayload=1920x1080,1024x768
+    if [ -f "/boot/memtest86+/memtest.efi" ]; then
         linux /boot/memtest86+/memtest.efi
-    }
-elif [ -f "/boot/memtest86+/memtest" ]; then
-    menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
-        set gfxpayload=1920x1080,1024x768
+    else
         linux /boot/memtest86+/memtest
-    }
-fi
+    fi
+}
 UEFI_ENTRY
 
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
@@ -474,8 +471,11 @@ patch_snapshot_entry() {
     local temp_cfg=$(mktemp)
 
     while IFS= read -r line; do
-        if [[ $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]+Linux\ snapshots\' ]]; then
-            echo "submenu 'RetroLinux Snapshots' --class retrolinux {" >>"$temp_cfg"
+        if [[ $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
+            line="${line/\{/--class retrolinux \{}"
+            line="${line/\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
+            line="${line/\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
+            echo "$line" >>"$temp_cfg"
             patched=true
         else
             echo "$line" >>"$temp_cfg"
