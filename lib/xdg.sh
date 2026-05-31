@@ -62,7 +62,8 @@ rx_xdg_ensure_dirs() {
     local created=0
     for dir in "${dirs[@]}"; do
         local path=$(rx_xdg_get_dir "$dir")
-        if [[ -n $path && $path != '$HOME' ]]; then
+        path=$(eval echo "$path")
+        if [[ -n $path && $path != "$HOME" ]]; then
             [[ ! -d $path ]] && mkdir -p "$path" 2>/dev/null && ((created++))
         fi
     done
@@ -76,7 +77,7 @@ rx_xdg_get_dir() {
     local var_name="XDG_${name^^}_DIR"
     local cached=$(get_var "$var_name" "")
     if [[ -n $cached && $cached != "null" ]]; then
-        echo "$cached"
+        eval echo "$cached"
         return 0
     fi
 
