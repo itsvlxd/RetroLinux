@@ -10,6 +10,7 @@ unzip
 expect
 udisks2
 usbutils
+os-prober
 net-tools
 inetutils
 base-devel
