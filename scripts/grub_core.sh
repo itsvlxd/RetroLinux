@@ -362,15 +362,6 @@ menuentry 'System restart' --class reboot --class restart {
     echo 'System rebooting...'
     reboot
 }
-
-menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
-    set gfxpayload=1920x1080,1024x768
-    if [ -f "/boot/memtest86+/memtest.efi" ]; then
-        linux /boot/memtest86+/memtest.efi
-    else
-        linux /boot/memtest86+/memtest
-    fi
-}
 UEFI_ENTRY
 
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
@@ -476,6 +467,14 @@ patch_snapshot_entry() {
             line="${line/\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
             line="${line/\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
             echo "$line" >>"$temp_cfg"
+            echo '    menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {' >>"$temp_cfg"
+            echo '        set gfxpayload=1920x1080,1024x768' >>"$temp_cfg"
+            echo '        if [ -f "/boot/memtest86+/memtest.efi" ]; then' >>"$temp_cfg"
+            echo '            linux /boot/memtest86+/memtest.efi' >>"$temp_cfg"
+            echo '        else' >>"$temp_cfg"
+            echo '            linux /boot/memtest86+/memtest' >>"$temp_cfg"
+            echo '        fi' >>"$temp_cfg"
+            echo '    }' >>"$temp_cfg"
             patched=true
         else
             echo "$line" >>"$temp_cfg"
