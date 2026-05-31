@@ -44,7 +44,8 @@ cmd_xdg() {
                     done
                     rx_table_separator
                     rx_table_spacer
-                    [[ $missing -gt 0 ]] && rx_log "warn" "$missing director${missing}y/ies missing on disk"
+                    local s="ies"; [[ $missing -eq 1 ]] && s="y"
+                    [[ $missing -gt 0 ]] && rx_log "warn" "$missing director${s} missing on disk"
                     ;;
                 "set")
                     local name="${1^^}"
@@ -439,7 +440,8 @@ cmd_xdg() {
                     done
                     rx_table_separator
                     rx_table_spacer
-                    [[ $broken -gt 0 ]] && rx_log "warn" "$broken entr${broken}y/ies point to missing binaries"
+                    local s="ies"; [[ $broken -eq 1 ]] && s="y"
+                    [[ $broken -gt 0 ]] && rx_log "warn" "$broken entr${s} point to missing binaries"
                     [[ $total -eq 0 ]] && rx_log "info" "No autostart entries found"
                     ;;
             esac
@@ -485,8 +487,15 @@ cmd_xdg() {
                 done
 
                 local detected_image="loupe"
-                rx_xdg_validate_desktop "loupe.desktop" || detected_image="viewnior"
-                rx_xdg_validate_desktop "$detected_image.desktop" || detected_image="feh"
+                if ! rx_xdg_resolve_desktop "loupe" >/dev/null 2>&1; then
+                    detected_image="viewnior"
+                    for img in viewnior feh gwenview eog; do
+                        if rx_xdg_resolve_desktop "$img" >/dev/null 2>&1; then
+                            detected_image="$img"
+                            break
+                        fi
+                    done
+                fi
 
                 local detected_video="mpv"
 
