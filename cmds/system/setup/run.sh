@@ -35,7 +35,7 @@ run_postinstall() {
 
     retro keyring setup --needed
 
-    check_dep "${EDITOR_CHOICE:-neovim}" "neovim"
+    check_dep "${EDITOR_CHOICE:-nvim}" "neovim"
     check_dep "${BROWSER_CHOICE:-firefox}" "firefox"
     check_dep "${FILEMANAGER_CHOICE:-nemo}" "nemo"
     check_dep "${FIREWALL_ENGINE:-nftables}" "nftables"
