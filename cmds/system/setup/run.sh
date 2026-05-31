@@ -19,7 +19,7 @@ run_postinstall() {
     faillock --user $USER --reset
 
     rx_git_fix_owner
-    sudo chown -R vlad:vlad "/home/vlad/.config" 2>/dev/null || true
+    sudo chown -R "$USER:$USER" "$HOME/.config" 2>/dev/null || true
 
     source "$HOME/.retro_install"
 
