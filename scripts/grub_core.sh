@@ -112,10 +112,12 @@ update_grub_config() {
             echo "GRUB_CMDLINE_LINUX_DEFAULT=\"$cmdline\"" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
         fi
 
+        local grub_disable="true"
+        [[ $os_prober == "true" ]] && grub_disable="false"
         if grep -q "^GRUB_DISABLE_OS_PROBER=" "$grub_defaults"; then
-            $SUDO_CMD sed -i "s|^GRUB_DISABLE_OS_PROBER=.*|GRUB_DISABLE_OS_PROBER=$os_prober|" "$grub_defaults"
+            $SUDO_CMD sed -i "s|^GRUB_DISABLE_OS_PROBER=.*|GRUB_DISABLE_OS_PROBER=$grub_disable|" "$grub_defaults"
         else
-            echo "GRUB_DISABLE_OS_PROBER=$os_prober" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
+            echo "GRUB_DISABLE_OS_PROBER=$grub_disable" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
         fi
 
         rx_log_file "success" "GRUB configuration updated"
@@ -362,6 +364,15 @@ menuentry 'System restart' --class reboot --class restart {
     echo 'System rebooting...'
     reboot
 }
+
+menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
+    set gfxpayload=1920x1080,1024x768
+    if [ -f "/boot/memtest86+/memtest.efi" ]; then
+        linux /boot/memtest86+/memtest.efi
+    else
+        linux /boot/memtest86+/memtest
+    fi
+}
 UEFI_ENTRY
 
         $SUDO_CMD cp "$temp_grub" "$grub_cfg"
@@ -463,18 +474,11 @@ patch_snapshot_entry() {
 
     while IFS= read -r line; do
         if [[ $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
+            line="${line/submenu/menuentry}"
             line="${line/\{/--class retrolinux \{}"
             line="${line/\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
             line="${line/\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
             echo "$line" >>"$temp_cfg"
-            echo '    menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {' >>"$temp_cfg"
-            echo '        set gfxpayload=1920x1080,1024x768' >>"$temp_cfg"
-            echo '        if [ -f "/boot/memtest86+/memtest.efi" ]; then' >>"$temp_cfg"
-            echo '            linux /boot/memtest86+/memtest.efi' >>"$temp_cfg"
-            echo '        else' >>"$temp_cfg"
-            echo '            linux /boot/memtest86+/memtest' >>"$temp_cfg"
-            echo '        fi' >>"$temp_cfg"
-            echo '    }' >>"$temp_cfg"
             patched=true
         else
             echo "$line" >>"$temp_cfg"
