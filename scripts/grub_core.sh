@@ -584,6 +584,11 @@ regenerate_grub() {
         rx_log_file "info" "Backing up $grub_defaults to $backup_file"
         sudo cp "$grub_defaults" "$backup_file" 2>/dev/null
 
+        local os_prober=$(get_var "GRUB_OS_PROBER" "false")
+        if [[ $os_prober == "true" ]]; then
+            check_dep os-prober os-prober
+        fi
+
         rx_log_file "info" "Running grub-mkconfig -o /boot/grub/grub.cfg"
         if $SUDO_CMD grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1; then
             rx_log_file "info" "GRUB config regenerated, applying patches..."
