@@ -417,14 +417,22 @@ cmd_firewall() {
 
         "delete")
             local id="$1"
-            [[ -z $id || ! $id =~ ^[0-9]+$ || $id -eq 0 ]] && \
-                rx_log "error" "Usage: retro firewall delete <rule_number>" && return 1
+            [[ -z $id || ! $id =~ ^[0-9]+(-[0-9]+)?$ ]] && \
+                rx_log "error" "Usage: retro firewall delete <rule_number> (e.g. 5 or 1-3)" && return 1
             local result
             result=$(bash "$core" --delete-id "$id" 2>/dev/null)
             if echo "$result" | grep -q "^OK|"; then
-                rx_log "success" "Rule #${PINK}${id}${RESET} deleted"
+                if [[ $id == *-* ]]; then
+                    rx_log "success" "Rules ${PINK}${id}${RESET} deleted"
+                else
+                    rx_log "success" "Rule #${PINK}${id}${RESET} deleted"
+                fi
             else
-                rx_log "error" "Failed to delete rule #${id}. Does it exist?"
+                if [[ $id == *-* ]]; then
+                    rx_log "error" "Failed to delete rules ${id}. Do they exist?"
+                else
+                    rx_log "error" "Failed to delete rule #${id}. Does it exist?"
+                fi
                 return 1
             fi
             ;;
@@ -462,7 +470,7 @@ cmd_firewall() {
             rx_help_cmd "off" "Disable and stop firewall" 50
             rx_help_cmd "restart" "Restart firewall" 50
             rx_help_cmd "rules" "List all firewall rules" 50
-            rx_help_cmd "delete <id>" "Delete rule by ID" 50
+            rx_help_cmd "delete <id>" "Delete rule(s) by ID (e.g. 5 or 1-3)" 50
             rx_help_cmd "default <drop|accept>" "Set default input policy" 50
             rx_help_cmd "engine" "Show current firewall engine" 50
             rx_help_cmd "logs [lines]" "Show firewall daemon logs" 50
