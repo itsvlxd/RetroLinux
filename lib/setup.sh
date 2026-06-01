@@ -7,6 +7,7 @@ declare -g RX_SETUP_MODE="interactive"
 declare -g RX_SETUP_OPTIONS=""
 declare -g RX_SETUP_NEEDED=false
 declare -g RX_SETUP_YES=false
+declare -g RX_SETUP_FORCE=false
 declare -A RX_SETUP_OPTS
 
 rx_setup_parse() {
@@ -15,6 +16,7 @@ rx_setup_parse() {
     RX_SETUP_OPTIONS_RAW=""
     RX_SETUP_NEEDED=false
     RX_SETUP_YES=false
+    RX_SETUP_FORCE=false
     RX_SETUP_VALID_KEYS=""
     unset RX_SETUP_OPTS
     declare -gA RX_SETUP_OPTS
@@ -38,6 +40,11 @@ rx_setup_parse() {
                 shift
                 ;;
             -y|--yes)
+                RX_SETUP_YES=true
+                shift
+                ;;
+            -f|--force)
+                RX_SETUP_FORCE=true
                 RX_SETUP_YES=true
                 shift
                 ;;
@@ -240,6 +247,10 @@ rx_setup_get_opt() {
     echo "${RX_SETUP_OPTS[$key]:-$default}"
 }
 
+rx_setup_is_force() {
+    [[ $RX_SETUP_FORCE == true ]]
+}
+
 rx_setup_current() {
     local icon="$1"
     local title="$2"
@@ -369,6 +380,11 @@ rx_input() {
     local pattern="${3:-}"
     local error_msg="${4:-Invalid input}"
 
+    if rx_setup_is_force; then
+        echo "$default"
+        return 0
+    fi
+
     while true; do
         rx_log "info" "${label} ${MUTE}[${default}]${RESET}: "
 
@@ -394,6 +410,11 @@ rx_input_numeric() {
     local default="${2:-}"
     local min="${3:-}"
     local max="${4:-}"
+
+    if rx_setup_is_force; then
+        echo "$default"
+        return 0
+    fi
 
     while true; do
         rx_log "info" "${label} ${MUTE}[${default}]${RESET}: "
@@ -430,6 +451,16 @@ rx_input_choice() {
     shift 3
 
     local options=("$@")
+
+    if rx_setup_is_force; then
+        if [[ -n $default ]]; then
+            echo "$default"
+        else
+            echo "${options[0]}"
+        fi
+        return 0
+    fi
+
     local num_options=${#options[@]}
 
     rx_log "info" "${icon}  ${label}"
