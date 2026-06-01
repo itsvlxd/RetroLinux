@@ -224,12 +224,33 @@ _nft_delete() {
 }
 
 _nft_delete_by_id() {
-    local id="$1"
-    local handle
-    handle=$($SUDO_CMD nft -a list chain inet filter input 2>/dev/null | grep -E '^\s+(tcp|udp) dport |^\s+ip saddr ' | sed -n "${id}p" | grep -oP 'handle \K[0-9]+')
-    if [[ -n $handle ]]; then
-        $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && _nft_commit
-        return $?
+    local id_range="$1"
+
+    local start end
+    if [[ $id_range =~ ^([0-9]+)-([0-9]+)$ ]]; then
+        start="${BASH_REMATCH[1]}"
+        end="${BASH_REMATCH[2]}"
+    else
+        start="$id_range"
+        end="$id_range"
+    fi
+
+    if [[ $end -lt $start ]]; then
+        local tmp=$start; start=$end; end=$tmp
+    fi
+
+    local deleted=0
+    for ((idx=end; idx>=start; idx--)); do
+        local handle
+        handle=$(_nft_handle_at_index "$idx")
+        if [[ -n $handle ]]; then
+            $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && ((deleted++)) || true
+        fi
+    done
+
+    if [[ $deleted -gt 0 ]]; then
+        _nft_commit
+        return 0
     fi
     return 1
 }
@@ -927,7 +948,7 @@ case "$1" in
         id="$2"
         engine=$(_engine_get)
         [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
-        [[ -z $id || ! $id =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_id"; exit 1; }
+        [[ -z $id || ! $id =~ ^[0-9]+(-[0-9]+)?$ ]] && { echo "result=error|reason=invalid_id"; exit 1; }
 
         case "$engine" in
             nftables) _nft_delete_by_id "$id" || { echo "result=error|reason=not_found"; exit 1; } ;;
@@ -936,7 +957,11 @@ case "$1" in
             iptables) echo "result=error|reason=unsupported"; exit 1 ;;
         esac
         echo "OK|deleted|id=${id}"
-        rx_log_file "success" "Rule #${id} deleted (${engine})"
+        if [[ $id == *-* ]]; then
+            rx_log_file "success" "Rules ${id} deleted (${engine})"
+        else
+            rx_log_file "success" "Rule #${id} deleted (${engine})"
+        fi
         ;;
 
     --block)
