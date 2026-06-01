@@ -257,6 +257,15 @@ cmd_timeshift() {
                     exclude_home="false"
                     custom_filters=""
                 fi
+
+                if [[ -z $device_choice ]]; then
+                    if [[ $config_exists == true ]]; then
+                        IFS='|' read -r ckey cur_device _ _ _ _ _ _ _ _ _ _ _ _ _ <<<"$config"
+                        device_choice="$cur_device"
+                    else
+                        device_choice=$(bash "$ts_script" --list-devices 2>/dev/null | grep "^DEVICE|" | head -1 | cut -d'|' -f2)
+                    fi
+                fi
             else
                 if [[ $config_exists == true ]]; then
                     IFS='|' read -r ckey cur_device cur_uuid cur_parent cur_btrfs cur_daily cur_weekly cur_monthly cur_hourly cur_boot cur_snap_count cur_snap_size cur_include_home cur_exclude cur_exclude_apps <<<"$config"
