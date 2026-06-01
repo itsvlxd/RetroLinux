@@ -509,15 +509,34 @@ rx_xdg_get_portal_backend() {
 }
 
 rx_xdg_list_portals() {
-    local portals=(hyprland gtk)
+    local portals=(hyprland gtk gnome kde)
     for p in "${portals[@]}"; do
         local pkg="xdg-desktop-portal-${p}"
         local installed="no"
         pacman -Qq "$pkg" >/dev/null 2>&1 && installed="yes"
         local running="no"
         pgrep -f "xdg-desktop-portal-${p}" >/dev/null 2>&1 && running="yes"
-        echo "$p|$installed|$running"
+        local conflict="no"
+        [[ $p == "gnome" || $p == "kde" ]] && conflict="yes"
+        echo "$p|$installed|$running|$conflict"
     done
+}
+
+rx_xdg_detect_conflicting_portals() {
+    local found=0
+    local conflicts=(gnome kde)
+    for p in "${conflicts[@]}"; do
+        local pkg="xdg-desktop-portal-${p}"
+        local installed="no"
+        pacman -Qq "$pkg" >/dev/null 2>&1 && installed="yes"
+        local running="no"
+        pgrep -f "xdg-desktop-portal-${p}" >/dev/null 2>&1 && running="yes"
+        if [[ $installed == "yes" || $running == "yes" ]]; then
+            echo "$p|$installed|$running"
+            ((found++))
+        fi
+    done
+    [[ $found -eq 0 ]] && echo "none"
 }
 
 rx_xdg_set_portal_backend() {
@@ -539,6 +558,9 @@ rx_xdg_set_portal_backend() {
 portal=$backend
 EOF
 
+    dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=Hyprland 2>/dev/null
+    export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-Hyprland}"
+    export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
     systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null
     systemctl --user restart --wait xdg-desktop-portal "xdg-desktop-portal-${backend}" 2>/dev/null
 

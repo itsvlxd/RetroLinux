@@ -101,6 +101,10 @@ portal_list() {
     rx_xdg_list_portals
 }
 
+portal_conflicts() {
+    rx_xdg_detect_conflicting_portals
+}
+
 portal_set() {
     local backend="$1"
     [[ -z $backend ]] && echo "result=error|reason=no_backend" && return 1
@@ -197,6 +201,7 @@ case "$1" in
     "--find-handlers") find_handlers "$2" ;;
     "--portal-status") portal_status ;;
     "--portal-list") portal_list ;;
+    "--portal-conflicts") portal_conflicts ;;
     "--portal-set") portal_set "$2" ;;
     "--configure-xdg-open") configure_xdg_open ;;
     "--bridge-flatpak") bridge_flatpak ;;

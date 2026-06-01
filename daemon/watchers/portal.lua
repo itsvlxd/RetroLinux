@@ -16,6 +16,29 @@ return {
         local backend_warning_shown = {}
 
         while true do
+            local conflicting_backends = { "gnome", "kde" }
+            for _, cb in ipairs(conflicting_backends) do
+                local key_running = "conflict_running_" .. cb
+                local key_installed = "conflict_installed_" .. cb
+                local cb_pid = Watcher.run_cmd("pgrep -x 'xdg-desktop-portal-" .. cb .. "' | head -1")
+                if cb_pid ~= "" then
+                    if not backend_warning_shown[key_running] then
+                        Watcher.log("portal", "[CONFLICT DETECTED] xdg-desktop-portal-" .. cb .. " is running (PID: " .. cb_pid .. ") — will interfere with Hyprland screensharing", "warn")
+                        backend_warning_shown[key_running] = true
+                    end
+                else
+                    backend_warning_shown[key_running] = nil
+                end
+                local cb_installed = Watcher.run_cmd("pacman -Qq 'xdg-desktop-portal-" .. cb .. "' >/dev/null 2>&1 && echo yes")
+                if cb_installed == "yes" then
+                    if not backend_warning_shown[key_installed] then
+                        Watcher.log("portal", "[CONFLICT DETECTED] xdg-desktop-portal-" .. cb .. " package is installed — remove it: sudo pacman -R xdg-desktop-portal-" .. cb, "warn")
+                        backend_warning_shown[key_installed] = true
+                    end
+                else
+                    backend_warning_shown[key_installed] = nil
+                end
+            end
 
             local portal_pid = Watcher.run_cmd("pgrep -x 'xdg-desktop-portal' | head -1")
             local backend = XDG.get_portal_backend()

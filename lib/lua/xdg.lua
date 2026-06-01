@@ -405,7 +405,8 @@ function XDG.set_portal_backend(backend)
 end
 
 function XDG.inject_portal_env()
-	Watcher.run_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null")
+	Watcher.run_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=Hyprland 2>/dev/null")
+	Watcher.run_cmd("export XDG_CURRENT_DESKTOP=\"${XDG_CURRENT_DESKTOP:-Hyprland}\" WAYLAND_DISPLAY=\"${WAYLAND_DISPLAY:-wayland-0}\" && systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null")
 	local backend = XDG.get_portal_backend()
 	if backend ~= "none" then
 		Watcher.run_cmd("systemctl --user restart --wait xdg-desktop-portal xdg-desktop-portal-" .. backend .. " 2>/dev/null")

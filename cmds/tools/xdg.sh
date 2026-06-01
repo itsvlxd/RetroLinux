@@ -12,11 +12,11 @@ cmd_xdg() {
 
     case "$action" in
         "dirs")
-            local sub="${1:-list}"
+            local sub="${1:-}"
             shift 2>/dev/null || true
 
             case "$sub" in
-                "list"|"")
+                "")
                     local dir_count=0
                     local missing=0
                     declare -a d_names d_paths d_exists
@@ -73,11 +73,11 @@ cmd_xdg() {
             ;;
 
         "defaults")
-            local sub="${1:-list}"
+            local sub="${1:-}"
             shift 2>/dev/null || true
 
             case "$sub" in
-                "list"|"")
+                "")
                     local count=0
                     declare -a d_mimes d_apps
 
@@ -154,57 +154,10 @@ cmd_xdg() {
             ;;
 
         "portal")
-            local sub="${1:-status}"
+            local sub="${1:-}"
             shift 2>/dev/null || true
 
             case "$sub" in
-                "status")
-                    local portal_result=$(bash "$xdg_script" --portal-status)
-                    local backend=$(echo "$portal_result" | grep -oP 'backend=\K[^|]+')
-                    local running=$(echo "$portal_result" | grep -oP 'running=\K[^|]+')
-
-                    : ${backend:="none"}
-                    : ${running:="no"}
-
-                    local backend_display="${backend^}"
-                    local backend_color="$PINK"
-                    [[ $backend == "none" ]] && backend_color="$WARN"
-
-                    local running_display="No"
-                    local running_color="$MUTE"
-                    if [[ $running == "yes" ]]; then
-                        running_display="Yes"
-                        running_color="$PINK"
-                    fi
-
-                    rx_table_header "󰂕" "XDG Portal Status"
-                    rx_table_row "󰂕" "Active Backend:" "$backend_display" "$backend_color" "16"
-                    rx_table_row "󰓅" "Running:" "$running_display" "$running_color" "16"
-                    rx_table_separator
-
-                    while IFS='|' read -r name installed pg_running; do
-                        [[ -z $name ]] && continue
-                        local icon="󰱼"
-                        local color="$MUTE"
-                        local status="Not installed"
-                        if [[ $installed == "yes" ]]; then
-                            icon="󰄲"
-                            color="$PINK"
-                            status="Installed"
-                            if [[ $pg_running == "yes" ]]; then
-                                icon="󰄲"
-                                color="$SUCCESS"
-                                status="Running"
-                            fi
-                        fi
-                        local is_active=""
-                        [[ $name == "$backend" ]] && is_active=" ${GRAY}(active)${RESET}"
-                        rx_table_row "$icon" "${name^}:" "${status}${is_active}" "$color" "16"
-                    done < <(bash "$xdg_script" --portal-list 2>/dev/null)
-
-                    rx_table_separator
-                    rx_table_spacer
-                    ;;
                 "set")
                     local backend="${1,,}"
                     [[ -z $backend ]] && rx_log "error" "Provide a backend name (hyprland, gtk)" && return 1
@@ -224,6 +177,9 @@ cmd_xdg() {
                     fi
                     ;;
                 "inject")
+                    dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=Hyprland 2>/dev/null
+                    export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-Hyprland}"
+                    export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
                     systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null
 
                     local backend=$(bash "$xdg_script" --portal-status 2>/dev/null | grep -oP 'backend=\K[^|]+')
@@ -317,10 +273,45 @@ cmd_xdg() {
                 health_text="Issues Found"
             fi
 
+            local portal_hyprland=""
+            local portal_gtk=""
+            while IFS='|' read -r name installed pg_running conflict; do
+                [[ -z $name ]] && continue
+                if [[ $conflict == "yes" ]]; then
+                    [[ $installed == "yes" || $pg_running == "yes" ]] && continue
+                fi
+                local p_status="N/A"
+                [[ $name == "hyprland" ]] && p_status="$installed"
+                [[ $name == "gtk" ]] && p_status="$installed"
+                case "$name" in
+                    hyprland) portal_hyprland="${installed^}${pg_running:+ (Running)}" ;;
+                    gtk) portal_gtk="${installed^}${pg_running:+ (Running)}" ;;
+                esac
+            done < <(bash "$xdg_script" --portal-list 2>/dev/null)
+
+            local conflict_count=0
+            local conflict_list=""
+            while IFS='|' read -r c_name c_installed c_running; do
+                [[ -z $c_name || $c_name == "none" ]] && continue
+                ((conflict_count++))
+                [[ -n $conflict_list ]] && conflict_list="${conflict_list}, "
+                conflict_list="${conflict_list}${c_name^} (${c_installed}/${c_running})"
+            done < <(bash "$xdg_script" --portal-conflicts 2>/dev/null)
+
+            local conflict_color="$SUCCESS"
+            local conflict_text="None"
+            if [[ $conflict_count -gt 0 ]]; then
+                conflict_color="$WARN"
+                conflict_text="$conflict_list"
+            fi
+
             rx_table_header "󰉋" "XDG Status"
             rx_table_row "󰉍" "Directories:" "$dir_count configured ($dir_missing missing)" "$dirs_color" "16"
             rx_table_row "󰈔" "Defaults:" "$default_count associations" "$PINK" "16"
             rx_table_row "󰂕" "Portal:" "${portal_backend^} (${portal_running})" "$portal_color" "16"
+            rx_table_row "󰄲" "Hyprland:" "$portal_hyprland" "$PINK" "16"
+            rx_table_row "󰄲" "GTK:" "$portal_gtk" "$PINK" "16"
+            rx_table_row "󰱼" "Conflicts:" "$conflict_text" "$conflict_color" "16"
             rx_table_row "󰏗" "Handlers:" "$health_valid/$health_total valid" "$health_color" "16"
             if [[ $ghost_desktop -gt 0 ]]; then
                 rx_table_row "󰱼" "Dead .desktop:" "$ghost_desktop" "$WARN" "16"
@@ -331,6 +322,10 @@ cmd_xdg() {
             rx_table_separator
             rx_table_spacer
 
+            if [[ $conflict_count -gt 0 ]]; then
+                rx_log "error" "${conflict_count} conflicting portal(s) detected: ${PINK}${conflict_list}${RESET}"
+                rx_log "info" "Uninstall with: ${PINK}sudo pacman -R xdg-desktop-portal-gnome xdg-desktop-portal-kde${RESET}"
+            fi
             if [[ $ghost_desktop -gt 0 || $ghost_binary -gt 0 ]]; then
                 rx_log "info" "Fix with: ${PINK}retro xdg defaults reset${RESET} or remove dead entries manually"
             fi
@@ -592,10 +587,10 @@ EOF
         *)
             rx_help_usage "retro xdg <command>"
             rx_help_commands "Available commands"
-            rx_help_cmd "dirs [list|set|reset]" "Manage XDG user directories" "40"
-            rx_help_cmd "defaults [list|set|reset]" "Manage default applications" "40"
+            rx_help_cmd "dirs [set|reset]" "Manage XDG user directories" "40"
+            rx_help_cmd "defaults [set|reset]" "Manage default applications" "40"
             rx_help_cmd "handlers <mime>" "Find apps that handle a MIME type" "40"
-            rx_help_cmd "portal [status|set|inject]" "Manage XDG portal backend" "40"
+            rx_help_cmd "portal [set|inject]" "Manage XDG portal backend" "40"
             rx_help_cmd "xdg-open" "Configure xdg-open for Hyprland" "40"
             rx_help_cmd "flatpak" "Bridge host defaults into Flatpak sandbox" "40"
             rx_help_cmd "query <file|ext>" "Reverse lookup: find app for a file or extension" "40"
