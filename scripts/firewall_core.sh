@@ -245,7 +245,9 @@ _nft_insert_block() {
     local handle
     handle=$(_nft_handle_at_index "$idx")
     if [[ -n $handle ]]; then
-        $SUDO_CMD nft add rule inet filter input position "$handle" ip saddr "${ip}" drop 2>/dev/null && _nft_commit
+        $SUDO_CMD nft insert rule inet filter input position "$handle" ip saddr "${ip}" drop 2>/dev/null && _nft_commit
+    else
+        $SUDO_CMD nft add rule inet filter input ip saddr "${ip}" drop 2>/dev/null && _nft_commit
     fi
 }
 
@@ -256,7 +258,9 @@ _nft_insert_deny() {
     local handle
     handle=$(_nft_handle_at_index "$idx")
     if [[ -n $handle ]]; then
-        $SUDO_CMD nft add rule inet filter input position "$handle" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+        $SUDO_CMD nft insert rule inet filter input position "$handle" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+    else
+        $SUDO_CMD nft add rule inet filter input "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
     fi
 }
 
@@ -267,7 +271,9 @@ _nft_insert_accept() {
     local handle
     handle=$(_nft_handle_at_index "$idx")
     if [[ -n $handle ]]; then
-        $SUDO_CMD nft add rule inet filter input position "$handle" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+        $SUDO_CMD nft insert rule inet filter input position "$handle" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+    else
+        $SUDO_CMD nft add rule inet filter input "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
     fi
 }
 
@@ -282,7 +288,9 @@ _nft_insert_deny_ip_port() {
     local target_handle
     target_handle=$(_nft_handle_at_index "$idx")
     if [[ -n $target_handle ]]; then
-        $SUDO_CMD nft add rule inet filter input position "$target_handle" ip saddr "${ip}" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+        $SUDO_CMD nft insert rule inet filter input position "$target_handle" ip saddr "${ip}" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
+    else
+        $SUDO_CMD nft add rule inet filter input ip saddr "${ip}" "${proto}" dport "${port}" drop 2>/dev/null && _nft_commit
     fi
 }
 
@@ -297,7 +305,9 @@ _nft_insert_accept_ip_port() {
     local target_handle
     target_handle=$(_nft_handle_at_index "$idx")
     if [[ -n $target_handle ]]; then
-        $SUDO_CMD nft add rule inet filter input position "$target_handle" ip saddr "${ip}" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+        $SUDO_CMD nft insert rule inet filter input position "$target_handle" ip saddr "${ip}" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
+    else
+        $SUDO_CMD nft add rule inet filter input ip saddr "${ip}" "${proto}" dport "${port}" accept 2>/dev/null && _nft_commit
     fi
 }
 
