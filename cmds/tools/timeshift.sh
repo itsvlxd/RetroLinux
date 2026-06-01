@@ -36,11 +36,16 @@ cmd_timeshift() {
                 snap_count=$(echo "$snapshots" | grep -c "^SNAPSHOT|" 2>/dev/null)
             fi
 
-            IFS='|' read -r ckey device uuid parent btrfs daily weekly monthly hourly boot hidden snap_count_raw snap_size <<<"$config"
+            IFS='|' read -r ckey device uuid parent btrfs daily weekly monthly hourly boot config_snap_count snap_size include_home exclude exclude_apps <<<"$config"
             IFS='|' read -r dkey dev_name total used avail pct <<<"$disk"
 
             local snap_label="$snap_count"
             [[ -z $snap_count || $snap_count == "0" ]] && snap_label="${snap_count}" || true
+
+            local filters=""
+            if [[ -n $exclude && $exclude != "[]" ]]; then
+                filters=$(echo "$exclude" | sed 's/\[//; s/\]//' | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
+            fi
 
             rx_table_header "󰕰" "Timeshift Status"
             rx_table_row "󰏗" "State:" "Configured" "$SUCCESS" "20"
@@ -53,8 +58,11 @@ cmd_timeshift() {
             rx_table_row "󰓅" "Monthly:" "$monthly" "$PINK" "20"
             rx_table_row "󰓅" "Hourly:" "$hourly" "$PINK" "20"
             rx_table_row "󰀧" "Boot:" "$boot" "$PINK" "20"
+            rx_table_separator
+            if [[ -n $filters ]]; then
+                rx_table_row "󰓅" "Filters:" "$filters" "$PINK" "20"
+            fi
             if [[ $dev_name != "none" && -n $total ]]; then
-                rx_table_separator
                 rx_table_row "󰓅" "Disk:" "$used / $total ($pct)" "$PINK" "20"
             fi
             rx_table_separator
@@ -151,30 +159,6 @@ cmd_timeshift() {
             fi
             ;;
 
-        "config")
-            local config=$(bash "$ts_script" --config 2>/dev/null || echo "ERROR")
-
-            if [[ $config == "ERROR"* ]]; then
-                rx_log "error" "Timeshift is not configured. Run ${PINK}retro timeshift setup${RESET}"
-                return 1
-            fi
-
-            IFS='|' read -r key device uuid parent btrfs daily weekly monthly hourly boot snap_count snap_size <<<"$config"
-
-            rx_table_header "󰕰" "Timeshift Configuration"
-            rx_table_row "󰏗" "Device:" "$device" "$PINK" "20"
-            rx_table_row "󰏗" "UUID:" "$uuid" "$PINK" "20"
-            rx_table_row "󰏗" "Type:" "$([ "$btrfs" == "true" ] && echo "BTRFS" || echo "RSYNC")" "$PINK" "20"
-            rx_table_separator
-            rx_table_row "󰓅" "Daily:" "$daily" "$PINK" "20"
-            rx_table_row "󰓅" "Weekly:" "$weekly" "$PINK" "20"
-            rx_table_row "󰓅" "Monthly:" "$monthly" "$PINK" "20"
-            rx_table_row "󰓅" "Hourly:" "$hourly" "$PINK" "20"
-            rx_table_row "󰀧" "Boot:" "$boot" "$PINK" "20"
-            rx_table_separator
-            rx_table_spacer
-            ;;
-
         "schedule")
             local timeframe="${1,,}"
             local value="${2,,}"
@@ -239,7 +223,7 @@ cmd_timeshift() {
             fi
 
             rx_setup_parse "$@"
-            rx_setup_validate "device,btrfs,daily,weekly,monthly,boot,boot_count,exclude_home" "device:required|btrfs:in=true,false|daily:numeric|weekly:numeric|monthly:numeric|boot:in=true,false|boot_count:numeric|exclude_home:in=true,false" || return 1
+            rx_setup_validate "device,btrfs,daily,weekly,monthly,boot,boot_count,exclude_home,filters" "device:required|btrfs:in=true,false|daily:numeric|weekly:numeric|monthly:numeric|boot:in=true,false|boot_count:numeric|exclude_home:in=true,false|filters:" || return 1
 
             local config=$(bash "$ts_script" --config 2>/dev/null || echo "ERROR")
             local config_exists=false
@@ -255,6 +239,7 @@ cmd_timeshift() {
             local boot_enabled="true"
             local boot_count="2"
             local exclude_home="false"
+            local custom_filters=""
 
             if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
                 device_choice=$(rx_setup_get_opt "device")
@@ -265,9 +250,19 @@ cmd_timeshift() {
                 boot_enabled=$(rx_setup_get_opt "boot" "true")
                 boot_count=$(rx_setup_get_opt "boot_count" "2")
                 exclude_home=$(rx_setup_get_opt "exclude_home" "false")
+                custom_filters=$(rx_setup_get_opt "filters" "")
+                if [[ $custom_filters == "optimized" ]]; then
+                    exclude_home="false"
+                    custom_filters=""
+                fi
             else
                 if [[ $config_exists == true ]]; then
-                    IFS='|' read -r ckey cur_device cur_uuid cur_parent cur_btrfs cur_daily cur_weekly cur_monthly cur_hourly cur_boot cur_snap_count cur_snap_size <<<"$config"
+                    IFS='|' read -r ckey cur_device cur_uuid cur_parent cur_btrfs cur_daily cur_weekly cur_monthly cur_hourly cur_boot cur_snap_count cur_snap_size cur_include_home cur_exclude cur_exclude_apps <<<"$config"
+
+                    local cur_filters="none"
+                    if [[ -n $cur_exclude && $cur_exclude != "[]" ]]; then
+                        cur_filters=$(echo "$cur_exclude" | sed 's/\[//; s/\]//' | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
+                    fi
 
                     rx_setup_prompt_reconfigure "󰕰" "Current Timeshift Configuration" \
                         "Device" "$cur_device" \
@@ -275,7 +270,8 @@ cmd_timeshift() {
                         "Daily" "$cur_daily" \
                         "Weekly" "$cur_weekly" \
                         "Monthly" "$cur_monthly" \
-                        "Boot" "$cur_boot" || return 0
+                        "Boot" "$cur_boot" \
+                        "Filters" "$cur_filters" || return 0
                 fi
 
                 rx_log "info" "Timeshift setup"
@@ -328,10 +324,29 @@ cmd_timeshift() {
                     rx_confirm "Exclude /home from backups?" "N" && exclude_home="true" || exclude_home="false"
                 fi
 
+                if rx_confirm "Use optimized filters (+ .config, exclude home/root)?" "Y"; then
+                    exclude_home="false"
+                else
+                    rx_log "info" "Tip: '+/pattern' to include, bare pattern to exclude"
+                    local custom_filters=$(rx_input "Custom filter patterns (space-separated):")
+                    if [[ -n $custom_filters ]]; then
+                        exclude_home=""
+                    fi
+                fi
+
                 local daily_label="$([ $daily_count -gt 0 ] && echo "$daily_count" || echo "off")"
                 local weekly_label="$([ $weekly_count -gt 0 ] && echo "$weekly_count" || echo "off")"
                 local monthly_label="$([ $monthly_count -gt 0 ] && echo "$monthly_count" || echo "off")"
                 local boot_label="$([ $boot_enabled == "true" ] && echo "$boot_count boot snaps" || echo "off")"
+
+                local summary_filters=""
+                if [[ -n $custom_filters ]]; then
+                    summary_filters="$custom_filters"
+                elif [[ $exclude_home == "true" ]]; then
+                    summary_filters="/home/*, /root"
+                else
+                    summary_filters="+ /home/*/.config/**, /home/*, /root"
+                fi
 
                 rx_setup_summary "󰕰" "Setup Summary" \
                     "Device" "$device_choice" \
@@ -340,22 +355,42 @@ cmd_timeshift() {
                     "Weekly" "$weekly_label" \
                     "Monthly" "$monthly_label" \
                     "Boot" "$boot_label" \
-                    "Exclude Home" "$exclude_home"
+                    "Filters" "$summary_filters"
 
                 rx_setup_confirm || return 0
             fi
 
-            local result=$(sudo bash "$ts_script" --apply-setup \
-                "device=${device_choice}" \
-                "btrfs=${btrfs_mode}" \
-                "daily=${daily_count}" \
-                "weekly=${weekly_count}" \
-                "monthly=${monthly_count}" \
-                "boot=${boot_enabled}" \
-                "boot_count=${boot_count}" \
-                "exclude_home=${exclude_home}" 2>&1)
+            if [[ -z $summary_filters ]]; then
+                if [[ -n $custom_filters ]]; then
+                    summary_filters="$custom_filters"
+                elif [[ $exclude_home == "true" ]]; then
+                    summary_filters="/home/*, /root"
+                else
+                    summary_filters="+ /home/*/.config/**, /home/*, /root"
+                fi
+            fi
+
+            local setup_args=(
+                "device=${device_choice}"
+                "btrfs=${btrfs_mode}"
+                "daily=${daily_count}"
+                "weekly=${weekly_count}"
+                "monthly=${monthly_count}"
+                "boot=${boot_enabled}"
+                "boot_count=${boot_count}"
+            )
+            if [[ -z $exclude_home && -n $custom_filters ]]; then
+                setup_args+=("filters=${custom_filters}")
+            else
+                setup_args+=("exclude_home=${exclude_home}")
+            fi
+            local result=$(sudo bash "$ts_script" --apply-setup "${setup_args[@]}" 2>&1)
 
             if echo "$result" | grep -q "^OK|"; then
+                echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/timeshift" | \
+                    sudo tee /etc/sudoers.d/timeshift >/dev/null && \
+                    sudo chmod 0440 /etc/sudoers.d/timeshift
+
                 rx_setup_success "󱗼" "Timeshift Configured" \
                     "Device" "$device_choice" \
                     "Type" "$([ "$btrfs_mode" == "true" ] && echo "BTRFS" || echo "RSYNC")" \
@@ -363,7 +398,9 @@ cmd_timeshift() {
                     "Weekly" "$weekly_label" \
                     "Monthly" "$monthly_label" \
                     "Boot" "$boot_label" \
-                    "Exclude Home" "$exclude_home"
+                    "Filters" "$summary_filters"
+
+                { sudo systemctl restart timeshift 2>/dev/null || sudo systemctl restart timeshift.timer 2>/dev/null; } || true
             else
                 rx_log "error" "Failed to apply Timeshift configuration: $result"
                 return 1
