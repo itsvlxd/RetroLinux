@@ -46,6 +46,7 @@ rx_setup_parse() {
             -f|--force)
                 RX_SETUP_FORCE=true
                 RX_SETUP_YES=true
+                [[ $RX_SETUP_MODE == "interactive" ]] && RX_SETUP_MODE="non-interactive"
                 shift
                 ;;
             *)
