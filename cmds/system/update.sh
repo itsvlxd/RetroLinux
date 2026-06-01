@@ -34,6 +34,7 @@ cmd_update() {
     fi
 
     local has_changes=$(git -C "$RETRO_DIR" status --porcelain 2>/dev/null)
+    local commits=""
 
     if [[ -n $has_changes ]]; then
         rx_confirm "Uncommitted changes detected. Reset --hard to discard?" "N" || return 0
@@ -48,7 +49,7 @@ cmd_update() {
         local new_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
 
         if [[ $old_head != $new_head ]]; then
-            local commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
+            commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
 
             if [[ -n $commits ]]; then
                 rx_table_header "󰜘" "Changelog"
@@ -145,6 +146,26 @@ cmd_update() {
 
         rx_log "info" "Syncing wallpapers from repository..."
         $RETRO_DIR/retro.sh wallpaper sync >/dev/null 2>&1
+
+        if [[ -n $commits ]]; then
+            local -A setup_modules
+            while IFS= read -r msg; do
+                local mod_regex='^[a-z]+\(([^)]+)\)'
+                if [[ $msg =~ $mod_regex ]] && echo "$msg" | grep -qi "setup"; then
+                    setup_modules["${BASH_REMATCH[1]}"]=1
+                fi
+            done <<< "$commits"
+
+            rx_table_header "󰰔" "Reapplying Changed Tool Setups"
+            for module in "${!setup_modules[@]}"; do
+                local tool_cmd="$RETRO_DIR/cmds/tools/${module}.sh"
+                if [[ -f $tool_cmd ]] && grep -q '"setup")' "$tool_cmd" 2>/dev/null; then
+                    rx_log "info" "Changes in ${PINK}${module}${RESET}, reapplying setup..."
+                    retro "$module" setup -f 2>/dev/null || true
+                fi
+            done
+            rx_table_separator
+        fi
 
         rx_log "success" "Update finished"
     else
