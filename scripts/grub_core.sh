@@ -506,13 +506,23 @@ patch_snapshot_entry() {
                 memtest_injected=true
                 local os_prober_enabled=$(get_var "GRUB_OS_PROBER" "false")
                 if [[ $os_prober_enabled == "true" ]] && command -v os-prober >/dev/null 2>&1; then
-                    while IFS= read -r probe_line; do
-                        local efi_path="${probe_line%%:*}"
-                        efi_path="${efi_path#*@}"
-                        local os_name=$(echo "$probe_line" | cut -d: -f3)
-                        if [[ $os_name == "Windows" ]]; then
-                            local efi_file="${efi_path#/}"
-                            cat >>"$temp_cfg" <<WINDOWS_ENTRY
+                    local os_prober_output
+                    os_prober_output=$(timeout 10 sudo os-prober 2>/dev/null || true)
+                    if [[ -z $os_prober_output ]]; then
+                        rx_log_file "info" "OS prober: no other operating systems detected"
+                    else
+                        local detected_list=""
+                        while IFS= read -r probe_line; do
+                            [[ -z $probe_line ]] && continue
+                            local os_name=$(echo "$probe_line" | cut -d: -f3)
+                            local os_title=$(echo "$probe_line" | cut -d: -f2)
+                            [[ -n $detected_list ]] && detected_list="${detected_list}, "
+                            detected_list="${detected_list}${os_name} (${os_title})"
+                            if [[ $os_name == "Windows" ]]; then
+                                local efi_path="${probe_line%%:*}"
+                                efi_path="${efi_path#*@}"
+                                local efi_file="${efi_path#/}"
+                                cat >>"$temp_cfg" <<WINDOWS_ENTRY
 
 menuentry "Windows Boot Manager" --class windows --class os {
     insmod part_gpt
@@ -521,9 +531,10 @@ menuentry "Windows Boot Manager" --class windows --class os {
     chainloader /${efi_file}
 }
 WINDOWS_ENTRY
-                            break
-                        fi
-                    done < <(timeout 10 sudo os-prober 2>/dev/null || true)
+                            fi
+                        done <<<"$os_prober_output"
+                        rx_log_file "success" "OS prober detected: ${detected_list}"
+                    fi
                 fi
                 cat >>"$temp_cfg" <<'MEMTEST'
 
