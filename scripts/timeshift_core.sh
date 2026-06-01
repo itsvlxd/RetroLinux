@@ -368,6 +368,7 @@ _apply_setup() {
     for pair in "$@"; do
         local key="${pair%%=*}"
         local val="${pair#*=}"
+
         case "$key" in
             device)
                 local uuid=$(blkid -s UUID -o value "$val" 2>/dev/null)
@@ -501,7 +502,10 @@ case "$1" in
     "--retention") _set_retention "$2" ;;
     "--location") _set_location "$2" ;;
     "--list-devices") _list_devices ;;
-    "--apply-setup") shift; _apply_setup "$@" ;;
+    "--apply-setup")
+        shift
+        _apply_setup "$@"
+        ;;
     "--set-boot") _set_boot "$2" ;;
     "--disk-usage") _get_disk_usage ;;
     "--stats") _get_stats ;;
