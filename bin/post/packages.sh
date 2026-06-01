@@ -39,7 +39,6 @@ rx_post_install_packages() {
 
     arch-chroot /mnt pacman -S --noconfirm --needed "${packages[@]}" 2>&1
 
-    # Setup NOPASSWD sudo for the user (needed for AUR helper install and module install)
     local username=$(arch-chroot /mnt getent passwd 1000 2>/dev/null | cut -d: -f1)
     if [[ -n $username ]]; then
         arch-chroot /mnt bash -c "
