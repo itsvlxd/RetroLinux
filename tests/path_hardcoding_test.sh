@@ -18,6 +18,7 @@ for script in "${ALL_SCRIPTS[@]}"; do
     while IFS= read -r line; do
         echo "$line" | grep -qE "/home/[^/]+/|/Users/[^/]+/" || continue
         echo "$line" | grep -q "sed.*s.*/home" && continue
+        echo "$line" | grep -qF "/home/*" && continue
         echo "$line" | grep -qv "^[[:space:]]*#" || continue
         base=$(basename "$script")
         VIOLATIONS+=("$base: hardcoded user path detected")

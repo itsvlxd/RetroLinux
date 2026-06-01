@@ -19,6 +19,3 @@ iso/profile/airootfs/usr/share/plymouth/themes/retrolinux/
 
 # Build outputs
 *.iso
-
-# Upgrade state
-.retro_skip_upgrade
