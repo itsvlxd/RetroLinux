@@ -142,7 +142,7 @@ cmd_update() {
                 local new_version=$(rx_git_version)
                 rx_confirm "Continue upgrading to RetroLinux ${PINK}${new_version}${RESET}${skip_note}?" "Y" || {
                     rx_log "warn" "Skipped. Reverting to ${PINK}${old_version}${RESET}..."
-                    echo "$new_head" > "$skip_file"
+                    echo "$new_head" >"$skip_file"
                     git -C "$RETRO_DIR" reset --hard "$old_head" >/dev/null 2>&1
                     return 0
                 }
@@ -178,17 +178,22 @@ cmd_update() {
                 if [[ $msg =~ $mod_regex ]]; then
                     setup_modules["${BASH_REMATCH[1]}"]=1
                 fi
-            done <<< "$commits"
+            done <<<"$commits"
 
-            rx_table_header "󰰔" "Reapplying Changed Tool Setups"
+            local -a matched
             for module in "${!setup_modules[@]}"; do
                 local tool_cmd="$RETRO_DIR/cmds/tools/${module}.sh"
                 if [[ -f $tool_cmd ]] && grep -q '"setup")' "$tool_cmd" 2>/dev/null; then
-                    rx_log "info" "Changes in ${PINK}${module}${RESET}, reapplying setup..."
-                    retro "$module" setup -f 2>/dev/null || true
+                    matched+=("$module")
                 fi
             done
-            rx_table_separator
+
+            if [[ ${#matched[@]} -gt 0 ]]; then
+                for module in "${matched[@]}"; do
+                    rx_log "info" "Changes in ${PINK}${module}${RESET}, reapplying setup..."
+                    retro "$module" setup -f 2>/dev/null || true
+                done
+            fi
         fi
 
         rx_log "success" "Update finished"
