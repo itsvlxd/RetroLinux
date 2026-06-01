@@ -51,20 +51,18 @@ cmd_update() {
         local new_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
 
         if [[ $old_head != $new_head ]]; then
-            local log_base="$old_head"
             local skip_note=""
             if [[ -f $skip_file ]]; then
                 local skipped_head
                 skipped_head=$(cat "$skip_file")
                 if git -C "$RETRO_DIR" merge-base --is-ancestor "$skipped_head" "$new_head" 2>/dev/null; then
-                    log_base="$skipped_head"
                     local skip_count
                     skip_count=$(git -C "$RETRO_DIR" rev-list --count "$old_head..$skipped_head" 2>/dev/null)
                     skip_note=" (${skip_count} previously skipped)"
                 fi
             fi
 
-            commits=$(git -C "$RETRO_DIR" log "$log_base..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
+            commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
 
             if [[ -n $commits ]]; then
                 rx_table_header "󰜘" "Changelog"
