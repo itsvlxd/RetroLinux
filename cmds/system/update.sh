@@ -19,7 +19,7 @@ cmd_update() {
 
     local old_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
     local old_version=$(rx_git_version)
-    local skip_file="$RETRO_DIR/.retro_skip_upgrade"
+    local skip_file="/tmp/retro_skip_upgrade"
 
     rx_git_fix_owner
 
@@ -136,16 +136,16 @@ cmd_update() {
                 [[ -n $other ]] && rx_help_section "󰋗" "Other" && echo -e "$other"
 
                 rx_help_footer
-
-                local new_version=$(rx_git_version)
-                rx_confirm "Continue upgrading to RetroLinux ${PINK}${new_version}${RESET}${skip_note}?" "Y" || {
-                    rx_log "warn" "Skipped. Reverting to ${PINK}${old_version}${RESET}..."
-                    echo "$new_head" >"$skip_file"
-                    git -C "$RETRO_DIR" reset --hard "$old_head" >/dev/null 2>&1
-                    return 0
-                }
-                rm -f "$skip_file"
             fi
+
+            local new_version=$(rx_git_version)
+            rx_confirm "Continue upgrading to RetroLinux ${PINK}${new_version}${RESET}${skip_note}?" "Y" || {
+                rx_log "warn" "Skipped. Reverting to ${PINK}${old_version}${RESET}..."
+                echo "$new_head" >"$skip_file"
+                git -C "$RETRO_DIR" reset --hard "$old_head" >/dev/null 2>&1
+                return 0
+            }
+            rm -f "$skip_file"
         fi
 
         rx_log "success" "Git pull successful"
