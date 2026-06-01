@@ -19,8 +19,21 @@ cmd_update() {
 
     rx_git_fix_owner
 
+    local current_branch=$(rx_git_branch)
+    if [[ $current_branch == "develop" ]]; then
+        rx_log "warn" "On ${PINK}develop${RESET} branch, creating Timeshift backup before update"
+        if command -v timeshift >/dev/null 2>&1; then
+            if sudo timeshift --create --comments "Pre-update safety backup (develop)" --tags O >/dev/null 2>&1; then
+                rx_log "success" "Timeshift backup created"
+            else
+                rx_log "warn" "Timeshift backup failed, continuing anyway"
+            fi
+        else
+            rx_log "warn" "Timeshift not installed, skipping backup"
+        fi
+    fi
+
     local has_changes=$(git -C "$RETRO_DIR" status --porcelain 2>/dev/null)
-    local pull_failed="false"
 
     if [[ -n $has_changes ]]; then
         rx_confirm "Uncommitted changes detected. Reset --hard to discard?" "N" || return 0
