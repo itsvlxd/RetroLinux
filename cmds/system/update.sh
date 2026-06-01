@@ -51,17 +51,6 @@ cmd_update() {
         local new_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
 
         if [[ $old_head != $new_head ]]; then
-            local skip_note=""
-            if [[ -f $skip_file ]]; then
-                local skipped_head
-                skipped_head=$(cat "$skip_file")
-                if git -C "$RETRO_DIR" merge-base --is-ancestor "$skipped_head" "$new_head" 2>/dev/null; then
-                    local skip_count
-                    skip_count=$(git -C "$RETRO_DIR" rev-list --count "$old_head..$skipped_head" 2>/dev/null)
-                    skip_note=" (${skip_count} previously skipped)"
-                fi
-            fi
-
             commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
 
             if [[ -n $commits ]]; then
@@ -139,7 +128,7 @@ cmd_update() {
             fi
 
             local new_version=$(rx_git_version)
-            rx_confirm "Continue upgrading to RetroLinux ${PINK}${new_version}${RESET}${skip_note}?" "Y" || {
+            rx_confirm "Continue upgrading to RetroLinux ${PINK}${new_version}${RESET}?" "Y" || {
                 rx_log "warn" "Skipped. Reverting to ${PINK}${old_version}${RESET}..."
                 echo "$new_head" >"$skip_file"
                 git -C "$RETRO_DIR" reset --hard "$old_head" >/dev/null 2>&1
