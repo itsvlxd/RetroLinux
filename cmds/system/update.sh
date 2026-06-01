@@ -17,6 +17,10 @@ cmd_update() {
 
     faillock --user $USER --reset
 
+    local old_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
+    local old_version=$(rx_git_version)
+    local skip_file="$RETRO_DIR/.retro_skip_upgrade"
+
     rx_git_fix_owner
 
     local current_branch=$(rx_git_branch)
@@ -41,15 +45,26 @@ cmd_update() {
         rx_git_reset_hard
     fi
 
-    local old_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
-
     rx_log "info" "Syncing repository with $(rx_git_branch)"
 
     if git -C "$RETRO_DIR" pull 2>&1; then
         local new_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
 
         if [[ $old_head != $new_head ]]; then
-            commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
+            local log_base="$old_head"
+            local skip_note=""
+            if [[ -f $skip_file ]]; then
+                local skipped_head
+                skipped_head=$(cat "$skip_file")
+                if git -C "$RETRO_DIR" merge-base --is-ancestor "$skipped_head" "$new_head" 2>/dev/null; then
+                    log_base="$skipped_head"
+                    local skip_count
+                    skip_count=$(git -C "$RETRO_DIR" rev-list --count "$old_head..$skipped_head" 2>/dev/null)
+                    skip_note=" (${skip_count} previously skipped)"
+                fi
+            fi
+
+            commits=$(git -C "$RETRO_DIR" log "$log_base..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
 
             if [[ -n $commits ]]; then
                 rx_table_header "󰜘" "Changelog"
@@ -123,6 +138,15 @@ cmd_update() {
                 [[ -n $other ]] && rx_help_section "󰋗" "Other" && echo -e "$other"
 
                 rx_help_footer
+
+                local new_version=$(rx_git_version)
+                rx_confirm "Continue upgrading to RetroLinux ${PINK}${new_version}${RESET}${skip_note}?" "Y" || {
+                    rx_log "warn" "Skipped. Reverting to ${PINK}${old_version}${RESET}..."
+                    echo "$new_head" > "$skip_file"
+                    git -C "$RETRO_DIR" reset --hard "$old_head" >/dev/null 2>&1
+                    return 0
+                }
+                rm -f "$skip_file"
             fi
         fi
 
@@ -151,7 +175,7 @@ cmd_update() {
             local -A setup_modules
             while IFS= read -r msg; do
                 local mod_regex='^[a-z]+\(([^)]+)\)'
-                if [[ $msg =~ $mod_regex ]] && echo "$msg" | grep -qi "setup"; then
+                if [[ $msg =~ $mod_regex ]]; then
                     setup_modules["${BASH_REMATCH[1]}"]=1
                 fi
             done <<< "$commits"
