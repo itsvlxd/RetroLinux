@@ -141,6 +141,7 @@ cmd_grub() {
                 local entry_details=()
                 local in_submenu=false
                 local submenu_name=""
+                local submenu_depth=0
                 local indent="  "
                 local next_is_vmlinuz=false
                 local first_entry_kernel=""
@@ -149,6 +150,7 @@ cmd_grub() {
                     if [[ $line =~ ^[[:space:]]*submenu[[:space:]]+\'([^\']+)\' ]]; then
                         submenu_name="${BASH_REMATCH[1]}"
                         in_submenu=true
+                        submenu_depth=0
                         entries+=("${submenu_name}")
                         entry_details+=("Submenu")
                         next_is_vmlinuz=false
@@ -198,9 +200,16 @@ cmd_grub() {
                     elif [[ $next_is_vmlinuz == true && -z $first_entry_kernel && $line =~ /vmlinuz-([^[:space:]]+) ]]; then
                         first_entry_kernel="${BASH_REMATCH[1]}"
                         next_is_vmlinuz=false
-                    elif [[ $line =~ ^fi$ ]] && [[ $in_submenu == true ]]; then
-                        in_submenu=false
-                        submenu_name=""
+                    fi
+
+                    if [[ $in_submenu == true ]]; then
+                        local open_b=$(echo "$line" | tr -cd '{' | wc -c)
+                        local close_b=$(echo "$line" | tr -cd '}' | wc -c)
+                        submenu_depth=$((submenu_depth + open_b - close_b))
+                        if [[ $submenu_depth -le 0 ]]; then
+                            in_submenu=false
+                            submenu_name=""
+                        fi
                     fi
                 done <"$grub_cfg"
 
