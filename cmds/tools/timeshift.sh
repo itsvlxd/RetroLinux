@@ -4,6 +4,7 @@ source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/menu.sh"
 source "$RETRO_DIR/lib/setup.sh"
+source "$RETRO_DIR/lib/timeshift.sh"
 source "$RETRO_DIR/scripts/timeshift_core.sh"
 
 cmd_timeshift() {
@@ -77,6 +78,8 @@ cmd_timeshift() {
                 return 1
             fi
 
+            local snap_count=$(echo "$snapshots" | grep "^COUNT|" | cut -d'|' -f2)
+
             if [[ $snapshots == "NONE" ]]; then
                 rx_table_header "󰕰" "Timeshift Snapshots"
                 rx_table_simple "󰄪" "No snapshots found" "$PINK"
@@ -86,8 +89,7 @@ cmd_timeshift() {
             fi
 
             if [[ $snapshots == *"AUTH_REQUIRED"* ]]; then
-                local snap_count=$(echo "$snapshots" | grep "^COUNT|" | cut -d'|' -f2)
-                rx_table_header "󰕰" "Timeshift Snapshots"
+                rx_table_header "󰕰" "Timeshift Snapshots: ${snap_count} total"
                 rx_table_row "󰏗" "Total snapshots:" "$snap_count" "$PINK" "25"
                 rx_table_row "󰓅" "Run with sudo to list:" "sudo retro timeshift list" "$GRAY" "25"
                 rx_table_separator
@@ -95,7 +97,7 @@ cmd_timeshift() {
                 return 0
             fi
 
-            rx_table_header "󰕰" "Timeshift Snapshots"
+            rx_table_header "󰕰" "Timeshift Snapshots: ${snap_count} total"
 
             while IFS= read -r line; do
                 IFS='|' read -r key date tag comment <<<"$line"
@@ -407,6 +409,38 @@ cmd_timeshift() {
             fi
             ;;
 
+        "cleanup")
+            local prefix="$1"
+            local max=3
+
+            if [[ -z $prefix ]]; then
+                rx_log "error" "Usage: retro timeshift cleanup <description-prefix>"
+                rx_log "info" "Example: retro timeshift cleanup 'Grub Changes'"
+                rx_log "info" "Keeps the 3 most recent snapshots matching the prefix"
+                return 1
+            fi
+
+            local list_output
+            list_output=$(sudo -n timeshift --list 2>&1) || true
+
+            if echo "$list_output" | grep -qi "auth\|password\|no snapshots found"; then
+                rx_log "error" "Could not access snapshots — sudo required"
+                return 1
+            fi
+
+            local before=$(echo "$list_output" | grep -Fc "$prefix")
+            rx_timeshift_limit_by_description "$prefix" "$max"
+
+            if [[ $before -gt $max ]]; then
+                local deleted=$((before - max))
+                rx_log "success" "Cleaned up $deleted '$prefix' snapshot(s), keeping $max"
+            elif [[ $before -eq 0 ]]; then
+                rx_log "info" "No snapshots found matching '$prefix'"
+            else
+                rx_log "info" "Only $before '$prefix' snapshot(s) found (limit: $max), nothing to do"
+            fi
+            ;;
+
         "gui")
             local check=$(bash "$ts_script" --check)
             if [[ $check == "ERROR"* ]]; then
@@ -452,6 +486,7 @@ cmd_timeshift() {
             rx_help_cmd "schedule [timeframe] [count|disable]" "Show or set snapshot retention schedule" "40"
             rx_help_cmd "setup [-o key=val,...]" "Interactive or scripted setup wizard" "40"
             rx_help_cmd "gui" "Open Timeshift graphical interface" "40"
+            rx_help_cmd "cleanup <prefix>" "Remove old on-demand snapshots matching prefix" "40"
             rx_help_examples
             rx_help_example "retro timeshift status" "Show current config and snapshot count" "40"
             rx_help_example "retro timeshift list" "List all snapshots" "40"
@@ -461,6 +496,7 @@ cmd_timeshift() {
             rx_help_example "retro timeshift setup" "Interactive setup wizard" "40"
             rx_help_example "retro timeshift setup -o device=/dev/sda1,daily=5,weekly=3,monthly=2,boot=true" "Non-interactive setup" "40"
             rx_help_example "retro timeshift gui" "Open GUI for manual management" "40"
+            rx_help_example "retro timeshift cleanup 'Grub Changes'" "Keep last 3 Grub Changes snapshots" "40"
             rx_help_spacer
             ;;
     esac

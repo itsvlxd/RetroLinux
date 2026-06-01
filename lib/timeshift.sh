@@ -12,10 +12,17 @@ rx_timeshift_limit_by_description() {
         return 0
     fi
 
+    local output
+    output=$(sudo -n timeshift --list 2>&1) || return 0
+
+    if echo "$output" | grep -qi "auth\|password\|no snapshots found"; then
+        return 0
+    fi
+
     local snapshots=()
     while IFS= read -r snap; do
         [[ -n $snap ]] && snapshots+=("$snap")
-    done < <(sudo timeshift --list-snapshots 2>/dev/null | grep -F "$prefix" | awk '{print $3}')
+    done < <(echo "$output" | grep -F "$prefix" | awk '{print $3}')
 
     local count=${#snapshots[@]}
     if [[ $count -le $max ]]; then
@@ -24,7 +31,7 @@ rx_timeshift_limit_by_description() {
 
     local delete_count=$((count - max))
     for ((i=0; i<delete_count; i++)); do
-        sudo timeshift --delete --snapshot "${snapshots[$i]}" >/dev/null 2>&1 || true
+        sudo -n timeshift --delete --snapshot "${snapshots[$i]}" >/dev/null 2>&1 || true
     done
 
     return 0

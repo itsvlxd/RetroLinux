@@ -124,7 +124,7 @@ _list_snapshots() {
         [[ -z $date ]] && continue
         local tag=$(echo "$line" | grep -oP '\s[OBMWD]\s' | tr -d ' ')
         [[ -z $tag ]] && tag=$(echo "$line" | grep -oP '  [OBMWD]  ' | tr -d ' ')
-        local comment=$(echo "$line" | grep -oP '\{[^}]+\}(?:\s*\{[^}]+\})*' | xargs)
+        local comment=$(echo "$line" | cut -c34- | xargs)
 
         echo "SNAPSHOT|${date}|${tag}|${comment}"
     done
