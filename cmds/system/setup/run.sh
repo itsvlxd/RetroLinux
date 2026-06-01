@@ -56,7 +56,7 @@ run_postinstall() {
 
     local root_device=$(findmnt -n -o SOURCE / | grep -oP '^/dev/[^ ]+')
     if [[ -n $root_device ]]; then
-        retro timeshift setup --needed -o "device=${root_device},daily=5,weekly=3,monthly=2,boot=true" 2>/dev/null || true
+        retro timeshift setup --needed -o "device=${root_device},daily=5,weekly=3,monthly=2,boot=true,filters=optimized" 2>/dev/null || true
     fi
 
     retro wallpaper "static" "false"

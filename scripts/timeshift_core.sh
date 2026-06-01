@@ -9,6 +9,12 @@ _read_json_field() {
     grep -o "\"${field}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$file" 2>/dev/null | sed 's/^[^:]*:[[:space:]]*"//; s/"$//'
 }
 
+_read_json_array() {
+    local file="$1"
+    local field="$2"
+    tr -d '\n' <"$file" | grep -oP "\"${field}\"\s*:\s*\[[^\]]*\]" 2>/dev/null | sed 's/^[^:]*:[[:space:]]*//'
+}
+
 _write_json_field() {
     local file="$1"
     local field="$2"
@@ -50,6 +56,16 @@ _get_config() {
     local count_boot=$(_read_json_field "$config_file" "count_boot")
     local snap_count=$(_read_json_field "$config_file" "snapshot_count")
     local snap_size=$(_read_json_field "$config_file" "snapshot_size")
+    local include_home=$(_read_json_field "$config_file" "include_btrfs_home_for_backup")
+    local exclude=$(_read_json_array "$config_file" "exclude" | tr -d '\n')
+    if [[ -z $exclude || $exclude == "[]" ]]; then
+        local rsync_exclude="/etc/timeshift/rsync/exclude.list"
+        if [[ -f $rsync_exclude ]]; then
+            local lines=$(grep -v '^#' "$rsync_exclude" | grep -v '^$' | sed 's/^/"/; s/$/"/' | tr '\n' ',' | sed 's/,$//')
+            [[ -n $lines ]] && exclude="[$lines]"
+        fi
+    fi
+    local exclude_apps=$(_read_json_array "$config_file" "exclude-apps" | tr -d '\n')
 
     [[ $sched_daily == "true" ]] && sched_daily="$count_daily" || sched_daily="0"
     [[ $sched_weekly == "true" ]] && sched_weekly="$count_weekly" || sched_weekly="0"
@@ -63,7 +79,7 @@ _get_config() {
         [[ -z $device ]] && device="$backup_uuid"
     fi
 
-    echo "CONFIG|${device:-none}|${backup_uuid:-none}|${parent_uuid:-none}|${btrfs_mode:-false}|${sched_daily:-0}|${sched_weekly:-0}|${sched_monthly:-0}|${sched_hourly:-0}|${sched_boot:-0}|${snap_count:-0}|${snap_size:-0}"
+    echo "CONFIG|${device:-none}|${backup_uuid:-none}|${parent_uuid:-none}|${btrfs_mode:-false}|${sched_daily:-0}|${sched_weekly:-0}|${sched_monthly:-0}|${sched_hourly:-0}|${sched_boot:-0}|${snap_count:-0}|${snap_size:-0}|${include_home:-false}|${exclude:-[]}|${exclude_apps:-[]}"
 }
 
 _list_snapshots() {
@@ -208,11 +224,11 @@ _set_schedule() {
 
     local field=""
     case "$timeframe" in
-        daily)   field="schedule_daily" ;;
-        weekly)  field="schedule_weekly" ;;
+        daily) field="schedule_daily" ;;
+        weekly) field="schedule_weekly" ;;
         monthly) field="schedule_monthly" ;;
-        hourly)  field="schedule_hourly" ;;
-        boot)    field="schedule_boot" ;;
+        hourly) field="schedule_hourly" ;;
+        boot) field="schedule_boot" ;;
         *)
             echo "ERROR:invalid_timeframe"
             return 1
@@ -241,13 +257,22 @@ _set_retention() {
         local val="${pair#*=}"
         case "$key" in
             daily)
-                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_daily" "true"; _write_json_field "$config_file" "count_daily" "$val"; } || _write_json_field "$config_file" "schedule_daily" "false"
+                [[ $val -gt 0 ]] && {
+                    _write_json_field "$config_file" "schedule_daily" "true"
+                    _write_json_field "$config_file" "count_daily" "$val"
+                } || _write_json_field "$config_file" "schedule_daily" "false"
                 ;;
             weekly)
-                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_weekly" "true"; _write_json_field "$config_file" "count_weekly" "$val"; } || _write_json_field "$config_file" "schedule_weekly" "false"
+                [[ $val -gt 0 ]] && {
+                    _write_json_field "$config_file" "schedule_weekly" "true"
+                    _write_json_field "$config_file" "count_weekly" "$val"
+                } || _write_json_field "$config_file" "schedule_weekly" "false"
                 ;;
             monthly)
-                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_monthly" "true"; _write_json_field "$config_file" "count_monthly" "$val"; } || _write_json_field "$config_file" "schedule_monthly" "false"
+                [[ $val -gt 0 ]] && {
+                    _write_json_field "$config_file" "schedule_monthly" "true"
+                    _write_json_field "$config_file" "count_monthly" "$val"
+                } || _write_json_field "$config_file" "schedule_monthly" "false"
                 ;;
         esac
     done
@@ -319,8 +344,8 @@ _apply_setup() {
   "parent_device_uuid" : "",
   "do_first_run" : "false",
   "btrfs_mode" : "true",
-  "include_btrfs_home_for_backup" : "false",
-  "include_btrfs_home_for_restore" : "false",
+  "include_btrfs_home_for_backup" : "true",
+  "include_btrfs_home_for_restore" : "true",
   "stop_cron_emails" : "false",
   "schedule_monthly" : "false",
   "schedule_weekly" : "false",
@@ -335,7 +360,7 @@ _apply_setup() {
   "snapshot_size" : "0",
   "snapshot_count" : "0",
   "date_format" : "%Y-%m-%d %H:%M:%S",
-  "exclude" : [],
+  "exclude" : ["+ /home/*/.config/**", "/home/*", "/root"],
   "exclude-apps" : []
 }' | sudo tee "$config_file" >/dev/null
     fi
@@ -350,21 +375,60 @@ _apply_setup() {
                 ;;
             btrfs) _write_json_field "$config_file" "btrfs_mode" "$val" ;;
             daily)
-                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_daily" "true"; _write_json_field "$config_file" "count_daily" "$val"; } || _write_json_field "$config_file" "schedule_daily" "false"
+                [[ $val -gt 0 ]] && {
+                    _write_json_field "$config_file" "schedule_daily" "true"
+                    _write_json_field "$config_file" "count_daily" "$val"
+                } || _write_json_field "$config_file" "schedule_daily" "false"
                 ;;
             weekly)
-                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_weekly" "true"; _write_json_field "$config_file" "count_weekly" "$val"; } || _write_json_field "$config_file" "schedule_weekly" "false"
+                [[ $val -gt 0 ]] && {
+                    _write_json_field "$config_file" "schedule_weekly" "true"
+                    _write_json_field "$config_file" "count_weekly" "$val"
+                } || _write_json_field "$config_file" "schedule_weekly" "false"
                 ;;
             monthly)
-                [[ $val -gt 0 ]] && { _write_json_field "$config_file" "schedule_monthly" "true"; _write_json_field "$config_file" "count_monthly" "$val"; } || _write_json_field "$config_file" "schedule_monthly" "false"
+                [[ $val -gt 0 ]] && {
+                    _write_json_field "$config_file" "schedule_monthly" "true"
+                    _write_json_field "$config_file" "count_monthly" "$val"
+                } || _write_json_field "$config_file" "schedule_monthly" "false"
                 ;;
             boot)
-                [[ $val == "true" || $val == "on" ]] && { _write_json_field "$config_file" "schedule_boot" "true"; _write_json_field "$config_file" "count_boot" "${boot_count:-2}"; } || _write_json_field "$config_file" "schedule_boot" "false"
+                [[ $val == "true" || $val == "on" ]] && {
+                    _write_json_field "$config_file" "schedule_boot" "true"
+                    _write_json_field "$config_file" "count_boot" "${boot_count:-2}"
+                } || _write_json_field "$config_file" "schedule_boot" "false"
                 ;;
             boot_count) _write_json_field "$config_file" "count_boot" "$val" ;;
             exclude_home)
                 _write_json_field "$config_file" "include_btrfs_home_for_backup" "$([ "$val" == "true" ] && echo "false" || echo "true")"
                 _write_json_field "$config_file" "include_btrfs_home_for_restore" "$([ "$val" == "true" ] && echo "false" || echo "true")"
+                local exclude_arr='["/home/*", "/root"]'
+                [[ $val == "false" ]] && exclude_arr='["+ /home/*/.config/**", "/home/*", "/root"]'
+                sudo python3 -c "
+import json
+with open('$config_file') as f:
+    cfg = json.load(f)
+cfg['exclude'] = $exclude_arr
+with open('$config_file', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
+                ;;
+            filters)
+                local arr="["
+                for p in $val; do
+                    [[ -z $p || $p == "+" ]] && continue
+                    [[ $p == +* ]] && p="+ ${p#+}"
+                    arr+="\"$p\", "
+                done
+                arr="${arr%, }]"
+                sudo python3 -c "
+import json
+with open('$config_file') as f:
+    cfg = json.load(f)
+cfg['exclude'] = $arr
+with open('$config_file', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
                 ;;
         esac
     done
@@ -414,7 +478,7 @@ _open_gui() {
     [[ $check == "ERROR"* ]] && echo "$check" && return 1
 
     if command -v timeshift-gtk >/dev/null 2>&1; then
-        timeshift-gtk &>/dev/null &
+        pkexec env WAYLAND_DISPLAY=$WAYLAND_DISPLAY XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR timeshift-gtk &>/dev/null &
         echo "OPENED|timeshift-gtk"
     elif command -v timeshift >/dev/null 2>&1; then
         echo "ERROR:no_gui"
@@ -437,7 +501,7 @@ case "$1" in
     "--retention") _set_retention "$2" ;;
     "--location") _set_location "$2" ;;
     "--list-devices") _list_devices ;;
-    "--apply-setup") _apply_setup "$2" ;;
+    "--apply-setup") shift; _apply_setup "$@" ;;
     "--set-boot") _set_boot "$2" ;;
     "--disk-usage") _get_disk_usage ;;
     "--stats") _get_stats ;;
