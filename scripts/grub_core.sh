@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
+source "$RETRO_DIR/lib/timeshift.sh"
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "grub"
 
@@ -466,6 +467,7 @@ create_timeshift_backup() {
     rx_log_file "info" "Creating Timeshift backup: $comment"
     if sudo timeshift --create --comments "$comment" --tags O >/dev/null 2>&1; then
         rx_log_file "success" "Timeshift backup created"
+        rx_timeshift_limit_by_description "Grub Changes" 3
     else
         rx_log_file "warn" "Timeshift backup failed, continuing anyway"
     fi
