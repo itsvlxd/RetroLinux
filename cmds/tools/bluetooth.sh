@@ -92,7 +92,7 @@ cmd_bluetooth() {
     _bt_status() {
         local stats=$(bash "$bt_script" --status)
 
-        IFS='|' read -r radio_on pwr_mode disc pair chip ver conns adapter <<<"$stats"
+        IFS='|' read -r radio_on pwr_mode disc pair chip ver conns adapter adapter_mac <<<"$stats"
 
         local mode_color="$PINK"
         [[ $pwr_mode == "SAVER" ]] && mode_color="$SUCCESS"
@@ -104,6 +104,7 @@ cmd_bluetooth() {
         rx_table_header "󰂯" "Bluetooth Status"
 
         rx_table_row "󰂳" "Radio Power:" "$radio_label" "$PINK" "20"
+        rx_table_row "󰂳" "Adapter MAC:" "$adapter_mac" "$PINK" "20"
         rx_table_row "󰈐" "Power Mode:" "${pwr_mode}" "$mode_color" "20"
         rx_table_row "󰈐" "Discoverable:" "${disc^^}" "$PINK" "20"
         rx_table_row "󰈐" "Pairable:" "${pair^^}" "$PINK" "20"

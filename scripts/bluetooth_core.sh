@@ -73,7 +73,7 @@ get_bt_status() {
 
     local conns=$(bluetoothctl devices Connected | wc -l)
 
-    echo "${radio_on:-no}|${hw_mode}|${disc:-no}|${pair:-no}|${chip_name}|${ver}|${conns}|${adapter}"
+    echo "${radio_on:-no}|${hw_mode}|${disc:-no}|${pair:-no}|${chip_name}|${ver}|${conns}|${adapter}|${controller_mac}"
 }
 
 get_nearby() {
