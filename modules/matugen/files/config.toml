@@ -1,13 +1,13 @@
 [config]
-contrast = 1.0
+contrast = 0
 base16_backend = "wal"
 source_color_index = 0
 type = "scheme-vibrant"
 
 [templates.hyprland]
 pre_hook = 'bash ~/.config/hypr/scripts/refresh_hyprland.sh'
-input_path = '~/.config/matugen/templates/hyprland.conf'
-output_path = '~/.config/retro/themes/hyprland-colors.conf'
+input_path = '~/.config/matugen/templates/hyprland.lua'
+output_path = '~/.config/retro/themes/hyprland-colors.lua'
 
 [templates.kitty]
 input_path = '~/.config/matugen/templates/kitty.conf'

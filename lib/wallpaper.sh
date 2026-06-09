@@ -151,6 +151,8 @@ rx_wallpaper_apply_colors() {
         matugen image -b wal "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
     fi
 
+    hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
+
     "$RETRO_DIR/retro.sh" app all refresh
 }
 
@@ -174,7 +176,7 @@ rx_wallpaper_get_gpu_env() {
             echo "LIBVA_DRIVER_NAME=iHD VDPAU_DRIVER=va_gl"
             return 0
             ;;
-        auto|*)
+        auto | *)
             if command -v lspci >/dev/null 2>&1; then
                 local gpu_line=$(lspci 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
                 if [[ -n $gpu_line ]]; then
