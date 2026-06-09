@@ -1,5 +1,5 @@
 --------------------
---- Hyprland ---
+---   Hyprland   ---
 --------------------
 --
 -- See https://wiki.hypr.land/Configuring/ for more

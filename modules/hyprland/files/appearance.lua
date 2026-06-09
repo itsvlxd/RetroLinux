@@ -1,5 +1,5 @@
 -------------------------
---- LOOK AND FEEL ---
+---   LOOK AND FEEL   ---
 -------------------------
 --
 -- Refer to https://wiki.hypr.land/Configuring/Variables/
