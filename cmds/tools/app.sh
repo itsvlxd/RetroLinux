@@ -107,6 +107,13 @@ cmd_apps() {
                 (cd "$mod_dir" && bash "$script" >/dev/null 2>&1 &)
             fi
         done
+        for virtual_mod in "$term_val" "$fm_val" "$editor_val"; do
+            local v_script="$RETRO_DIR/modules/$virtual_mod/files/scripts/${action}_${virtual_mod}.sh"
+            if [[ -f "$v_script" ]]; then
+                rx_log "info" "Running ${action} for ${virtual_mod}..."
+                (cd "$RETRO_DIR/modules/$virtual_mod" && bash "$v_script" >/dev/null 2>&1 &)
+            fi
+        done
         return 0
     fi
 
