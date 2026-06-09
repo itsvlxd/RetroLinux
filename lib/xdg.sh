@@ -487,7 +487,7 @@ rx_xdg_get_portal_backend() {
         fi
     fi
 
-    local env_conf="$RETRO_CONFIG/env.conf"
+    local env_conf="$RETRO_CONFIG/env.lua"
     if [[ -f $env_conf ]]; then
         local portal_line=$(grep "xdg-desktop-portal" "$env_conf" 2>/dev/null | head -1)
         if [[ -n $portal_line ]]; then
