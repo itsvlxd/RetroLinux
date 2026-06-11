@@ -44,6 +44,7 @@ run_postinstall() {
 
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${BROWSER_CHOICE:-firefox},filemanager=${FILEMANAGER_CHOICE:-nemo},image=loupe,video=mpv"
     retro wallpaper setup --needed -o "theme=retro"
+    retro theme setup --needed -y
     retro power setup --needed -o "profile=recommended"
     retro font setup --needed -y
     retro audio setup
