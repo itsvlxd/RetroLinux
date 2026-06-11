@@ -83,6 +83,7 @@ rx_theme_set() {
 
 rx_theme_refresh_apps() {
     bash "$RETRO_DIR/retro.sh" app all refresh >/dev/null 2>&1
+    bash "$RETRO_DIR/retro.sh" theme refresh >/dev/null 2>&1
 }
 
 rx_theme_apply_mode() {
@@ -97,6 +98,45 @@ rx_theme_apply_mode() {
     esac
 
     set_var "RETRO_THEME_MODE" "$mode"
+
+    local theme_name="adw-gtk3"
+    local portal_theme="prefer-light"
+    local gtk3_prefer="0"
+    local qt_color=""
+    [[ $mode == "dark" ]] && theme_name="adw-gtk3-dark" && portal_theme="prefer-dark" && gtk3_prefer="1" && qt_color="dark"
+
+    gsettings set org.gnome.desktop.interface color-scheme "$portal_theme" 2>/dev/null
+    gsettings set org.gnome.desktop.interface gtk-theme "$theme_name" 2>/dev/null
+
+    mkdir -p "$HOME/.config/gtk-3.0"
+    cat >"$HOME/.config/gtk-3.0/settings.ini" <<EOF
+[Settings]
+gtk-theme-name=$theme_name
+gtk-application-prefer-dark-theme=$gtk3_prefer
+EOF
+
+    mkdir -p "$HOME/.config/qt5ct" "$HOME/.config/qt6ct"
+    for qt_conf in "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt6ct/qt6ct.conf"; do
+        if [[ ! -f $qt_conf ]]; then
+            mkdir -p "$(dirname "$qt_conf")"
+            cat >"$qt_conf" <<QF
+[Appearance]
+style=kvantum
+color_scheme_path=${qt_color}
+QF
+        else
+            sed -i 's/^style=.*/style=kvantum/' "$qt_conf" 2>/dev/null
+            sed -i 's/color_scheme_path=.*/color_scheme_path='"${qt_color}"'/' "$qt_conf" 2>/dev/null
+        fi
+    done
+
+    local kvantum_theme="KvGnome"
+    [[ $mode == "dark" ]] && kvantum_theme="KvGnomeDark"
+    mkdir -p "$HOME/.config/Kvantum"
+    cat >"$HOME/.config/Kvantum/kvantum.kvconfig" <<EOF
+[General]
+theme=$kvantum_theme
+EOF
 
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")

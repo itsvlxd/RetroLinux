@@ -215,8 +215,39 @@ rx_apply_color_map() {
             file="$output_dir/hyprland-colors.lua"
             if [[ -f $file ]]; then
                 sed -i "s/^\(    ${key} = \"\)0xff[0-9a-f]*\"/\10xff${hex}\"/" "$file"
+                if [[ $key == "primary" ]]; then
+                    sed -i "s/^\(    source_color = \"\)0xff[0-9a-f]*\"/\10xff${hex}\"/" "$file"
+                fi
             fi
         fi
+
+        # gtk3.css / gtk4.css
+        for gtk_file in "$HOME/.config/gtk-3.0/gtk.css" "$HOME/.config/gtk-4.0/gtk.css"; do
+            [[ -f $gtk_file ]] || continue
+            case "$key" in
+                primary)
+                    sed -i "s/^\(@define-color accent_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color accent_bg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    ;;
+                on_primary)
+                    sed -i "s/^\(@define-color accent_fg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    ;;
+                surface)
+                    sed -i "s/^\(@define-color window_bg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color headerbar_bg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color popover_bg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color view_bg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color card_bg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    ;;
+                on_surface)
+                    sed -i "s/^\(@define-color window_fg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color headerbar_fg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color popover_fg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color view_fg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    sed -i "s/^\(@define-color card_fg_color *\)#[0-9a-f]*/\1#${hex}/" "$gtk_file"
+                    ;;
+            esac
+        done
     done <<< "$keys"
 }
 

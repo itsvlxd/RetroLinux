@@ -13,7 +13,7 @@ hl.config({
 
 		-- https://wiki.hypr.land/Configuring/Variables/#variable-types for info about colors
 		col = {
-			active_border = { colors = { colors.source_color, colors.primary }, angle = 45 },
+			active_border = { colors = { colors.source_color, colors.secondary }, angle = 45 },
 			inactive_border = colors.surface_variant,
 		},
 

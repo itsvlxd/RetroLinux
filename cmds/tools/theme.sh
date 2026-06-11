@@ -86,12 +86,16 @@ cmd_theme() {
         "setup")
             rx_setup_parse "$@"
 
+            local theme_exists=false
+            [[ $(get_var "RETRO_THEME_SCHEME" "") != "" ]] && theme_exists=true
+            rx_setup_check_needed "$theme_exists" && return 0
+
             local mode_conf
             mode_conf=$(get_var "RETRO_THEME_MODE" "dark")
             local scheme_conf
             scheme_conf=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
 
-            if [[ $SKIP_PROMPT == "true" ]]; then
+            if [[ $RX_SETUP_YES == "true" ]]; then
                 _theme_call "--mode" "$mode_conf"
                 _theme_call "--theme" "$scheme_conf"
                 rx_log "success" "Theme configuration applied with current defaults"
@@ -109,7 +113,6 @@ cmd_theme() {
             # --- Mode ---
             new_mode=$(rx_input_choice "󰄾" "Color Mode" "$mode_conf" "dark" "light")
 
-            # --- Theme ---
             local -a theme_options=("wallpaper")
             local -a theme_internal=("wallpaper")
             while IFS='|' read -r display_name internal_name description; do
@@ -131,26 +134,20 @@ cmd_theme() {
                 new_scheme="${selected_theme%% — *}"
             fi
 
-            # --- Opacity (float) ---
             new_opacity=$(rx_input "Window opacity" "$(get_var RETRO_OPACITY 1.0)" \
                 '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 0.9)")
 
-            # --- Inactive Opacity (float) ---
             new_inactive_opacity=$(rx_input "Inactive window opacity" "$(get_var RETRO_INACTIVE_OPACITY 0.8)" \
                 '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 0.8)")
 
-            # --- Rounding ---
             new_rounding=$(rx_input_numeric "Window rounding (px)" "$(get_var RETRO_ROUNDING 10)" 0 50)
             new_rounding_power=$(rx_input_numeric "Rounding power" "$(get_var RETRO_ROUNDING_POWER 2)" 1 10)
 
-            # --- Border ---
             new_border=$(rx_input_numeric "Border size (px)" "$(get_var RETRO_BORDER_SIZE 2)" 0 20)
 
-            # --- Gaps ---
             new_gap_in=$(rx_input_numeric "Gaps between windows (px)" "$(get_var RETRO_GAP_IN 5)" 0 50)
             new_gap_out=$(rx_input_numeric "Gaps around workspace (px)" "$(get_var RETRO_GAP_OUT 20)" 0 100)
 
-            # --- Shadow ---
             new_shadow=false
             rx_confirm "Enable shadows?" "$(get_var RETRO_SHADOW true)" && new_shadow=true
             if [[ $new_shadow == "true" ]]; then
@@ -161,7 +158,6 @@ cmd_theme() {
                 new_shadow_power=$(get_var RETRO_SHADOW_RENDER_POWER 3)
             fi
 
-            # --- Blur ---
             new_blur=false
             rx_confirm "Enable blur?" "$(get_var RETRO_BLUR true)" && new_blur=true
             if [[ $new_blur == "true" ]]; then
@@ -175,13 +171,11 @@ cmd_theme() {
                 new_blur_vibrancy=$(get_var RETRO_BLUR_VIBRANCY 0.1696)
             fi
 
-            # --- Kitty ---
             new_kitty_font=$(_pick_font "Select Kitty font" "$(get_var KITTY_FONT "JetBrainsMono Nerd Font")")
             new_kitty_font_size=$(rx_input "Kitty font size" "$(get_var KITTY_FONT_SIZE 9.5)" \
                 '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 9.5)")
             new_kitty_padding=$(rx_input_numeric "Kitty padding (px)" "$(get_var KITTY_PADDING 5)" 0 50)
 
-            # --- Rofi ---
             new_rofi_font=$(_pick_font "Select Rofi font" "$(get_var ROFI_FONT "JetBrainsMono Nerd Font")")
             new_rofi_font_size=$(rx_input "Rofi font size" "$(get_var ROFI_FONT_SIZE 9.5)" \
                 '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 9.5)")
@@ -189,7 +183,6 @@ cmd_theme() {
             new_rofi_rounding=$(rx_input_numeric "Rofi rounding (px)" "$(get_var ROFI_ROUNDING 10)" 0 50)
             new_rofi_padding=$(rx_input_numeric "Rofi padding (px)" "$(get_var ROFI_PADDING 5)" 0 50)
 
-            # --- Summary ---
             rx_setup_summary "󰄈" "Theme Configuration Summary" \
                 "Mode" "$new_mode" \
                 "Color Scheme" "$new_scheme" \
@@ -205,7 +198,6 @@ cmd_theme() {
 
             rx_setup_confirm || return 0
 
-            # --- Apply ---
             set_var "RETRO_THEME_MODE" "$new_mode"
             set_var "RETRO_THEME_SCHEME" "$new_scheme"
 
@@ -344,6 +336,27 @@ cmd_theme() {
             fi
             ;;
 
+        "refresh")
+            local mode
+            mode=$(get_var "RETRO_THEME_MODE" "dark")
+            local theme="adw-gtk3"
+            [[ $mode == "dark" ]] && theme="adw-gtk3-dark"
+            gsettings set org.gnome.desktop.interface color-scheme 'prefer-light' 2>/dev/null
+            gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null
+            if command -v xsettingsd >/dev/null 2>&1; then
+                mkdir -p "$HOME/.config/xsettingsd"
+                cat > "$HOME/.config/xsettingsd/xsettingsd.conf" <<EOF
+Net/ThemeName "Adwaita"
+EOF
+                timeout 0.1s xsettingsd 2>/dev/null
+                cat > "$HOME/.config/xsettingsd/xsettingsd.conf" <<EOF
+Net/ThemeName "$theme"
+EOF
+                timeout 0.1s xsettingsd 2>/dev/null
+            fi
+            rx_log "success" "GTK/Qt theme reloaded into all open apps"
+            ;;
+
         *)
             rx_help_usage "retro theme <command>"
             rx_help_commands "Available commands"
@@ -355,6 +368,7 @@ cmd_theme() {
             rx_help_cmd "set <key> <value>" "Set an individual aesthetic value (e.g. 'set opacity 0.95')"
             rx_help_cmd "font {set|size}" "Set font family or size (interactive app picker)"
             rx_help_cmd "apply-colors" "Regenerate colors from wallpaper"
+            rx_help_cmd "refresh" "Live-reload GTK3/GTK4 theme into running apps"
             rx_help_examples
             rx_help_example "retro theme status" "Show current configuration"
             rx_help_example "retro theme setup" "Interactive configuration wizard"
