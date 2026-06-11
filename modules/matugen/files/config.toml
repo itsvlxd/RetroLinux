@@ -12,7 +12,6 @@ output_path = '~/.config/retro/themes/hyprland-colors.lua'
 [templates.kitty]
 input_path = '~/.config/matugen/templates/kitty.conf'
 output_path = '~/.config/retro/themes/kitty-colors.conf'
-post_hook = 'bash ~/.config/kitty/scripts/refresh_kitty.sh'
 
 [templates.nvim]
 input_path = '~/.config/matugen/templates/nvim.json'
@@ -21,7 +20,6 @@ output_path = '~/.config/retro/themes/nvim-colors.json'
 [templates.rofi]
 input_path = '~/.config/matugen/templates/rofi.rasm'
 output_path = '~/.config/retro/themes/rofi-colors.rasi'
-post_hook = 'bash ~/.config/rofi/scripts/refresh_rofi.sh'
 
 [templates.colors-css]
 input_path = '~/.config/matugen/templates/colors.css'

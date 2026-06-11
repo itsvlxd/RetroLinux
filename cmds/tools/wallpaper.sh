@@ -99,11 +99,14 @@ cmd_wallpaper() {
             ;;
 
         "list")
-            local theme=$(get_var "RETRO_THEME")
-            [[ -z $theme || $theme == "null" ]] && theme="retro"
+            local collection
+            collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
 
-            local target_dir="$wall_dir/$theme"
-            [[ ! -d $target_dir ]] && target_dir="$wall_dir"
+            local target_dir="$wall_dir/$collection"
+            if [[ $collection == "all" ]]; then
+                target_dir="$wall_dir (all collections)"
+            fi
+            [[ ! -d $target_dir && $collection != "all" ]] && target_dir="$wall_dir"
 
             declare -a names
             declare -a resolutions
@@ -222,6 +225,38 @@ cmd_wallpaper() {
             bash "$wall_script" --picker
             ;;
 
+        "collection")
+            local col_value="$value"
+            if [[ -z $col_value ]]; then
+                local current
+                current=$(bash "$wall_script" --collection 2>/dev/null | grep "^current=" | cut -d= -f2)
+                rx_log "info" "Current collection: ${PINK}${current:-retro}${RESET}"
+                return 0
+            fi
+
+            case "$col_value" in
+                list)
+                    rx_log "info" "Available wallpaper collections:"
+                    while IFS= read -r col; do
+                        [[ -z $col ]] && continue
+                        rx_log "info" "  ${PINK}${col}${RESET}"
+                    done < <(bash "$wall_script" --collection list 2>/dev/null)
+                    ;;
+                *)
+                    local result
+                    result=$(bash "$wall_script" --collection "$col_value" 2>/dev/null)
+                    local new_col
+                    new_col=$(echo "$result" | grep "^collection=" | cut -d= -f2)
+                    if [[ -n $new_col ]]; then
+                        rx_log "success" "Wallpaper collection set to: ${PINK}${new_col}${RESET}"
+                    else
+                        rx_log "error" "Failed to set collection."
+                        return 1
+                    fi
+                    ;;
+            esac
+            ;;
+
         "cache")
             local cache_target=$(echo "$value" | awk '{print $1}')
             rx_log "info" "Building the frame cache... this might take a second."
@@ -330,7 +365,8 @@ cmd_wallpaper() {
         "status")
             local current_wall=$(get_var "WALL_CURRENT")
             local engine=$(get_var "CLR_ENGINE")
-            local theme=$(get_var "RETRO_THEME")
+            local collection
+            collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
             local static_forced=$(get_var "WALL_STATIC_FORCED")
             local static_on_bat=$(get_var "WALL_STATIC_ON_BAT")
             local static_on_saver=$(get_var "WALL_STATIC_ON_SAVER")
@@ -342,7 +378,7 @@ cmd_wallpaper() {
 
             : ${current_wall:="None"}
             : ${engine:="matugen"}
-            : ${theme:="retro"}
+            : ${collection:="retro"}
             : ${static_forced:="false"}
             : ${static_on_bat:="false"}
             : ${static_on_saver:="true"}
@@ -393,7 +429,7 @@ cmd_wallpaper() {
 
             rx_table_header "󰸉" "Wallpaper Status"
             rx_table_row "󰀻" "Name:" "$wall_name" "$PINK" "14"
-            rx_table_row "󰏘" "Theme Pool:" "${theme^}" "$PINK" "14"
+            rx_table_row "󰏘" "Collection:" "${collection^}" "$PINK" "14"
             rx_table_row "$type_icon" "Style:" "$type" "$PINK" "14"
             rx_table_row "󰓅" "Engine:" "${engine^^}" "$PINK" "14"
             rx_table_row "󰏤" "Paused:" "$paused_status" "$paused_color" "14"
@@ -411,15 +447,17 @@ cmd_wallpaper() {
 
             local config_data
             config_data=$(bash "$wall_script" --setup-get 2>/dev/null)
-            local current_theme current_wallpaper
+            local current_theme current_collection current_wallpaper
             while IFS='=' read -r key val; do
                 case "$key" in
                     theme) current_theme="$val" ;;
+                    collection) current_collection="$val" ;;
                     wallpaper) current_wallpaper="$val" ;;
                 esac
             done <<<"$config_data"
 
             : "${current_theme:=retro}"
+            : "${current_collection:=retro}"
             : "${current_wallpaper:=Not set}"
 
             local config_exists=true
@@ -490,6 +528,7 @@ cmd_wallpaper() {
             rx_help_cmd "list" "List all wallpapers with resolution info"
             rx_help_cmd "sync" "Sync wallpapers from repository and optimize"
             rx_help_cmd "picker" "Launch interactive wallpaper picker"
+            rx_help_cmd "collection [name|list]" "View or switch wallpaper collection"
             rx_help_cmd "cache [value]" "Build animated wallpaper cache"
             rx_help_cmd "restore" "Restore previous wallpaper"
             rx_help_cmd "res" "Set wallpaper render resolution"
@@ -500,6 +539,9 @@ cmd_wallpaper() {
             rx_help_examples
             rx_help_example "retro wallpaper set bmw-m760" "Set wallpaper by name"
             rx_help_example "retro wallpaper slideshow on 300" "Enable slideshow 5min"
+            rx_help_example "retro wallpaper collection retro" "Switch to retro collection"
+            rx_help_example "retro wallpaper collection all" "Browse all collections"
+            rx_help_example "retro wallpaper collection list" "List available collections"
             rx_help_example "retro wallpaper res" "Set render resolution"
             rx_help_spacer
             ;;

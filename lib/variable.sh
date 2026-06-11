@@ -5,13 +5,8 @@
 _VARS_FILE="$RETRO_CONFIG/variables.sh"
 
 declare -A _RETRO_VARS_CACHE
-_VARS_FILE_MTIME=0
 
 _rx_parse_vars_file() {
-    local current_mtime
-    current_mtime=$(stat -c %Y "$_VARS_FILE" 2>/dev/null || echo 0)
-    [[ $current_mtime -eq $_VARS_FILE_MTIME ]] && return
-    _VARS_FILE_MTIME=$current_mtime
     _RETRO_VARS_CACHE=()
     if [[ -f $_VARS_FILE ]]; then
         while IFS= read -r line; do
@@ -51,10 +46,9 @@ set_var() {
     else
         echo "export $key=\"$value\"" >>"$_VARS_FILE"
     fi
-    _VARS_FILE_MTIME=$(stat -c %Y "$_VARS_FILE" 2>/dev/null || echo 0)
 }
 
 reload_vars() {
-    _VARS_FILE_MTIME=0
+    _RETRO_VARS_CACHE=()
     _rx_parse_vars_file
 }

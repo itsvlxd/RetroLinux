@@ -21,8 +21,9 @@ add_wallpaper() {
         return 1
     fi
 
-    local theme=$(get_var "RETRO_THEME" "retro")
-    local target_dir="$WALL_DIR/$theme"
+    local collection
+    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+    local target_dir="$WALL_DIR/$collection"
     mkdir -p "$target_dir"
 
     local filename=$(basename "$source_file")
@@ -46,15 +47,12 @@ slideshow_next() {
     local next_wall
     while IFS= read -r wall; do
         [[ -z $wall ]] && continue
+        [[ $wall == "$current" ]] && continue
         if check_wallpaper_resolution "$wall"; then
             next_wall="$wall"
             break
         fi
-    done < <(find "$target_dir" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null |
-        grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" |
-        grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" |
-        grep -vF "$current" |
-        shuf)
+    done < <(rx_wallpaper_list_files | shuf)
 
     if [[ -n $next_wall ]]; then
         rx_log_file "INFO" "Slideshow advancing to: $(rx_format_string "$(basename "$next_wall")")"
@@ -213,9 +211,8 @@ list_wallpapers_with_resolution() {
     local valid_count=0
     local invalid_count=0
 
-    for f in "$target_dir"/*; do
-        [[ -d $f ]] && continue
-        [[ -f $f || -L $f ]] || continue
+    while IFS= read -r f; do
+        [[ -z $f ]] && continue
 
         local filename=$(basename "$f")
 
@@ -237,7 +234,7 @@ list_wallpapers_with_resolution() {
         if [[ $show_all == "true" || $status == "MISMATCH" ]]; then
             echo "$status|$filename|${file_res:-unknown}"
         fi
-    done
+    done < <(rx_wallpaper_list_files)
 
     echo "valid=$valid_count|invalid=$invalid_count"
 }
@@ -262,7 +259,12 @@ set_wallpaper() {
         fi
     fi
 
-    rx_wallpaper_start "$input" "${2:-false}"
+    if ! rx_wallpaper_start "$input" "${2:-false}"; then
+        rx_log_file "ERROR" "Failed to start wallpaper: $input"
+        echo "ERR|wallpaper_start_failed|$input"
+        return 1
+    fi
+
     echo "OK|$input"
 }
 
@@ -354,12 +356,13 @@ launch_picker() {
     local theme_conf="$HOME/.config/rofi/themes/gallery.rasi"
     local list=""
     local target_dir=$(rx_wallpaper_get_theme_dir)
+    local collection
+    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
 
     declare -A wall_map
 
-    for f in "$target_dir"/*; do
-        [[ -d $f ]] && continue
-        [[ -f $f || -L $f ]] || continue
+    while IFS= read -r f; do
+        [[ -z $f ]] && continue
 
         local filename=$(basename "$f")
 
@@ -372,7 +375,7 @@ launch_picker() {
 
         wall_map["$display"]="$f"
         list+="${display}\0icon\x1f${thumb}\n"
-    done
+    done < <(rx_wallpaper_list_files)
 
     if [[ -z $list ]]; then
         echo "result=error|reason=no_files_found|path=$target_dir"
@@ -389,7 +392,7 @@ launch_picker() {
 
     local folder_name="${target_dir##*/}"
 
-    local choice=$(printf "%b" "$list" | rofi -dmenu -i -p "󰸉 Wallpapers (${folder_name^})" -theme "$theme_conf" -theme-str "
+    local choice=$(printf "%b" "$list" | rofi -dmenu -i -p "󰸉 Wallpapers (${collection^})" -theme "$theme_conf" -theme-str "
                 window { background-color: #${base_bg}${alpha}; } 
                 inputbar { background-color: #${base_bg}${alpha}; }  
                 element selected.normal { background-color: #${base_bg_alt}${alpha_alt}; }
@@ -408,11 +411,10 @@ resolve_name() {
     local display_name="$1"
     [[ -z $display_name ]] && return 1
 
-    local target_dir=$(rx_wallpaper_get_theme_dir)
     local search_pattern=$(echo "$display_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
 
-    for f in "$target_dir"/*; do
-        [[ -f $f || -L $f ]] || continue
+    while IFS= read -r f; do
+        [[ -z $f ]] && continue
         local filename=$(basename "$f")
         [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
         local raw="${filename%.*}"
@@ -421,7 +423,7 @@ resolve_name() {
             echo "$f"
             return 0
         fi
-    done
+    done < <(rx_wallpaper_list_files)
     return 1
 }
 
@@ -527,22 +529,21 @@ case "$1" in
         if [[ -n $2 ]]; then
             rx_wallpaper_generate_cache "$2" >/dev/null
         else
-            target_dir=$(rx_wallpaper_get_theme_dir)
-            for f in "$target_dir"/*; do
-                [[ -f $f || -L $f ]] && rx_wallpaper_generate_cache "$f" >/dev/null
-            done
+            while IFS= read -r f; do
+                [[ -z $f ]] && continue
+                rx_wallpaper_generate_cache "$f" >/dev/null
+            done < <(rx_wallpaper_list_files)
         fi
         ;;
     "--precache-all")
         mkdir -p "$FRAME_CACHE"
-        target_dir=$(rx_wallpaper_get_theme_dir)
-        for f in "$target_dir"/*; do
-            [[ -f $f || -L $f ]] || continue
+        while IFS= read -r f; do
+            [[ -z $f ]] && continue
             ext="${f##*.}"
             if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
                 rx_wallpaper_generate_cache "$f" >/dev/null
             fi
-        done
+        done < <(rx_wallpaper_list_files)
         ;;
     "--restore") restore_wallpaper "${2:-false}" ;;
     "--static") static_wallpaper "$2" ;;
@@ -554,19 +555,21 @@ case "$1" in
         if [[ ${2:-} == "--with-resolution" || ${2:-} == "-r" ]]; then
             list_wallpapers_with_resolution true
         else
-            ls -1 "$target_dir"
+            while IFS= read -r f; do
+                [[ -z $f ]] && continue
+                echo "$(basename "$f")"
+            done < <(rx_wallpaper_list_files)
         fi
         ;;
     "--list-with-res")
-        target_dir=$(rx_wallpaper_get_theme_dir)
-        for f in "$target_dir"/*; do
-            [[ -f $f || -L $f ]] || continue
+        while IFS= read -r f; do
+            [[ -z $f ]] && continue
             filename=$(basename "$f")
             [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
             res=$(get_image_resolution "$f")
             [[ -z $res ]] && res="unknown"
             echo "$filename|$res"
-        done
+        done < <(rx_wallpaper_list_files)
         ;;
     "--resolve-name")
         resolve_name "$2"
@@ -584,23 +587,56 @@ case "$1" in
     "--gpu")
         gpu_wallpaper "$2"
         ;;
+    "--collection")
+        new_collection="$2"
+        current_collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+
+        if [[ -z $new_collection ]]; then
+            echo "current=$current_collection"
+            exit 0
+        fi
+
+        if [[ $new_collection == "list" ]]; then
+            found=false
+            for d in "$WALL_DIR"/*/; do
+                [[ -d $d ]] || continue
+                echo "$(basename "$d")"
+                found=true
+            done
+            [[ $found == false ]] && echo "(no collections yet)"
+            exit 0
+        fi
+
+        set_var "RETRO_WALL_COLLECTION" "$new_collection"
+
+        if [[ $new_collection != "all" ]]; then
+            target="$WALL_DIR/$new_collection"
+            mkdir -p "$target"
+        fi
+
+        restore_wallpaper >/dev/null 2>&1
+        echo "collection=$new_collection"
+        ;;
     "--picker") launch_picker ;;
     "--setup-get")
-        local theme=$(get_var "RETRO_THEME" "retro")
-        local current=$(get_var "WALL_CURRENT" "")
+        theme=$(get_var "RETRO_THEME" "retro")
+        current=$(get_var "WALL_CURRENT" "")
+        collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
         echo "theme=${theme}"
+        echo "collection=${collection}"
         echo "wallpaper=$(basename "$current")"
         ;;
     "--setup-apply")
-        local theme="${2:-retro}"
+        theme="${2:-retro}"
         sync_wallpapers
         set_var "RETRO_THEME" "$theme"
+        set_var "RETRO_WALL_COLLECTION" "$theme"
 
         declare -A default_walls=(
             ["retro"]="car-in-neon-gas-station.mp4"
             ["black_and_white"]="monochrome-spider-man.mp4"
         )
-        local def_wall="${default_walls[$theme]}"
+        def_wall="${default_walls[$theme]}"
         if [[ -z $def_wall || ! -f "$WALL_DIR/$theme/$def_wall" ]]; then
             def_wall=$(ls -1 "$WALL_DIR/$theme" 2>/dev/null | grep -vE '\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$' | head -n 1)
         fi
@@ -616,10 +652,11 @@ case "$1" in
         # TODO: Add animated preview thumbnail generation for all wallpapers in the theme pool
         rm -rf "$FRAME_CACHE"
         mkdir -p "$FRAME_CACHE"
-        local target_dir="$WALL_DIR/$theme"
-        for f in "$target_dir"/*; do
-            [[ -f $f || -L $f ]] && rx_wallpaper_generate_cache "$f" >/dev/null
-        done
+        target_dir="$WALL_DIR/$theme"
+        while IFS= read -r f; do
+            [[ -z $f ]] && continue
+            rx_wallpaper_generate_cache "$f" >/dev/null
+        done < <(rx_wallpaper_list_files)
 
         echo "OK|configured|theme=${theme}|wallpaper=${def_wall:-none}"
         rx_log_file "success" "Wallpaper configured (theme=${theme})"
