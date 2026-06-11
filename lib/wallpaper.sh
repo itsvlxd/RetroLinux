@@ -28,20 +28,47 @@ rx_wallpaper_generate_cache() {
 }
 
 rx_wallpaper_get_theme_dir() {
-    local theme=$(get_var "RETRO_THEME")
-    [[ -z $theme || $theme == "null" ]] && theme="retro"
+    local collection
+    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
 
-    local target="$WALL_DIR/$theme"
+    if [[ $collection == "all" ]]; then
+        echo "$WALL_DIR"
+        return 0
+    fi
+
+    local target="$WALL_DIR/$collection"
     if [[ -d $target ]]; then
         echo "$target"
     else
-        echo "$WALL_DIR"
+        mkdir -p "$target"
+        echo "$target"
+    fi
+}
+
+rx_wallpaper_list_files() {
+    local target_dir
+    target_dir=$(rx_wallpaper_get_theme_dir)
+    local collection
+    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+
+    if [[ $collection == "all" ]]; then
+        find "$target_dir" -maxdepth 2 \( -type f -o -type l \) 2>/dev/null \
+            | grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" \
+            | grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" \
+            | sort
+    else
+        find "$target_dir" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null \
+            | grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" \
+            | grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" \
+            | sort
     fi
 }
 
 rx_wallpaper_resolve_path() {
     local input="$1"
     local theme_dir=$(rx_wallpaper_get_theme_dir)
+    local collection
+    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
 
     if [[ -f $input ]]; then
         echo "$input"
@@ -49,6 +76,14 @@ rx_wallpaper_resolve_path() {
         echo "$theme_dir/$input"
     elif [[ -f "$WALL_DIR/$input" ]]; then
         echo "$WALL_DIR/$input"
+    elif [[ $collection == "all" ]]; then
+        local found
+        found=$(find "$WALL_DIR" -maxdepth 2 -name "$input" -type f 2>/dev/null | head -1)
+        if [[ -n $found ]]; then
+            echo "$found"
+        else
+            return 1
+        fi
     else
         return 1
     fi
@@ -128,7 +163,19 @@ rx_wallpaper_apply_colors() {
     local filename="$2"
     local is_same_wall="$3"
 
+    local scheme
+    scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
+    # Fallback: read file directly in case cache is stale
+    if [[ $scheme == "wallpaper" ]]; then
+        local file_scheme
+        file_scheme=$(grep "^export RETRO_THEME_SCHEME=" "$RETRO_CONFIG/variables.sh" 2>/dev/null | head -1 | cut -d'"' -f2)
+        [[ -n $file_scheme ]] && scheme="$file_scheme"
+    fi
+    [[ $scheme != "wallpaper" ]] && return 0
     [[ $is_same_wall == "true" ]] && return 0
+
+    local mode
+    mode=$(get_var "RETRO_THEME_MODE" "dark")
 
     local color_cache="$FRAME_CACHE/${filename}.colors"
     local scheme_type=""
@@ -146,9 +193,10 @@ rx_wallpaper_apply_colors() {
     fi
 
     if [[ $scheme_type == "monochrome" ]]; then
-        matugen image -b wal "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
+        matugen image -b wal --mode "$mode" "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1 || return 1
+        rx_grayscale_output
     else
-        matugen image -b wal "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
+        matugen image -b wal --mode "$mode" "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1 || return 1
     fi
 
     hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
@@ -256,6 +304,11 @@ rx_wallpaper_start() {
     local is_same_wall=false
     [[ $current_wall == "$wall_path" ]] && is_same_wall=true
 
+    local scheme
+    scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
+    local needs_colors=false
+    [[ $scheme == "wallpaper" ]] && needs_colors=true
+
     local gen_timestamp=$(date +%s%N)
     echo "$gen_timestamp" >/tmp/retro_wallpaper_gen
 
@@ -263,13 +316,16 @@ rx_wallpaper_start() {
 
     rx_wallpaper_set_image "$static_source" "$quick" "$is_first_load"
 
-    (
-        pkill mpvpaper 2>/dev/null
-        sleep 1
+    if [[ $needs_colors == "true" || $is_video == "true" ]]; then
+        (
+            pkill mpvpaper 2>/dev/null
+            sleep 1
 
-        rx_wallpaper_apply_colors "$static_source" "$filename" "$is_same_wall"
+            if [[ $needs_colors == "true" ]]; then
+                rx_wallpaper_apply_colors "$static_source" "$filename" "$is_same_wall"
+            fi
 
-        if [[ $is_video == "true" ]]; then
+            if [[ $is_video == "true" ]]; then
             local current_gen=$(cat /tmp/retro_wallpaper_gen 2>/dev/null)
             if [[ $current_gen != "$gen_timestamp" ]]; then
                 return 0
@@ -295,6 +351,7 @@ rx_wallpaper_start() {
             rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename"
         fi
     ) &>/dev/null &
+fi
 }
 
 rx_wallpaper_restore() {

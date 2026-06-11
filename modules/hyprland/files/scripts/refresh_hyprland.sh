@@ -15,6 +15,12 @@ GAP_IN=$(get_var "RETRO_GAP_IN" "5")
 GAP_OUT=$(get_var "RETRO_GAP_OUT" "20")
 TRANS=$(get_var "RETRO_OPACITY" "1.0")
 INACTIVE_TRANS=$(get_var "RETRO_INACTIVE_OPACITY" "0.8")
+ROUNDING_POWER=$(get_var "RETRO_ROUNDING_POWER" "2")
+SHADOW_RANGE=$(get_var "RETRO_SHADOW_RANGE" "4")
+SHADOW_RENDER_POWER=$(get_var "RETRO_SHADOW_RENDER_POWER" "3")
+BLUR_SIZE=$(get_var "RETRO_BLUR_SIZE" "3")
+BLUR_PASSES=$(get_var "RETRO_BLUR_PASSES" "3")
+BLUR_VIBRANCY=$(get_var "RETRO_BLUR_VIBRANCY" "0.1696")
 
 if [ "$SHADOW" = "true" ] || [ "$SHADOW" = "1" ]; then SHADOW_BOOL="true"; else SHADOW_BOOL="false"; fi
 if [ "$BLUR" = "true" ] || [ "$BLUR" = "1" ]; then BLUR_BOOL="true"; else BLUR_BOOL="false"; fi
@@ -27,15 +33,22 @@ return {
     retro_inactive_opacity = $INACTIVE_TRANS,
     retro_border_size = $BORDER,
     retro_rounding = $ROUNDING,
+    retro_rounding_power = $ROUNDING_POWER,
     retro_gap_in = $GAP_IN,
     retro_gap_out = $GAP_OUT,
     retro_shadow = $SHADOW_BOOL,
+    retro_shadow_range = $SHADOW_RANGE,
+    retro_shadow_render_power = $SHADOW_RENDER_POWER,
     retro_blur = $BLUR_BOOL,
+    retro_blur_size = $BLUR_SIZE,
+    retro_blur_passes = $BLUR_PASSES,
+    retro_blur_vibrancy = $BLUR_VIBRANCY,
 }
 EOF
 
 if mv "$TEMP_FILE" "$OUTPUT"; then
     chmod 644 "$OUTPUT"
+    hyprctl reload >/dev/null 2>&1
 else
     rm -f "$TEMP_FILE"
     exit 1

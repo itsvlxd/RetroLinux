@@ -28,25 +28,25 @@ hl.config({
 	-- https://wiki.hypr.land/Configuring/Variables/#decoration
 	decoration = {
 		rounding = vars.retro_rounding,
-		rounding_power = 2,
+		rounding_power = vars.retro_rounding_power,
 
 		-- Change transparency of focused and unfocused windows
 		active_opacity = vars.retro_opacity,
-		inactive_opacity = 0.8,
+		inactive_opacity = vars.retro_inactive_opacity,
 
 		shadow = {
 			enabled = vars.retro_shadow,
-			range = 4,
-			render_power = 3,
+			range = vars.retro_shadow_range,
+			render_power = vars.retro_shadow_render_power,
 			color = colors.shadow,
 		},
 
 		-- https://wiki.hypr.land/Configuring/Variables/#blur
 		blur = {
 			enabled = vars.retro_blur,
-			size = 3,
-			passes = 3,
-			vibrancy = 0.1696,
+			size = vars.retro_blur_size,
+			passes = vars.retro_blur_passes,
+			vibrancy = vars.retro_blur_vibrancy,
 		},
 	},
 
