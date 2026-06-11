@@ -645,11 +645,6 @@ case "$1" in
             rx_wallpaper_start "$WALL_DIR/$theme/$def_wall" "true" &>/dev/null &
         fi
 
-        # TODO: Auto-detect per-monitor resolution and pre-configure WALL_RES_MAP
-        # TODO: Generate theme-specific matugen color template on setup
-        # TODO: Add size-optimized video re-encoding to target resolution
-        # TODO: Build a proper theme management tool (themes folder, icon packs, qtile/gtk integration)
-        # TODO: Add animated preview thumbnail generation for all wallpapers in the theme pool
         rm -rf "$FRAME_CACHE"
         mkdir -p "$FRAME_CACHE"
         target_dir="$WALL_DIR/$theme"

@@ -494,9 +494,6 @@ cmd_wallpaper() {
                 rx_setup_confirm || return 0
             fi
 
-            # TODO: Add wallpaper preview picker (rofi/fzf-based) before confirming apply
-            # TODO: Add per-resolution video optimization step during setup
-
             rx_log "info" "Applying wallpaper configuration..."
             local result
             result=$(bash "$wall_script" --setup-apply "$theme_input" 2>/dev/null)

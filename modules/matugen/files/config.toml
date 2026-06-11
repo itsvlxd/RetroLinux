@@ -24,3 +24,19 @@ output_path = '~/.config/retro/themes/rofi-colors.rasi'
 [templates.colors-css]
 input_path = '~/.config/matugen/templates/colors.css'
 output_path = '~/.config/retro/themes/colors.css'
+
+
+[templates.gtk2]
+pre_hook = 'mkdir -p ~/.config/gtk-2.0'
+input_path = '~/.config/matugen/templates/gtk.css'
+output_path = '~/.config/gtk-2.0/gtk.css'
+
+[templates.gtk3]
+pre_hook = 'mkdir -p ~/.config/gtk-3.0'
+input_path = '~/.config/matugen/templates/gtk.css'
+output_path = '~/.config/gtk-3.0/gtk.css'
+
+[templates.gtk4]
+pre_hook = 'mkdir -p ~/.config/gtk-4.0'
+input_path = '~/.config/matugen/templates/gtk.css'
+output_path = '~/.config/gtk-4.0/gtk.css'
