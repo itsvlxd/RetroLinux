@@ -196,6 +196,7 @@ cmd_theme() {
             local new_blur new_blur_size new_blur_passes new_blur_vibrancy
             local new_kitty_font new_kitty_font_size new_kitty_padding
             local new_rofi_font new_rofi_font_size new_rofi_border new_rofi_rounding new_rofi_padding
+            local new_browser_theme
 
             # --- Mode ---
             new_mode=$(rx_input_choice "󰄾" "Color Mode" "$mode_conf" "dark" "light")
@@ -270,6 +271,10 @@ cmd_theme() {
             new_rofi_rounding=$(rx_input_numeric "Rofi rounding (px)" "$(get_var ROFI_ROUNDING 10)" 0 50)
             new_rofi_padding=$(rx_input_numeric "Rofi padding (px)" "$(get_var ROFI_PADDING 5)" 0 50)
 
+            new_browser_theme=false
+            rx_confirm "Enable browser theme theming for web pages? Requires Firefox/Zen" \
+                "$(get_var RETRO_BROWSER_THEME true)" && new_browser_theme=true
+
             rx_setup_summary "󰄈" "Theme Configuration Summary" \
                 "Mode" "$new_mode" \
                 "Color Scheme" "$new_scheme" \
@@ -281,7 +286,8 @@ cmd_theme() {
                 "Shadow" "$new_shadow" \
                 "Blur" "$new_blur" \
                 "Kitty Font" "$new_kitty_font" \
-                "Rofi Font" "$new_rofi_font"
+                "Rofi Font" "$new_rofi_font" \
+                "Browser Theme" "$new_browser_theme"
 
             rx_setup_confirm || return 0
 
@@ -312,6 +318,9 @@ cmd_theme() {
             _theme_call "--set" "rofi_border" "$new_rofi_border"
             _theme_call "--set" "rofi_rounding" "$new_rofi_rounding"
             _theme_call "--set" "rofi_padding" "$new_rofi_padding"
+
+            set_var "RETRO_BROWSER_THEME" "$new_browser_theme"
+            [[ $new_browser_theme == "true" ]] && _theme_call "--deploy-browsers"
 
             rx_setup_success "󰄈" "Theme Configured" \
                 "Mode" "$new_mode" \
