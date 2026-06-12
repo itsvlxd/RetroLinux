@@ -13,10 +13,6 @@ output_path = '~/.config/retro/themes/hyprland-colors.lua'
 input_path = '~/.config/matugen/templates/kitty.conf'
 output_path = '~/.config/retro/themes/kitty-colors.conf'
 
-[templates.nvim]
-input_path = '~/.config/matugen/templates/nvim.json'
-output_path = '~/.config/retro/themes/nvim-colors.json'
-
 [templates.rofi]
 input_path = '~/.config/matugen/templates/rofi.rasm'
 output_path = '~/.config/retro/themes/rofi-colors.rasi'
@@ -24,7 +20,6 @@ output_path = '~/.config/retro/themes/rofi-colors.rasi'
 [templates.colors-css]
 input_path = '~/.config/matugen/templates/colors.css'
 output_path = '~/.config/retro/themes/colors.css'
-
 
 [templates.gtk2]
 pre_hook = 'mkdir -p ~/.config/gtk-2.0'
@@ -40,3 +35,13 @@ output_path = '~/.config/gtk-3.0/gtk.css'
 pre_hook = 'mkdir -p ~/.config/gtk-4.0'
 input_path = '~/.config/matugen/templates/gtk.css'
 output_path = '~/.config/gtk-4.0/gtk.css'
+
+[templates.kvantum_kvconfig]
+pre_hook = 'mkdir -p ~/.config/Kvantum/matugen'
+input_path = '~/.config/matugen/templates/kvantum-colors.kvconfig'
+output_path = '~/.config/Kvantum/matugen/matugen.kvconfig'
+
+[templates.kvantum_svg]
+pre_hook = 'mkdir -p ~/.config/Kvantum/matugen'
+input_path = '~/.config/matugen/templates/kvantum-colors.svg'
+output_path = '~/.config/Kvantum/matugen/matugen.svg'
