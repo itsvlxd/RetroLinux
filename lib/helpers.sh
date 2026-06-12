@@ -244,7 +244,7 @@ rx_apply_color_map() {
             esac
         done
 
-        local kvantum_file="$HOME/.config/Kvantum/matugen/matugen.kvconfig"
+        local kvantum_file="$HOME/.config/Kvantum/retro/retro.kvconfig"
         if [[ -f $kvantum_file ]]; then
             case "$key" in
                 primary)
