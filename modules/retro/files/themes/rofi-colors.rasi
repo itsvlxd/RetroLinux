@@ -1,28 +1,28 @@
 * {
     background:         #17111aFF;
-    background-alt:     #4c444fFF;
+    background-alt:     #3a323dFF;
 
-    foreground:         #ffffffFF;
+    foreground:         #ebdeedFF;
     selected:           #a83be9FF;
-    active:             #ffebf4FF;
-    urgent:             #ffece9FF;
+    active:             #f1b4dcFF;
+    urgent:             #ffb4abFF;
 
-    cursor-color:       #fcebffFF;
-    border-color:       #fcebffFF;
-    inactive-border:    #f9ecfaFF;
+    cursor-color:       #e5b4ffFF;
+    border-color:       #e5b4ffFF;
+    inactive-border:    #988d9aFF;
 
     black:              #0f0f12FF;
     red:                #b051ddFF;
     green:              #23152eFF;
     yellow:             #321a42FF;
-    blue:               #fcebffFF;
+    blue:               #e5b4ffFF;
     magenta:            #e5b4ffFF;
     cyan:               #1b1328FF;
-    white:              #ffffffFF;
+    white:              #cfc3d0FF;
     highlight:          #a83be9FF;
 
     bright-black:       #542c69FF;
     bright-red:         #6b3586FF;
     bright-blue:        #f5d9ffFF;
-    bright-magenta:     #7200aaFF;
+    bright-magenta:     #9300daFF;
 }

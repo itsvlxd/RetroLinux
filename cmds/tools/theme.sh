@@ -310,22 +310,81 @@ cmd_theme() {
             ;;
 
         "list")
-            rx_table_header "󰄈" "Available Color Schemes"
-            local wallpaper_desc="Sync with current wallpaper (matugen)"
-            [[ ${#wallpaper_desc} -gt 20 ]] && wallpaper_desc="${wallpaper_desc:0:20}.."
-            printf " ${PINK}󰊪 ${RESET}%-16s${PINK}%-22s${RESET}${MUTE}%s${RESET}\n" "wallpaper" "—" "$wallpaper_desc"
-            while IFS='|' read -r display_name internal_name description; do
-                [[ -z $internal_name ]] && continue
-                local def_data
-                def_data=$(_theme_call "--theme-data" "$internal_name")
-                local author
-                author=$(echo "$def_data" | cut -d'|' -f3)
-                local desc_short="${description:0:20}"
-                [[ ${#description} -gt 20 ]] && desc_short="${desc_short}.."
-                printf " ${PINK}󰊪 ${RESET}%-16s${PINK}%-20s${RESET}${MUTE}%s${RESET}\n" "$internal_name" "$author" "$desc_short"
-            done < <(_theme_call "--list-themes")
-            rx_table_separator
-            rx_table_spacer
+            _color_dot() {
+                local hex="$1"
+                if [[ -z $hex ]]; then
+                    echo -ne "${MUTE}●${RESET}"
+                    return
+                fi
+                hex="${hex#\#}"
+                local r=$((16#${hex:0:2})) g=$((16#${hex:2:2})) b=$((16#${hex:4:2}))
+                echo -ne "\e[38;2;${r};${g};${b}m●\e[0m"
+            }
+            _color_text() {
+                local hex="$1" text="$2"
+                if [[ -z $hex ]]; then
+                    echo -ne "${PINK}${text}${RESET}"
+                    return
+                fi
+                hex="${hex#\#}"
+                local r=$((16#${hex:0:2})) g=$((16#${hex:2:2})) b=$((16#${hex:4:2}))
+                echo -ne "\e[38;2;${r};${g};${b}m${text}\e[0m"
+            }
+
+            echo -e "\n ${PINK}󰄈 Available Color Schemes${RESET}"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────────────────────────────────${RESET}"
+
+            local lua_file="$HOME/.config/retro/themes/hyprland-colors.lua"
+            local css_file="$HOME/.config/retro/themes/colors.css"
+            local wall_primary=""
+            local -a wall_dots=()
+            if [[ -f "$lua_file" ]]; then
+                wall_primary=$(grep -oP '^\s*primary\s*=\s*"0x\K[0-9a-fA-F]{6}' "$lua_file" | head -1)
+            fi
+            if [[ -f "$css_file" ]]; then
+                for i in 0 1 2 3 4 5 6 7; do
+                    local c
+                    c=$(grep -oP "@define-color color${i}\s+\K#[0-9a-fA-F]+" "$css_file" | head -1)
+                    c="${c#\#}"
+                    wall_dots+=("$c")
+                done
+            fi
+
+            echo -n " ${PINK}󰊪${RESET} "
+            _color_text "$wall_primary" "wallpaper"
+            local pad=$((22 - 9))
+            printf "%${pad}s" ""
+            echo -ne "${GRAY}-${RESET}"
+            local auth_pad=$((24 - 1))
+            printf "%${auth_pad}s" ""
+            for dot in "${wall_dots[@]:-}"; do
+                _color_dot "$dot"
+                echo -n " "
+            done
+            echo
+
+            while IFS='|' read -r display internal author primary red green yellow blue magenta cyan white black; do
+                [[ -z $internal ]] && continue
+                echo -n " ${PINK}󰊪${RESET} "
+                _color_text "$primary" "$display"
+                local name_len=${#display}
+                local name_pad=$((22 - name_len))
+                [[ $name_pad -lt 1 ]] && name_pad=1
+                printf "%${name_pad}s" ""
+                echo -ne "${GRAY}${author}${RESET}"
+                local auth_len=${#author}
+                local auth_pad=$((24 - auth_len))
+                [[ $auth_pad -lt 1 ]] && auth_pad=1
+                printf "%${auth_pad}s" ""
+                for c in "$red" "$green" "$yellow" "$blue" "$magenta" "$cyan" "$white" "$black"; do
+                    _color_dot "$c"
+                    echo -n " "
+                done
+                echo
+            done < <(_theme_call "--list-display")
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────────────────────────────────${RESET}"
+            echo
             ;;
 
         "font")

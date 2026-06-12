@@ -38,6 +38,55 @@ _list_themes() {
     done
 }
 
+_list_displays() {
+    local files=("$THEMES_DIR"/*.json)
+    if [[ ! -e ${files[0]} ]]; then
+        return
+    fi
+    for f in "${files[@]}"; do
+        local base display author primary
+        local red green yellow blue magenta cyan white black
+        base=$(basename "$f" .json)
+        display=$(jq -r '.name // empty' "$f" 2>/dev/null)
+        author=$(jq -r '.author // empty' "$f" 2>/dev/null | sed 's/ *([^)]* variant) *//')
+        primary=$(jq -r '.color_map.primary // empty' "$f" 2>/dev/null)
+
+        if [[ -n $primary ]]; then
+            red=$(jq -r '.color_map.red // empty' "$f" 2>/dev/null)
+            green=$(jq -r '.color_map.green // empty' "$f" 2>/dev/null)
+            yellow=$(jq -r '.color_map.yellow // empty' "$f" 2>/dev/null)
+            blue=$(jq -r '.color_map.blue // empty' "$f" 2>/dev/null)
+            magenta=$(jq -r '.color_map.magenta // empty' "$f" 2>/dev/null)
+            cyan=$(jq -r '.color_map.cyan // empty' "$f" 2>/dev/null)
+            white=$(jq -r '.color_map.white // empty' "$f" 2>/dev/null)
+            black=$(jq -r '.color_map.black // empty' "$f" 2>/dev/null)
+        else
+            local palette_path palette_file
+            palette_path=$(jq -r '.palette // empty' "$f" 2>/dev/null)
+            if [[ -n $palette_path ]]; then
+                palette_file="$THEMES_DIR/$palette_path"
+                if command -v convert >/dev/null 2>&1 && [[ -f $palette_file ]]; then
+                    local -a sampled
+                    mapfile -t sampled < <(convert "$palette_file" -sample 8x1! -depth 8 txt:- 2>/dev/null | grep -oP '#[0-9A-Fa-f]{6}')
+                    if [[ ${#sampled[@]} -ge 1 ]]; then
+                        primary="${sampled[0]#\#}"
+                        red="${sampled[0]#\#}"
+                        green="${sampled[1]#\#}"
+                        yellow="${sampled[2]#\#}"
+                        blue="${sampled[3]#\#}"
+                        magenta="${sampled[4]#\#}"
+                        cyan="${sampled[5]#\#}"
+                        white="${sampled[6]#\#}"
+                        black="${sampled[7]#\#}"
+                    fi
+                fi
+            fi
+        fi
+
+        echo "${display:-$base}|$base|${author:--}|$primary|$red|$green|$yellow|$blue|$magenta|$cyan|$white|$black"
+    done
+}
+
 rx_theme_set() {
     local key="$1"
     local value="$2"
@@ -320,6 +369,9 @@ case "$1" in
         ;;
     "--list-themes")
         _list_themes
+        ;;
+    "--list-display")
+        _list_displays
         ;;
     "--theme-data")
         _load_theme_def "$2"
