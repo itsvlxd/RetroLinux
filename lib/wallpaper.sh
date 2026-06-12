@@ -202,6 +202,7 @@ rx_wallpaper_apply_colors() {
     hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
 
     "$RETRO_DIR/retro.sh" app all refresh
+    rx_set_papirus_folder_color
 }
 
 rx_wallpaper_get_gpu_env() {

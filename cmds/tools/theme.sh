@@ -81,10 +81,18 @@ cmd_theme() {
             rx_table_row "󰊪" "Padding:" "$(get_var ROFI_PADDING 5)" "$PINK" "22"
             rx_table_separator
             rx_table_spacer
+
+            rx_table_header "󰄈" "GTK Desktop"
+            rx_table_row "󰊪" "GTK Theme:" "$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null || echo N/A)" "$PINK" "22"
+            rx_table_row "󰊪" "Icon Theme:" "$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null || echo N/A)" "$PINK" "22"
+            rx_table_row "󰊪" "Color Scheme:" "$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || echo N/A)" "$PINK" "22"
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "setup")
             rx_setup_parse "$@"
+            _theme_call "--papirus-setup"
 
             local theme_exists=false
             [[ $(get_var "RETRO_THEME_SCHEME" "") != "" ]] && theme_exists=true
@@ -341,6 +349,7 @@ cmd_theme() {
             mode=$(get_var "RETRO_THEME_MODE" "dark")
             local theme="adw-gtk3"
             [[ $mode == "dark" ]] && theme="adw-gtk3-dark"
+            gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null
             gsettings set org.gnome.desktop.interface color-scheme 'prefer-light' 2>/dev/null
             gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null
             if command -v xsettingsd >/dev/null 2>&1; then
@@ -353,6 +362,9 @@ EOF
 Net/ThemeName "$theme"
 EOF
                 timeout 0.1s xsettingsd 2>/dev/null
+            fi
+            if command -v kvantummanager >/dev/null 2>&1; then
+                kvantummanager --set matugen >/dev/null 2>&1 &
             fi
             rx_log "success" "GTK/Qt theme reloaded into all open apps"
             ;;

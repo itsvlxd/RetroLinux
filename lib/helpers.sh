@@ -186,7 +186,6 @@ rx_apply_color_map() {
         local hex="${value#\#}"
         local slot="${slot_map[$key]:-}"
 
-        # kitty-colors.conf
         local file="$output_dir/kitty-colors.conf"
         if [[ -f $file ]]; then
             if [[ -n $slot ]]; then
@@ -196,21 +195,18 @@ rx_apply_color_map() {
             fi
         fi
 
-        # colors.css
         file="$output_dir/colors.css"
         if [[ -f $file ]]; then
             local css_key="${slot:-$key}"
             sed -i "s/\(@define-color ${css_key} *\)#[0-9a-f]*/\1#${hex}/" "$file"
         fi
 
-        # rofi-colors.rasi
         file="$output_dir/rofi-colors.rasi"
         if [[ -f $file ]]; then
             local rofi_key="${key//_/-}"
             sed -i "s/^\(    ${rofi_key}: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
         fi
 
-        # hyprland-colors.lua (Material You roles only, not convenience aliases)
         if [[ -z $slot ]]; then
             file="$output_dir/hyprland-colors.lua"
             if [[ -f $file ]]; then
@@ -221,7 +217,6 @@ rx_apply_color_map() {
             fi
         fi
 
-        # gtk3.css / gtk4.css
         for gtk_file in "$HOME/.config/gtk-3.0/gtk.css" "$HOME/.config/gtk-4.0/gtk.css"; do
             [[ -f $gtk_file ]] || continue
             case "$key" in
@@ -248,7 +243,31 @@ rx_apply_color_map() {
                     ;;
             esac
         done
-    done <<< "$keys"
+
+        local kvantum_file="$HOME/.config/Kvantum/matugen/matugen.kvconfig"
+        if [[ -f $kvantum_file ]]; then
+            case "$key" in
+                primary)
+                    sed -i "s/^\(highlight\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    sed -i "s/^\(link\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    ;;
+                surface)
+                    sed -i "s/^\(window\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    sed -i "s/^\(dark\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    ;;
+                on_surface)
+                    sed -i "s/^\(text\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    sed -i "s/^\(window\.text\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    sed -i "s/^\(button\.text\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    sed -i "s/^\(tooltip\.text\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    sed -i "s/^\(progress\.indicator\.text\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    ;;
+                surface_variant)
+                    sed -i "s/^\(mid\.light\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    ;;
+            esac
+        fi
+    done <<<"$keys"
 }
 
 check_dep() {
@@ -259,8 +278,11 @@ check_dep() {
         local helper=$(get_var "PKG_HELPER")
         : "${helper:="yay"}"
         rx_log "error" "Missing required dependency: ${PINK}$cmd${RESET}"
-        rx_confirm "Would you like to install [${GRAY}$pkgs${RESET}] using $helper?" "N" || { rx_log "info" "Dependency required. Aborting."; return 1; }
-        
+        rx_confirm "Would you like to install [${GRAY}$pkgs${RESET}] using $helper?" "N" || {
+            rx_log "info" "Dependency required. Aborting."
+            return 1
+        }
+
         rx_log "info" "Installing..."
         $helper -S $pkgs
         if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -296,3 +318,71 @@ rx_grayscale_output() {
     done < <(find "$output_dir" -maxdepth 1 -type f 2>/dev/null)
 }
 
+rx_set_papirus_folder_color() {
+    local hex="$1"
+    local scheme
+    scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
+
+    if [[ -z $hex ]]; then
+        if [[ $scheme == "wallpaper" ]]; then
+            hex=$(grep -oP 'source_color = "0x[0-9a-f]{2}\K[0-9a-f]{6}' "$HOME/.config/retro/themes/hyprland-colors.lua" 2>/dev/null | head -1)
+        else
+            local theme_file="$RETRO_DIR/themes/${scheme}.json"
+            [[ -f $theme_file ]] && hex=$(jq -r '.color_map.primary // empty' "$theme_file" 2>/dev/null | sed 's/^#//')
+        fi
+    fi
+    [[ -z $hex ]] && return 0
+
+    local hsl
+    hsl=$(convert xc:"#${hex}" -colorspace HSL txt:- 2>/dev/null | tail -1)
+    local hue=$(echo "$hsl" | grep -oP 'hsl\(\K[^,]+')
+    local sat=$(echo "$hsl" | grep -oP 'hsl\([^,]+,\K[^,]+' | tr -d '%')
+    local lum=$(echo "$hsl" | grep -oP ',\K[^%]+(?=%\))')
+
+    local color="nordic"
+    if [[ -n $hue && -n $sat ]]; then
+        if (($(echo "$sat < 15" | bc -l))); then
+            if (($(echo "$lum < 20" | bc -l))); then
+                color="black"
+            elif (($(echo "$lum > 80" | bc -l))); then
+                color="white"
+            else
+                color="nordic"
+            fi
+        elif (($(echo "$hue < 15" | bc -l))); then
+            color="red"
+        elif (($(echo "$hue < 30" | bc -l))); then
+            color="carmine"
+        elif (($(echo "$hue < 45" | bc -l))); then
+            color="deeporange"
+        elif (($(echo "$hue < 55" | bc -l))); then
+            color="orange"
+        elif (($(echo "$hue < 70" | bc -l))); then
+            color="paleorange"
+        elif (($(echo "$hue < 100" | bc -l))); then
+            color="yellow"
+        elif (($(echo "$hue < 150" | bc -l))); then
+            color="green"
+        elif (($(echo "$hue < 180" | bc -l))); then
+            color="teal"
+        elif (($(echo "$hue < 200" | bc -l))); then
+            color="cyan"
+        elif (($(echo "$hue < 215" | bc -l))); then
+            color="darkcyan"
+        elif (($(echo "$hue < 245" | bc -l))); then
+            color="blue"
+        elif (($(echo "$hue < 265" | bc -l))); then
+            color="indigo"
+        elif (($(echo "$hue < 290" | bc -l))); then
+            color="violet"
+        elif (($(echo "$hue < 320" | bc -l))); then
+            color="magenta"
+        elif (($(echo "$hue < 335" | bc -l))); then
+            color="pink"
+        else
+            color="red"
+        fi
+    fi
+
+    command -v papirus-folders >/dev/null 2>&1 && sudo -n papirus-folders -C "$color" --theme Papirus-Dark >/dev/null 2>&1
+}
