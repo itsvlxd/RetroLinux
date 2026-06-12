@@ -139,7 +139,7 @@ rx_theme_apply_mode() {
     local mode="$1"
 
     case "$mode" in
-        dark|light) ;;
+        dark | light) ;;
         *)
             rx_log "error" "Mode must be ${PINK}dark${RESET} or ${PINK}light${RESET}"
             return 1
@@ -172,7 +172,7 @@ EOF
     mkdir -p "$HOME/.config/Kvantum"
     cat >"$HOME/.config/Kvantum/kvantum.kvconfig" <<EOF
 [General]
-theme=matugen
+theme=retro
 EOF
     command -v kvantummanager >/dev/null 2>&1 && kvantummanager --set matugen >/dev/null 2>&1 &
 
@@ -360,14 +360,14 @@ rx_theme_deploy_browsers() {
                     done
                 fi
             fi
-        } > "$chrome_dir/userContent.css"
+        } >"$chrome_dir/userContent.css"
 
         local user_js="$profile_dir/user.js"
         local pref_line='user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);'
         if [[ -f $user_js ]]; then
-            grep -qF "$pref_line" "$user_js" 2>/dev/null || echo "$pref_line" >> "$user_js"
+            grep -qF "$pref_line" "$user_js" 2>/dev/null || echo "$pref_line" >>"$user_js"
         else
-            echo "$pref_line" > "$user_js"
+            echo "$pref_line" >"$user_js"
         fi
 
         rx_log "info" "Browser chrome deployed: ${PINK}${browser}${RESET} → ${GRAY}$profile_dir${RESET}"
@@ -402,7 +402,7 @@ rx_theme_browser_status() {
             status="${MUTE}no chrome${RESET}"
         fi
         echo "${browser}|${path}|${status}"
-    done <<< "$profiles"
+    done <<<"$profiles"
 }
 
 rx_theme_apply_colors() {

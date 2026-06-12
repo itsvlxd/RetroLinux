@@ -37,16 +37,16 @@ input_path = '~/.config/matugen/templates/gtk.css'
 output_path = '~/.config/gtk-4.0/gtk.css'
 
 [templates.kvantum_kvconfig]
-pre_hook = 'mkdir -p ~/.config/Kvantum/matugen'
-input_path = '~/.config/matugen/templates/kvantum-colors.kvconfig'
-output_path = '~/.config/Kvantum/matugen/matugen.kvconfig'
+pre_hook = 'mkdir -p ~/.config/Kvantum/retro'
+input_path = '~/.config/matugen/templates/kvantum.kvconfig'
+output_path = '~/.config/Kvantum/retro/retro.kvconfig'
 
 [templates.kvantum_svg]
 pre_hook = 'mkdir -p ~/.config/Kvantum/matugen'
-input_path = '~/.config/matugen/templates/kvantum-colors.svg'
-output_path = '~/.config/Kvantum/matugen/matugen.svg'
+input_path = '~/.config/matugen/templates/kvantum.svg'
+output_path = '~/.config/Kvantum/retro/retro.svg'
 
-[templates.firefox-website-colors]
+[templates.firefox]
 input_path = "~/.config/matugen/templates/firefox.css"
 output_path = "~/.config/retro/themes/firefox.css"
 
