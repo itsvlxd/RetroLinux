@@ -1,0 +1,11 @@
+{
+  "title": "Cava Audio Visualizer",
+  "description": "Cava — Console Audio Visualizer for Alsa/MPD/Pulse. Color themes generated via matugen.",
+  "type": "extra",
+  "access": "user",
+  "defaults": false,
+  "mode": "all",
+  "config": "./files",
+  "install": "~/.config/cava",
+  "overwrite": false
+}

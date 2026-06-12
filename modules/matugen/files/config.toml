@@ -45,3 +45,9 @@ output_path = '~/.config/Kvantum/matugen/matugen.kvconfig'
 pre_hook = 'mkdir -p ~/.config/Kvantum/matugen'
 input_path = '~/.config/matugen/templates/kvantum-colors.svg'
 output_path = '~/.config/Kvantum/matugen/matugen.svg'
+
+[templates.cava]
+pre_hook = 'mkdir -p ~/.config/cava/themes'
+input_path = '~/.config/matugen/templates/cava-colors.ini'
+output_path = '~/.config/cava/themes/retro'
+post_hook = 'pkill -USR1 cava 2>/dev/null || true'
