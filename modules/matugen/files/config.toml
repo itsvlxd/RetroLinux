@@ -46,6 +46,10 @@ pre_hook = 'mkdir -p ~/.config/Kvantum/matugen'
 input_path = '~/.config/matugen/templates/kvantum-colors.svg'
 output_path = '~/.config/Kvantum/matugen/matugen.svg'
 
+[templates.firefox-website-colors]
+input_path = "~/.config/matugen/templates/firefox.css"
+output_path = "~/.config/retro/themes/firefox.css"
+
 [templates.cava]
 pre_hook = 'mkdir -p ~/.config/cava/themes'
 input_path = '~/.config/matugen/templates/cava-colors.ini'

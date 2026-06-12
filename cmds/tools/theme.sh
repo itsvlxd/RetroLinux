@@ -130,7 +130,20 @@ cmd_theme() {
             _status_line "󰏗" "Rofi Launcher:" \
                 "$(get_var ROFI_FONT "JetBrainsMono Nerd Font") ($(get_var ROFI_FONT_SIZE 9.5)pt) │ Border: $(get_var ROFI_BORDER_SIZE 2) │ Round: $(get_var ROFI_ROUNDING 10)"
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+            local browser_status
+            browser_status=$(_theme_call "--browser-status" 2>/dev/null)
+            if [[ -n $browser_status ]]; then
+                while IFS='|' read -r browser path status_str; do
+                    local browser_label="${browser^}"
+                    _status_line "󰈹" "Browser ${browser_label}:" "$status_str"
+                done <<< "$browser_status"
+                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+            fi
+            ;;
+
+        "browsers")
+            _theme_call "--deploy-browsers"
+            rx_log "success" "Browser chrome deployed to all detected profiles"
             ;;
 
         "setup")
@@ -482,6 +495,7 @@ EOF
             rx_help_cmd "set <key> <value>" "Set an individual aesthetic value (e.g. 'set opacity 0.95')"
             rx_help_cmd "font {set|size}" "Set font family or size (interactive app picker)"
             rx_help_cmd "apply-colors" "Regenerate colors from wallpaper"
+            rx_help_cmd "browsers" "Deploy colors and website themes to Firefox/Zen profiles"
             rx_help_cmd "refresh" "Live-reload GTK3/GTK4 theme into running apps"
             rx_help_examples
             rx_help_example "retro theme status" "Show current configuration"
@@ -489,6 +503,7 @@ EOF
             rx_help_example "retro theme mode dark" "Switch to dark mode"
             rx_help_example "retro theme set catppuccin" "Apply Catppuccin color scheme"
             rx_help_example "retro theme set opacity 0.95" "Set window opacity"
+            rx_help_example "retro theme browsers" "Deploy colors + website themes to browsers"
             rx_help_example "retro theme font set" "Set font for an app"
             rx_help_spacer
             ;;

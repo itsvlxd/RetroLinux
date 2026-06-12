@@ -1,0 +1,135 @@
+@-moz-document domain("reddit.com") {
+    :root {
+        /* Backgrounds */
+        --color-neutral-background: var(--background) !important;
+        --color-neutral-background-weak: var(--surface_container_low) !important;
+        --color-neutral-background-hover: var(--surface_container_high) !important;
+        --color-neutral-background-selected: var(--surface_container_highest) !important;
+        --color-neutral-background-container: var(--surface_container) !important;
+        --color-neutral-background-container-strong: var(--surface_bright) !important;
+        --color-neutral-background-strong: var(--surface_dim) !important;
+
+        /* Text */
+        --color-neutral-content-strong: var(--on_surface) !important;
+        --color-neutral-content: var(--on_surface_variant) !important;
+        --color-neutral-content-weak: var(--on_surface_variant) !important;
+        --color-neutral-content-disabled: var(--surface_variant) !important;
+
+        /* Borders */
+        --color-neutral-border-strong: var(--outline) !important;
+        --color-neutral-border-medium: var(--outline_variant) !important;
+        --color-neutral-border: var(--outline_variant) !important;
+        --color-neutral-border-weak: var(--surface_variant) !important;
+
+        /* Primary / Accent */
+        --color-primary-background: var(--primary) !important;
+        --color-primary-plain: var(--primary) !important;
+        --color-primary-plain-hover: var(--primary_fixed_dim) !important;
+
+        /* Secondary */
+        --color-secondary-background: var(--secondary_container) !important;
+        --color-secondary-plain: var(--secondary) !important;
+
+        /* Semantic */
+        --color-danger-background: var(--error_container) !important;
+        --color-danger-content: var(--error) !important;
+        --color-success-background: var(--tertiary_container) !important;
+        --color-success-content: var(--tertiary) !important;
+        --color-warning-background: var(--secondary_container) !important;
+        --color-warning-content: var(--secondary) !important;
+        --color-caution-background: var(--error_container) !important;
+        --color-caution-plain: var(--error) !important;
+
+        /* Links */
+        --color-a-default: var(--primary) !important;
+        --color-a-hover: var(--primary_fixed_dim) !important;
+        --color-a-visited: var(--tertiary) !important;
+
+        /* Vote buttons */
+        --color-upvote-content: var(--primary) !important;
+        --color-downvote-content: var(--error) !important;
+
+        /* Brand */
+        --color-brand-background: var(--primary) !important;
+        --color-global-gold: var(--secondary) !important;
+        --color-global-orangered: var(--primary) !important;
+
+        /* UI */
+        --color-scrim: var(--scrim) !important;
+        --color-media-background: var(--surface_variant) !important;
+        --color-ui-canvas: var(--surface_variant) !important;
+        --color-ui-modalbackground: var(--surface_container_high) !important;
+
+        /* Buttons */
+        --button-color-background: var(--primary) !important;
+        --button-color-text: var(--on_primary) !important;
+
+        /* Tone scale (for layered elements) */
+        --color-tone-1: var(--surface_container_lowest) !important;
+        --color-tone-2: var(--surface_container_low) !important;
+        --color-tone-3: var(--surface_container) !important;
+        --color-tone-4: var(--surface_container_high) !important;
+        --color-tone-5: var(--surface_container_highest) !important;
+        --color-tone-6: var(--surface_bright) !important;
+        --color-tone-7: var(--surface_dim) !important;
+
+        /* Interactive states */
+        --color-interactive-background-disabled: var(--surface_variant) !important;
+        --color-interactive-content-disabled: var(--on_surface_variant) !important;
+    }
+
+    /* Fix category badges */
+    [data-testid="post-container"] [data-testid="post-category-badge"],
+    ._1wz4Hf_nVfTbyJfVHkHH3b {
+        background-color: var(--surface_container_high) !important;
+        color: var(--on_surface) !important;
+    }
+
+    /* Create Post button */
+    a[href^="/submit"] {
+        background-color: var(--primary) !important;
+        color: var(--on_primary) !important;
+    }
+
+    /* Community sidebar */
+    ._3X6vR3MZRqhMAEgxPslm79,
+    [data-testid="community-detail"] {
+        background-color: var(--surface_container) !important;
+        border: 1px solid var(--outline_variant) !important;
+    }
+
+    /* Comment sections */
+    ._1OVn1MhxMyozlKemVdXd3H,
+    [data-testid="comment"] {
+        background-color: var(--surface_container_low) !important;
+    }
+
+    /* Search bar */
+    input[type="text"],
+    input[type="search"],
+    [data-testid="search-input"] {
+        background-color: var(--surface_container) !important;
+        color: var(--on_surface_container) !important;
+        border: 1px solid var(--outline_variant) !important;
+    }
+
+    /* Dropdowns / popovers */
+    [role="menu"],
+    [data-testid="dropdown-menu"],
+    ._3iQ2gQnCV_j_8bsHNaZkX2 {
+        background-color: var(--surface_container_high) !important;
+        border: 1px solid var(--outline_variant) !important;
+    }
+
+    /* Modal overlays */
+    [role="dialog"],
+    ._2lvC2VhP0DL2nOBnZ6qE6r {
+        background-color: var(--surface_container_high) !important;
+        color: var(--on_surface) !important;
+    }
+
+    /* Scrollbar thumb (Firefox) */
+    * {
+        scrollbar-color: var(--outline_variant) transparent !important;
+    }
+}
