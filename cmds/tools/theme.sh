@@ -37,57 +37,100 @@ cmd_theme() {
 
     case "$action" in
         "status")
-            rx_table_header "󰄈" "Theme Configuration"
-            local mode
+            _status_line() {
+                local icon="$1" label="$2" value="$3"
+                printf "  ${PINK}%s${RESET} %-22s ${PINK}%s${RESET}\n" "$icon" "$label" "$value"
+            }
+            _lighten() {
+                local h="$1" p="${2:-60}"
+                local r=$((16#${h:0:2})) g=$((16#${h:2:2})) b=$((16#${h:4:2}))
+                r=$((r + (255 - r) * p / 100))
+                g=$((g + (255 - g) * p / 100))
+                b=$((b + (255 - b) * p / 100))
+                printf "%02x%02x%02x" $r $g $b
+            }
+            _darken() {
+                local h="$1" p="${2:-75}"
+                local r=$((16#${h:0:2})) g=$((16#${h:2:2})) b=$((16#${h:4:2}))
+                r=$((r * (100 - p) / 100))
+                g=$((g * (100 - p) / 100))
+                b=$((b * (100 - p) / 100))
+                printf "%02x%02x%02x" $r $g $b
+            }
+
+            local mode scheme wallpaper
             mode=$(get_var "RETRO_THEME_MODE" "dark")
-            local scheme
+            mode="${mode^}"
             scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
             if [[ $scheme != "wallpaper" ]]; then
-                local def_data
+                local def_data display_name
                 def_data=$(_theme_call "--theme-data" "$scheme")
-                local display_name
                 display_name=$(echo "$def_data" | cut -d'|' -f2)
                 [[ -n $display_name ]] && scheme="$display_name"
             fi
-            rx_table_row "󰊪" "Mode:" "$mode" "$PINK" "22"
-            rx_table_row "󰊪" "Color Scheme:" "$scheme" "$PINK" "22"
-            rx_table_separator
-            rx_table_spacer
+            scheme="${scheme^}"
 
-            rx_table_header "󰄈" "Hyprland Look"
-            rx_table_row "󰊪" "Opacity:" "$(get_var RETRO_OPACITY 1.0)" "$PINK" "22"
-            rx_table_row "󰊪" "Inactive Opacity:" "$(get_var RETRO_INACTIVE_OPACITY 0.8)" "$PINK" "22"
-            rx_table_row "󰊪" "Rounding:" "$(get_var RETRO_ROUNDING 10)" "$PINK" "22"
-            rx_table_row "󰊪" "Rounding Power:" "$(get_var RETRO_ROUNDING_POWER 2)" "$PINK" "22"
-            rx_table_row "󰊪" "Border:" "$(get_var RETRO_BORDER_SIZE 2)" "$PINK" "22"
-            rx_table_row "󰊪" "Gap In/Out:" "$(get_var RETRO_GAP_IN 5) / $(get_var RETRO_GAP_OUT 20)" "$PINK" "22"
-            rx_table_row "󰊪" "Shadow:" "$(get_var RETRO_SHADOW true) (range: $(get_var RETRO_SHADOW_RANGE 4), power: $(get_var RETRO_SHADOW_RENDER_POWER 3))" "$PINK" "22"
-            rx_table_row "󰊪" "Blur:" "$(get_var RETRO_BLUR true) (size: $(get_var RETRO_BLUR_SIZE 3), passes: $(get_var RETRO_BLUR_PASSES 3))" "$PINK" "22"
-            rx_table_separator
-            rx_table_spacer
+            echo -e "\n ${PINK}󰏘 Theme Status${RESET}"
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
-            rx_table_header "󰄈" "Kitty"
-            rx_table_row "󰊪" "Font:" "$(get_var KITTY_FONT "JetBrainsMono Nerd Font")" "$PINK" "22"
-            rx_table_row "󰊪" "Font Size:" "$(get_var KITTY_FONT_SIZE 9.5)" "$PINK" "22"
-            rx_table_row "󰊪" "Padding:" "$(get_var KITTY_PADDING 5)" "$PINK" "22"
-            rx_table_separator
-            rx_table_spacer
+            _status_line "󰊪" "Environment:" "$mode / $scheme"
 
-            rx_table_header "󰄈" "Rofi"
-            rx_table_row "󰊪" "Font:" "$(get_var ROFI_FONT "JetBrainsMono Nerd Font")" "$PINK" "22"
-            rx_table_row "󰊪" "Font Size:" "$(get_var ROFI_FONT_SIZE 9.5)" "$PINK" "22"
-            rx_table_row "󰊪" "Border:" "$(get_var ROFI_BORDER_SIZE 2)" "$PINK" "22"
-            rx_table_row "󰊪" "Rounding:" "$(get_var ROFI_ROUNDING 10)" "$PINK" "22"
-            rx_table_row "󰊪" "Padding:" "$(get_var ROFI_PADDING 5)" "$PINK" "22"
-            rx_table_separator
-            rx_table_spacer
+            wallpaper=$(get_var "WALL_CURRENT" "")
+            if [[ -n $wallpaper ]]; then
+                wallpaper="${wallpaper##*/}"
+                wallpaper="${wallpaper%.*}"
+            else
+                wallpaper="(none)"
+            fi
+            _status_line "󰸉" "Wallpaper:" "$wallpaper"
 
-            rx_table_header "󰄈" "GTK Desktop"
-            rx_table_row "󰊪" "GTK Theme:" "$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null || echo N/A)" "$PINK" "22"
-            rx_table_row "󰊪" "Icon Theme:" "$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null || echo N/A)" "$PINK" "22"
-            rx_table_row "󰊪" "Color Scheme:" "$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || echo N/A)" "$PINK" "22"
-            rx_table_separator
-            rx_table_spacer
+            local lua_file="$HOME/.config/retro/themes/hyprland-colors.lua"
+            local primary_hex=""
+            if [[ -f "$lua_file" ]]; then
+                primary_hex=$(grep -oP '^\s*primary\s*=\s*"0x\K[0-9a-fA-F]{6}' "$lua_file" | head -1)
+            fi
+            if [[ -n $primary_hex ]]; then
+                local light_hex dark_hex
+                light_hex=$(_lighten "$primary_hex" 60)
+                dark_hex=$(_darken "$primary_hex" 75)
+                _status_line "󰏘" "Accent Palette:" \
+                    "Primary: #${primary_hex} │ Light: #${light_hex} │ Dark: #${dark_hex}"
+            else
+                _status_line "󰏘" "Accent Palette:" "(not generated yet)"
+            fi
+
+            local gtk_theme qt_theme
+            gtk_theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null || echo "N/A")
+            gtk_theme="${gtk_theme//\'/}"
+            qt_theme=$(grep '^theme=' "$HOME/.config/Kvantum/kvantum.kvconfig" 2>/dev/null | cut -d= -f2 || echo "N/A")
+            _status_line "󰉋" "Toolkits:" "GTK: ${gtk_theme} │ Qt: Kvantum (${qt_theme})"
+
+            local icon_theme cursor_theme
+            icon_theme=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null || echo "N/A")
+            icon_theme="${icon_theme//\'/}"
+            cursor_theme=$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null || echo "N/A")
+            cursor_theme="${cursor_theme//\'/}"
+            _status_line "󰉏" "Asset Themes:" "Icons: ${icon_theme} │ Cursor: ${cursor_theme}"
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+
+            _status_line "󰃠" "Window Opacity:" \
+                "$(get_var RETRO_OPACITY 1.0) active │ $(get_var RETRO_INACTIVE_OPACITY 0.8) inactive"
+            _status_line "󰋙" "Layout Geometry:" \
+                "Borders: $(get_var RETRO_BORDER_SIZE 2)px │ Rounding: $(get_var RETRO_ROUNDING 10)px (pwr: $(get_var RETRO_ROUNDING_POWER 2))"
+            _status_line "󰢤" "Workspace Gaps:" \
+                "$(get_var RETRO_GAP_IN 5) inner │ $(get_var RETRO_GAP_OUT 20) outer"
+            _status_line "󰏗" "Compositor FX:" \
+                "Shadows: $(get_var RETRO_SHADOW true) │ Blur: $(get_var RETRO_BLUR true)"
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
+
+            _status_line "󰛖" "Kitty Terminal:" \
+                "$(get_var KITTY_FONT "JetBrainsMono Nerd Font") ($(get_var KITTY_FONT_SIZE 9.5)pt) │ Padding: $(get_var KITTY_PADDING 15)"
+            _status_line "󰏗" "Rofi Launcher:" \
+                "$(get_var ROFI_FONT "JetBrainsMono Nerd Font") ($(get_var ROFI_FONT_SIZE 9.5)pt) │ Border: $(get_var ROFI_BORDER_SIZE 2) │ Round: $(get_var ROFI_ROUNDING 10)"
+
+            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
             ;;
 
         "setup")
