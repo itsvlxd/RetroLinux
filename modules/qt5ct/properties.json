@@ -1,0 +1,11 @@
+{
+  "title": "Qt5 Configuration",
+  "description": "Qt5 Settings Manager for configuring Qt5 application appearance and theming.",
+  "type": "core",
+  "access": "user",
+  "defaults": false,
+  "mode": "all",
+  "config": "./files",
+  "install": "~/.config/qt5ct",
+  "overwrite": false
+}

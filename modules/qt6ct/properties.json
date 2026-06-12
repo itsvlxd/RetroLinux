@@ -1,0 +1,11 @@
+{
+  "title": "Qt6 Configuration",
+  "description": "Qt6 Settings Manager for configuring Qt6 application appearance and theming.",
+  "type": "core",
+  "access": "user",
+  "defaults": false,
+  "mode": "all",
+  "config": "./files",
+  "install": "~/.config/qt6ct",
+  "overwrite": false
+}
