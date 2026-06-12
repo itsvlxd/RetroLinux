@@ -141,7 +141,7 @@ optimize_wallpapers() {
     done
 
     rx_log_file "INFO" "Optimization complete: $optimized optimized, $skipped skipped"
-    restore_wallpaper
+    restore_wallpaper >/dev/null 2>&1
 }
 
 get_monitor_resolutions() {
