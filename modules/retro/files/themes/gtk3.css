@@ -1,0 +1,80 @@
+/* ===================================================================
+   1. RETRO SYSTEM GTK3 COLOR MATRIX DEFINITIONS
+   =================================================================== */
+@define-color window_bg_color #141414;
+@define-color window_fg_color #e4e4e4;
+@define-color headerbar_bg_color #141414;
+@define-color headerbar_fg_color #e4e4e4;
+@define-color popover_bg_color #141414;
+@define-color popover_fg_color #e4e4e4;
+@define-color view_bg_color #141414;
+@define-color view_fg_color #e4e4e4;
+@define-color card_bg_color #141414;
+@define-color card_fg_color #e4e4e4;
+@define-color sidebar_bg_color #141414;
+@define-color sidebar_fg_color #e4e4e4;
+@define-color sidebar_border_color #141414;
+@define-color sidebar_backdrop_color #141414;
+
+@define-color accent_color #606060;
+@define-color accent_fg_color #151515;
+@define-color accent_bg_color #cacaca;
+@define-color theme_selected_bg_color #606060;
+@define-color theme_selected_fg_color #151515;
+
+:root {
+    --accent-bg-color: #606060;
+    --accent-color: #cacaca;
+    --accent-fg-color: #151515;
+}
+
+/* ===================================================================
+   2. THE SLIDER & SCALE OVERRIDES (Fixes Nemo's Zoom & Trackbars)
+   =================================================================== */
+/* Force the active filled track of any slider/scale window element */
+scale highlight,
+.nemo-window scale highlight,
+.nemo-window statusbar scale highlight {
+    background-color: #606060 !important;
+}
+
+/* Style the interactive adjustment knob slider handle */
+scale slider,
+.nemo-window scale slider {
+    background-color: #e4e4e4 !important;
+    border: 1px solid #606060 !important;
+    box-shadow: none !important;
+}
+
+/* Style the background empty track channel */
+scale trough,
+.nemo-window scale trough {
+    background-color: #1f1f1f !important;
+    border: 1px solid #141414 !important;
+}
+
+/* Fix vertical/horizontal scrollbar handles just in case */
+scrollbar slider {
+    background-color: #606060 !important;
+}
+scrollbar trough {
+    background-color: transparent !important;
+}
+
+/* ===================================================================
+   3. NEMO STRUCTURAL SIDEBAR & SELECTION OVERRIDES 
+   =================================================================== */
+.nemo-window placessidebar row:selected,
+.nemo-window placessidebar :selected,
+.nemo-window treeview.view:selected,
+.nemo-window .view:selected,
+.nemo-window .view.cell:selected {
+    background-color: #606060 !important;
+    color: #151515 !important;
+}
+
+.nemo-window .view.cell:hover,
+.nemo-window placessidebar row:hover {
+    background-color: rgba(219, 36, 82, 0.15) !important;
+    color: #e4e4e4 !important;
+}
