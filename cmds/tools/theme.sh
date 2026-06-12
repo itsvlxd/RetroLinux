@@ -39,7 +39,7 @@ cmd_theme() {
         "status")
             _status_line() {
                 local icon="$1" label="$2" value="$3"
-                printf "  ${PINK}%s${RESET} %-22s ${PINK}%s${RESET}\n" "$icon" "$label" "$value"
+                printf " ${PINK}%s${RESET} %-22s ${PINK}%s${RESET}\n" "$icon" "$label" "$value"
             }
             _lighten() {
                 local h="$1" p="${2:-60}"
@@ -86,7 +86,7 @@ cmd_theme() {
 
             local lua_file="$HOME/.config/retro/themes/hyprland-colors.lua"
             local primary_hex=""
-            if [[ -f "$lua_file" ]]; then
+            if [[ -f $lua_file ]]; then
                 primary_hex=$(grep -oP '^\s*primary\s*=\s*"0x\K[0-9a-fA-F]{6}' "$lua_file" | head -1)
             fi
             if [[ -n $primary_hex ]]; then
@@ -94,7 +94,7 @@ cmd_theme() {
                 light_hex=$(_lighten "$primary_hex" 60)
                 dark_hex=$(_darken "$primary_hex" 75)
                 _status_line "󰏘" "Accent Palette:" \
-                    "Primary: #${primary_hex} │ Light: #${light_hex} │ Dark: #${dark_hex}"
+                    "${GRAY}Primary:${PINK} #${primary_hex}  ${GRAY}Light:${PINK} #${light_hex}  ${GRAY}Dark:${PINK} #${dark_hex}"
             else
                 _status_line "󰏘" "Accent Palette:" "(not generated yet)"
             fi
@@ -103,47 +103,70 @@ cmd_theme() {
             gtk_theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null || echo "N/A")
             gtk_theme="${gtk_theme//\'/}"
             qt_theme=$(grep '^theme=' "$HOME/.config/Kvantum/kvantum.kvconfig" 2>/dev/null | cut -d= -f2 || echo "N/A")
-            _status_line "󰉋" "Toolkits:" "GTK: ${gtk_theme} │ Qt: Kvantum (${qt_theme})"
+            _status_line "󰉋" "Toolkits:" "${GRAY}GTK:${PINK} ${gtk_theme}  ${GRAY}Qt:${PINK} Kvantum (${qt_theme})"
 
             local icon_theme cursor_theme
             icon_theme=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null || echo "N/A")
             icon_theme="${icon_theme//\'/}"
             cursor_theme=$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null || echo "N/A")
             cursor_theme="${cursor_theme//\'/}"
-            _status_line "󰉏" "Asset Themes:" "Icons: ${icon_theme} │ Cursor: ${cursor_theme}"
+            local browser_state
+            if [[ $(get_var "RETRO_BROWSER_THEME" "true") == "true" ]]; then
+                browser_state="${SUCCESS}● Enabled"
+            else
+                browser_state="${MUTE}○ Disabled"
+            fi
+            _status_line "󰉏" "Asset Themes:" "${GRAY}Icons:${PINK} ${icon_theme}  ${GRAY}Cursor:${PINK} ${cursor_theme}  ${GRAY}Browser:${browser_state}"
 
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
             _status_line "󰃠" "Window Opacity:" \
-                "$(get_var RETRO_OPACITY 1.0) active │ $(get_var RETRO_INACTIVE_OPACITY 0.8) inactive"
+                "$(get_var RETRO_OPACITY 1.0) ${GRAY}active${PINK}  $(get_var RETRO_INACTIVE_OPACITY 0.8) ${GRAY}inactive"
             _status_line "󰋙" "Layout Geometry:" \
-                "Borders: $(get_var RETRO_BORDER_SIZE 2)px │ Rounding: $(get_var RETRO_ROUNDING 10)px (pwr: $(get_var RETRO_ROUNDING_POWER 2))"
+                "${GRAY}Borders:${PINK} $(get_var RETRO_BORDER_SIZE 2)px  ${GRAY}Rounding:${PINK} $(get_var RETRO_ROUNDING 10)px (pwr: $(get_var RETRO_ROUNDING_POWER 2))"
             _status_line "󰢤" "Workspace Gaps:" \
-                "$(get_var RETRO_GAP_IN 5) inner │ $(get_var RETRO_GAP_OUT 20) outer"
+                "$(get_var RETRO_GAP_IN 5) ${GRAY}inner${PINK}  $(get_var RETRO_GAP_OUT 20) ${GRAY}outer"
             _status_line "󰏗" "Compositor FX:" \
-                "Shadows: $(get_var RETRO_SHADOW true) │ Blur: $(get_var RETRO_BLUR true)"
+                "${GRAY}Shadows:${PINK} $(get_var RETRO_SHADOW true)  ${GRAY}Blur:${PINK} $(get_var RETRO_BLUR true)"
 
             echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
 
             _status_line "󰛖" "Kitty Terminal:" \
-                "$(get_var KITTY_FONT "JetBrainsMono Nerd Font") ($(get_var KITTY_FONT_SIZE 9.5)pt) │ Padding: $(get_var KITTY_PADDING 15)"
+                "$(get_var KITTY_FONT "JetBrainsMono Nerd Font") ($(get_var KITTY_FONT_SIZE 9.5)pt)  ${GRAY}Padding:${PINK} $(get_var KITTY_PADDING 15)"
             _status_line "󰏗" "Rofi Launcher:" \
-                "$(get_var ROFI_FONT "JetBrainsMono Nerd Font") ($(get_var ROFI_FONT_SIZE 9.5)pt) │ Border: $(get_var ROFI_BORDER_SIZE 2) │ Round: $(get_var ROFI_ROUNDING 10)"
+                "$(get_var ROFI_FONT "JetBrainsMono Nerd Font") ($(get_var ROFI_FONT_SIZE 9.5)pt)  ${GRAY}Border:${PINK} $(get_var ROFI_BORDER_SIZE 2)  ${GRAY}Round:${PINK} $(get_var ROFI_ROUNDING 10)"
 
-            local browser_status
-            browser_status=$(_theme_call "--browser-status" 2>/dev/null)
-            if [[ -n $browser_status ]]; then
-                while IFS='|' read -r browser path status_str; do
-                    local browser_label="${browser^}"
-                    _status_line "󰈹" "Browser ${browser_label}:" "$status_str"
-                done <<< "$browser_status"
-                echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────────${RESET}"
-            fi
+            rx_table_separator
+            rx_table_spacer
             ;;
 
         "browsers")
-            _theme_call "--deploy-browsers"
-            rx_log "success" "Browser chrome deployed to all detected profiles"
+            local subcmd="${1:-toggle}"
+            case "$subcmd" in
+                "enable")
+                    result=$(_theme_call "--browsers-enable")
+                    if [[ $result == "enabled" ]]; then
+                        rx_log "success" "Browser theme integration Enabled"
+                    fi
+                    ;;
+                "disable")
+                    _theme_call "--browsers-disable"
+                    rx_log "success" "Browser theme integration Disabled"
+                    ;;
+                "refresh")
+                    _theme_call "--deploy-browsers"
+                    rx_log "success" "Browser chrome deployed"
+                    ;;
+                toggle | *)
+                    local result
+                    result=$(_theme_call "--toggle-browsers")
+                    if [[ $result == "enabled" ]]; then
+                        rx_log "success" "Browser theme integration Enabled"
+                    elif [[ $result == "disabled" ]]; then
+                        rx_log "success" "Browser theme integration Disabled"
+                    fi
+                    ;;
+            esac
             ;;
 
         "setup")
@@ -351,10 +374,10 @@ cmd_theme() {
             local css_file="$HOME/.config/retro/themes/colors.css"
             local wall_primary=""
             local -a wall_dots=()
-            if [[ -f "$lua_file" ]]; then
+            if [[ -f $lua_file ]]; then
                 wall_primary=$(grep -oP '^\s*primary\s*=\s*"0x\K[0-9a-fA-F]{6}' "$lua_file" | head -1)
             fi
-            if [[ -f "$css_file" ]]; then
+            if [[ -f $css_file ]]; then
                 for i in 0 1 2 3 4 5 6 7; do
                     local c
                     c=$(grep -oP "@define-color color${i}\s+\K#[0-9a-fA-F]+" "$css_file" | head -1)
@@ -469,11 +492,11 @@ cmd_theme() {
             gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null
             if command -v xsettingsd >/dev/null 2>&1; then
                 mkdir -p "$HOME/.config/xsettingsd"
-                cat > "$HOME/.config/xsettingsd/xsettingsd.conf" <<EOF
+                cat >"$HOME/.config/xsettingsd/xsettingsd.conf" <<EOF
 Net/ThemeName "Adwaita"
 EOF
                 timeout 0.1s xsettingsd 2>/dev/null
-                cat > "$HOME/.config/xsettingsd/xsettingsd.conf" <<EOF
+                cat >"$HOME/.config/xsettingsd/xsettingsd.conf" <<EOF
 Net/ThemeName "$theme"
 EOF
                 timeout 0.1s xsettingsd 2>/dev/null

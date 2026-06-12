@@ -126,26 +126,31 @@ rx_generate_colors() {
     local scheme_type="${3:-scheme-tonal-spot}"
     local source_index="${4:-0}"
     local prefer="${5:-}"
+    local solid_color="${6:-}"
 
     if ! command -v matugen >/dev/null 2>&1; then
         rx_log "error" "matugen is not installed"
         return 1
     fi
 
-    if [[ ! -f $source ]]; then
-        rx_log "error" "Source image not found for color generation: ${PINK}$source${RESET}"
-        return 1
-    fi
-
     local matugen_output
     local matugen_exit
 
-    if [[ -n $prefer ]]; then
-        matugen_output=$(matugen image --mode "$mode" "$source" -t "$scheme_type" --prefer "$prefer" 2>&1)
+    if [[ -n $solid_color ]]; then
+        matugen_output=$(matugen color hex "$solid_color" --mode "$mode" -t "$scheme_type" 2>&1)
         matugen_exit=$?
     else
-        matugen_output=$(matugen image --mode "$mode" "$source" -t "$scheme_type" --source-color-index "$source_index" 2>&1)
-        matugen_exit=$?
+        if [[ ! -f $source ]]; then
+            rx_log "error" "Source image not found for color generation: ${PINK}$source${RESET}"
+            return 1
+        fi
+        if [[ -n $prefer ]]; then
+            matugen_output=$(matugen image --mode "$mode" "$source" -t "$scheme_type" --prefer "$prefer" 2>&1)
+            matugen_exit=$?
+        else
+            matugen_output=$(matugen image --mode "$mode" "$source" -t "$scheme_type" --source-color-index "$source_index" 2>&1)
+            matugen_exit=$?
+        fi
     fi
 
     if [[ $matugen_exit -ne 0 ]]; then
@@ -199,6 +204,16 @@ rx_apply_color_map() {
         if [[ -f $file ]]; then
             local css_key="${slot:-$key}"
             sed -i "s/\(@define-color ${css_key} *\)#[0-9a-f]*/\1#${hex}/" "$file"
+        fi
+
+        file="$output_dir/firefox.css"
+        if [[ -f $file ]]; then
+            local ff_key="${slot:-$key}"
+            sed -i "s/^\([[:space:]]*--${ff_key}: *\)#[0-9a-f][0-9a-f]*/\1#${hex}/" "$file"
+            local r=$((16#${hex:0:2}))
+            local g=$((16#${hex:2:2}))
+            local b=$((16#${hex:4:2}))
+            sed -i "s/^\([[:space:]]*--${ff_key}_rgb: *\)[0-9][0-9]* [0-9][0-9]* [0-9][0-9]*/\1${r} ${g} ${b}/" "$file"
         fi
 
         file="$output_dir/rofi-colors.rasi"
@@ -264,6 +279,29 @@ rx_apply_color_map() {
                     ;;
                 surface_variant)
                     sed -i "s/^\(mid\.light\.color=\)#[0-9a-f]*/\1#${hex}/" "$kvantum_file"
+                    ;;
+            esac
+        fi
+
+        local cava_file="$HOME/.config/cava/themes/retro"
+        if [[ -f $cava_file ]]; then
+            case "$key" in
+                on_surface)
+                    sed -i "s/^foreground = '.*'/foreground = '#${hex}'/" "$cava_file"
+                    ;;
+                primary)
+                    sed -i "s/^gradient_color_1 = '.*'/gradient_color_1 = '#${hex}'/" "$cava_file"
+                    sed -i "s/^horizontal_gradient_color_1 = '.*'/horizontal_gradient_color_1 = '#${hex}'/" "$cava_file"
+                    ;;
+                secondary)
+                    sed -i "s/^gradient_color_2 = '.*'/gradient_color_2 = '#${hex}'/" "$cava_file"
+                    ;;
+                tertiary)
+                    sed -i "s/^gradient_color_3 = '.*'/gradient_color_3 = '#${hex}'/" "$cava_file"
+                    sed -i "s/^horizontal_gradient_color_3 = '.*'/horizontal_gradient_color_3 = '#${hex}'/" "$cava_file"
+                    ;;
+                primary_container)
+                    sed -i "s/^horizontal_gradient_color_2 = '.*'/horizontal_gradient_color_2 = '#${hex}'/" "$cava_file"
                     ;;
             esac
         fi

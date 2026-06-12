@@ -40,7 +40,7 @@
             "key": "   OS",
             "shell": "bash",
             "text": "retro -v",
-            "format": "Retro Linux {1}"
+            "format": "RetroLinux {1}"
         },
         {
             "type": "host",
@@ -75,7 +75,9 @@
         {
             "type": "command",
             "key": "  󰏘 THM",
-            "text": "retro variable get RETRO_THEME",
+            "shell": "bash",
+            "text": "s=$(retro variable get RETRO_THEME_SCHEME); [[ $s == wallpaper ]] && exit 1; d=$(retro variable get RETRO_DIR); jq -r '.name // empty' \"$d/themes/${s}.json\" 2>/dev/null || echo \"$s\"",
+            "condition": { "succeeded": true },
             "format": "{#97}{1}{#}"
         },
         "break",
