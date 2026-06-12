@@ -39,6 +39,10 @@ xdg-desktop-portal
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 
+# Icons
+papirus-folders
+papirus-icon-theme
+
 # Auth
 fprintd
 seahorse
