@@ -27,8 +27,6 @@ qt5ct
 qt6ct
 kvantum
 kvantum-qt5
-qgnomeplatform-qt5
-qgnomeplatform-qt6
 
 # XDG
 xdg-utils
