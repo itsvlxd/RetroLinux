@@ -5,6 +5,7 @@
 -- See https://wiki.hypr.land/Configuring/Keywords/
 
 local prog = require("programs")
+local Retro = require("lib.retro")
 
 local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
@@ -13,7 +14,7 @@ hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(prog.terminal))
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch exit"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(prog.fileManager))
-hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(prog.fullScreen))
+hl.bind(mainMod .. " + F", Retro.fullscreen)
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("retro clipboard open"))
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("retro wallpaper picker"))

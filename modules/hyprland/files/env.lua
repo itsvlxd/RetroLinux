@@ -4,6 +4,9 @@
 --
 -- See https://wiki.hypr.land/Configuring/Environment-variables/
 
+local retro_dir = os.getenv("RETRO_DIR") or "/opt/retrolinux"
+package.path = retro_dir .. "/lib/lua/?.lua;" .. package.path
+
 pcall(dofile, os.getenv("HOME") .. "/.config/retro/env.lua")
 
 hl.env("XCURSOR_SIZE", "24")
