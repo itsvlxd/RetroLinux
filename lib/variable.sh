@@ -55,7 +55,6 @@ set_var() {
     else
         echo "export $key=\"$value\"" >>"$_VARS_FILE"
     fi
-    _VARS_FILE_MTIME=$(_rx_get_file_mtime)
 }
 
 reload_vars() {

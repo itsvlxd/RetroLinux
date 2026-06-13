@@ -82,7 +82,6 @@ function Variable.set_var(key, value)
         end
         f:close()
     end
-    _vars_file_mtime = _get_file_mtime(path)
     return true
 end
 
