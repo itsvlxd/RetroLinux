@@ -21,14 +21,40 @@ rx_generate_conf() {
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig>
 
-  <alias>
-    <family>sans-serif</family>
-    <prefer><family>$main</family><family>$nerd</family><family>$emoji</family></prefer>
-  </alias>
-  <alias>
-    <family>monospace</family>
-    <prefer><family>$main</family><family>$nerd</family><family>$emoji</family></prefer>
-  </alias>
+  <match target="pattern">
+    <test qual="any" name="family"><string>sans-serif</string></test>
+    <edit name="family" mode="assign" binding="strong">
+      <string>$main</string>
+    </edit>
+  </match>
+
+  <match target="pattern">
+    <test qual="any" name="family"><string>system-ui</string></test>
+    <edit name="family" mode="assign" binding="strong">
+      <string>$main</string>
+    </edit>
+  </match>
+
+  <match target="pattern">
+    <test qual="any" name="family"><string>Arial</string></test>
+    <edit name="family" mode="assign" binding="strong">
+      <string>$main</string>
+    </edit>
+  </match>
+
+  <match target="pattern">
+    <test qual="any" name="family"><string>Helvetica</string></test>
+    <edit name="family" mode="assign" binding="strong">
+      <string>$main</string>
+    </edit>
+  </match>
+
+  <match target="pattern">
+    <test qual="any" name="family"><string>monospace</string></test>
+    <edit name="family" mode="assign" binding="strong">
+      <string>$nerd</string>
+    </edit>
+  </match>
 
   <match target="pattern">
     <test name="family"><string>Noto Color Emoji</string></test>
@@ -44,16 +70,30 @@ rx_generate_conf() {
     </edit>
   </match>
 
+  <match target="font">
+    <edit name="antialias" mode="assign"><bool>true</bool></edit>
+  </match>
+  <match target="font">
+    <edit name="hinting" mode="assign"><bool>false</bool></edit>
+  </match>
+  <match target="font">
+    <edit name="hintstyle" mode="assign"><const>hintnone</const></edit>
+  </match>
+  <match target="font">
+    <edit name="rgba" mode="assign"><const>rgb</const></edit>
+  </match>
+  <match target="font">
+    <edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit>
+  </match>
+
 </fontconfig>
 EOF
 
-    fc-cache -f >/dev/null 2>&1
+    fc-cache -f -v >/dev/null 2>&1
 
-    cur_hint=$(gsettings get org.gnome.desktop.interface font-antialiasing | tr -d "'")
-
-    gsettings set org.gnome.desktop.interface font-antialiasing 'none'
-    sleep 0.1
-    gsettings set org.gnome.desktop.interface font-antialiasing "$cur_hint"
+    gsettings set org.gnome.desktop.interface font-antialiasing 'rgba'
+    gsettings set org.gnome.desktop.interface font-hinting 'none'
+    bash "$RETRO_DIR/scripts/theme_core.sh" "--apply-gtk-font" 2>/dev/null
 }
 
 rx_refresh_apps() {
