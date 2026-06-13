@@ -3,24 +3,6 @@
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/variable.sh"
 
-handle_kitty_padding() {
-    local pid="$1"
-    local is_fullscreen="$2"
-    local rule=$(get_var "KITTY_SHRINK_PADDING_FULLSCREEN")
-    local default_pd=$(get_var "KITTY_PADDING")
-
-    if [[ $rule == "true" ]]; then
-        if [[ $is_fullscreen == "0" || $is_fullscreen == "false" ]]; then
-            kitty @ --to="unix:/tmp/kitty-$pid" set-spacing \
-                padding-top=1 padding-bottom=1 padding-left=1 padding-right=1 2>/dev/null
-        else
-            kitty @ --to="unix:/tmp/kitty-$pid" set-spacing \
-                padding-top="$default_pd" padding-bottom="$default_pd" \
-                padding-left="$default_pd" padding-right="$default_pd" 2>/dev/null
-        fi
-    fi
-}
-
 cmd_wm() {
     local window_core="$RETRO_DIR/scripts/window_core.sh"
     local action="${1,,}"
@@ -29,14 +11,6 @@ cmd_wm() {
 
     case "$action" in
         "fullscreen")
-            local active=$(hyprctl activewindow -j)
-            local class=$(echo "$active" | jq -r '.class')
-            local pid=$(echo "$active" | jq -r '.pid')
-            local fs_state=$(echo "$active" | jq -r '.fullscreen | tostring')
-
-            if [[ ${class,,} == "kitty" ]]; then
-                handle_kitty_padding "$pid" "$fs_state"
-            fi
             hyprctl dispatch 'hl.dsp.window.fullscreen()'
             ;;
 
