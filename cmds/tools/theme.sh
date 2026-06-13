@@ -16,6 +16,9 @@ _theme_set() {
     local value="$2"
     if _theme_call "--set" "$key" "$value"; then
         rx_log "success" "${PINK}$key${RESET} set to ${PINK}$value${RESET}"
+    else
+        rx_log "error" "Failed to set ${PINK}$key${RESET}"
+        return 1
     fi
 }
 
@@ -342,16 +345,34 @@ cmd_theme() {
             if [[ -z $value ]]; then
                 if bash "$_THEME_CORE" "--theme" "$key"; then
                     rx_log "success" "Color scheme set to ${PINK}$key${RESET}"
+                else
+                    rx_log "error" "Unknown color scheme: ${PINK}$key${RESET}"
                 fi
             else
-                _theme_set "$key" "$value"
+                case "$key" in
+                    opacity|blur|blur_size|blur_passes|blur_vibrancy|kitty_font|kitty_font_size|kitty_padding|kitty_shrink_padding|rofi_font|rofi_font_size|rofi_border|rofi_rounding|rofi_padding|scheme)
+                        _theme_set "$key" "$value"
+                        ;;
+                    *)
+                        local scheme="$*"
+                        if bash "$_THEME_CORE" "--theme" "$scheme"; then
+                            rx_log "success" "Color scheme set to ${PINK}$scheme${RESET}"
+                        else
+                            rx_log "error" "Unknown color scheme: ${PINK}$scheme${RESET}"
+                        fi
+                        ;;
+                esac
             fi
             ;;
 
         "mode")
             local mode="$1"
             [[ -z $mode ]] && rx_log "error" "Usage: retro theme mode <dark|light>" && return 1
-            _theme_call "--mode" "$mode" && rx_log "success" "Mode set to ${PINK}$mode${RESET}"
+            if _theme_call "--mode" "$mode"; then
+                rx_log "success" "Mode set to ${PINK}$mode${RESET}"
+            else
+                rx_log "error" "Failed to set mode to ${PINK}$mode${RESET}"
+            fi
             ;;
 
         "list")

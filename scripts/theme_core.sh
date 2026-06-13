@@ -11,7 +11,19 @@ THEMES_DIR="$RETRO_DIR/themes"
 _load_theme_def() {
     local name="$1"
     local file="$THEMES_DIR/${name}.json"
-    [[ ! -f $file ]] && return 1
+    local resolved="$name"
+    if [[ ! -f $file ]]; then
+        local normalized
+        normalized=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
+        file="$THEMES_DIR/${normalized}.json"
+        [[ -f $file ]] && resolved="$normalized"
+    fi
+    if [[ ! -f $file ]]; then
+        for f in "$THEMES_DIR"/*.json; do
+            [[ $(jq -r '.name // empty' "$f" 2>/dev/null) == "$name" ]] && file="$f" && resolved=$(basename "$f" .json) && break
+        done
+        [[ ! -f $file ]] && return 1
+    fi
     local palette_path
     palette_path=$(jq -r '.palette // empty' "$file" 2>/dev/null)
     local display_name
@@ -20,7 +32,7 @@ _load_theme_def() {
     author=$(jq -r '.author // empty' "$file" 2>/dev/null)
     local description
     description=$(jq -r '.description // empty' "$file" 2>/dev/null)
-    echo "$palette_path|${display_name:-$name}|${author:--}|$description"
+    echo "$palette_path|${display_name:-$name}|${author:--}|$description|$resolved"
 }
 
 _list_themes() {
@@ -122,7 +134,6 @@ rx_theme_set() {
             return $?
             ;;
         *)
-            rx_log "error" "Unknown key: ${PINK}${key}${RESET}"
             return 1
             ;;
     esac
@@ -142,7 +153,6 @@ rx_theme_apply_mode() {
     case "$mode" in
         dark | light) ;;
         *)
-            rx_log "error" "Mode must be ${PINK}dark${RESET} or ${PINK}light${RESET}"
             return 1
             ;;
     esac
@@ -194,11 +204,19 @@ rx_theme_apply_scheme() {
 
     if [[ $scheme == "wallpaper" ]]; then
         set_var "RETRO_THEME_SCHEME" "wallpaper"
+        rx_log_file "debug" "rx_theme_apply_scheme: RETRO_CONFIG=$RETRO_CONFIG"
         local wallpaper
         wallpaper=$(get_var "WALL_CURRENT" "")
-        if [[ -z $wallpaper || ! -f $wallpaper ]]; then
+        rx_log_file "debug" "rx_theme_apply_scheme: scheme=wallpaper, WALL_CURRENT=$wallpaper"
+        if [[ -z $wallpaper ]]; then
+            rx_log_file "warn" "rx_theme_apply_scheme: WALL_CURRENT is empty"
             return 0
         fi
+        if [[ ! -f $wallpaper ]]; then
+            rx_log_file "error" "rx_theme_apply_scheme: file not found: $wallpaper"
+            return 0
+        fi
+        rx_log_file "info" "rx_theme_apply_scheme: calling rx_theme_apply_colors"
         rx_theme_apply_colors
         return 0
     fi
@@ -206,11 +224,12 @@ rx_theme_apply_scheme() {
     local def_data
     def_data=$(_load_theme_def "$scheme")
     if [[ -z $def_data ]]; then
-        rx_log "error" "Unknown theme: ${PINK}${scheme}${RESET}"
         return 1
     fi
 
-    set_var "RETRO_THEME_SCHEME" "$scheme"
+    local resolved
+    resolved=$(echo "$def_data" | cut -d'|' -f5)
+    set_var "RETRO_THEME_SCHEME" "$resolved"
     rx_theme_apply_colors
 }
 
@@ -339,7 +358,7 @@ rx_theme_deploy_browsers() {
     local verbose=${1:-0}
 
     if [[ $(get_var "RETRO_BROWSER_THEME" "true") != "true" ]]; then
-        [[ $verbose -eq 1 ]] && rx_log "warn" "Browser theme integration is disabled (enable via 'retro theme browsers enable')"
+        [[ $verbose -eq 1 ]] && rx_log_file "warn" "Browser theme integration is disabled (enable via 'retro theme browsers enable')"
         return 0
     fi
 
@@ -402,14 +421,14 @@ rx_theme_deploy_browsers() {
             echo "$pref_line" >"$user_js"
         fi
 
-        [[ $verbose -eq 1 ]] && rx_log "info" "Browser chrome deployed: ${PINK}${browser}${RESET} → ${GRAY}$profile_dir${RESET}"
+        [[ $verbose -eq 1 ]] && rx_log_file "info" "Browser chrome deployed: ${PINK}${browser}${RESET} → ${GRAY}$profile_dir${RESET}"
         ((deployed++))
     done < <(_detect_browser_profiles | sort -u)
 
     if [[ $deployed -eq 0 ]]; then
-        rx_log "warn" "No browser profiles found to deploy"
+        rx_log_file "warn" "No browser profiles found to deploy"
     elif [[ $verbose -eq 0 ]]; then
-        rx_log "info" "Browser chrome deployed to ${PINK}${deployed}${RESET} profile(s)"
+        rx_log_file "info" "Browser chrome deployed to ${PINK}${deployed}${RESET} profile(s)"
     fi
 }
 
@@ -454,18 +473,25 @@ rx_theme_apply_colors() {
     if [[ $scheme == "wallpaper" ]]; then
         local wallpaper
         wallpaper=$(get_var "WALL_CURRENT" "")
+        rx_log_file "debug" "rx_theme_apply_colors: WALL_CURRENT=$wallpaper"
         if [[ -z $wallpaper || ! -f $wallpaper ]]; then
             local frame="$HOME/.config/retro/wallpaper_frames"
             wallpaper=$(find "$frame" -maxdepth 1 -name '*.png' 2>/dev/null | head -1)
+            rx_log_file "debug" "rx_theme_apply_colors: fallback frame=$wallpaper"
         fi
         if [[ -z $wallpaper || ! -f $wallpaper ]]; then
+            rx_log_file "warn" "rx_theme_apply_colors: no wallpaper or frame found, skipping color gen"
             rx_theme_refresh_apps
             return 0
         fi
 
         local static_source="$wallpaper"
         local cache="$HOME/.config/retro/wallpaper_frames/$(basename "$wallpaper").png"
-        [[ -f $cache ]] && static_source="$cache"
+        if [[ -f $cache ]]; then
+            static_source="$cache"
+            rx_log_file "debug" "rx_theme_apply_colors: using cached frame $cache"
+        fi
+        rx_log_file "debug" "rx_theme_apply_colors: static_source=$static_source"
 
         local scheme_type
         local color_cache="$HOME/.config/retro/wallpaper_frames/$(basename "$wallpaper").colors"
@@ -483,40 +509,49 @@ rx_theme_apply_colors() {
             fi
         fi
 
+        rx_log_file "debug" "rx_theme_apply_colors: scheme_type=$scheme_type, mode=$mode"
         if [[ $scheme_type == "scheme-monochrome" ]]; then
-            matugen image -b wal --mode "$mode" "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1 || return 1
+            rx_log_file "info" "rx_theme_apply_colors: running matugen (monochrome) on $static_source"
+            matugen image -b wal --mode "$mode" "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+                rx_log_file "error" "rx_theme_apply_colors: matugen monochrome failed on $static_source"
+                return 1
+            fi
             rx_grayscale_output
         else
-            matugen image -b wal --mode "$mode" "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1 || return 1
+            rx_log_file "info" "rx_theme_apply_colors: running matugen (vibrant) on $static_source"
+            matugen image -b wal --mode "$mode" "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+                rx_log_file "error" "rx_theme_apply_colors: matugen vibrant failed on $static_source"
+                return 1
+            fi
         fi
     else
         local theme_file="$THEMES_DIR/${scheme}.json"
-        local source_color
-        source_color=$(jq -r '.source_color // .color_map.primary // ""' "$theme_file" 2>/dev/null)
+        rx_log_file "debug" "rx_theme_apply_colors: theme scheme=$scheme, file=$theme_file"
+        local palette_path
+        palette_path=$(jq -r '.palette // empty' "$theme_file" 2>/dev/null)
 
-        if [[ -n $source_color ]]; then
-            rx_generate_colors "" "$mode" "scheme-tonal-spot" "0" "" "$source_color" || return 1
+        if [[ -n $palette_path && -f "$THEMES_DIR/$palette_path" ]]; then
+            rx_log_file "info" "rx_theme_apply_colors: using palette PNG for $scheme"
+            rx_generate_colors "$THEMES_DIR/$palette_path" "$mode" "scheme-tonal-spot" "0" "saturation" || return 1
         else
-            local def_data
-            def_data=$(_load_theme_def "$scheme")
-            local palette_rel
-            palette_rel=$(echo "$def_data" | cut -d'|' -f1)
-            if [[ -z $palette_rel ]]; then
-                rx_log "error" "No palette image or source color defined for theme: ${PINK}$scheme${RESET}"
-                rx_theme_refresh_apps
-                return 0
+            local source_color
+            source_color=$(jq -r '.source_color // .color_map.primary // ""' "$theme_file" 2>/dev/null)
+            if [[ -n $source_color ]]; then
+                rx_log_file "info" "rx_theme_apply_colors: using source_color=$source_color for $scheme"
+                rx_generate_colors "" "$mode" "scheme-tonal-spot" "0" "" "$source_color" || return 1
+            else
+                rx_log_file "error" "rx_theme_apply_colors: no palette or source_color for $scheme"
+                return 1
             fi
-            local palette_path="$THEMES_DIR/$palette_rel"
-            if [[ ! -f $palette_path ]]; then
-                rx_log "error" "Palette image not found: ${PINK}$palette_path${RESET}"
-                rx_theme_refresh_apps
-                return 0
-            fi
-            rx_generate_colors "$palette_path" "$mode" "scheme-tonal-spot" "0" "saturation" || return 1
         fi
 
-        if [[ -f $theme_file && $mode != "light" ]]; then
-            rx_apply_color_map "$theme_file"
+        if [[ -f $theme_file ]]; then
+            local has_cm
+            has_cm=$(jq -r '.color_map | type' "$theme_file" 2>/dev/null)
+            rx_log_file "debug" "rx_theme_apply_colors: color_map type=$has_cm for $scheme"
+            [[ $has_cm == "object" ]] && rx_apply_color_map "$theme_file"
         fi
     fi
 
