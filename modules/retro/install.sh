@@ -56,7 +56,7 @@ patch_env() {
     if [[ -f $file ]]; then
         if grep -q "export $var_name=" "$file"; then
             local current_val=$(grep "export $var_name=" "$file" | sed 's/.*export '"$var_name"'="\(.*\)"/\1/')
-            if [[ "$current_val" != "$var_val" ]]; then
+            if [[ $current_val != "$var_val" ]]; then
                 sed -i "s|export $var_name=\".*\"|export $var_name=\"$var_val\"|" "$file"
                 rx_log "success" "Updated $var_name in $(basename "$file")"
             fi
@@ -83,6 +83,20 @@ if [[ -n $shell_conf ]]; then
     patch_env "$shell_conf" "RETRO_CONFIG" "$RETRO_CONFIG"
 fi
 
+ENV_DIR="$HOME/.config/environment.d"
+mkdir -p "$ENV_DIR"
+ENV_FILE="$ENV_DIR/retro.conf"
+for entry in "RETRO_DIR=$RETRO_DIR" "RETRO_CONFIG=$RETRO_CONFIG"; do
+    var="${entry%%=*}"
+    if grep -q "^${var}=" "$ENV_FILE" 2>/dev/null; then
+        sed -i "s|^${var}=.*|${entry}|" "$ENV_FILE"
+    else
+        echo "$entry" >>"$ENV_FILE"
+    fi
+done
+
+systemctl --user set-environment RETRO_DIR="$RETRO_DIR" RETRO_CONFIG="$RETRO_CONFIG" 2>/dev/null || true
+
 [[ ! -d $RETRO_CONFIG ]] && mkdir -p "$RETRO_CONFIG"
 
 sync_missing_variables() {
@@ -98,7 +112,7 @@ sync_missing_variables() {
             if [[ -f $user_vars ]] && grep -q "^export $key=" "$user_vars" 2>/dev/null; then
                 continue
             fi
-            echo "$line" >> "$user_vars"
+            echo "$line" >>"$user_vars"
             rx_log "success" "Added missing variable: $key"
             added=1
         fi
