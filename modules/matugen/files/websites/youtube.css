@@ -35,6 +35,39 @@
         --t2d807bb79e75606d: var(--primary) !important;
         --t6216186c28b3834b: var(--on_primary) !important;
         --t617db776af0de196: var(--primary) !important;
+        /* --tffc2fd3a644f6275: var(--secondary) !important; */
+    }
+
+    .ytSpecIconBadgeShapeTypeNotification .ytSpecIconBadgeShapeBadge {
+        background-color: var(--primary) !important;
+        color: #fff;
+    }
+
+    #progress.ytd-thumbnail-overlay-resume-playback-renderer {
+        height: 100%;
+        background: linear-gradient(
+            90deg,
+            var(--primary) 80%,
+            var(--secondary)
+        );
+    }
+
+    #ryd-bar {
+        background: var(--primary) !important;
+        border-radius: 2px;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .ytSpecButtonShapeNextMono.ytSpecButtonShapeNextFilled {
+        background: var(--primary) !important;
+    }
+
+    .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment {
+        background-image: linear-gradient(
+            90deg,
+            var(--primary) 80%,
+            var(--secondary)
+        );
     }
 
     /* Sidebar / Navigation */
