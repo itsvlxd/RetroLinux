@@ -40,6 +40,7 @@
 
         --bgColor-danger-emphasis: var(--error) !important;
         --fgColor-danger: var(--error) !important;
+        --fgColor-onEmphasis: var(--background) !important;
         --button-danger-fgColor-rest: var(--error) !important;
         --button-danger-bgColor-hover: var(--error_container) !important;
 
