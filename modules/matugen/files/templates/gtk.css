@@ -16,3 +16,13 @@
 @define-color sidebar_border_color @window_bg_color;
 @define-color sidebar_backdrop_color @window_bg_color;
 
+* {
+    font-family: "REPLACE_RETRO_FONT", sans-serif;
+    font-size: REPLACE_RETRO_SIZEpt;
+
+    -gtk-icon-transform: none;
+    font-smoothing: antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
