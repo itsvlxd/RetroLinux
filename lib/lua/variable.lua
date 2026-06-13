@@ -20,7 +20,8 @@ local function _get_file_mtime(path)
     if not handle then return 0 end
     local mtime = handle:read("*a")
     handle:close()
-    return tonumber(mtime:gsub("%s+$", "")) or 0
+    mtime = mtime:gsub("%s+$", "")
+    return tonumber(mtime) or 0
 end
 
 local function _parse_vars_file()
