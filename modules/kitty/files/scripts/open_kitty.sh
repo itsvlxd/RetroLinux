@@ -1,5 +1,8 @@
 #!/bin/bash
 
+if [[ -z $RETRO_DIR ]]; then
+    RETRO_DIR="/opt/retrolinux"
+fi
 source "$RETRO_DIR/lib/helpers.sh"
 
 OPACITY=$(get_var "RETRO_OPACITY" "1.0")
