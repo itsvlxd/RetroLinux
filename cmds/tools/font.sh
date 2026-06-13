@@ -299,6 +299,12 @@ cmd_font() {
             rx_table_spacer
             ;;
 
+        "regenerate")
+            bash "$font_core" --sync
+            bash "$RETRO_DIR/scripts/theme_core.sh" "--apply-gtk-font" 2>/dev/null
+            rx_log "success" "Fontconfig regenerated with current variables."
+            ;;
+
         "setup")
             rx_setup_parse "$type" $value
 
@@ -429,6 +435,7 @@ cmd_font() {
             rx_help_cmd "list" "List all installed fonts"
             rx_help_cmd "remote [query]" "Search remote font packages"
             rx_help_cmd "status" "Show active fonts and count"
+            rx_help_cmd "regenerate" "Rebuild font cache with existing font configuration"
             rx_help_cmd "setup [--yes|-y]" "Interactive font setup wizard"
             rx_help_examples
             rx_help_example "retro font install ttf-jetbrains" "Install from package"
