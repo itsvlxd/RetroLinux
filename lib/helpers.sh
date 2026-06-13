@@ -165,7 +165,7 @@ rx_apply_color_map() {
     local output_dir="${RETRO_CONFIG:-$HOME/.config/retro}/themes"
 
     local keys
-    keys=$(jq -r '.color_map | to_entries[] | "\(.key)|\(.value)"' "$theme_file" 2>/dev/null)
+    keys=$(jq -r '.color_map | if has("highlight") then .highlight = .primary else . end | if has("cursor") then .cursor = .primary else . end | to_entries[] | "\(.key)|\(.value)"' "$theme_file" 2>/dev/null)
     [[ -z $keys ]] && return 0
 
     declare -A slot_map
@@ -198,6 +198,16 @@ rx_apply_color_map() {
             else
                 sed -i "s/^\(${key} \+\)#[0-9a-f]*/\1#${hex}/" "$file"
             fi
+
+            case "$key" in
+                primary)
+                    sed -i "s/^\(cursor \+\)#[0-9a-f]*/\1#${hex}/" "$file"
+                    sed -i "s/^\(url_color \+\)#[0-9a-f]*/\1#${hex}/" "$file"
+                    ;;
+                secondary)
+                    sed -i "s/^\(selection_background \+\)#[0-9a-f]*/\1#${hex}/" "$file"
+                    ;;
+            esac
         fi
 
         file="$output_dir/colors.css"
@@ -220,6 +230,11 @@ rx_apply_color_map() {
         if [[ -f $file ]]; then
             local rofi_key="${key//_/-}"
             sed -i "s/^\(    ${rofi_key}: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
+
+            if [[ $key == "primary" ]]; then
+                sed -i "s/^\(    selected: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
+                sed -i "s/^\(    highlight: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
+            fi
         fi
 
         if [[ -z $slot ]]; then
