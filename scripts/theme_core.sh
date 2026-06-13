@@ -129,6 +129,8 @@ rx_theme_set() {
         rofi_border) var_name="ROFI_BORDER_SIZE" ;;
         rofi_rounding) var_name="ROFI_ROUNDING" ;;
         rofi_padding) var_name="ROFI_PADDING" ;;
+        gtk_font) var_name="GTK_FONT" ;;
+        gtk_font_size) var_name="GTK_FONT_SIZE" ;;
         scheme)
             rx_theme_apply_scheme "$value"
             return $?
@@ -145,6 +147,55 @@ rx_theme_set() {
 rx_theme_refresh_apps() {
     bash "$RETRO_DIR/retro.sh" app all refresh >/dev/null 2>&1
     bash "$RETRO_DIR/retro.sh" theme refresh >/dev/null 2>&1
+}
+
+rx_theme_apply_gtk_font() {
+    local gtk_font
+    gtk_font=$(get_var "GTK_FONT" "Inter")
+    local gtk_font_size
+    gtk_font_size=$(get_var "GTK_FONT_SIZE" "10")
+    local font_line="gtk-font-name=${gtk_font} ${gtk_font_size}"
+
+    mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
+    for f in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+        [[ -f $f ]] && sed -i "/^gtk-font-name=/d" "$f"
+        echo "$font_line" >>"$f"
+    done
+
+    for f in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+        [[ -f $f ]] || continue
+        for key in "gtk-xft-antialias" "gtk-xft-hinting" "gtk-xft-hintstyle" "gtk-xft-rgba"; do
+            sed -i "/^${key}=/d" "$f"
+        done
+        cat >>"$f" <<'EOF'
+gtk-xft-antialias=1
+gtk-xft-hinting=0
+gtk-xft-hintstyle=hintnone
+gtk-xft-rgba=rgb
+EOF
+    done
+
+    local gtk2rc="$HOME/.gtkrc-2.0"
+    for key in "gtk-xft-antialias" "gtk-xft-hinting" "gtk-xft-hintstyle" "gtk-xft-rgba"; do
+        [[ -f $gtk2rc ]] && sed -i "/^${key}/d" "$gtk2rc"
+    done
+    cat >>"$gtk2rc" <<'EOF'
+gtk-xft-antialias=1
+gtk-xft-hinting=0
+gtk-xft-hintstyle="hintnone"
+gtk-xft-rgba="rgb"
+EOF
+
+    local css_files=(
+        "${RETRO_CONFIG:-$HOME/.config/retro}/themes/colors.css"
+        "$HOME/.config/gtk-3.0/gtk.css"
+        "$HOME/.config/gtk-4.0/gtk.css"
+    )
+    for f in "${css_files[@]}"; do
+        [[ -f $f ]] || continue
+        sed -i "s|REPLACE_RETRO_FONT|${gtk_font}|g" "$f"
+        sed -i "s|REPLACE_RETRO_SIZE|${gtk_font_size}|g" "$f"
+    done
 }
 
 rx_theme_apply_mode() {
@@ -167,6 +218,8 @@ rx_theme_apply_mode() {
     gsettings set org.gnome.desktop.interface color-scheme "$portal_theme" 2>/dev/null
     gsettings set org.gnome.desktop.interface gtk-theme "$theme_name" 2>/dev/null
     gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null
+    gsettings set org.gnome.desktop.interface font-antialiasing 'rgba' 2>/dev/null
+    gsettings set org.gnome.desktop.interface font-hinting 'none' 2>/dev/null
 
     mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
     cat >"$HOME/.config/gtk-3.0/settings.ini" <<EOF
@@ -174,10 +227,20 @@ rx_theme_apply_mode() {
 gtk-theme-name=$theme_name
 gtk-icon-theme-name=Papirus-Dark
 gtk-application-prefer-dark-theme=$gtk3_prefer
+gtk-font-name=$(get_var "GTK_FONT" "Inter") $(get_var "GTK_FONT_SIZE" "10")
+gtk-xft-antialias=1
+gtk-xft-hinting=0
+gtk-xft-hintstyle=hintnone
+gtk-xft-rgba=rgb
 EOF
     cat >"$HOME/.config/gtk-4.0/settings.ini" <<EOF
 [Settings]
 gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=$(get_var "GTK_FONT" "Inter") $(get_var "GTK_FONT_SIZE" "10")
+gtk-xft-antialias=1
+gtk-xft-hinting=0
+gtk-xft-hintstyle=hintnone
+gtk-xft-rgba=rgb
 EOF
 
     mkdir -p "$HOME/.config/Kvantum"
@@ -556,6 +619,7 @@ rx_theme_apply_colors() {
     fi
 
     rx_theme_refresh_apps
+    rx_theme_apply_gtk_font
     rx_set_papirus_folder_color
     rx_theme_deploy_browsers
 }
@@ -603,6 +667,8 @@ rofi_font_size|$(get_var "ROFI_FONT_SIZE" "9.5")
 rofi_border|$(get_var "ROFI_BORDER_SIZE" "2")
 rofi_rounding|$(get_var "ROFI_ROUNDING" "10")
 rofi_padding|$(get_var "ROFI_PADDING" "5")
+gtk_font|$(get_var "GTK_FONT" "Inter")
+gtk_font_size|$(get_var "GTK_FONT_SIZE" "10")
 EOF
 }
 
@@ -702,10 +768,21 @@ EOF
         cat <<EOF | sudo tee /etc/gtk-3.0/settings.ini >/dev/null
 [Settings]
 gtk-icon-theme-name = Papirus-Dark
+gtk-xft-antialias=1
+gtk-xft-hinting=0
+gtk-xft-hintstyle=hintnone
+gtk-xft-rgba=rgb
 EOF
         cat <<EOF | sudo tee /etc/gtk-4.0/settings.ini >/dev/null
 [Settings]
 gtk-icon-theme-name = Papirus-Dark
+gtk-xft-antialias=1
+gtk-xft-hinting=0
+gtk-xft-hintstyle=hintnone
+gtk-xft-rgba=rgb
 EOF
+        ;;
+    "--apply-gtk-font")
+        rx_theme_apply_gtk_font
         ;;
 esac

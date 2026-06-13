@@ -138,6 +138,8 @@ cmd_theme() {
                 "$(get_var KITTY_FONT "JetBrainsMono Nerd Font") ($(get_var KITTY_FONT_SIZE 9.5)pt)  ${GRAY}Padding:${PINK} $(get_var KITTY_PADDING 15)"
             _status_line "󰏗" "Rofi Launcher:" \
                 "$(get_var ROFI_FONT "JetBrainsMono Nerd Font") ($(get_var ROFI_FONT_SIZE 9.5)pt)  ${GRAY}Border:${PINK} $(get_var ROFI_BORDER_SIZE 2)  ${GRAY}Round:${PINK} $(get_var ROFI_ROUNDING 10)"
+            _status_line "󰛖" "System GTK:" \
+                "$(get_var GTK_FONT "Inter") ($(get_var GTK_FONT_SIZE 10)pt)"
 
             rx_table_separator
             rx_table_spacer
@@ -199,6 +201,7 @@ cmd_theme() {
             local new_blur new_blur_size new_blur_passes new_blur_vibrancy
             local new_kitty_font new_kitty_font_size new_kitty_padding
             local new_rofi_font new_rofi_font_size new_rofi_border new_rofi_rounding new_rofi_padding
+            local new_gtk_font new_gtk_font_size
             local new_browser_theme
 
             # --- Mode ---
@@ -274,6 +277,10 @@ cmd_theme() {
             new_rofi_rounding=$(rx_input_numeric "Rofi rounding (px)" "$(get_var ROFI_ROUNDING 10)" 0 50)
             new_rofi_padding=$(rx_input_numeric "Rofi padding (px)" "$(get_var ROFI_PADDING 5)" 0 50)
 
+            new_gtk_font=$(_pick_font "Select GTK font" "$(get_var GTK_FONT "Inter")")
+            new_gtk_font_size=$(rx_input "GTK font size" "$(get_var GTK_FONT_SIZE 10)" \
+                '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 10)")
+
             new_browser_theme=false
             rx_confirm "Enable browser theme theming for web pages? Requires Firefox/Zen" \
                 "$(get_var RETRO_BROWSER_THEME true)" && new_browser_theme=true
@@ -290,6 +297,8 @@ cmd_theme() {
                 "Blur" "$new_blur" \
                 "Kitty Font" "$new_kitty_font" \
                 "Rofi Font" "$new_rofi_font" \
+                "GTK Font" "$new_gtk_font" \
+                "GTK Font Size" "$new_gtk_font_size" \
                 "Browser Theme" "$new_browser_theme"
 
             rx_setup_confirm || return 0
@@ -321,6 +330,8 @@ cmd_theme() {
             _theme_call "--set" "rofi_border" "$new_rofi_border"
             _theme_call "--set" "rofi_rounding" "$new_rofi_rounding"
             _theme_call "--set" "rofi_padding" "$new_rofi_padding"
+            _theme_call "--set" "gtk_font" "$new_gtk_font"
+            _theme_call "--set" "gtk_font_size" "$new_gtk_font_size"
 
             set_var "RETRO_BROWSER_THEME" "$new_browser_theme"
             [[ $new_browser_theme == "true" ]] && _theme_call "--deploy-browsers"
@@ -350,7 +361,7 @@ cmd_theme() {
                 fi
             else
                 case "$key" in
-                    opacity|blur|blur_size|blur_passes|blur_vibrancy|kitty_font|kitty_font_size|kitty_padding|kitty_shrink_padding|rofi_font|rofi_font_size|rofi_border|rofi_rounding|rofi_padding|scheme)
+                    opacity|blur|blur_size|blur_passes|blur_vibrancy|kitty_font|kitty_font_size|kitty_padding|kitty_shrink_padding|rofi_font|rofi_font_size|rofi_border|rofi_rounding|rofi_padding|gtk_font|gtk_font_size|scheme)
                         _theme_set "$key" "$value"
                         ;;
                     *)
