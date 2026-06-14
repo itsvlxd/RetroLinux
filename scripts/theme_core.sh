@@ -248,7 +248,7 @@ EOF
 [General]
 theme=retro
 EOF
-    command -v kvantummanager >/dev/null 2>&1 && kvantummanager --set matugen >/dev/null 2>&1 &
+    command -v kvantummanager >/dev/null 2>&1 && kvantummanager --set retro >/dev/null 2>&1 &
 
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
