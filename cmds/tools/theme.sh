@@ -361,7 +361,7 @@ cmd_theme() {
                 fi
             else
                 case "$key" in
-                    opacity|blur|blur_size|blur_passes|blur_vibrancy|kitty_font|kitty_font_size|kitty_padding|kitty_shrink_padding|rofi_font|rofi_font_size|rofi_border|rofi_rounding|rofi_padding|gtk_font|gtk_font_size|scheme)
+                    opacity | blur | blur_size | blur_passes | blur_vibrancy | kitty_font | kitty_font_size | kitty_padding | kitty_shrink_padding | rofi_font | rofi_font_size | rofi_border | rofi_rounding | rofi_padding | gtk_font | gtk_font_size | scheme)
                         _theme_set "$key" "$value"
                         ;;
                     *)
@@ -543,7 +543,7 @@ EOF
                 timeout 0.1s xsettingsd 2>/dev/null
             fi
             if command -v kvantummanager >/dev/null 2>&1; then
-                kvantummanager --set matugen >/dev/null 2>&1 &
+                kvantummanager --set retro >/dev/null 2>&1 &
             fi
             rx_log "success" "GTK/Qt theme reloaded into all open apps"
             ;;
