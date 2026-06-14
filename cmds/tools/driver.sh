@@ -770,21 +770,22 @@ cmd_driver() {
             ;;
 
         hypr | hyprenv)
-            local force_vendor="$2"
-            local hypr_result=$(bash "$driver_script" --hypr "$force_vendor")
+            local force_vendor=""
+            [[ $2 =~ ^(nvidia|amd|intel)$ ]] && force_vendor="$2"
+            local hypr_raw
+            hypr_raw=$(bash "$driver_script" --hypr "$force_vendor")
+            local env_path
+            env_path=$(echo "$hypr_raw" | tail -1)
 
-            local result_type=$(echo "$hypr_result" | grep -oP "result=\K[^|]+")
-            local gpu_type=$(echo "$hypr_result" | grep -oP "type=\K[^|]+")
-
-            if [[ $result_type == "success" ]]; then
+            if echo "$hypr_raw" | head -1 | grep -q "result=success"; then
+                local gpu_type
+                gpu_type=$(echo "$hypr_raw" | head -1 | grep -oP "type=\K[^|]+")
                 rx_log "success" "Generated ${gpu_type^^} env.conf"
-            elif [[ $result_type == "warn" ]]; then
+            elif echo "$hypr_raw" | head -1 | grep -q "result=warn"; then
                 rx_log "warn" "No GPU detected, generated generic env.conf"
             fi
 
-            local show_result=$(bash "$driver_script" --hypr-show)
-            if echo "$show_result" | grep -q "result=success"; then
-                local env_path=$(echo "$show_result" | grep -oP "path=\K[^|]+")
+            if [[ -f $env_path ]]; then
                 rx_table_header "󰢮" "Hyprland GPU Environment"
                 cat "$env_path" | sed 's/^/ /'
                 rx_table_separator
