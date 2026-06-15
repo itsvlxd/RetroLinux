@@ -160,12 +160,60 @@ rx_generate_colors() {
     fi
 }
 
+_dark_to_light() {
+    local hex="$1"
+    local key="$2"
+    python3 -c "
+import sys, colorsys
+
+hx = sys.argv[1]
+key = sys.argv[2]
+r = int(hx[0:2], 16) / 255.0
+g = int(hx[2:4], 16) / 255.0
+b = int(hx[4:6], 16) / 255.0
+h, l, s = colorsys.rgb_to_hls(r, g, b)
+l = max(0.001, min(0.999, l))
+s = max(0.001, min(0.999, s))
+
+bg_keys = {'background', 'surface', 'surface_variant', 'shadow', 'black', 'bright_black'}
+fg_keys = {'on_surface', 'on_background', 'white', 'bright_white', 'on_primary', 'on_secondary', 'on_error'}
+
+if key in bg_keys:
+    new_l = max(0.88, min(0.97, 1.0 - l * 0.85))
+elif key in fg_keys:
+    new_l = min(0.15, max(0.05, 1.0 - l))
+elif key == 'outline':
+    new_l = min(0.55, max(0.25, 1.0 - l * 0.8))
+else:
+    new_l = min(0.72, max(0.38, 1.0 - l * 0.5))
+    s = max(0.15, s * 0.85)
+
+rr, gg, bb = colorsys.hls_to_rgb(h, new_l, s)
+print(f'{int(rr*255):02x}{int(gg*255):02x}{int(bb*255):02x}')
+" "$hex" "$key"
+}
+
+
 rx_apply_color_map() {
     local theme_file="$1"
     local output_dir="${RETRO_CONFIG:-$HOME/.config/retro}/themes"
+    local mode
+    mode=$(get_var "RETRO_THEME_MODE" "dark")
+
+    local cm_key="color_map"
+    local computed=false
+    if [[ $mode == "light" ]]; then
+        local has_light
+        has_light=$(jq -r '.color_map_light | type' "$theme_file" 2>/dev/null)
+        if [[ $has_light == "object" ]]; then
+            cm_key="color_map_light"
+        else
+            computed=true
+        fi
+    fi
 
     local keys
-    keys=$(jq -r '.color_map | if has("highlight") then .highlight = .primary else . end | if has("cursor") then .cursor = .primary else . end | to_entries[] | "\(.key)|\(.value)"' "$theme_file" 2>/dev/null)
+    keys=$(jq -r --arg cm "$cm_key" '.[$cm] | if has("highlight") then .highlight = .primary else . end | if has("cursor") then .cursor = .primary else . end | to_entries[] | "\(.key)|\(.value)"' "$theme_file" 2>/dev/null)
     [[ -z $keys ]] && return 0
 
     declare -A slot_map
@@ -189,6 +237,7 @@ rx_apply_color_map() {
     while IFS='|' read -r key value; do
         [[ -z $key || -z $value ]] && continue
         local hex="${value#\#}"
+        [[ $computed == true ]] && hex=$(_dark_to_light "$hex" "$key")
         local slot="${slot_map[$key]:-}"
 
         local file="$output_dir/kitty-colors.conf"
