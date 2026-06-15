@@ -260,6 +260,7 @@ EOF
         fi
     fi
     rx_theme_apply_colors
+    rx_theme_deploy_root_config
 }
 
 rx_theme_apply_scheme() {
@@ -684,6 +685,18 @@ rx_theme_get_setup_values() {
     echo "gap_out=$(get_var "RETRO_GAP_OUT" "20")"
     echo "shadow=$(get_var "RETRO_SHADOW" "true")"
     echo "blur=$(get_var "RETRO_BLUR" "true")"
+}
+
+
+rx_theme_deploy_root_config() {
+    local dirs=("gtk-3.0" "gtk-4.0" "Kvantum" "qt5ct" "qt6ct")
+    sudo mkdir -p /root/.config
+    for dir in "${dirs[@]}"; do
+        local src="$HOME/.config/$dir"
+        mkdir -p "$src"
+        sudo ln -snf "$src" "/root/.config/$dir"
+    done
+    rx_log_file "info" "Root config symlinks deployed ($(get_var "RETRO_THEME_MODE" "dark"), $(get_var "GTK_FONT" "Inter") $(get_var "GTK_FONT_SIZE" "10"))"
 }
 
 case "$1" in

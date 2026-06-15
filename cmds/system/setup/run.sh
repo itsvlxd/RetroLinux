@@ -46,6 +46,10 @@ run_postinstall() {
 
     retro wallpaper setup --needed -o "theme=retro"
     retro theme setup --needed -y
+    sudo mkdir -p /root/.config
+    for _dir in gtk-3.0 gtk-4.0 Kvantum qt5ct qt6ct; do
+        sudo ln -snf "$HOME/.config/$_dir" "/root/.config/$_dir"
+    done
     retro power setup --needed -o "profile=recommended"
     retro font setup --needed -y
     retro input setup --needed -y

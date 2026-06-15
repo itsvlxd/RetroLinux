@@ -303,10 +303,8 @@ cmd_theme() {
 
             rx_setup_confirm || return 0
 
-            set_var "RETRO_THEME_MODE" "$new_mode"
             set_var "RETRO_THEME_SCHEME" "$new_scheme"
-
-            _theme_call "--apply-colors"
+            _theme_call "--mode" "$new_mode"
 
             _theme_call "--set" "opacity" "$new_opacity"
             _theme_call "--set" "inactive_opacity" "$new_inactive_opacity"
