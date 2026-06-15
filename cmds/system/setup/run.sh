@@ -48,6 +48,7 @@ run_postinstall() {
     retro theme setup --needed -y
     retro power setup --needed -o "profile=recommended"
     retro font setup --needed -y
+    retro input setup --needed -y
     retro audio setup
     retro polkit setup --needed -y
     retro firewall setup --needed -o "engine=${FIREWALL_ENGINE:-nftables},default=drop"
