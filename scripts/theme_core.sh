@@ -261,6 +261,10 @@ EOF
     fi
     rx_theme_apply_colors
     rx_theme_deploy_root_config
+    local cursor cursor_size
+    cursor=$(get_var "RETRO_CURSOR_THEME" "auto")
+    cursor_size=$(get_var "RETRO_CURSOR_SIZE" "24")
+    rx_cursor_set "$cursor" "$cursor_size" >/dev/null
 }
 
 rx_theme_apply_scheme() {
@@ -699,6 +703,131 @@ rx_theme_deploy_root_config() {
     rx_log_file "info" "Root config symlinks deployed ($(get_var "RETRO_THEME_MODE" "dark"), $(get_var "GTK_FONT" "Inter") $(get_var "GTK_FONT_SIZE" "10"))"
 }
 
+_cursor_resolve() {
+    local name="$1"
+    if [[ $name == "auto" ]]; then
+        local mode
+        mode=$(get_var "RETRO_THEME_MODE" "dark")
+        if [[ $mode == "light" ]]; then
+            echo "Moga-White"
+        else
+            echo "Moga-Black"
+        fi
+    else
+        echo "$name"
+    fi
+}
+
+rx_cursor_set() {
+    local input="$1"
+    local size="${2:-24}"
+    local name
+    name=$(_cursor_resolve "$input")
+
+    local src_dir="$RETRO_DIR/themes/cursors/$name"
+    if [[ ! -d $src_dir ]]; then
+        rx_log_file "error" "Cursor theme '$name' not found in $RETRO_DIR/themes/cursors/"
+        return 1
+    fi
+
+    mkdir -p "$HOME/.local/share/icons" "$HOME/.icons" "$HOME/.icons/default"
+    ln -snf "$src_dir" "$HOME/.local/share/icons/$name"
+    ln -snf "$HOME/.local/share/icons/$name" "$HOME/.icons/$name"
+    cat >"$HOME/.icons/default/index.theme" <<EOF
+[Icon Theme]
+Inherits=$name
+EOF
+    sudo mkdir -p /usr/share/icons/default
+    cat <<EOF | sudo tee /usr/share/icons/default/index.theme >/dev/null
+[Icon Theme]
+Inherits=$name
+EOF
+
+    local xresources="$HOME/.Xresources"
+    if grep -q '^Xcursor\.theme' "$xresources" 2>/dev/null; then
+        sed -i "s/^Xcursor\.theme:.*/Xcursor.theme: $name/" "$xresources"
+    else
+        echo "Xcursor.theme: $name" >> "$xresources"
+    fi
+    if grep -q '^Xcursor\.size' "$xresources" 2>/dev/null; then
+        sed -i "s/^Xcursor\.size:.*/Xcursor.size: $size/" "$xresources"
+    else
+        echo "Xcursor.size: $size" >> "$xresources"
+    fi
+    command -v xrdb >/dev/null 2>&1 && DISPLAY="${DISPLAY:-:0}" xrdb -merge "$xresources" 2>/dev/null
+
+    for gtk_file in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+        [[ -f $gtk_file ]] || continue
+        if grep -q '^gtk-cursor-theme-name' "$gtk_file" 2>/dev/null; then
+            sed -i "s/^gtk-cursor-theme-name=.*/gtk-cursor-theme-name=$name/" "$gtk_file"
+        else
+            echo "gtk-cursor-theme-name=$name" >> "$gtk_file"
+        fi
+    done
+
+    local env_file="$HOME/.config/retro/env.lua"
+    mkdir -p "$(dirname "$env_file")"
+    [[ ! -f $env_file ]] && touch "$env_file"
+    if grep -q 'XCURSOR_THEME' "$env_file" 2>/dev/null; then
+        sed -i "s/hl\.env(\"XCURSOR_THEME\", \"[^\"]*\")/hl.env(\"XCURSOR_THEME\", \"$name\")/" "$env_file"
+    else
+        echo "hl.env(\"XCURSOR_THEME\", \"$name\")" >> "$env_file"
+    fi
+    for var in XCURSOR_SIZE HYPRCURSOR_THEME HYPRCURSOR_SIZE; do
+        local val="$size"
+        [[ $var == HYPRCURSOR_THEME ]] && val="$name"
+        if grep -q "$var" "$env_file" 2>/dev/null; then
+            sed -i "s/hl\.env(\"$var\", \"[^\"]*\")/hl.env(\"$var\", \"$val\")/" "$env_file"
+        else
+            echo "hl.env(\"$var\", \"$val\")" >> "$env_file"
+        fi
+    done
+
+    gsettings set org.gnome.desktop.interface cursor-theme "$name" 2>/dev/null
+    gsettings set org.gnome.desktop.interface cursor-size "$size" 2>/dev/null
+
+    command -v hyprctl >/dev/null 2>&1 && hyprctl setcursor "$name" "$size" 2>/dev/null
+
+    local xsettingsd_conf="$HOME/.config/xsettingsd/xsettingsd.conf"
+    if [[ -f $xsettingsd_conf ]]; then
+        if grep -q 'Net/CursorTheme' "$xsettingsd_conf" 2>/dev/null; then
+            sed -i "s/Net\/CursorTheme.*/Net\/CursorTheme \"$name\"/" "$xsettingsd_conf"
+        else
+            echo "Net/CursorTheme \"$name\"" >> "$xsettingsd_conf"
+        fi
+        if grep -q 'Net/CursorSize' "$xsettingsd_conf" 2>/dev/null; then
+            sed -i "s/Net\/CursorSize.*/Net\/CursorSize $size/" "$xsettingsd_conf"
+        else
+            echo "Net/CursorSize $size" >> "$xsettingsd_conf"
+        fi
+        command -v xsettingsd >/dev/null 2>&1 && timeout 0.1s xsettingsd 2>/dev/null
+    fi
+
+    local css_files=(
+        "${RETRO_CONFIG:-$HOME/.config/retro}/themes/colors.css"
+        "$HOME/.config/gtk-3.0/gtk.css"
+        "$HOME/.config/gtk-4.0/gtk.css"
+    )
+    for f in "${css_files[@]}"; do
+        [[ -f $f ]] || continue
+        sed -i "s|REPLACE_CURSOR|${name}|g" "$f"
+    done
+
+    set_var "RETRO_CURSOR_THEME" "$input"
+    set_var "RETRO_CURSOR_SIZE" "$size"
+    echo "$name"
+}
+
+rx_cursor_list() {
+    local dir
+    for dir in "$RETRO_DIR/themes/cursors"/*/; do
+        [[ -d $dir ]] || continue
+        local name
+        name=$(grep -m1 '^Name=' "$dir/index.theme" 2>/dev/null | cut -d= -f2)
+        echo "${name:-$(basename "$dir")}"
+    done
+}
+
 case "$1" in
     "--set")
         rx_theme_set "$2" "$3"
@@ -797,5 +926,11 @@ EOF
         ;;
     "--apply-gtk-font")
         rx_theme_apply_gtk_font
+        ;;
+    "--cursor-set")
+        rx_cursor_set "$2" "$3"
+        ;;
+    "--cursor-list")
+        rx_cursor_list
         ;;
 esac

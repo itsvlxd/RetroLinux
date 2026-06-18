@@ -1011,6 +1011,13 @@ generate_hypr_env() {
             echo "hl.env(\"mesa_glthread\", \"true\")"
             result_line="result=warn|no_gpu_detected"
         fi
+
+        echo
+        echo "-- Cursor theme (from retro theme cursor set)"
+        echo "hl.env(\"XCURSOR_THEME\", \"$(get_var 'RETRO_CURSOR_THEME' 'auto')\")"
+        echo "hl.env(\"XCURSOR_SIZE\", \"$(get_var 'RETRO_CURSOR_SIZE' '24')\")"
+        echo "hl.env(\"HYPRCURSOR_THEME\", \"$(get_var 'RETRO_CURSOR_THEME' 'auto')\")"
+        echo "hl.env(\"HYPRCURSOR_SIZE\", \"$(get_var 'RETRO_CURSOR_SIZE' '24')\")"
     } >"$env_file"
 
     echo "$result_line"
