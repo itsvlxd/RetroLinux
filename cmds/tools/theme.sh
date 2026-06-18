@@ -546,6 +546,53 @@ EOF
             rx_log "success" "GTK/Qt theme reloaded into all open apps"
             ;;
 
+        "cursor")
+            local cursor_action="${1,,}"
+            shift 2>/dev/null || true
+
+            case "$cursor_action" in
+                "set")
+                    local cursor_name="$1"
+                    [[ -z $cursor_name ]] && rx_log "error" "Usage: retro theme cursor set <name|auto>" && return 1
+                    local cursor_size
+                    cursor_size=$(get_var "RETRO_CURSOR_SIZE" "24")
+                    local resolved
+                    resolved=$(_theme_call "--cursor-set" "$cursor_name" "$cursor_size")
+                    if [[ $? -eq 0 && -n $resolved ]]; then
+                        rx_log "success" "Cursor theme set to ${PINK}$resolved${RESET} (size: ${PINK}$cursor_size${RESET})"
+                    else
+                        rx_log "error" "Failed to set cursor theme"
+                        return 1
+                    fi
+                    ;;
+                "size")
+                    local new_size="$1"
+                    [[ -z $new_size ]] && rx_log "error" "Usage: retro theme cursor size <number>" && return 1
+                    local current
+                    current=$(get_var "RETRO_CURSOR_THEME" "auto")
+                    local resolved
+                    resolved=$(_theme_call "--cursor-set" "$current" "$new_size")
+                    if [[ $? -eq 0 && -n $resolved ]]; then
+                        rx_log "success" "Cursor size set to ${PINK}$new_size${RESET}"
+                    else
+                        rx_log "error" "Failed to set cursor size"
+                        return 1
+                    fi
+                    ;;
+                "list")
+                    rx_table_header "󰆣" "Cursor Themes"
+                    while IFS= read -r name; do
+                        rx_table_list_single "󰆣" "$name"
+                    done < <(_theme_call "--cursor-list")
+                    rx_table_spacer
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro theme cursor {set|size|list}"
+                    return 1
+                    ;;
+            esac
+            ;;
+
         *)
             rx_help_usage "retro theme <command>"
             rx_help_commands "Available commands"
@@ -556,6 +603,7 @@ EOF
             rx_help_cmd "set <name>" "Apply a predefined color scheme (e.g. 'set catppuccin')"
             rx_help_cmd "set <key> <value>" "Set an individual aesthetic value (e.g. 'set opacity 0.95')"
             rx_help_cmd "font {set|size}" "Set font family or size (interactive app picker)"
+            rx_help_cmd "cursor {set|size|list}" "Manage cursor themes (set <name|auto>, size <N>, list)"
             rx_help_cmd "apply-colors" "Regenerate colors from wallpaper"
             rx_help_cmd "browsers" "Deploy colors and website themes to Firefox/Zen profiles"
             rx_help_cmd "refresh" "Live-reload GTK3/GTK4 theme into running apps"
@@ -567,6 +615,8 @@ EOF
             rx_help_example "retro theme set opacity 0.95" "Set window opacity"
             rx_help_example "retro theme browsers" "Deploy colors + website themes to browsers"
             rx_help_example "retro theme font set" "Set font for an app"
+            rx_help_example "retro theme cursor set auto" "Auto-switch cursor with mode (Moga-Black/Moga-White)"
+            rx_help_example "retro theme cursor size 32" "Set cursor size to 32px"
             rx_help_spacer
             ;;
     esac

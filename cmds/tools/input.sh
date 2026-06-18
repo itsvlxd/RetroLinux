@@ -162,7 +162,7 @@ cmd_input() {
             fi
 
             case "$new_direction" in
-                horizontal|vertical) ;;
+                horizontal | vertical) ;;
                 "")
                     rx_log "error" "Direction is required (horizontal or vertical)"
                     return 1
@@ -369,7 +369,7 @@ cmd_input() {
 
                         local action_icon="󰇝"
                         case "$type" in
-                            exec)   action_icon="󰄧" ;;
+                            exec) action_icon="󰄧" ;;
                             function) action_icon="󰊕" ;;
                             dispatch) action_icon="󰄾" ;;
                         esac
@@ -381,7 +381,7 @@ cmd_input() {
 
                         printf " ${PINK}%s${RESET} %-20s ${PINK}%-10s${RESET} %s\n" \
                             "$action_icon" "$key" "$type" "$display_value"
-                    done <<< "$data"
+                    done <<<"$data"
 
                     echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────────────────${RESET}"
                     echo -e " ${PINK}󰐧${RESET} ${PINK}${count}${RESET} keybinds total"
@@ -394,9 +394,9 @@ cmd_input() {
                     if [[ -z $new_key || -z $new_action ]]; then
                         rx_log "error" "Usage: retro input binds add <key> <action_type>:<action_value>"
                         rx_log "info" "Examples:"
-                        rx_log "info" "  retro input binds add \"SUPER + B\" exec:firefox"
-                        rx_log "info" "  retro input binds add \"SUPER + SHIFT + Q\" dispatch:window.close"
-                        rx_log "info" "  retro input binds add \"SUPER + SPACE\" func:open_terminal"
+                        rx_log "info" '  retro input binds add "SUPER + B" exec:firefox'
+                        rx_log "info" '  retro input binds add "SUPER + SHIFT + Q" dispatch:window.close'
+                        rx_log "info" '  retro input binds add "SUPER + SPACE" func:open_terminal'
                         return 1
                     fi
 
@@ -427,7 +427,7 @@ cmd_input() {
 
                     if [[ -z $target_key ]]; then
                         rx_log "error" "Usage: retro input binds remove <key>"
-                        rx_log "info" "Example: retro input binds remove \"SUPER + Z\""
+                        rx_log "info" 'Example: retro input binds remove "SUPER + Z"'
                         return 1
                     fi
 
@@ -468,7 +468,7 @@ cmd_input() {
                             [[ $matches -eq 1 ]] && echo -e "\n ${PINK}󰐧 Find: ${term}${RESET}"
                             printf "  ${PINK}%-22s${RESET} ${MUTE}%-12s${RESET} %s\n" "$key" "$type" "$value"
                         fi
-                    done <<< "$data"
+                    done <<<"$data"
 
                     if [[ $matches -eq 0 ]]; then
                         rx_log "info" "No binds matching ${PINK}$term${RESET}"
@@ -514,14 +514,14 @@ cmd_input() {
             rx_help_example "retro input mouse 0.5 adaptive" "Set mouse sensitivity"
             rx_help_example "retro input gesture 3 horizontal workspace" "3-finger swipe to switch workspaces"
             rx_help_example "retro input binds list" "List all keybinds"
-            rx_help_example "retro input binds add \"SUPER + B\" exec:firefox" "Add a keybind"
-            rx_help_example "retro input binds remove \"SUPER + Z\"" "Remove a keybind"
+            rx_help_example 'retro input binds add "SUPER + B" exec:firefox' "Add a keybind"
+            rx_help_example 'retro input binds remove "SUPER + Z"' "Remove a keybind"
             rx_help_example "retro input binds find SUPER" "Search keybinds"
-            rx_help_example "retro input keybinds edit" "Edit keybinds in \$EDITOR"
+            rx_help_example "retro input keybinds edit" 'Edit keybinds in $EDITOR'
             rx_help_example "retro input keybinds reset" "Reset keybinds to defaults"
             rx_help_spacer
             ;;
     esac
 }
 
-register_command "TOOLS" "input|i" "Manage input devices, keybinds, and gestures" "cmd_input"
+register_command "TOOLS" "input" "Manage input devices, keybinds, and gestures" "cmd_input"
