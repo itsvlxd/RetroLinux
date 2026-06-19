@@ -627,6 +627,7 @@ rx_theme_apply_colors() {
     rx_theme_apply_gtk_font
     rx_set_papirus_folder_color
     rx_theme_deploy_browsers
+    rx_sddm_refresh
 }
 
 rx_theme_get_status_lines() {
@@ -828,6 +829,389 @@ rx_cursor_list() {
     done
 }
 
+_sddm_css() {
+    sed -n "s/@define-color $1 *\(#[^;]*\);.*/\1/p" "${2:?}"
+}
+
+rx_sddm_refresh() {
+    local sddm_dir="/usr/share/sddm/themes/retro"
+    [[ ! -d $sddm_dir ]] && return 0
+
+    local sudo_cmd=""
+    [[ ! -w $sddm_dir ]] && sudo_cmd="sudo"
+
+    local config_src="${RETRO_CONFIG:-$HOME/.config/retro}/themes/sddm.conf"
+    local wallpaper
+    wallpaper=$(get_var "WALL_CURRENT" "")
+    local frame="$HOME/.config/retro/wallpaper_frames/$(basename "$wallpaper").png"
+
+    $sudo_cmd mkdir -p "$sddm_dir/backgrounds" "$sddm_dir/configs"
+
+    if [[ -f $frame ]]; then
+        $sudo_cmd magick "$frame" -resize "1920x1080^" -gravity center -extent 1920x1080 \
+            "$sddm_dir/backgrounds/retro-wallpaper.jpg" 2>/dev/null
+    elif [[ -f $wallpaper ]]; then
+        $sudo_cmd magick "$wallpaper" -resize "1920x1080^" -gravity center -extent 1920x1080 \
+            "$sddm_dir/backgrounds/retro-wallpaper.jpg" 2>/dev/null
+    fi
+
+    local mode scheme
+    mode=$(get_var "RETRO_THEME_MODE" "dark")
+    scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
+
+    local surface on_surface primary on_primary surface_variant outline
+    local primary_container error tertiary
+    local on_surface_variant on_primary_container
+
+    if [[ $scheme != "wallpaper" ]]; then
+        local theme_file="$THEMES_DIR/${scheme}.json"
+        local cm_key="color_map"
+        local computed=false
+        if [[ $mode == "light" ]]; then
+            local has_light
+            has_light=$(jq -r '.color_map_light | type' "$theme_file" 2>/dev/null)
+            if [[ $has_light == "object" ]]; then
+                cm_key="color_map_light"
+            else
+                computed=true
+            fi
+        fi
+
+        local val
+        val=$(jq -r ".[\"$cm_key\"].surface // \"\"" "$theme_file" 2>/dev/null)
+        surface="${val:-#070514}"
+        val=$(jq -r ".[\"$cm_key\"].on_surface // \"\"" "$theme_file" 2>/dev/null)
+        on_surface="${val:-#e5e9f0}"
+        val=$(jq -r ".[\"$cm_key\"].primary // \"\"" "$theme_file" 2>/dev/null)
+        primary="${val:-#b24bf3}"
+        val=$(jq -r ".[\"$cm_key\"].on_primary // \"\"" "$theme_file" 2>/dev/null)
+        on_primary="${val:-#ffffff}"
+        val=$(jq -r ".[\"$cm_key\"].surface_variant // \"\"" "$theme_file" 2>/dev/null)
+        surface_variant="${val:-#0a091a}"
+        val=$(jq -r ".[\"$cm_key\"].outline // \"\"" "$theme_file" 2>/dev/null)
+        outline="${val:-#323c58}"
+        val=$(jq -r ".[\"$cm_key\"].primary_container // \"\"" "$theme_file" 2>/dev/null)
+        primary_container="${val:-#12102e}"
+        val=$(jq -r ".[\"$cm_key\"].error // \"\"" "$theme_file" 2>/dev/null)
+        error="${val:-#ff2a6d}"
+        val=$(jq -r ".[\"$cm_key\"].tertiary // \"\"" "$theme_file" 2>/dev/null)
+        tertiary="${val:-#ffcc33}"
+
+        if [[ $computed == true ]]; then
+            surface="#$(_dark_to_light "${surface#\#}" "surface")"
+            on_surface="#$(_dark_to_light "${on_surface#\#}" "on_surface")"
+            primary="#$(_dark_to_light "${primary#\#}" "primary")"
+            on_primary="#$(_dark_to_light "${on_primary#\#}" "on_primary")"
+            surface_variant="#$(_dark_to_light "${surface_variant#\#}" "surface_variant")"
+            outline="#$(_dark_to_light "${outline#\#}" "outline")"
+            primary_container="#$(_dark_to_light "${primary_container#\#}" "primary_container")"
+            error="#$(_dark_to_light "${error#\#}" "error")"
+            tertiary="#$(_dark_to_light "${tertiary#\#}" "tertiary")"
+        fi
+    else
+        local css_file="${RETRO_CONFIG:-$HOME/.config/retro}/themes/colors.css"
+        if [[ -f $css_file ]]; then
+            surface=$(_sddm_css "surface" "$css_file")
+            on_surface=$(_sddm_css "on_surface" "$css_file")
+            primary=$(_sddm_css "primary" "$css_file")
+            on_primary=$(_sddm_css "on_primary" "$css_file")
+            surface_variant=$(_sddm_css "surface_variant" "$css_file")
+            outline=$(_sddm_css "outline" "$css_file")
+            primary_container=$(_sddm_css "primary_container" "$css_file")
+            error=$(_sddm_css "error" "$css_file")
+            tertiary=$(_sddm_css "tertiary" "$css_file")
+        fi
+    fi
+
+    : "${surface:=#070514}"
+    : "${on_surface:=#e5e9f0}"
+    : "${primary:=#b24bf3}"
+    : "${on_primary:=#ffffff}"
+    : "${surface_variant:=#0a091a}"
+    : "${outline:=#323c58}"
+    : "${primary_container:=#12102e}"
+    : "${error:=#ff2a6d}"
+    : "${tertiary:=#ffcc33}"
+    : "${on_surface_variant:=$on_surface}"
+    : "${on_primary_container:=$on_primary}"
+
+    mkdir -p "$(dirname "$config_src")"
+    cat > "$config_src" << SDDMEOF
+; Auto-generated by retro theme engine — do not edit
+
+[General]
+scale = 1.0
+enable-animations = true
+animated-background-placeholder = "retro-wallpaper.jpg"
+background-fill-mode = "fill"
+
+[LockScreen]
+display = true
+padding-top = 0
+padding-right = 0
+padding-bottom = 0
+padding-left = 0
+background = "retro-wallpaper.jpg"
+use-background-color = false
+background-color = ${surface}
+blur = 32
+brightness = 0.0
+saturation = 0.0
+
+[LockScreen.Clock]
+display = true
+position = "top-center"
+align = "center"
+format = "hh:mm"
+font-family = "RedHatDisplay"
+font-size = 70
+font-weight = 900
+color = ${on_surface}
+
+[LockScreen.Date]
+display = true
+format = "dddd, MMMM dd, yyyy"
+locale = "en_US"
+font-family = "RedHatDisplay"
+font-size = 14
+font-weight = 600
+color = ${on_surface}
+margin-top = -15
+
+[LockScreen.Message]
+display = true
+position = "bottom-center"
+align = "center"
+text = "Press any key"
+font-family = "RedHatDisplay"
+font-size = 12
+font-weight = 400
+display-icon = true
+icon = "enter.svg"
+icon-size = 16
+color = ${on_surface}
+paint-icon = true
+spacing = 0
+
+[LoginScreen]
+background = "retro-wallpaper.jpg"
+use-background-color = false
+background-color = ${surface}
+blur = 0
+brightness = 0.0
+saturation = 0.0
+
+[LoginScreen.LoginArea]
+position = "center"
+margin = -1
+
+[LoginScreen.LoginArea.Avatar]
+shape = "circle"
+border-radius = 35
+active-size = 120
+inactive-size = 80
+inactive-opacity = 0.35
+active-border-size = 0
+inactive-border-size = 0
+active-border-color = ${primary}
+inactive-border-color = ${outline}
+always-active = false
+
+[LoginScreen.LoginArea.Username]
+font-family = "RedHatDisplay"
+font-size = 16
+font-weight = 700
+color = ${on_surface}
+margin = 10
+
+[LoginScreen.LoginArea.PasswordInput]
+width = 200
+height = 30
+display-icon = true
+font-family = "RedHatDisplay"
+font-size = 12
+icon = "password.svg"
+icon-size = 16
+content-color = ${on_surface}
+background-color = ${surface_variant}
+background-opacity = 1.0
+border-size = 1
+border-color = ${outline}
+border-radius-left = 10
+border-radius-right = 10
+margin-top = 10
+masked-character = "●"
+
+[LoginScreen.LoginArea.LoginButton]
+background-color = ${primary}
+background-opacity = 1.0
+active-background-color = ${primary}
+active-background-opacity = 0.80
+icon = "arrow-right.svg"
+icon-size = 18
+content-color = ${on_primary}
+active-content-color = ${on_primary}
+border-size = 0
+border-color = ${primary}
+border-radius-left = 10
+border-radius-right = 10
+margin-left = 5
+show-text-if-no-password = true
+hide-if-not-needed = false
+font-family = "RedHatDisplay"
+font-size = 12
+font-weight = 600
+
+[LoginScreen.LoginArea.Spinner]
+display-text = true
+text = "Logging in"
+font-family = "RedHatDisplay"
+font-weight = 600
+font-size = 14
+icon-size = 30
+icon = "spinner.svg"
+color = ${primary}
+spacing = 5
+
+[LoginScreen.LoginArea.WarningMessage]
+font-family = "RedHatDisplay"
+font-size = 11
+font-weight = 400
+normal-color = ${on_surface_variant}
+warning-color = ${tertiary}
+error-color = ${error}
+margin-top = 10
+
+[LoginScreen.MenuArea.Buttons]
+margin-top = 50
+margin-right = 50
+margin-bottom = 50
+margin-left = 50
+size = 30
+border-radius = 5
+spacing = 10
+font-family = "RedHatDisplay"
+
+[LoginScreen.MenuArea.Popups]
+max-height = 300
+item-height = 30
+item-spacing = 2
+padding = 5
+display-scrollbar = true
+margin = 5
+background-color = ${surface_variant}
+background-opacity = 1.0
+active-option-background-color = ${primary_container}
+active-option-background-opacity = 1.0
+content-color = ${on_surface}
+active-content-color = ${on_primary_container}
+font-family = "RedHatDisplay"
+border-size = 1
+border-color = ${outline}
+font-size = 11
+icon-size = 16
+
+[LoginScreen.MenuArea.Session]
+display = true
+position = "bottom-left"
+index = 0
+popup-direction = "up"
+popup-align = "center"
+display-session-name = true
+button-width = 200
+popup-width = 200
+background-color = ${surface}
+background-opacity = 0.0
+active-background-opacity = 0.30
+content-color = ${on_surface}
+active-content-color = ${primary}
+border-size = 0
+font-size = 10
+icon-size = 16
+
+[LoginScreen.MenuArea.Layout]
+display = true
+position = "bottom-right"
+index = 0
+popup-direction = "up"
+popup-align = "center"
+popup-width = 180
+display-layout-name = true
+background-color = ${surface}
+background-opacity = 0.0
+active-background-opacity = 0.30
+content-color = ${on_surface}
+active-content-color = ${primary}
+border-size = 0
+font-size = 10
+icon = "language.svg"
+icon-size = 16
+
+[LoginScreen.MenuArea.Keyboard]
+display = true
+position = "bottom-right"
+index = 0
+background-color = ${surface}
+background-opacity = 0.0
+active-background-opacity = 0.30
+content-color = ${on_surface}
+active-content-color = ${primary}
+border-size = 0
+icon = "keyboard.svg"
+icon-size = 16
+
+[LoginScreen.MenuArea.Power]
+display = true
+position = "bottom-right"
+index = 0
+popup-direction = "up"
+popup-align = "center"
+popup-width = 100
+background-color = ${surface}
+background-opacity = 0.0
+active-background-opacity = 0.30
+content-color = ${on_surface}
+active-content-color = ${primary}
+border-size = 0
+icon = "power.svg"
+icon-size = 16
+
+[LoginScreen.VirtualKeyboard]
+scale = 1.0
+position = "login"
+start-hidden = true
+background-color = ${surface_variant}
+background-opacity = 1.0
+key-content-color = ${on_surface}
+key-color = ${surface}
+key-opacity = 1.0
+key-active-background-color = ${primary_container}
+key-active-opacity = 1.0
+selection-background-color = ${primary}
+selection-content-color = ${on_primary}
+primary-color = ${primary}
+border-size = 0
+border-color = ${outline}
+restrict-input = "none"
+
+[Tooltips]
+enable = true
+font-family = "RedHatDisplay"
+font-size = 11
+content-color = ${on_surface}
+background-color = ${surface_variant}
+background-opacity = 1.0
+border-radius = 5
+disable-user = false
+disable-login-button = false
+SDDMEOF
+
+    $sudo_cmd cp "$config_src" "$sddm_dir/configs/retro.conf"
+    $sudo_cmd sed -i "s|^ConfigFile=.*|ConfigFile=configs/retro.conf|" "$sddm_dir/metadata.desktop"
+
+    rx_log_file "info" "SDDM theme refreshed (wallpaper + colors deployed)"
+}
+
 case "$1" in
     "--set")
         rx_theme_set "$2" "$3"
@@ -932,5 +1316,8 @@ EOF
         ;;
     "--cursor-list")
         rx_cursor_list
+        ;;
+    "--sddm-refresh")
+        rx_sddm_refresh
         ;;
 esac
