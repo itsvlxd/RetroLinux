@@ -202,6 +202,7 @@ rx_wallpaper_apply_colors() {
     hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
 
     "$RETRO_DIR/retro.sh" app all refresh
+    bash "$RETRO_DIR/scripts/theme_core.sh" "--sddm-refresh" >/dev/null 2>&1
     rx_set_papirus_folder_color
 }
 
