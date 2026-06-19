@@ -54,3 +54,8 @@ output_path = "~/.config/retro/themes/firefox.css"
 pre_hook = 'mkdir -p ~/.config/cava/themes'
 input_path = '~/.config/matugen/templates/cava-colors.ini'
 output_path = '~/.config/cava/themes/retro'
+
+[templates.sddm]
+pre_hook = 'mkdir -p ~/.config/retro/themes'
+input_path = '~/.config/matugen/templates/sddm.conf'
+output_path = '~/.config/retro/themes/sddm.conf'
