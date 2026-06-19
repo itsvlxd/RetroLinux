@@ -1,0 +1,11 @@
+{
+  "title": "SDDM",
+  "description": "SilentSDDM login theme with dynamic colors and wallpaper-matched background",
+  "type": "core",
+  "access": "root",
+  "defaults": false,
+  "mode": "install",
+  "config": "./files",
+  "install": "/usr/share/sddm/themes",
+  "overwrite": true
+}
