@@ -217,7 +217,7 @@ function Notify.pkg_updates(count, sample, extra_opts)
 		icon = "software-update-available-symbolic",
 		urgency = "normal",
 		timeout = "20000",
-		background = true,
+		wait = true,
 		actions = {
 			{ key = "update", label = "Update Now" },
 			{ key = "later", label = "Remind Later" },
@@ -239,7 +239,7 @@ function Notify.retro_update(commits, extra_opts)
 		icon = "software-update-available-symbolic",
 		urgency = "normal",
 		timeout = "20000",
-		background = true,
+		wait = true,
 		actions = {
 			{ key = "update", label = "Update" },
 			{ key = "later", label = "Remind me later" },
