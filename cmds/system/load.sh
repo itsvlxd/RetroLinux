@@ -22,6 +22,8 @@ cmd_load() {
 
         "retro benchmark hud load|Loads mangohud and benchmark variables"
 
+        "retro display scale --from-dpi|Applying display scaling to XWayland DPI"
+
         "wl-paste --type text --watch cliphist store -ignore-secrets|Starting cliphist text store watcher"
         "wl-paste --type image --watch cliphist store -ignore-secrets|Starting cliphist image store watcher"
 
