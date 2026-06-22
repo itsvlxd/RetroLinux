@@ -27,7 +27,7 @@ return {
 		while true do
 			local now = Watcher.time()
 
-			if now - last_pkg_check > pkg_interval then
+			if now - last_pkg_check >= pkg_interval then
 				local helper = Watcher.get_var("PKG_HELPER", "yay")
 				local pac_raw = Watcher.run_cmd("checkupdates 2>/dev/null")
 				local pac_count = 0
@@ -43,22 +43,27 @@ return {
 
 				local total = pac_count + aur_count
 
-				local raw_thresh = Watcher.get_var("RETRO_PKG_UPDATE_THRESH", "20")
-				local thresh = tonumber((raw_thresh:gsub("%D", ""))) or 20
+			local raw_thresh = Watcher.get_var("RETRO_PKG_UPDATE_THRESH", "20")
+			local thresh = tonumber((raw_thresh:gsub("%D", ""))) or 20
 
 				if total > 0 and total >= thresh then
-					local sample_raw = Watcher.run_cmd(
-						"(checkupdates 2>/dev/null; " .. helper .. " -Qu 2>/dev/null) | head -n 3 | awk '{print $1}'"
-					)
-					local sample = ""
-					local count = 0
-					for pkg in sample_raw:gmatch("[^\n]+") do
-						count = count + 1
-						if count > 1 then
-							sample = sample .. ", "
+					local sample_names = {}
+					local seen = {}
+					for line in pac_raw:gmatch("[^\n]+") do
+						local name = line:match("^(%S+)")
+						if name and not seen[name] and #sample_names < 3 then
+							seen[name] = true
+							table.insert(sample_names, name)
 						end
-						sample = sample .. pkg
 					end
+					for line in aur_raw:gmatch("[^\n]+") do
+						local name = line:match("^(%S+)")
+						if name and not seen[name] and #sample_names < 3 then
+							seen[name] = true
+							table.insert(sample_names, name)
+						end
+					end
+					local sample = table.concat(sample_names, ", ")
 					Watcher.log(
 						"timers",
 						string.format(
@@ -89,7 +94,7 @@ return {
 				last_pkg_check = now
 			end
 
-			if retro_dir and now - last_retro_check > retro_interval then
+			if retro_dir and now - last_retro_check >= retro_interval then
 				local git_check = Watcher.run_cmd("test -d '" .. retro_dir .. "/.git' && echo yes")
 				if git_check == "yes" then
 					Watcher.run_cmd("git -C '" .. retro_dir .. "' fetch origin 2>/dev/null")

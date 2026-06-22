@@ -137,19 +137,17 @@ function Events.on_bluetooth_pairing_request(name, mac)
 end
 
 function Events.on_pkg_updates_available(count, sample)
+	log("Notification: pkg_updates | count=" .. count .. " | sample=" .. sample)
 	local retro_dir = os.getenv("RETRO_DIR")
-	local update_cmd = "hyprctl dispatch exec '[float; size 1000 700; center] kitty -- bash "
-		.. retro_dir
-		.. "/scripts/lib/system_update.sh "
-		.. count
-		.. " "
-		.. sample
-		.. "'"
-	Notify.pkg_updates(count, sample, {
-		action_handlers = {
-			{ key = "update", cmd = update_cmd },
-		},
-	})
+	local kitty_args = "kitty -- bash " .. retro_dir .. "/scripts/lib/system_update.sh " .. count .. " " .. sample
+	local lua_expr = 'hl.dsp.exec_cmd("' .. kitty_args .. '" , { float = true, size = { 1000, 700 }, center = true })'
+	local update_cmd = "hyprctl dispatch '" .. lua_expr .. "'"
+	local action = Notify.pkg_updates(count, sample, {})
+	if action == "update" then
+		os.execute(update_cmd .. " &")
+	elseif action == "later" then
+		log("Package update deferred by user")
+	end
 end
 
 function Events.on_ssh_login(username, ip, method)
@@ -274,15 +272,18 @@ function Events.on_ssh_close(username, ip, reason)
 end
 
 function Events.on_retro_update_available(commits)
+	log("Notification: retro_update | commits=" .. commits)
 	local retro_dir = os.getenv("RETRO_DIR")
-	local update_cmd = "hyprctl dispatch exec '[float; size 1000 700; center] kitty -- bash -c \"cd "
-		.. retro_dir
-		.. " && bash retro.sh --update; echo; echo Press Enter to close.; read\"'"
-	Notify.retro_update(commits, {
-		action_handlers = {
-			{ key = "update", cmd = update_cmd },
-		},
-	})
+	local kitty_args = 'kitty -- bash -c "cd ' .. retro_dir .. ' && bash retro.sh --update; echo; echo Press Enter to close.; read"'
+	local kitty_esc = kitty_args:gsub('"', '\\"')
+	local lua_expr = 'hl.dsp.exec_cmd("' .. kitty_esc .. '" , { float = true, size = { 1000, 700 }, center = true })'
+	local update_cmd = "hyprctl dispatch '" .. lua_expr .. "'"
+	local action = Notify.retro_update(commits, {})
+	if action == "update" then
+		os.execute(update_cmd .. " &")
+	elseif action == "later" then
+		log("Retro update deferred by user")
+	end
 end
 
 return Events
