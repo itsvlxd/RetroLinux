@@ -43,6 +43,10 @@ cmd_display() {
             fi
             ;;
         "scale")
+            if [[ $arg1 == "--from-dpi" ]]; then
+                _display_apply_dpi_from_focused "$display_core"
+                return $?
+            fi
             if [[ -z $arg1 ]]; then
                 rx_log "error" "Usage: retro display scale <monitor> [factor]" && return 1
             fi
@@ -208,6 +212,9 @@ _display_status() {
         rx_table_row "" "Refresh:" "$hz_display" "$PINK" "16"
         rx_table_row "󰘶" "Position:" "$pos_display" "$GRAY" "16"
         rx_table_row "󰧑" "Scale:" "$scale_display" "$GRAY" "16"
+        local xft_dpi
+        xft_dpi=$(bash "$core" --scale-to-dpi "$scale" 2>/dev/null)
+        rx_table_row "󰌆" "XWayland DPI:" "${xft_dpi:-96}" "$PINK" "16"
         rx_table_row "󰑪" "VRR:" "$vrr_display" "$vrr_color" "16"
         rx_table_row "󰤇" "DPMS:" "$dpms_display" "$dpms_color" "16"
         rx_table_row "󰙀" "Workspace:" "$ws_name" "$GRAY" "16"
@@ -315,13 +322,29 @@ _display_set_refresh() {
     rx_log "success" "Set $monitor refresh rate to ${hz}Hz"
 }
 
+_display_apply_dpi_from_focused() {
+    local core="$1"
+    local focused_scale
+    focused_scale=$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused==true) | .scale' | head -1)
+    if [[ -z $focused_scale ]]; then
+        rx_log "error" "No focused monitor found" && return 1
+    fi
+    local dpi
+    dpi=$(bash "$core" --scale-to-dpi "$focused_scale" 2>/dev/null)
+    bash "$core" --set-xft-dpi "$dpi" >/dev/null 2>&1
+    rx_log "success" "Applied XWayland DPI ${dpi} (scale ${focused_scale})"
+}
+
 _display_get_scale() {
     local core="$1"
     local monitor="$2"
     local raw
     raw=$(bash "$core" --get "$monitor" "scale" 2>/dev/null)
     [[ -z $raw || $raw == ERR_NO_MONITOR ]] && rx_log "error" "Monitor not found: $monitor" && return 1
+    local dpi
+    dpi=$(bash "$core" --scale-to-dpi "$raw" 2>/dev/null)
     rx_table_simple "󰧑" "${monitor}: scale ${raw}" "$PINK"
+    rx_table_simple "󰌆" "XWayland DPI: ${dpi:-96}" "$GRAY"
 }
 
 _display_set_scale() {
@@ -333,7 +356,9 @@ _display_set_scale() {
     [[ $result == ERR_NO_MONITOR ]] && rx_log "error" "Monitor not found: $monitor" && return 1
     [[ $result == ERR_ARGS ]] && rx_log "error" "Usage: retro display scale <monitor> <factor>" && return 1
     [[ $result == ERR_SET_FAILED ]] && rx_log "error" "Failed to set scale for $monitor" && return 1
-    rx_log "success" "Set $monitor scale to $scale"
+    local dpi
+    dpi=$(bash "$core" --scale-to-dpi "$scale" 2>/dev/null)
+    rx_log "success" "Set $monitor scale to ${scale} (XWayland DPI: ${dpi:-96})"
 }
 
 _display_get_position() {
@@ -686,6 +711,15 @@ _display_setup() {
 
     # Reload Hyprland config
     hyprctl reload 2>/dev/null || true
+
+    # Auto-set XWayland DPI from focused monitor's scale
+    local focused_scale
+    focused_scale=$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused==true) | .scale' | head -1)
+    if [[ -n $focused_scale ]]; then
+        local focused_dpi
+        focused_dpi=$(bash "$core" --scale-to-dpi "$focused_scale" 2>/dev/null)
+        bash "$core" --set-xft-dpi "$focused_dpi" >/dev/null 2>&1
+    fi
 
     rx_setup_success "󰍹" "Display Configuration Applied" \
         "Config" "monitors.lua"

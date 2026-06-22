@@ -2,20 +2,15 @@
 --- MONITORS ---
 ----------------
 --
--- See https://wiki.hypr.land/Configuring/Monitors/
+-- Run `retro display setup` to generate a custom config.
 
-hl.monitor({
-    output = "desc:Samsung Display Corp. 0x4197",
-    mode = "highrr",
-    vrr = 1,
-    position = "0x0",
-    scale = 2,
-    bitdepth = 10,
-})
+local ok = pcall(dofile, os.getenv("HOME") .. "/.config/retro/monitors.lua")
 
-hl.monitor({
-    output = "",
-    mode = "preferred",
-    position = "auto",
-    scale = 1,
-})
+if not ok then
+	hl.monitor({
+		output = "",
+		mode = "preferred",
+		position = "auto",
+		scale = 1,
+	})
+end

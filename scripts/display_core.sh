@@ -162,6 +162,9 @@ _cmd_set_scale() {
         echo "ERR_SET_FAILED"
         return 1
     fi
+    local dpi
+    dpi=$(echo "$scale * 96" | bc -l | cut -d'.' -f1)
+    _set_xft_dpi "$dpi"
     rx_log_file "info" "Set scale for $name to $scale"
 }
 
@@ -197,6 +200,44 @@ _cmd_set_dpms() {
         hyprctl dispatch dpms "$state" >/dev/null 2>&1 || { rx_log_file "error" "Failed to set DPMS $state"; echo "ERR_DPMS_FAILED"; return 1; }
     fi
     rx_log_file "info" "DPMS set to $state${monitor:+ for $monitor}"
+}
+
+_set_xft_dpi() {
+    local dpi="$1"
+    [[ -z $dpi || $dpi == "0" ]] && dpi=96
+
+    local xresources="$HOME/.Xresources"
+    if grep -q '^Xft\.dpi' "$xresources" 2>/dev/null; then
+        sed -i "s/^Xft\.dpi:.*/Xft.dpi: $dpi/" "$xresources"
+    else
+        echo "Xft.dpi: $dpi" >> "$xresources"
+    fi
+    command -v xrdb >/dev/null 2>&1 && DISPLAY="${DISPLAY:-:0}" xrdb -merge "$xresources" 2>/dev/null || true
+    rx_log_file "info" "Set Xft.dpi to $dpi"
+}
+
+_cmd_set_xft_dpi() {
+    local dpi="$1"
+    [[ -z $dpi ]] && echo "ERR_ARGS" && return 1
+    _set_xft_dpi "$dpi"
+}
+
+_cmd_get_xft_dpi() {
+    local dpi
+    dpi=$(command -v xrdb >/dev/null 2>&1 && DISPLAY="${DISPLAY:-:0}" xrdb -get Xft.dpi 2>/dev/null || true)
+    if [[ -z $dpi ]]; then
+        dpi=$(grep '^Xft\.dpi' "$HOME/.Xresources" 2>/dev/null | head -1 | awk '{print $2}')
+    fi
+    echo "${dpi:-96}"
+}
+
+_cmd_scale_to_dpi() {
+    local scale="$1"
+    [[ -z $scale ]] && echo "ERR_ARGS" && return 1
+    local dpi
+    dpi=$(echo "$scale * 96" | bc -l | cut -d'.' -f1)
+    [[ -z $dpi || $dpi == "0" ]] && dpi=96
+    echo "$dpi"
 }
 
 _cmd_generate_config() {
@@ -272,6 +313,15 @@ case "$1" in
         ;;
     "--set-dpms")
         _cmd_set_dpms "$2" "$3"
+        ;;
+    "--set-xft-dpi")
+        _cmd_set_xft_dpi "$2"
+        ;;
+    "--get-xft-dpi")
+        _cmd_get_xft_dpi
+        ;;
+    "--scale-to-dpi")
+        _cmd_scale_to_dpi "$2"
         ;;
     "--generate-config")
         _cmd_generate_config "$2"
