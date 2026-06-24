@@ -179,7 +179,7 @@ _display_status() {
 
     local first=true
     # shellcheck disable=SC2034
-    while IFS='|' read -r name desc make model w h refresh_x x y scale vrr dpms disabled _tr _mirror_of _ws_id ws_name _focused _mc; do
+    while IFS='|' read -r name desc make model w h refresh_x x y scale vrr dpms disabled tr _mirror_of _ws_id ws_name _focused _mc; do
         [[ -z $name ]] && continue
 
         if $first; then
@@ -212,6 +212,11 @@ _display_status() {
         rx_table_row "" "Refresh:" "$hz_display" "$PINK" "16"
         rx_table_row "󰘶" "Position:" "$pos_display" "$GRAY" "16"
         rx_table_row "󰧑" "Scale:" "$scale_display" "$GRAY" "16"
+        local transform_names=("normal" "90°" "180°" "270°" "flipped" "flipped+90°" "flipped+180°" "flipped+270°")
+        local tname="${transform_names[$tr]:-unknown}"
+        local tcolor="$GRAY"
+        [[ $tr != "0" ]] && tcolor="$WARN"
+        rx_table_row "󰔄" "Transform:" "$tr ($tname)" "$tcolor" "16"
         local xft_dpi
         xft_dpi=$(bash "$core" --scale-to-dpi "$scale" 2>/dev/null)
         rx_table_row "󰌆" "XWayland DPI:" "${xft_dpi:-96}" "$PINK" "16"
@@ -226,6 +231,25 @@ _display_status() {
     done <<<"$raw"
 
     rx_table_separator
+
+    local rot_status
+    rot_status=$(bash "$core" --rotation-status 2>/dev/null) || true
+    if [[ -n $rot_status ]]; then
+        local r_monitor r_transform r_locked
+        r_monitor=$(echo "$rot_status" | grep "^monitor:" | cut -d: -f2-)
+        r_transform=$(echo "$rot_status" | grep "^transform:" | cut -d: -f2-)
+        r_locked=$(echo "$rot_status" | grep "^locked:" | cut -d: -f2-)
+        if [[ -n $r_monitor ]]; then
+            local rl_color="$SUCCESS"
+            local rl_icon="󰄱"
+            local rl_text="Following sensor"
+            [[ $r_locked == "true" ]] && rl_color="$WARN" && rl_icon="󰌾" && rl_text="Locked"
+
+            rx_table_row "󰔄" "Rotation:" "$r_monitor → $r_transform" "$PINK" "16"
+            rx_table_row "$rl_icon" "Auto-rotate:" "$rl_text" "$rl_color" "16"
+        fi
+    fi
+
     rx_table_spacer
 }
 
