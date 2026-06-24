@@ -15,6 +15,7 @@ inetutils
 base-devel
 lm_sensors
 pacman-contrib
+iio-sensor-proxy
 
 # GTK
 libadwaita
