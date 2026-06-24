@@ -240,6 +240,91 @@ _cmd_scale_to_dpi() {
     echo "$dpi"
 }
 
+_cmd_set_transform() {
+    local name="$1"
+    local t="$2"
+    [[ -z $name || -z $t ]] && echo "ERR_ARGS" && return 1
+    [[ $t != [0-7] ]] && echo "ERR_INVALID_TRANSFORM" && return 1
+
+    local config
+    config=$(_get_monitor_config "$name")
+    [[ -z $config ]] && echo "ERR_NO_MONITOR" && return 1
+
+    local mode="${config%%,*}"
+    local pos_scale="${config#*,}"
+    local pos="${pos_scale%,*}"
+    local scale="${pos_scale#*,}"
+
+    if ! hyprctl keyword monitor "$name, $mode, $pos, $scale, transform, $t" >/dev/null 2>&1; then
+        rx_log_file "error" "Failed to set transform for $name"
+        echo "ERR_SET_FAILED"
+        return 1
+    fi
+
+    hyprctl keyword input:touchdevice:output "$name" >/dev/null 2>&1 || true
+    hyprctl keyword input:touchdevice:transform "$t" >/dev/null 2>&1 || true
+    hyprctl keyword input:tablet:output "$name" >/dev/null 2>&1 || true
+    hyprctl keyword input:tablet:transform "$t" >/dev/null 2>&1 || true
+
+    pkill -x hyprpaper >/dev/null 2>&1 || true
+    hyprpaper >/dev/null 2>&1 &
+
+    rx_log_file "info" "Set transform for $name to $t"
+}
+
+_cmd_get_transform() {
+    local name="$1"
+    _cmd_get "$name" "transform"
+}
+
+_cmd_lock_rotation() {
+    local action="${1:-status}"
+    case "$action" in
+        on)
+            rx_set_var "ROTATION_LOCK" "true"
+            echo "Rotation lock enabled"
+            ;;
+        off)
+            rx_set_var "ROTATION_LOCK" "false"
+            echo "Rotation lock disabled"
+            ;;
+        toggle)
+            local cur
+            cur=$(rx_get_var "ROTATION_LOCK" "false")
+            if [[ $cur == "true" ]]; then
+                rx_set_var "ROTATION_LOCK" "false"
+                echo "Rotation lock disabled"
+            else
+                rx_set_var "ROTATION_LOCK" "true"
+                echo "Rotation lock enabled"
+            fi
+            ;;
+        status)
+            local locked
+            locked=$(rx_get_var "ROTATION_LOCK" "false")
+            echo "$locked"
+            ;;
+    esac
+}
+
+_cmd_detect_internal_monitor() {
+    _get_monitors_json | jq -r '.[] | select(.name | test("^(eDP|LVDS|DSI)")) | .name' | head -1
+}
+
+_cmd_rotation_status() {
+    local monitor
+    monitor=$(_cmd_detect_internal_monitor)
+    local transform
+    transform=$(_cmd_get_transform "$monitor" 2>/dev/null || echo "?")
+    local locked
+    locked=$(rx_get_var "ROTATION_LOCK" "false")
+    local names=("normal" "90°" "180°" "270°" "flipped" "flipped+90°" "flipped+180°" "flipped+270°")
+    local tname="${names[$transform]:-unknown}"
+    echo "monitor:$monitor"
+    echo "transform:$transform ($tname)"
+    echo "locked:$locked"
+}
+
 _cmd_generate_config() {
     local input="$1"
     [[ -z $input ]] && echo "ERR_ARGS" && return 1
@@ -325,6 +410,21 @@ case "$1" in
         ;;
     "--generate-config")
         _cmd_generate_config "$2"
+        ;;
+    "--set-transform")
+        _cmd_set_transform "$2" "$3"
+        ;;
+    "--get-transform")
+        _cmd_get_transform "$2"
+        ;;
+    "--lock-rotation")
+        _cmd_lock_rotation "$2"
+        ;;
+    "--detect-internal-monitor")
+        _cmd_detect_internal_monitor
+        ;;
+    "--rotation-status")
+        _cmd_rotation_status
         ;;
     *)
         echo "ERR_UNKNOWN_FLAG"
