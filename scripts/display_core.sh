@@ -246,25 +246,53 @@ _cmd_set_transform() {
     [[ -z $name || -z $t ]] && echo "ERR_ARGS" && return 1
     [[ $t != [0-7] ]] && echo "ERR_INVALID_TRANSFORM" && return 1
 
-    local config
-    config=$(_get_monitor_config "$name")
-    [[ -z $config ]] && echo "ERR_NO_MONITOR" && return 1
+    local json
+    json=$(_get_monitor_json "$name")
+    [[ -z $json ]] && echo "ERR_NO_MONITOR" && return 1
 
-    local mode="${config%%,*}"
-    local pos_scale="${config#*,}"
-    local pos="${pos_scale%,*}"
-    local scale="${pos_scale#*,}"
+    local mode
+    mode=$(echo "$json" | jq -r '.availableModes[0] // "preferred"')
+    local pos
+    pos=$(echo "$json" | jq -r '"\(.x)x\(.y)"')
+    local scale
+    scale=$(echo "$json" | jq -r '.scale')
+    local vrr
+    vrr=$(echo "$json" | jq -r 'if .vrr then 1 else 0 end')
+    local cm
+    cm=$(echo "$json" | jq -r '.colorManagementPreset // empty')
+    local bitdepth
+    bitdepth=$(echo "$json" | jq -r '.bitdepth // empty')
+    local disabled
+    disabled=$(echo "$json" | jq -r '.disabled')
 
-    if ! hyprctl keyword monitor "$name, $mode, $pos, $scale, transform, $t" >/dev/null 2>&1; then
+    local extra=""
+    [[ -n $cm ]] && extra="$extra, cm = \"$cm\""
+    [[ -n $bitdepth ]] && extra="$extra, bitdepth = $bitdepth"
+    [[ $disabled == "true" ]] && extra="$extra, disabled = true"
+
+    local lua="hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"$pos\", scale = $scale, vrr = $vrr, transform = $t$extra })"
+
+    if ! hyprctl eval "$lua" >/dev/null 2>&1; then
         rx_log_file "error" "Failed to set transform for $name"
         echo "ERR_SET_FAILED"
         return 1
     fi
 
-    hyprctl keyword input:touchdevice:output "$name" >/dev/null 2>&1 || true
-    hyprctl keyword input:touchdevice:transform "$t" >/dev/null 2>&1 || true
-    hyprctl keyword input:tablet:output "$name" >/dev/null 2>&1 || true
-    hyprctl keyword input:tablet:transform "$t" >/dev/null 2>&1 || true
+    local touch_base
+    touch_base=$(hyprctl devices -j 2>/dev/null | jq -r '(.touch // [])[0].name // ""')
+    if [[ -n $touch_base ]]; then
+        local devs
+        devs=$(hyprctl devices -j 2>/dev/null | jq -r --arg b "$touch_base" '
+            [(.touch // [])[] | select(.name | startswith($b)) | .name] +
+            [(.tablets // [])[] | select(.name | startswith($b)) | .name] +
+            [(.mice // [])[] | select(.name | startswith($b)) | .name]
+            | unique[]
+        ')
+        while IFS= read -r dev; do
+            [[ -z $dev ]] && continue
+            hyprctl eval 'hl.device({ name = "'"$dev"'", transform = '"$t"', output = "'"$name"'" })' >/dev/null 2>&1 || true
+        done <<< "$devs"
+    fi
 
     pkill -x hyprpaper >/dev/null 2>&1 || true
     hyprpaper >/dev/null 2>&1 &
@@ -281,27 +309,23 @@ _cmd_lock_rotation() {
     local action="${1:-status}"
     case "$action" in
         on)
-            rx_set_var "ROTATION_LOCK" "true"
-            echo "Rotation lock enabled"
+            set_var "ROTATION_LOCK" "true"
             ;;
         off)
-            rx_set_var "ROTATION_LOCK" "false"
-            echo "Rotation lock disabled"
+            set_var "ROTATION_LOCK" "false"
             ;;
         toggle)
             local cur
-            cur=$(rx_get_var "ROTATION_LOCK" "false")
+            cur=$(get_var "ROTATION_LOCK" "false")
             if [[ $cur == "true" ]]; then
-                rx_set_var "ROTATION_LOCK" "false"
-                echo "Rotation lock disabled"
+                set_var "ROTATION_LOCK" "false"
             else
-                rx_set_var "ROTATION_LOCK" "true"
-                echo "Rotation lock enabled"
+                set_var "ROTATION_LOCK" "true"
             fi
             ;;
         status)
             local locked
-            locked=$(rx_get_var "ROTATION_LOCK" "false")
+            locked=$(get_var "ROTATION_LOCK" "false")
             echo "$locked"
             ;;
     esac
@@ -317,7 +341,7 @@ _cmd_rotation_status() {
     local transform
     transform=$(_cmd_get_transform "$monitor" 2>/dev/null || echo "?")
     local locked
-    locked=$(rx_get_var "ROTATION_LOCK" "false")
+    locked=$(get_var "ROTATION_LOCK" "false")
     local names=("normal" "90°" "180°" "270°" "flipped" "flipped+90°" "flipped+180°" "flipped+270°")
     local tname="${names[$transform]:-unknown}"
     echo "monitor:$monitor"
