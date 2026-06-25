@@ -116,6 +116,36 @@ cmd_display() {
             fi
             _display_get_transform "$display_core" "$arg1"
             ;;
+        "rotation")
+            local rot_action="${arg1,,}"
+            case "$rot_action" in
+                lock)
+                    bash "$display_core" --lock-rotation on 2>/dev/null
+                    rx_log "success" "Auto-rotation locked"
+                    ;;
+                unlock)
+                    bash "$display_core" --lock-rotation off 2>/dev/null
+                    rx_log "success" "Auto-rotation unlocked"
+                    ;;
+                toggle)
+                    bash "$display_core" --lock-rotation toggle 2>/dev/null
+                    rx_log "success" "Auto-rotation toggled"
+                    ;;
+                set)
+                    [[ -z $arg2 ]] && rx_log "error" "Usage: retro display rotation set <monitor> <0-7>" && return 1
+                    local result
+                    result=$(bash "$display_core" --set-transform "$arg2" "$arg3" 2>/dev/null)
+                    [[ $result == ERR_NO_MONITOR ]] && rx_log "error" "Monitor not found: $arg2" && return 1
+                    [[ $result == ERR_ARGS || $result == ERR_INVALID_TRANSFORM ]] && rx_log "error" "Invalid transform (0-7)" && return 1
+                    [[ $result == ERR_SET_FAILED ]] && rx_log "error" "Failed to set transform" && return 1
+                    rx_log "success" "Set $arg2 transform to ${arg3}"
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro display rotation <lock|unlock|toggle|set>"
+                    return 1
+                    ;;
+            esac
+            ;;
         "bitdepth" | "bpc")
             if [[ -z $arg1 ]]; then
                 rx_log "error" "Usage: retro display bitdepth <monitor>" && return 1
@@ -149,6 +179,8 @@ cmd_display() {
             rx_help_cmd "brightness <mon>" "Show SDR brightness" 26
             rx_help_cmd "saturation <mon>" "Show SDR saturation" 26
             rx_help_cmd "transform <mon>" "Show rotation" 26
+            rx_help_cmd "rotation lock|unlock|toggle" "Lock/unlock auto-rotation" 26
+            rx_help_cmd "rotation set <mon> <0-7>" "Manually set transform" 26
             rx_help_cmd "bitdepth <mon>" "Show color depth" 26
             rx_help_cmd "cm <mon>" "Show color management" 26
             rx_help_cmd "setup" "Interactive monitor configuration" 26
@@ -241,15 +273,15 @@ _display_status() {
         r_locked=$(echo "$rot_status" | grep "^locked:" | cut -d: -f2-)
         if [[ -n $r_monitor ]]; then
             local rl_color="$SUCCESS"
-            local rl_icon="󰄱"
-            local rl_text="Following sensor"
-            [[ $r_locked == "true" ]] && rl_color="$WARN" && rl_icon="󰌾" && rl_text="Locked"
+            local rl_display="● Following sensor"
+            [[ $r_locked == "true" ]] && rl_color="$WARN" && rl_display="○ Locked"
 
             rx_table_row "󰔄" "Rotation:" "$r_monitor → $r_transform" "$PINK" "16"
-            rx_table_row "$rl_icon" "Auto-rotate:" "$rl_text" "$rl_color" "16"
+            rx_table_row "󰔄" "Auto-rotate:" "$rl_display" "$rl_color" "16"
         fi
     fi
 
+    rx_table_separator
     rx_table_spacer
 }
 
