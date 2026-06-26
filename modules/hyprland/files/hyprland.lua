@@ -82,16 +82,22 @@ pcall(dofile, os.getenv("HOME") .. "/.config/retro/windowrules.lua")
 
 local retro_dir = os.getenv("RETRO_DIR") or "/opt/retrolinux"
 local retro_config = os.getenv("HOME") .. "/.config/retro"
-package.path = retro_config .. "/?.lua;" .. retro_dir .. "/lib/lua/?.lua;" .. retro_dir .. "/modules/hyprland/files/?.lua;" .. package.path
+package.path = retro_config
+	.. "/?.lua;"
+	.. retro_dir
+	.. "/lib/lua/?.lua;"
+	.. retro_dir
+	.. "/modules/hyprland/files/?.lua;"
+	.. package.path
 
 local ok, _ = pcall(dofile, retro_config .. "/input.lua")
 if not ok then
-    require("input")
+	require("input")
 end
 
 ok, _ = pcall(dofile, retro_config .. "/keybinds.lua")
 if not ok then
-    require("keybinds")
+	require("keybinds")
 end
 
 require("programs")
@@ -101,3 +107,4 @@ require("autostart")
 require("appearance")
 require("windows")
 require("permissions")
+--require("settings")
