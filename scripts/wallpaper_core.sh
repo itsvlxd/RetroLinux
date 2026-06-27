@@ -63,84 +63,61 @@ slideshow_next() {
 }
 
 optimize_wallpapers() {
-    local res_map=$(get_var "WALL_RES_MAP")
-
-    if [[ -z $res_map || $res_map == "null" ]]; then
-        local mon_res
-        mon_res=$(get_monitor_resolutions)
-        res_map="default|$mon_res"
+    local target_res=$(get_var "WALL_RES_MAP")
+    if [[ -z $target_res || $target_res == "null" ]]; then
+        target_res=$(get_monitor_resolutions | head -1)
     fi
-
-    local target_res=$(echo "$res_map" | tr ',' '\n' | cut -d'|' -f2 | head -n 1)
     local target_w="${target_res%x*}"
     local target_h="${target_res#*x}"
-
     [[ -z $target_w || -z $target_h ]] && return 0
 
-    local theme=$(get_var "RETRO_THEME" "retro")
+    # Pause wallpaper system so the daemon doesn't restart mpvpaper
+    set_var "WALL_PAUSED" "true"
+    pkill mpvpaper 2>/dev/null
+    sleep 1
 
-    local source_dir="$REPO_WALLS/$theme"
-    [[ ! -d $source_dir ]] && source_dir="$REPO_WALLS"
+    local optimized=0 skipped=0
 
-    local cache_target="$WALL_DIR/$theme"
-    mkdir -p "$cache_target"
+    # Build file list, then process with ALL stderr suppressed
+    local file_list=$(mktemp /tmp/wallpaper_list.XXXXXX)
+    find "$WALL_DIR" -maxdepth 2 \( -type f -o -type l \) 2>/dev/null \
+        | grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" \
+        | grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" \
+        | sort > "$file_list"
 
-    local optimized=0
-    local skipped=0
+    while IFS= read -r f; do
+        [[ -z $f ]] && continue
+        [[ -L $f ]] && f=$(readlink -f "$f")
+        local filename=$(basename "$f")
 
-    for src_file in "$source_dir"/*; do
-        [[ -f $src_file ]] || continue
+        local file_res=$(get_image_resolution "$f")
+        local file_w="${file_res%x*}"
+        local file_h="${file_res#*x}"
+        [[ -z $file_w || -z $file_h ]] && { ((skipped++)); continue; }
 
-        local filename=$(basename "$src_file")
-        local ext="${filename##*.}"
-        local is_video=false
-        [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]] && is_video=true
-
-        local opt_file="$cache_target/$filename"
-
-        local src_res=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$src_file" 2>/dev/null)
-        local src_w="${src_res%x*}"
-        local src_h="${src_res#*x}"
-
-        if [[ -z $src_w || -z $src_h ]]; then
-            ln -sf "$src_file" "$opt_file"
+        if [[ $file_w -le $target_w && $file_h -le $target_h ]]; then
             ((skipped++))
+            rx_wallpaper_generate_cache "$f" >/dev/null
             continue
         fi
 
-        if [[ $src_w -eq $target_w && $src_h -eq $target_h ]]; then
-            if [[ ! -L $opt_file || $(readlink "$opt_file") != "$src_file" ]]; then
-                rm -f "$opt_file"
-                ln -sf "$src_file" "$opt_file"
-            fi
-            ((skipped++))
+        local ext="${filename##*.}"
+        if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
+            local tmp=$(mktemp --suffix=".$ext")
+            ffmpeg -y -i "$f" \
+                -vf "scale='min($target_w,iw)':'min($target_h,ih)':force_original_aspect_ratio=decrease" \
+                -c:v libx264 -preset fast -crf 23 -an "$tmp" -loglevel error \
+            && mv "$tmp" "$f" || rm -f "$tmp"
         else
-
-            local cached_res=""
-            if [[ -f $opt_file && ! -L $opt_file ]]; then
-                cached_res=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$opt_file" 2>/dev/null)
-            fi
-
-            if [[ $cached_res != "${target_w}x${target_h}" ]]; then
-                rm -f "$opt_file"
-
-                if [[ $is_video == "true" ]]; then
-                    ffmpeg -y -i "$src_file" \
-                        -vf "scale=${target_w}:${target_h}:force_original_aspect_ratio=decrease,pad=${target_w}:${target_h}:(ow-iw)/2:(oh-ih)/2" \
-                        -c:v libx264 -preset fast -crf 23 \
-                        -an "$opt_file" -loglevel error
-                    ((optimized++))
-                else
-                    magick "$src_file" -resize "${target_w}x${target_h}^" -gravity center -extent "${target_w}x${target_h}" "$opt_file"
-                    ((optimized++))
-                fi
-            else
-                ((skipped++))
-            fi
+            magick "$f" -resize "${target_w}x${target_h}>" "$f"
         fi
-    done
+        ((optimized++))
+        rx_wallpaper_generate_cache "$f" >/dev/null
+    done < "$file_list" 2>/dev/null
+    rm -f "$file_list"
 
-    rx_log_file "INFO" "Optimization complete: $optimized optimized, $skipped skipped"
+    rx_log_file "INFO" "Optimization complete: $optimized optimized, $skipped already at target resolution"
+    set_var "WALL_PAUSED" "false"
     restore_wallpaper >/dev/null 2>&1
 }
 
@@ -148,7 +125,7 @@ get_monitor_resolutions() {
     local res_map=$(get_var "WALL_RES_MAP")
 
     if [[ -n $res_map && $res_map != "null" ]]; then
-        echo "$res_map" | tr ',' '\n' | cut -d'|' -f2
+        echo "$res_map"
         return 0
     fi
 
@@ -503,6 +480,14 @@ sync_wallpapers() {
     done
 
     rx_log_file "info" "Wallpaper sync: ${synced} new, ${skipped} skipped"
+
+    # Generate frame cache for newly synced files
+    if [[ $synced -gt 0 ]]; then
+        while IFS= read -r f; do
+            [[ -z $f ]] && continue
+            rx_wallpaper_generate_cache "$f" >/dev/null
+        done < <(rx_wallpaper_list_files)
+    fi
 }
 
 case "$1" in
