@@ -4,3 +4,4 @@ from .obex import (
     run_shell_cmd,
 )
 from .env import ensure_dbus, get_shell_env
+from .variable import get_module_default, get_var, reload_vars, set_var

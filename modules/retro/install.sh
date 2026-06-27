@@ -126,3 +126,12 @@ sync_missing_variables() {
 }
 
 sync_missing_variables
+
+# Compile GSettings schema for the Settings GUI
+if command -v glib-compile-schemas >/dev/null 2>&1; then
+    schema_dir="$RETRO_DIR/cmds/tools/settings/data"
+    if [[ -d $schema_dir ]]; then
+        glib-compile-schemas "$schema_dir" 2>/dev/null || true
+        rx_log "info" "GSettings schema compiled for Retro Settings"
+    fi
+fi
