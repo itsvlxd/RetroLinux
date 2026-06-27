@@ -25,6 +25,7 @@ CURSOR_ICON = "settings-cursor-symbolic"
 PENDING_ICON = "view-list-symbolic"
 PROFILES_ICON = "user-bookmarks-symbolic"
 SETTINGS_ICON = "emblem-system-symbolic"
+WALLPAPERS_ICON = "computer-symbolic"
 
 # Used by pages/pending.py when a change can't be matched to a known
 # group_id (defensive — should not happen in practice).

@@ -26,6 +26,7 @@ from settings.pages.monitors import MonitorsPage
 from settings.pages.pending import PendingChangesPage
 from settings.pages.section import SectionPage
 from settings.pages.settings import SettingsPage
+from settings.pages.wallpapers import WallpapersPage
 from settings.pages.window_rules import WindowRulesPage
 from settings.pages.workspaces import WorkspacesPage
 from settings.ui import (
@@ -114,6 +115,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._window_rules_page: WindowRulesPage | None = None
         self._layer_rules_page: LayerRulesPage | None = None
         self._layouts_page: LayoutsPage | None = None
+        self._wallpapers_page: WallpapersPage | None = None
         self._settings_page: SettingsPage | None = None
         self._pending_page: PendingChangesPage | None = None
         self._pre_search_page_id: str | None = None
@@ -123,13 +125,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._section_pages: list[SectionPage] = []
 
         self._load_css()
-        try:
-            self._build_ui()
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"[RETRO] FATAL: _build_ui failed: {e}", file=__import__('sys').stderr)
-            raise
+        self._build_ui()
         self._register_state()
         self._refresh_all_modified_indicators()
 
@@ -370,6 +366,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
+            (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
         ]
         for cls, attr, slug, title in standalone_page_specs:
@@ -381,6 +378,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             header = self._make_page_header(title, with_pending_chip=with_chip)
             self._page_stack.add_named(page.build(header=header), slug)
             self._page_titles[slug] = title
+
+        if self._wallpapers_page is not None:
+            self._wallpapers_page._notify_dirty = self._on_section_dirty
+            self._search_page_builder.add_entries(self._wallpapers_page.get_search_entries())
 
         return groups, groups_by_id
 
@@ -701,6 +702,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             counts["window_rules"] += self._window_rules_page.pending_change_count()
         if self._layer_rules_page and self._layer_rules_page.is_dirty():
             counts["layer_rules"] += self._layer_rules_page.pending_change_count()
+        if self._wallpapers_page is not None and self._wallpapers_page.needs_optimization():
+            counts["wallpapers"] = 1
 
         # The pending-changes chip totals everything else
         counts["pending"] = sum(counts.values())
@@ -1039,7 +1042,11 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         """Check if any section has unsaved changes."""
         if self.app_state.has_dirty():
             return True
-        return any(s.is_dirty() for s in self._section_pages)
+        if any(s.is_dirty() for s in self._section_pages):
+            return True
+        if self._wallpapers_page is not None and self._wallpapers_page.is_dirty():
+            return True
+        return False
 
     def _update_banner(self):
         """Show or hide the unsaved changes banner."""
@@ -1217,6 +1224,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self.hypr.clear_pending()
         for section in self._section_pages:
             section.mark_saved()
+        if self._wallpapers_page is not None:
+            self._wallpapers_page.flush_pending()
         self._undo.clear()
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()
