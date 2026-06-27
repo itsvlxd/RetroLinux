@@ -6,8 +6,6 @@ source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "input"
 
-_INPUT_MODULE_KEYBINDS="$RETRO_DIR/modules/hyprland/files/keybinds.lua"
-
 _rx_input_var_name() {
     local key="$1"
     case "$key" in
@@ -206,9 +204,8 @@ rx_input_get_setup_values() {
 
 rx_input_keybinds_reset() {
     local target="${RETRO_CONFIG:-$HOME/.config/retro}/keybinds.lua"
-    mkdir -p "$(dirname "$target")"
-    if [[ -f $_INPUT_MODULE_KEYBINDS ]]; then
-        cp "$_INPUT_MODULE_KEYBINDS" "$target"
+    if [[ -f $target ]]; then
+        rm "$target"
         echo "OK"
     else
         return 1
@@ -254,16 +251,8 @@ rx_input_binds_add() {
     kb_file=$(rx_input_keybinds_path)
     mkdir -p "$(dirname "$kb_file")"
 
-    if [[ ! -f $kb_file ]]; then
-        rx_input_keybinds_reset >/dev/null
-    fi
-
     local existing
     existing=$(rx_input_binds_check "$key")
-    if [[ -n $existing ]]; then
-        echo "DUPLICATE|${key}|${existing}"
-        return 1
-    fi
 
     local action_type="${action_spec%%:*}"
     local action_value="${action_spec#*:}"
@@ -288,10 +277,17 @@ rx_input_binds_add() {
     {
         echo ""
         echo "-- user added"
+        if [[ -n $existing ]]; then
+            echo "hl.unbind(\"${key}\")"
+        fi
         echo "${lua_line}"
     } >> "$kb_file"
 
-    echo "OK|${key}|${action_type}|${action_value}"
+    if [[ -n $existing ]]; then
+        echo "REPLACED|${key}|${action_type}|${action_value}"
+    else
+        echo "ADDED|${key}|${action_type}|${action_value}"
+    fi
 }
 
 rx_input_binds_remove() {
