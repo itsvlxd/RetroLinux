@@ -1,0 +1,1266 @@
+{
+  "groups": [
+    {
+      "id": "appearance",
+      "label": "Appearance",
+      "icon": "sliders-horizontal-arrow-symbolic",
+      "sections": [
+        {
+          "id": "general",
+          "label": "Gaps",
+          "options": [
+            {
+              "key": "general:gaps_in",
+              "variable": "RETRO_GAP_IN",
+              "label": "Inner gaps",
+              "description": "Gaps between windows in pixels",
+              "type": "int",
+              "default": 5,
+              "min": 0,
+              "max": 100
+            },
+            {
+              "key": "general:gaps_out",
+              "variable": "RETRO_GAP_OUT",
+              "label": "Outer gaps",
+              "description": "Gaps between windows and monitor edges in pixels",
+              "type": "int",
+              "default": 20,
+              "min": 0,
+              "max": 100
+            }
+          ]
+        },
+        {
+          "id": "general:borders",
+          "label": "Borders",
+          "options": [
+            {
+              "key": "general:border_size",
+              "variable": "RETRO_BORDER_SIZE",
+              "label": "Border size"
+            },
+            {
+              "key": "general:resize_on_border",
+              "variable": "RETRO_RESIZE_ON_BORDER",
+              "label": "Resize on border"
+            },
+            {
+              "key": "general:extend_border_grab_area",
+              "variable": "RETRO_EXTEND_BORDER_GRAB_AREA",
+              "label": "Extend border grab area",
+              "description": "Extends the area around the border where you can click and drag for resize",
+              "depends_on": "general:resize_on_border"
+            },
+            {
+              "key": "general:hover_icon_on_border",
+              "variable": "RETRO_HOVER_ICON_ON_BORDER",
+              "label": "Hover icon on border",
+              "description": "Show a cursor icon when hovering on borders",
+              "depends_on": "general:resize_on_border"
+            }
+          ]
+        },
+        {
+          "id": "general:border_colors",
+          "label": "Border Colors",
+          "options": [
+            {
+              "key": "general:col.active_border",
+              "label": "Active border color",
+              "description": "Border color for the active window"
+            },
+            {
+              "key": "general:col.inactive_border",
+              "label": "Inactive border color",
+              "description": "Border color for inactive windows"
+            }
+          ]
+        },
+        {
+          "id": "general:layout",
+          "label": "Layout",
+          "options": [
+            {
+              "key": "general:layout",
+              "variable": "RETRO_LAYOUT",
+              "label": "Layout",
+              "description": "Which layout to use for tiling",
+              "type": "choice",
+              "values": [
+                {
+                  "id": "dwindle",
+                  "label": "Dwindle"
+                },
+                {
+                  "id": "master",
+                  "label": "Master"
+                },
+                {
+                  "id": "scrolling",
+                  "label": "Scrolling"
+                },
+                {
+                  "id": "monocle",
+                  "label": "Monocle"
+                }
+              ]
+            },
+            {
+              "key": "general:allow_tearing",
+              "variable": "RETRO_ALLOW_TEARING",
+              "label": "Allow tearing",
+              "description": "Allow screen tearing for reduced latency"
+            }
+          ]
+        },
+        {
+          "id": "general:snap",
+          "label": "Snap",
+          "options": [
+            {
+              "key": "general:snap:enabled",
+              "variable": "RETRO_SNAP_ENABLED",
+              "label": "Enable snap",
+              "description": "Enable snapping for floating windows"
+            },
+            {
+              "key": "general:snap:window_gap",
+              "variable": "RETRO_SNAP_WINDOW_GAP",
+              "label": "Window snap gap",
+              "depends_on": "general:snap:enabled"
+            },
+            {
+              "key": "general:snap:monitor_gap",
+              "variable": "RETRO_SNAP_MONITOR_GAP",
+              "label": "Monitor snap gap",
+              "depends_on": "general:snap:enabled"
+            },
+            {
+              "key": "general:snap:border_overlap",
+              "variable": "RETRO_SNAP_BORDER_OVERLAP",
+              "label": "Border overlap",
+              "depends_on": "general:snap:enabled"
+            },
+            {
+              "key": "general:snap:respect_gaps",
+              "variable": "RETRO_SNAP_RESPECT_GAPS",
+              "label": "Respect gaps",
+              "depends_on": "general:snap:enabled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decoration",
+      "label": "Decoration",
+      "icon": "appearance-symbolic",
+      "sections": [
+        {
+          "id": "decoration",
+          "label": "Rounding and Opacity",
+          "options": [
+            {
+              "key": "decoration:rounding",
+              "label": "Corner rounding",
+              "max": 50,
+              "variable": "RETRO_ROUNDING",
+              "default": 0
+            },
+            {
+              "key": "decoration:rounding_power",
+              "label": "Rounding power",
+              "step": 0.1,
+              "variable": "RETRO_ROUNDING_POWER"
+            },
+            {
+              "key": "decoration:active_opacity",
+              "label": "Active opacity",
+              "description": "Opacity of active windows",
+              "step": 0.05,
+              "variable": "RETRO_OPACITY"
+            },
+            {
+              "key": "decoration:inactive_opacity",
+              "label": "Inactive opacity",
+              "description": "Opacity of inactive windows",
+              "step": 0.05,
+              "variable": "RETRO_INACTIVE_OPACITY",
+              "default": 1.0
+            },
+            {
+              "key": "decoration:fullscreen_opacity",
+              "label": "Fullscreen opacity",
+              "description": "Opacity of fullscreen windows",
+              "step": 0.05,
+              "variable": "RETRO_FULLSCREEN_OPACITY"
+            },
+            {
+              "key": "decoration:dim_inactive",
+              "label": "Dim inactive",
+              "variable": "RETRO_DIM_INACTIVE"
+            },
+            {
+              "key": "decoration:dim_strength",
+              "label": "Dim strength",
+              "description": "How much to dim inactive windows",
+              "step": 0.05,
+              "depends_on": "decoration:dim_inactive",
+              "variable": "RETRO_DIM_STRENGTH"
+            },
+            {
+              "key": "decoration:dim_around",
+              "label": "Dim around",
+              "description": "Dim factor for floating windows when a dialog is open",
+              "step": 0.05,
+              "variable": "RETRO_DIM_AROUND",
+              "default": 0.4
+            },
+            {
+              "key": "decoration:dim_special",
+              "label": "Dim special",
+              "description": "Dim the rest of the screen when a special workspace is open",
+              "step": 0.05,
+              "variable": "RETRO_DIM_SPECIAL",
+              "default": 0.2
+            },
+            {
+              "key": "decoration:dim_modal",
+              "variable": "RETRO_DIM_MODAL",
+              "label": "Dim modal",
+              "description": "Enables dimming of parents of modal windows",
+              "default": true
+            },
+            {
+              "key": "decoration:border_part_of_window",
+              "variable": "RETRO_BORDER_PART_OF_WINDOW",
+              "label": "Border part of window",
+              "description": "Whether the window border should be a part of the window",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "decoration:blur",
+          "label": "Blur",
+          "options": [
+            {
+              "key": "decoration:blur:enabled",
+              "label": "Enable blur",
+              "variable": "RETRO_BLUR"
+            },
+            {
+              "key": "decoration:blur:size",
+              "label": "Blur size",
+              "description": "Blur radius in pixels",
+              "min": 1,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_SIZE",
+              "default": 8
+            },
+            {
+              "key": "decoration:blur:passes",
+              "label": "Blur passes",
+              "min": 1,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_PASSES",
+              "default": 1
+            },
+            {
+              "key": "decoration:blur:ignore_opacity",
+              "label": "Ignore opacity",
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_IGNORE_OPACITY",
+              "default": true
+            },
+            {
+              "key": "decoration:blur:new_optimizations",
+              "label": "New optimizations",
+              "description": "Enable further optimizations to the blur (recommended)",
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_NEW_OPT",
+              "default": true
+            },
+            {
+              "key": "decoration:blur:xray",
+              "label": "X-Ray",
+              "description": "If enabled, floating windows will ignore tiled windows in their blur",
+              "depends_on": "decoration:blur:new_optimizations",
+              "variable": "RETRO_BLUR_XRAY"
+            },
+            {
+              "key": "decoration:blur:noise",
+              "label": "Blur noise",
+              "description": "How much noise to apply to the blur",
+              "step": 0.001,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_NOISE",
+              "default": 0.0117
+            },
+            {
+              "key": "decoration:blur:contrast",
+              "label": "Blur contrast",
+              "description": "Contrast modulation for blur",
+              "step": 0.01,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_CONTRAST",
+              "default": 0.8916
+            },
+            {
+              "key": "decoration:blur:brightness",
+              "label": "Blur brightness",
+              "description": "Brightness modulation for blur",
+              "step": 0.01,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_BRIGHTNESS",
+              "default": 0.8172
+            },
+            {
+              "key": "decoration:blur:vibrancy",
+              "label": "Blur vibrancy",
+              "description": "Increase saturation of blurred colors",
+              "step": 0.01,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_VIBRANCY"
+            },
+            {
+              "key": "decoration:blur:vibrancy_darkness",
+              "label": "Blur vibrancy darkness",
+              "description": "How much to increase saturation of dark colors",
+              "step": 0.01,
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_VIB_DARKNESS"
+            },
+            {
+              "key": "decoration:blur:special",
+              "label": "Blur special workspaces",
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_SPECIAL"
+            },
+            {
+              "key": "decoration:blur:popups",
+              "label": "Blur popups",
+              "depends_on": "decoration:blur:enabled",
+              "variable": "RETRO_BLUR_POPUPS"
+            },
+            {
+              "key": "decoration:blur:popups_ignorealpha",
+              "variable": "RETRO_BLUR_POPUPS_IGNOREALPHA",
+              "label": "Popups ignore alpha",
+              "description": "If pixel opacity is below set value, will not blur popups",
+              "default": 0.2
+            },
+            {
+              "key": "decoration:blur:input_methods",
+              "variable": "RETRO_BLUR_INPUT_METHODS",
+              "label": "Blur input methods",
+              "description": "Whether to blur input methods (e.g. fcitx5)",
+              "default": false
+            },
+            {
+              "key": "decoration:blur:input_methods_ignorealpha",
+              "variable": "RETRO_BLUR_INPUT_METHODS_IGNOREALPHA",
+              "label": "Input methods ignore alpha",
+              "description": "If pixel opacity is below set value, will not blur input methods",
+              "default": 0.2
+            }
+          ]
+        },
+        {
+          "id": "decoration:shadow",
+          "label": "Shadow",
+          "options": [
+            {
+              "key": "decoration:shadow:enabled",
+              "label": "Enable shadow",
+              "variable": "RETRO_SHADOW"
+            },
+            {
+              "key": "decoration:shadow:range",
+              "label": "Shadow range",
+              "depends_on": "decoration:shadow:enabled",
+              "variable": "RETRO_SHADOW_RANGE"
+            },
+            {
+              "key": "decoration:shadow:render_power",
+              "label": "Shadow render power",
+              "description": "Higher values produce a faster shadow falloff",
+              "depends_on": "decoration:shadow:enabled",
+              "variable": "RETRO_SHADOW_RENDER_POWER"
+            },
+            {
+              "key": "decoration:shadow:ignore_window",
+              "label": "Ignore window",
+              "depends_on": "decoration:shadow:enabled"
+            },
+            {
+              "key": "decoration:shadow:offset",
+              "label": "Shadow offset",
+              "description": "Shadow position offset as 'x y' in pixels",
+              "default": "0 0",
+              "depends_on": "decoration:shadow:enabled",
+              "variable": "RETRO_SHADOW_OFFSET"
+            },
+            {
+              "key": "decoration:shadow:scale",
+              "label": "Shadow scale",
+              "description": "Scale factor for the shadow relative to the window",
+              "step": 0.05,
+              "depends_on": "decoration:shadow:enabled",
+              "variable": "RETRO_SHADOW_SCALE"
+            },
+            {
+              "key": "decoration:shadow:color",
+              "label": "Shadow color",
+              "depends_on": "decoration:shadow:enabled",
+              "variable": "RETRO_SHADOW_COLOR"
+            },
+            {
+              "key": "decoration:shadow:color_inactive",
+              "label": "Inactive shadow color",
+              "default": "0xee1a1a1a",
+              "depends_on": "decoration:shadow:enabled"
+            },
+            {
+              "key": "decoration:shadow:sharp",
+              "variable": "RETRO_SHADOW_SHARP",
+              "label": "Sharp shadows",
+              "description": "If enabled, will make the shadows sharp, akin to an infinite render power",
+              "default": false
+            }
+          ]
+        },
+        {
+          "id": "decoration:glow",
+          "label": "Glow",
+          "options": [
+            {
+              "key": "decoration:glow:enabled",
+              "variable": "RETRO_GLOW_ENABLED",
+              "label": "Enable glow",
+              "description": "Enable inner glow on windows",
+              "default": false
+            },
+            {
+              "key": "decoration:glow:range",
+              "variable": "RETRO_GLOW_RANGE",
+              "label": "Glow range",
+              "description": "Glow range (size) in layout px",
+              "default": 10
+            },
+            {
+              "key": "decoration:glow:render_power",
+              "variable": "RETRO_GLOW_RENDER_POWER",
+              "label": "Glow render power",
+              "description": "In what power to render the falloff [1-4]",
+              "default": 3
+            },
+            {
+              "key": "decoration:glow:color",
+              "variable": "RETRO_GLOW_COLOR",
+              "label": "Glow color",
+              "description": "Glow color. Alpha dictates glow opacity.",
+              "default": "0xee1a1a1a"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "animations",
+      "label": "Animations",
+      "icon": "bounce-symbolic",
+      "sections": [
+        {
+          "id": "animations",
+          "label": "General",
+          "options": [
+            {
+              "key": "animations:enabled",
+              "label": "Enable animations",
+              "description": "Master switch for all window and workspace animations",
+              "variable": "RETRO_ANIMATIONS"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "label": "Devices",
+      "icon": "input-keyboard-symbolic",
+      "sections": [
+        {
+          "id": "input",
+          "label": "Keyboard",
+          "options": [
+            {
+              "key": "input:kb_layout",
+              "label": "Keyboard layouts",
+              "description": "Active layouts in order; the first is the default. Add a layout-switch shortcut under Keyboard options.",
+              "type": "keyboard_layouts",
+              "source": "xkb_input_sources",
+              "companion_key": "input:kb_variant"
+            },
+            {
+              "key": "input:kb_variant",
+              "label": "Keyboard variant",
+              "managed_by": "input:kb_layout"
+            },
+            {
+              "key": "input:kb_options",
+              "label": "Keyboard options",
+              "description": "Modifier keys, layout switching, and other keyboard tweaks",
+              "source": "xkb_options",
+              "multi": true
+            },
+            {
+              "key": "input:numlock_by_default",
+              "label": "Numlock by default",
+              "description": "Enable numlock on startup"
+            },
+            {
+              "key": "input:repeat_rate",
+              "label": "Repeat rate"
+            },
+            {
+              "key": "input:repeat_delay",
+              "label": "Repeat delay"
+            }
+          ]
+        },
+        {
+          "id": "input:mouse",
+          "label": "Mouse",
+          "options": [
+            {
+              "key": "input:sensitivity",
+              "label": "Mouse sensitivity",
+              "description": "Mouse sensitivity (-1.0 to 1.0, 0 is default)",
+              "step": 0.05
+            },
+            {
+              "key": "input:accel_profile",
+              "label": "Acceleration profile",
+              "description": "How cursor speed changes relative to mouse movement speed",
+              "type": "choice",
+              "values": [
+                {
+                  "id": "",
+                  "label": "Default"
+                },
+                {
+                  "id": "flat",
+                  "label": "Flat"
+                },
+                {
+                  "id": "adaptive",
+                  "label": "Adaptive"
+                }
+              ]
+            },
+            {
+              "key": "input:follow_mouse",
+              "label": "Follow mouse",
+              "description": "Window focus follows mouse movement",
+              "type": "choice",
+              "values": [
+                {
+                  "label": "Disabled"
+                },
+                {
+                  "label": "Full"
+                },
+                {
+                  "label": "Loose"
+                },
+                {
+                  "label": "Loose (no mouse focus)"
+                }
+              ]
+            },
+            {
+              "key": "input:natural_scroll",
+              "label": "Natural scroll",
+              "description": "Enable natural (inverted) scrolling"
+            },
+            {
+              "key": "input:scroll_factor",
+              "label": "Scroll factor",
+              "description": "Multiplier for scroll amount",
+              "min": 0.1,
+              "max": 10.0,
+              "step": 0.1
+            },
+            {
+              "key": "input:left_handed",
+              "label": "Left-handed mode"
+            },
+            {
+              "key": "input:mouse_refocus",
+              "label": "Mouse refocus",
+              "description": "Re-focus the window under the cursor when switching workspaces"
+            },
+            {
+              "key": "input:float_switch_override_focus",
+              "label": "Float switch override focus",
+              "description": "Focus the window under cursor when switching between tiled and floating",
+              "type": "choice",
+              "values": [
+                {
+                  "label": "Disabled"
+                },
+                {
+                  "label": "Enabled"
+                },
+                {
+                  "label": "Enabled (also unfocuses)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "input:touchpad",
+          "label": "Touchpad",
+          "options": [
+            {
+              "key": "input:touchpad:disable_while_typing",
+              "label": "Disable while typing",
+              "description": "Ignore touchpad input while typing on the keyboard"
+            },
+            {
+              "key": "input:touchpad:natural_scroll",
+              "label": "Natural scroll",
+              "description": "Enable natural scrolling on touchpad"
+            },
+            {
+              "key": "input:touchpad:tap-to-click",
+              "label": "Tap to click",
+              "description": "Tapping sends a click (1, 2, or 3 fingers for LMB, RMB, MMB)"
+            },
+            {
+              "key": "input:touchpad:clickfinger_behavior",
+              "label": "Clickfinger behavior",
+              "description": "Use finger count instead of button areas for click mapping"
+            },
+            {
+              "key": "input:touchpad:tap_button_map",
+              "label": "Tap button map",
+              "type": "choice",
+              "values": [
+                {
+                  "id": "",
+                  "label": "Default"
+                },
+                {
+                  "id": "lrm",
+                  "label": "Left, Right, Middle"
+                },
+                {
+                  "id": "lmr",
+                  "label": "Left, Middle, Right"
+                }
+              ]
+            },
+            {
+              "key": "input:touchpad:middle_button_emulation",
+              "label": "Middle button emulation",
+              "description": "Press left and right buttons simultaneously to emulate middle click"
+            },
+            {
+              "key": "input:touchpad:drag_lock",
+              "label": "Drag lock",
+              "description": "Drag lock mode for tap-and-drag",
+              "type": "choice",
+              "values": [
+                {
+                  "label": "Disabled"
+                },
+                {
+                  "label": "Enabled with timeout"
+                },
+                {
+                  "label": "Sticky"
+                }
+              ]
+            },
+            {
+              "key": "input:touchpad:scroll_factor",
+              "label": "Touchpad scroll factor",
+              "min": 0.1,
+              "max": 10.0,
+              "step": 0.1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cursor",
+      "label": "Cursor",
+      "icon": "hyprmod-cursor-symbolic",
+      "sections": [
+        {
+          "id": "cursor",
+          "label": "General",
+          "options": [
+            {
+              "key": "cursor:no_hardware_cursors",
+              "label": "Hardware cursors"
+            },
+            {
+              "key": "cursor:enable_hyprcursor",
+              "label": "Enable Hyprcursor"
+            },
+            {
+              "key": "cursor:no_warps",
+              "label": "Disable cursor warps",
+              "description": "Do not warp the cursor when focusing, using keybinds, etc."
+            },
+            {
+              "key": "cursor:persistent_warps",
+              "label": "Persistent warps",
+              "description": "Remember cursor position per window when warping back"
+            },
+            {
+              "key": "cursor:warp_on_change_workspace",
+              "label": "Warp on workspace change",
+              "description": "Move cursor to the last focused window after switching workspaces. Force ignores the no_warps setting."
+            },
+            {
+              "key": "cursor:zoom_factor",
+              "label": "Zoom factor",
+              "step": 0.1
+            }
+          ]
+        },
+        {
+          "id": "cursor:visibility",
+          "label": "Visibility",
+          "options": [
+            {
+              "key": "cursor:inactive_timeout",
+              "label": "Inactive timeout",
+              "description": "Seconds before hiding cursor (0 to never hide)"
+            },
+            {
+              "key": "cursor:hide_on_key_press",
+              "label": "Hide on key press"
+            },
+            {
+              "key": "cursor:hide_on_touch",
+              "label": "Hide on touch"
+            },
+            {
+              "key": "cursor:hide_on_tablet",
+              "label": "Hide on tablet"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gestures",
+      "label": "Gestures",
+      "icon": "gesture-swipe-left-symbolic",
+      "sections": [
+        {
+          "id": "gestures",
+          "label": "Workspace Swipe",
+          "options": [
+            {
+              "key": "gestures:workspace_swipe_create_new",
+              "label": "Create new workspace",
+              "description": "Swiping past the last workspace creates a new one"
+            },
+            {
+              "key": "gestures:workspace_swipe_forever",
+              "label": "Swipe forever",
+              "description": "Keep swiping through workspaces without limits"
+            },
+            {
+              "key": "gestures:workspace_swipe_cancel_ratio",
+              "label": "Cancel ratio",
+              "description": "How far you need to swipe before the gesture commits",
+              "step": 0.05
+            },
+            {
+              "key": "gestures:workspace_swipe_min_speed_to_force",
+              "label": "Min speed to force",
+              "description": "Minimum swipe speed to force the gesture regardless of distance"
+            },
+            {
+              "key": "gestures:workspace_swipe_direction_lock",
+              "label": "Direction lock",
+              "description": "Lock gesture to a single direction once started"
+            },
+            {
+              "key": "gestures:workspace_swipe_use_r",
+              "label": "Use relative workspaces",
+              "description": "Swipe through relative workspaces instead of absolute"
+            }
+          ]
+        },
+        {
+          "id": "gestures:touchpad",
+          "label": "Touchpad",
+          "options": [
+            {
+              "key": "gestures:workspace_swipe_distance",
+              "label": "Swipe distance",
+              "description": "Distance in pixels for the touchpad swipe gesture"
+            },
+            {
+              "key": "gestures:workspace_swipe_invert",
+              "label": "Invert direction"
+            }
+          ]
+        },
+        {
+          "id": "gestures:touchscreen",
+          "label": "Touchscreen",
+          "options": [
+            {
+              "key": "gestures:workspace_swipe_touch",
+              "label": "Touch swipe",
+              "description": "Enable workspace swipe via touchscreen"
+            },
+            {
+              "key": "gestures:workspace_swipe_touch_invert",
+              "label": "Invert touch direction",
+              "depends_on": "gestures:workspace_swipe_touch"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dwindle",
+      "label": "Dwindle",
+      "icon": "grid-filled-symbolic",
+      "hidden": true,
+      "parent_page": "layouts",
+      "sections": [
+        {
+          "id": "dwindle",
+          "label": "Split Behavior",
+          "options": [
+            {
+              "key": "dwindle:preserve_split",
+              "label": "Preserve split",
+              "description": "Split direction won't change when the container is resized"
+            },
+            {
+              "key": "dwindle:pseudotile",
+              "label": "Pseudotile",
+              "description": "Pseudotiled windows retain their floating size when tiled"
+            },
+            {
+              "key": "dwindle:force_split",
+              "label": "Force split direction",
+              "type": "choice",
+              "values": [
+                {
+                  "label": "Follow mouse"
+                },
+                {
+                  "label": "Left / Top"
+                },
+                {
+                  "label": "Right / Bottom"
+                }
+              ]
+            },
+            {
+              "key": "dwindle:smart_split",
+              "label": "Smart split",
+              "description": "Split direction is based on cursor position within the window"
+            },
+            {
+              "key": "dwindle:default_split_ratio",
+              "label": "Default split ratio",
+              "step": 0.05
+            },
+            {
+              "key": "dwindle:split_width_multiplier",
+              "label": "Split width multiplier",
+              "step": 0.1
+            },
+            {
+              "key": "dwindle:permanent_direction_override",
+              "label": "Permanent direction override"
+            },
+            {
+              "key": "dwindle:use_active_for_splits",
+              "label": "Use active for splits"
+            }
+          ]
+        },
+        {
+          "id": "dwindle:other",
+          "label": "Other",
+          "options": [
+            {
+              "key": "dwindle:smart_resizing",
+              "label": "Smart resizing"
+            },
+            {
+              "key": "dwindle:special_scale_factor",
+              "label": "Special workspace scale",
+              "step": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "master",
+      "label": "Master",
+      "icon": "menu-large-symbolic",
+      "hidden": true,
+      "parent_page": "layouts",
+      "sections": [
+        {
+          "id": "master",
+          "label": "Layout",
+          "options": [
+            {
+              "key": "master:orientation",
+              "label": "Orientation",
+              "type": "choice",
+              "values": [
+                {
+                  "id": "left",
+                  "label": "Left"
+                },
+                {
+                  "id": "right",
+                  "label": "Right"
+                },
+                {
+                  "id": "top",
+                  "label": "Top"
+                },
+                {
+                  "id": "bottom",
+                  "label": "Bottom"
+                },
+                {
+                  "id": "center",
+                  "label": "Center"
+                }
+              ]
+            },
+            {
+              "key": "master:mfact",
+              "label": "Master factor",
+              "description": "Size of the master area as a percentage of the screen",
+              "step": 0.05
+            },
+            {
+              "key": "master:new_status",
+              "label": "New window status",
+              "type": "choice",
+              "values": [
+                {
+                  "id": "master",
+                  "label": "Master"
+                },
+                {
+                  "id": "slave",
+                  "label": "Slave"
+                },
+                {
+                  "id": "inherit",
+                  "label": "Inherit"
+                }
+              ]
+            },
+            {
+              "key": "master:new_on_top",
+              "label": "New on top"
+            },
+            {
+              "key": "master:new_on_active",
+              "label": "New window placement",
+              "type": "choice",
+              "values": [
+                {
+                  "id": "none",
+                  "label": "None"
+                },
+                {
+                  "id": "before",
+                  "label": "Before active"
+                },
+                {
+                  "id": "after",
+                  "label": "After active"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "master:other",
+          "label": "Other",
+          "options": [
+            {
+              "key": "master:smart_resizing",
+              "label": "Smart resizing"
+            },
+            {
+              "key": "master:special_scale_factor",
+              "label": "Special workspace scale",
+              "step": 0.05
+            },
+            {
+              "key": "master:allow_small_split",
+              "label": "Allow small split"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scrolling",
+      "label": "Scrolling",
+      "icon": "view-more-symbolic",
+      "hidden": true,
+      "parent_page": "layouts",
+      "sections": [
+        {
+          "id": "scrolling",
+          "label": "Columns",
+          "options": [
+            {
+              "key": "scrolling:column_width",
+              "label": "Default column width",
+              "description": "Default width of a column as a fraction of the screen",
+              "step": 0.05
+            },
+            {
+              "key": "scrolling:explicit_column_widths",
+              "label": "Preset column widths"
+            },
+            {
+              "key": "scrolling:direction",
+              "label": "Scroll direction",
+              "default": "right",
+              "values": [
+                {
+                  "id": "right",
+                  "label": "Right"
+                },
+                {
+                  "id": "left",
+                  "label": "Left"
+                },
+                {
+                  "id": "down",
+                  "label": "Down"
+                },
+                {
+                  "id": "up",
+                  "label": "Up"
+                }
+              ]
+            },
+            {
+              "key": "scrolling:fullscreen_on_one_column",
+              "label": "Single column fullscreen"
+            }
+          ]
+        },
+        {
+          "id": "scrolling:focus",
+          "label": "Focus",
+          "options": [
+            {
+              "key": "scrolling:focus_fit_method",
+              "label": "Focus fit method",
+              "values": [
+                {
+                  "label": "Center"
+                },
+                {
+                  "label": "Fit"
+                }
+              ]
+            },
+            {
+              "key": "scrolling:follow_focus",
+              "label": "Follow focus",
+              "description": "Move the layout automatically to bring the focused window into view"
+            },
+            {
+              "key": "scrolling:follow_min_visible",
+              "label": "Minimum visible fraction",
+              "step": 0.05,
+              "depends_on": "scrolling:follow_focus"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "xwayland",
+      "label": "XWayland",
+      "icon": "application-x-executable-symbolic",
+      "sections": [
+        {
+          "id": "xwayland",
+          "label": "XWayland",
+          "options": [
+            {
+              "key": "xwayland:enabled",
+              "label": "Enable XWayland",
+              "description": "Allow running applications using X11"
+            },
+            {
+              "key": "xwayland:force_zero_scaling",
+              "label": "Force zero scaling",
+              "description": "Force apps to use Wayland-native scaling instead of X11 scaling"
+            },
+            {
+              "key": "xwayland:use_nearest_neighbor",
+              "label": "Use nearest neighbor",
+              "description": "Use nearest-neighbor filtering for upscaling XWayland apps"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ecosystem",
+      "label": "Ecosystem",
+      "icon": "sprout-symbolic",
+      "sections": [
+        {
+          "id": "ecosystem",
+          "label": "Ecosystem",
+          "options": [
+            {
+              "key": "ecosystem:no_update_news",
+              "label": "Disable update news",
+              "description": "Disable the popup when Hyprland is updated to a new version"
+            },
+            {
+              "key": "ecosystem:no_donation_nag",
+              "label": "Disable donation nag",
+              "description": "Disable the donation popup that shows twice a year"
+            },
+            {
+              "key": "ecosystem:enforce_permissions",
+              "label": "Enforce permissions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "monitor_globals",
+      "label": "Display Settings",
+      "hidden": true,
+      "parent_page": "monitors",
+      "parent_label": "Monitors",
+      "sections": [
+        {
+          "id": "monitor_globals",
+          "label": "Display Settings",
+          "options": [
+            {
+              "key": "misc:vrr",
+              "label": "Variable refresh rate",
+              "description": "Controls adaptive sync globally",
+              "type": "choice",
+              "values": [
+                {
+                  "label": "Off"
+                },
+                {
+                  "label": "On"
+                },
+                {
+                  "label": "Fullscreen only"
+                },
+                {
+                  "label": "Fullscreen (game content)"
+                }
+              ]
+            },
+            {
+              "key": "misc:vfr",
+              "label": "Variable frame rate",
+              "description": "Enable variable frame rate (saves battery)"
+            },
+            {
+              "key": "misc:mouse_move_enables_dpms",
+              "label": "Mouse move enables DPMS"
+            },
+            {
+              "key": "misc:key_press_enables_dpms",
+              "label": "Key press enables DPMS"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "misc",
+      "label": "Miscellaneous",
+      "icon": "applications-system-symbolic",
+      "sections": [
+        {
+          "id": "misc",
+          "label": "Behavior",
+          "options": [
+            {
+              "key": "misc:disable_autoreload",
+              "label": "Disable autoreload",
+              "description": "Disable config autoreload (manual reload via hyprctl reload)"
+            },
+            {
+              "key": "misc:focus_on_activate",
+              "label": "Focus on activate",
+              "description": "Whether to focus an app that requests to be focused"
+            },
+            {
+              "key": "misc:animate_manual_resizes",
+              "label": "Animate manual resizes",
+              "description": "Animate windows when manually resizing or moving them"
+            },
+            {
+              "key": "misc:animate_mouse_windowdragging",
+              "label": "Animate mouse window dragging",
+              "description": "Animate windows being dragged by the mouse"
+            }
+          ]
+        },
+        {
+          "id": "misc:startup",
+          "label": "Startup",
+          "description": "These options only take effect when Hyprland starts",
+          "options": [
+            {
+              "key": "misc:disable_hyprland_logo",
+              "label": "Disable Hyprland logo"
+            },
+            {
+              "key": "misc:disable_splash_rendering",
+              "label": "Disable splash rendering",
+              "description": "Hide the splash text shown on the desktop after startup"
+            },
+            {
+              "key": "misc:force_default_wallpaper",
+              "label": "Force default wallpaper",
+              "description": "Force the default wallpaper (-1 random, 0-2 for specific)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

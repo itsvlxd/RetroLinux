@@ -411,12 +411,11 @@ cmd_input() {
                     local status=$?
 
                     if [[ $status -eq 0 ]]; then
-                        rx_log "success" "Keybind added: ${PINK}$new_key${RESET} → ${PINK}$new_action${RESET}"
-                    elif echo "$result" | grep -q "^DUPLICATE"; then
-                        local existing_info
-                        existing_info=$(echo "$result" | cut -d'|' -f3-)
-                        rx_log "error" "Duplicate key: ${PINK}$new_key${RESET} already bound to:"
-                        rx_log "info" "  ${PINK}$existing_info${RESET}"
+                        if echo "$result" | grep -q "^REPLACED"; then
+                            rx_log "success" "Keybind replaced: ${PINK}$new_key${RESET} → ${PINK}$new_action${RESET}"
+                        else
+                            rx_log "success" "Keybind added: ${PINK}$new_key${RESET} → ${PINK}$new_action${RESET}"
+                        fi
                     else
                         rx_log "error" "Failed to add keybind"
                     fi

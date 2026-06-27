@@ -17,10 +17,13 @@ for k, v in pairs(colors) do
 end
 
 ok, vars = pcall(dofile, os.getenv("HOME") .. "/.config/retro/themes/variables.lua")
+
 if not ok then
 	os.execute("bash " .. os.getenv("HOME") .. "/.config/hypr/scripts/refresh_hyprland.sh 2>/dev/null")
+
 	ok, vars = pcall(dofile, os.getenv("HOME") .. "/.config/retro/themes/variables.lua")
 end
+
 if not ok then
 	vars = {
 		retro_opacity = 1.0,
@@ -37,9 +40,14 @@ if not ok then
 		retro_blur_size = 3,
 		retro_blur_passes = 3,
 		retro_blur_vibrancy = 0.1696,
+		retro_layout = "dwindle",
+		retro_resize_on_border = true,
+		retro_allow_tearing = false,
+		retro_animations = true,
 	}
 end
 
+-- FIX: make something to remove this
 if APPLY_COLORS_ONLY then
 	hl.config({
 		general = {
@@ -95,11 +103,6 @@ if not ok then
 	require("input")
 end
 
-ok, _ = pcall(dofile, retro_config .. "/keybinds.lua")
-if not ok then
-	require("keybinds")
-end
-
 require("programs")
 require("env")
 require("monitors")
@@ -107,4 +110,6 @@ require("autostart")
 require("appearance")
 require("windows")
 require("permissions")
---require("settings")
+
+pcall(dofile, retro_dir .. "/modules/hyprland/files/keybinds.lua")
+pcall(dofile, retro_config .. "/keybinds.lua")

@@ -18,12 +18,23 @@ hl.config({
 		},
 
 		-- Set to true enable resizing windows by clicking and dragging on borders and gaps
-		resize_on_border = true,
+		resize_on_border = vars.retro_resize_on_border,
 
 		-- Please see https://wiki.hypr.land/Configuring/Tearing/ before you turn this on
-		allow_tearing = false,
+		allow_tearing = vars.retro_allow_tearing,
 
-		layout = "dwindle",
+		extend_border_grab_area = vars.retro_extend_border_grab_area,
+		hover_icon_on_border = vars.retro_hover_icon_on_border,
+
+		snap = {
+			enabled = vars.retro_snap_enabled,
+			window_gap = vars.retro_snap_window_gap,
+			monitor_gap = vars.retro_snap_monitor_gap,
+			border_overlap = vars.retro_snap_border_overlap,
+			respect_gaps = vars.retro_snap_respect_gaps,
+		},
+
+		layout = vars.retro_layout,
 	},
 	-- https://wiki.hypr.land/Configuring/Variables/#decoration
 	decoration = {
@@ -33,12 +44,24 @@ hl.config({
 		-- Change transparency of focused and unfocused windows
 		active_opacity = vars.retro_opacity,
 		inactive_opacity = vars.retro_inactive_opacity,
+		fullscreen_opacity = vars.retro_fullscreen_opacity,
+
+		dim_inactive = vars.retro_dim_inactive,
+		dim_strength = vars.retro_dim_strength,
+		dim_around = vars.retro_dim_around,
+		dim_special = vars.retro_dim_special,
+		dim_modal = vars.retro_dim_modal,
+
+		border_part_of_window = vars.retro_border_part_of_window,
 
 		shadow = {
 			enabled = vars.retro_shadow,
 			range = vars.retro_shadow_range,
 			render_power = vars.retro_shadow_render_power,
-			color = colors.shadow,
+			sharp = vars.retro_shadow_sharp,
+			offset = vars.retro_shadow_offset,
+			scale = vars.retro_shadow_scale,
+			color = vars.retro_shadow_color,
 		},
 
 		-- https://wiki.hypr.land/Configuring/Variables/#blur
@@ -46,13 +69,33 @@ hl.config({
 			enabled = vars.retro_blur,
 			size = vars.retro_blur_size,
 			passes = vars.retro_blur_passes,
+			ignore_opacity = vars.retro_blur_ignore_opacity,
+			new_optimizations = vars.retro_blur_new_optimizations,
+			xray = vars.retro_blur_xray,
+			noise = vars.retro_blur_noise,
+			contrast = vars.retro_blur_contrast,
+			brightness = vars.retro_blur_brightness,
 			vibrancy = vars.retro_blur_vibrancy,
+			vibrancy_darkness = vars.retro_blur_vibrancy_darkness,
+			special = vars.retro_blur_special,
+			popups = vars.retro_blur_popups,
+			popups_ignorealpha = vars.retro_blur_popups_ignorealpha,
+			input_methods = vars.retro_blur_input_methods,
+			input_methods_ignorealpha = vars.retro_blur_input_methods_ignorealpha,
+		},
+
+		-- https://wiki.hypr.land/Configuring/Variables/#decoration-glow
+		glow = {
+			enabled = vars.retro_glow_enabled,
+			range = vars.retro_glow_range,
+			render_power = vars.retro_glow_render_power,
+			color = colors.primary,
 		},
 	},
 
 	-- https://wiki.hypr.land/Configuring/Variables/#animations
 	animations = {
-		enabled = true,
+		enabled = vars.retro_animations,
 	},
 })
 

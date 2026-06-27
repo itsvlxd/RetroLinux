@@ -52,6 +52,15 @@ gnome-keyring
 # Disk
 smartmontools
 
+# Python
+python-gobject
+python-hyprland-config
+python-hyprland-monitors
+python-hyprland-schema
+python-hyprland-socket
+python-hyprland-state
+python-pygobject-stubs
+
 # Apps
 loupe
 mpv
