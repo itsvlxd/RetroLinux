@@ -113,3 +113,4 @@ require("permissions")
 
 pcall(dofile, retro_dir .. "/modules/hyprland/files/keybinds.lua")
 pcall(dofile, retro_config .. "/keybinds.lua")
+pcall(dofile, retro_config .. "/settings.lua")
