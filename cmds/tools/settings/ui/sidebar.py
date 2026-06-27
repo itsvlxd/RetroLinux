@@ -12,6 +12,7 @@ from settings.ui.icons import (
     LAYOUTS_ICON,
     MONITORS_ICON,
     SETTINGS_ICON,
+    WALLPAPERS_ICON,
     WINDOW_RULES_ICON,
     WORKSPACES_ICON,
 )
@@ -194,6 +195,7 @@ class Sidebar:
         display = new_category("Display")
         add_row(display, "monitors", "Monitors", MONITORS_ICON)
         add_row(display, "workspaces", "Workspaces", WORKSPACES_ICON)
+        add_row(display, "wallpapers", "Wallpapers", WALLPAPERS_ICON)
 
         windowing = new_category("Window Management")
         # Dwindle/Master/Scrolling are merged into a single Layouts page
