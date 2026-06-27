@@ -147,9 +147,6 @@ cmd_wallpaper() {
             local count=$(echo "$sync_result" | grep -oP 'synced=\K[0-9]+')
             local skipped=$(echo "$sync_result" | grep -oP 'skipped=\K[0-9]+')
             rx_log "success" "Sync complete: ${PINK}${count}${RESET} new, ${GRAY}${skipped}${RESET} already present."
-            rx_log "info" "Optimizing wallpapers for your monitors..."
-            bash "$wall_script" --optimize
-            rx_log "success" "All wallpapers are now optimized."
             ;;
 
         "gpu")
