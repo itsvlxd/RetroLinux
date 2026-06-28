@@ -27,6 +27,7 @@ from settings.pages.monitors import MonitorsPage
 from settings.pages.pending import PendingChangesPage
 from settings.pages.section import SectionPage
 from settings.pages.settings import SettingsPage
+from settings.pages.themes import ThemesPage
 from settings.pages.wallpapers import WallpapersPage
 from settings.pages.window_rules import WindowRulesPage
 from settings.pages.workspaces import WorkspacesPage
@@ -116,6 +117,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._window_rules_page: WindowRulesPage | None = None
         self._layer_rules_page: LayerRulesPage | None = None
         self._layouts_page: LayoutsPage | None = None
+        self._themes_page: ThemesPage | None = None
         self._wallpapers_page: WallpapersPage | None = None
         self._settings_page: SettingsPage | None = None
         self._pending_page: PendingChangesPage | None = None
@@ -382,6 +384,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
+            (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
         ]
@@ -935,6 +938,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         if cls is WallpapersPage:
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ThemesPage:
+            page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
 
     def show_page(self, gid: str):
         """Switch the content pane to the given page."""
@@ -1105,6 +1111,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         if any(s.is_dirty() for s in self._section_pages):
             return True
         if self._wallpapers_page is not None and self._wallpapers_page.is_dirty():
+            return True
+        if self._themes_page is not None and self._themes_page.is_dirty():
             return True
         return False
 
@@ -1286,6 +1294,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             section.mark_saved()
         if self._wallpapers_page is not None:
             self._wallpapers_page.flush_pending()
+        if self._themes_page is not None:
+            self._themes_page.flush_pending()
         self._undo.clear()
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()
