@@ -1,6 +1,7 @@
 """Main application window with sidebar navigation."""
 
 import subprocess
+import time
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -123,11 +124,19 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         # Populated at the end of _build_ui() once section pages exist;
         # initialized empty so has_dirty() is safe during initial builds.
         self._section_pages: list[SectionPage] = []
+        self._deferred_groups: dict[str, dict] = {}
+        self._lazy_section_specs: dict[str, tuple] = {}
+        self._lazy_standalone_specs: dict[str, tuple] = {}
 
+        _t0 = time.monotonic()
         self._load_css()
         self._build_ui()
+        _t1 = time.monotonic()
         self._register_state()
+        _t2 = time.monotonic()
         self._refresh_all_modified_indicators()
+        _t3 = time.monotonic()
+        print(f"[TIMING] build_ui={_t1-_t0:.3f}s  register_state={_t2-_t1:.3f}s  refresh={_t3-_t2:.3f}s  total={_t3-_t0:.3f}s", file=__import__('sys').stderr)
 
     @property
     def auto_save(self) -> bool:
@@ -209,6 +218,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self._toast_overlay.set_child(self._main_box)
         self.set_content(self._toast_overlay)
+        _bt0 = time.monotonic()
 
         # Auto-save action (window-level, referenced by menu)
         auto_save_action = Gio.SimpleAction.new_stateful(
@@ -260,9 +270,17 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._search_page_builder = SearchPage(self._schema)
 
         self._build_content_pane()
+        _bt1 = time.monotonic()
+        print(f'[TIMING]   content_pane={_bt1-_bt0:.3f}s', file=__import__('sys').stderr)
+
         groups, groups_by_id = self._build_pages()
+        _bt2 = time.monotonic()
+        print(f'[TIMING]   build_pages={_bt2-_bt1:.3f}s', file=__import__('sys').stderr)
+
         self._sidebar.populate(groups_by_id)
         self._build_search_page()
+        _bt3 = time.monotonic()
+        print(f'[TIMING]   sidebar+search={_bt3-_bt2:.3f}s', file=__import__('sys').stderr)
 
         # Cache the list of section pages (animations, monitors, binds) — stable after build
         self._section_pages = [
@@ -288,6 +306,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             first_id = groups[0]["id"]
             self.show_page(first_id)
             self._sidebar.select_first()
+        _bt4 = time.monotonic()
+        print(f'[TIMING]   finalize={_bt4-_bt3:.3f}s', file=__import__('sys').stderr)
 
     def _build_content_pane(self):
         """Build the content pane with page stack and banner."""
@@ -311,10 +331,13 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._split_view.set_content(self._content_nav)
 
     def _build_pages(self) -> tuple[list[dict], dict[str, dict]]:
-        """Build schema pages and special pages."""
+        """Build the default schema page eagerly, defer the rest."""
+        _bt0 = time.monotonic()
         self._page_titles: dict[str, str] = {}
         groups = schema.get_groups(self._schema)
         groups_by_id: dict[str, dict] = {}
+        self._deferred_groups.clear()
+        default_built = False
 
         for group in groups:
             target_group = group.get("parent_page", group["id"])
@@ -326,14 +349,19 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
                 continue
             groups_by_id[group["id"]] = group
 
-            page = self._build_page(group)
-            self._page_stack.add_named(page, group["id"])
-            self._page_titles[group["id"]] = group["label"]
+            if not default_built:
+                # Build the first non-hidden group eagerly (default page)
+                page = self._build_page(group)
+                self._page_stack.add_named(page, group["id"])
+                self._page_titles[group["id"]] = group["label"]
+                default_built = True
+            else:
+                # Defer all other schema groups for lazy building
+                self._deferred_groups[group["id"]] = group
+        _bt1 = time.monotonic()
+        print(f'[TIMING]    schema_groups={_bt1-_bt0:.3f}s', file=__import__('sys').stderr)
 
-        # SectionPage subclasses that follow the standard
-        # ``(window, on_dirty_changed, push_undo, saved_sections)``
-        # constructor. ``slug`` is the page-stack key, ``title`` shows in
-        # the header.
+        # Store section page specs for lazy building
         section_page_specs: list[tuple[type, str, str, str]] = [
             (BindsPage, "_binds_page", "binds", "Keybinds"),
             (MonitorsPage, "_monitors_page", "monitors", "Monitors"),
@@ -344,25 +372,13 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (LayerRulesPage, "_layer_rules_page", "layer_rules", "Layer Rules"),
         ]
         for cls, attr, slug, title in section_page_specs:
-            page = cls(
-                self,
-                on_dirty_changed=self._on_section_dirty,
-                push_undo=self._undo.push,
-                saved_sections=self.saved_sections,
-            )
-            setattr(self, attr, page)
-            self._page_stack.add_named(page.build(header=self._make_page_header(title)), slug)
-            self._page_titles[slug] = title
-            if cls is MonitorsPage:
-                self._search_page_builder.add_entries(page.get_search_entries())
+            self._lazy_section_specs[slug] = (cls, attr, title)
 
         self._search_page_builder.add_entries(CursorPage.get_search_entries())
+        _bt2 = time.monotonic()
+        print(f'[TIMING]    section_pages={_bt2-_bt1:.3f}s', file=__import__('sys').stderr)
 
-        # Standalone pages (no dirty/undo wiring; built from ``self`` only).
-        # ``LayoutsPage`` is schema-driven but doesn't take the section-page
-        # constructor — it embeds Dwindle/Master/Scrolling option groups
-        # behind a ViewSwitcher, registering their option rows via
-        # ``build_schema_group_widgets`` during ``build()``.
+        # Store standalone page specs for lazy building
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
@@ -370,18 +386,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (SettingsPage, "_settings_page", "settings", "Settings"),
         ]
         for cls, attr, slug, title in standalone_page_specs:
-            page = cls(self)
-            setattr(self, attr, page)
-            # The Pending Changes page header omits the pending chip — it
-            # would just be a no-op shortcut to the page the user is on.
-            with_chip = cls is not PendingChangesPage
-            header = self._make_page_header(title, with_pending_chip=with_chip)
-            self._page_stack.add_named(page.build(header=header), slug)
-            self._page_titles[slug] = title
+            self._lazy_standalone_specs[slug] = (cls, attr, title)
 
-        if self._wallpapers_page is not None:
-            self._wallpapers_page._notify_dirty = self._on_section_dirty
-            self._search_page_builder.add_entries(self._wallpapers_page.get_search_entries())
+        _bt3 = time.monotonic()
+        print(f'[TIMING]    standalone_pages={_bt3-_bt2:.3f}s', file=__import__('sys').stderr)
 
         return groups, groups_by_id
 
@@ -882,8 +890,56 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     # -- Sidebar --
 
+    def _build_lazy_group_page(self, gid: str):
+        """Build a deferred schema group page and sync its option rows."""
+        group = self._deferred_groups.pop(gid)
+        page = self._build_page(group)
+        self._page_stack.add_named(page, gid)
+        self._page_titles[gid] = group["label"]
+        for s in group.get("sections", []):
+            for o in s.get("options", []):
+                state = self.app_state.get(o["key"])
+                opt_row = self._option_rows.get(o["key"])
+                if opt_row and state and state.live_value is not None:
+                    opt_row.set_value_silent(state.live_value)
+        self._refresh_all_modified_indicators()
+
+    def _build_lazy_section_page(self, slug: str):
+        """Build a deferred section page (binds, monitors, etc.)."""
+        cls, attr, title = self._lazy_section_specs.pop(slug)
+        page = cls(self, on_dirty_changed=self._on_section_dirty, push_undo=self._undo.push, saved_sections=self.saved_sections)
+        setattr(self, attr, page)
+        widget = page.build(header=self._make_page_header(title))
+        self._page_stack.add_named(widget, slug)
+        self._page_titles[slug] = title
+        self._section_pages.append(page)
+        if cls is MonitorsPage:
+            self._search_page_builder.add_entries(page.get_search_entries())
+        for key in self._option_rows:
+            self._sync_option_row(key)
+
+    def _build_lazy_standalone_page(self, slug: str):
+        """Build a deferred standalone page (layouts, pending, wallpapers, settings)."""
+        cls, attr, title = self._lazy_standalone_specs.pop(slug)
+        page = cls(self)
+        setattr(self, attr, page)
+        with_chip = cls is not PendingChangesPage
+        header = self._make_page_header(title, with_pending_chip=with_chip)
+        widget = page.build(header=header)
+        self._page_stack.add_named(widget, slug)
+        self._page_titles[slug] = title
+        if cls is WallpapersPage:
+            page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+
     def show_page(self, gid: str):
         """Switch the content pane to the given page."""
+        if gid in self._deferred_groups:
+            self._build_lazy_group_page(gid)
+        elif gid in self._lazy_section_specs:
+            self._build_lazy_section_page(gid)
+        elif gid in self._lazy_standalone_specs:
+            self._build_lazy_standalone_page(gid)
         if gid in self._page_titles:
             if self._monitors_page and gid != "monitors":
                 self._monitors_page.confirm_changes()

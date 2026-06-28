@@ -40,6 +40,10 @@ class RetroSettingsApp(Adw.Application):
 
 
 def main():
+    debug = "--debug" in sys.argv
+    if debug:
+        sys.argv.remove("--debug")
+
     app = RetroSettingsApp()
 
     def _on_signal(*_args) -> bool:
