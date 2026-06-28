@@ -3,7 +3,7 @@
     "author": "Catppuccin (deep variant)",
     "palette": "palettes/catppuccin-deep-palette.png",
     "link": "https://catppuccin.com",
-    "description": "Deeper darker variant of Catppuccin Mocha — near-black background with brighter accents",
+    "description": "An even deeper take on Catppuccin Mocha with a near-black background and vibrant pink, mint, and yellow accents that pop against the darkness",
     "color_map": {
         "primary": "#f5d0e8",
         "on_primary": "#11111b",

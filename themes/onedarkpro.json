@@ -3,7 +3,7 @@
     "author": "Binaryify",
     "palette": "palettes/onedarkpro-palette.png",
     "link": "https://github.com/Binaryify/OneDark-Pro",
-    "description": "Cool blue accents, clean modern look",
+    "description": "Deep blue-gray background with cool blue accents and a clean, modern aesthetic inspired by VSCode's popular One Dark Pro theme",
     "color_map": {
         "primary": "#61afef",
         "on_primary": "#282c34",

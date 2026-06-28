@@ -3,7 +3,7 @@
     "author": "Wimer Hazenberg ",
     "palette": "palettes/monokai-palette.png",
     "link": "https://monokai.nl",
-    "description": "Vibrant green accents, rich contrast",
+    "description": "Bold neon-green primary against a dark charcoal canvas, with vivid pink, purple, and cyan highlights for striking contrast — the classic Monokai palette",
     "color_map": {
         "primary": "#a6e22e",
         "on_primary": "#272822",
