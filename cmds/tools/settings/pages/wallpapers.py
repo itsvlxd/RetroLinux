@@ -6,8 +6,9 @@ from pathlib import Path
 
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk
 
-from lib.python.variable import get_var
+from lib.python.variable import get_var, get_module_default
 from settings.ui import make_page_layout
+from settings.ui.row_actions import RowActions
 
 FRAME_CACHE = Path.home() / ".config" / "retro" / "wallpaper_frames"
 WALLPAPER_CORE = Path(os.environ.get("RETRO_DIR", "")) / "scripts" / "wallpaper_core.sh"
@@ -136,78 +137,170 @@ class WallpapersPage:
         self._gpu_row: Gtk.Widget | None = None
         self._pending_gpu: str | None = None
         self._gpu_modes: list[str] = []
-
-    def _set_row_managed(self, row: Gtk.Widget, var_name: str) -> None:
-        from lib.python.variable import get_var as _get_var, get_module_default as _get_def
-        is_managed = _get_var(var_name) != _get_def(var_name)
-        row.remove_css_class("option-managed")
-        row.remove_css_class("option-default")
-        row.add_css_class("option-managed" if is_managed else "option-default")
-        for child in row:
-            if isinstance(child, Gtk.Button) and child.get_icon_name() == "user-trash-symbolic":
-                child.set_visible(is_managed)
+        self._setting_value = False
+        self._static_actions: RowActions | None = None
+        self._bat_actions: RowActions | None = None
+        self._col_actions: RowActions | None = None
+        self._slide_actions: RowActions | None = None
+        self._interval_actions: RowActions | None = None
+        self._res_actions: RowActions | None = None
+        self._gpu_actions: RowActions | None = None
 
     def _refresh_managed(self) -> None:
-        for row, var in (
-            (self._static_row, "WALL_STATIC_FORCED"),
-            (self._bat_row, "WALL_STATIC_ON_BAT"),
-            (self._col_row, "RETRO_WALL_COLLECTION"),
-            (self._slide_row, "WALL_SLIDESHOW_ACTIVE"),
-            (self._interval_row, "WALL_SLIDESHOW_INTERVAL"),
-            (self._res_row, "WALL_RES_MAP"),
-            (self._gpu_row, "WALL_GPU_OFFLOAD"),
+        for row, var, actions in (
+            (self._static_row, "WALL_STATIC_FORCED", self._static_actions),
+            (self._bat_row, "WALL_STATIC_ON_BAT", self._bat_actions),
+            (self._col_row, "RETRO_WALL_COLLECTION", self._col_actions),
+            (self._slide_row, "WALL_SLIDESHOW_ACTIVE", self._slide_actions),
+            (self._interval_row, "WALL_SLIDESHOW_INTERVAL", self._interval_actions),
+            (self._res_row, "WALL_RES_MAP", self._res_actions),
+            (self._gpu_row, "WALL_GPU_OFFLOAD", self._gpu_actions),
         ):
-            if row is not None:
-                self._set_row_managed(row, var)
+            if row is None or actions is None:
+                continue
+            live = get_var(var, "")
+            default = get_module_default(var)
+            if not default:
+                default = live
+            effective = self._pending_for(var, live)
+            is_managed = effective != default
+            is_dirty = self._has_pending(var)
+            is_saved = live != default
+            actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
 
-    def _build_revert(self, row: Gtk.Widget, var_name: str) -> Gtk.Button:
-        btn = Gtk.Button(icon_name="user-trash-symbolic")
-        btn.add_css_class("flat")
-        btn.set_valign(Gtk.Align.CENTER)
-        btn.set_tooltip_text("Reset to default")
-        btn.connect("clicked", lambda _b: self._on_revert(var_name))
-        btn.set_visible(False)
-        return btn
+    def _pending_for(self, var_name: str, fallback: str = "") -> str:
+        val = self._get_pending(var_name)
+        return val if val is not None else fallback
 
-    def _on_revert(self, var_name: str):
-        from lib.python.variable import get_module_default as _d
-        def_val = _d(var_name)
-
+    def _get_pending(self, var_name: str) -> str | None:
         if var_name == "WALL_STATIC_FORCED":
-            self._pending_static = def_val == "true"
-            if self._static_switch is not None:
-                self._static_switch.set_active(self._pending_static)  # type: ignore[union-attr]
+            if self._pending_static is None:
+                return None
+            return "true" if self._pending_static else "false"
+        if var_name == "WALL_STATIC_ON_BAT":
+            if self._pending_static_bat is None:
+                return None
+            return "true" if self._pending_static_bat else "false"
+        if var_name == "RETRO_WALL_COLLECTION":
+            return self._pending_collection
+        if var_name == "WALL_SLIDESHOW_ACTIVE":
+            if self._pending_slideshow is None:
+                return None
+            return "true" if self._pending_slideshow else "false"
+        if var_name == "WALL_SLIDESHOW_INTERVAL":
+            return str(self._pending_interval) if self._pending_interval is not None else None
+        if var_name == "WALL_RES_MAP":
+            return self._pending_res_map
+        if var_name == "WALL_GPU_OFFLOAD":
+            return self._pending_gpu
+        return None
+
+    def _has_pending(self, var_name: str) -> bool:
+        if var_name == "WALL_STATIC_FORCED":
+            return self._pending_static is not None
+        if var_name == "WALL_STATIC_ON_BAT":
+            return self._pending_static_bat is not None
+        if var_name == "RETRO_WALL_COLLECTION":
+            return self._pending_collection is not None
+        if var_name == "WALL_SLIDESHOW_ACTIVE":
+            return self._pending_slideshow is not None
+        if var_name == "WALL_SLIDESHOW_INTERVAL":
+            return self._pending_interval is not None
+        if var_name == "WALL_RES_MAP":
+            return self._pending_res_map is not None
+        if var_name == "WALL_GPU_OFFLOAD":
+            return self._pending_gpu is not None
+        return False
+
+    def _set_pending(self, var_name: str, value: str):
+        if var_name == "WALL_STATIC_FORCED":
+            self._pending_static = value == "true"
         elif var_name == "WALL_STATIC_ON_BAT":
-            self._pending_static_bat = def_val == "true"
-            if self._bat_switch is not None:
-                self._bat_switch.set_active(self._pending_static_bat)  # type: ignore[union-attr]
+            self._pending_static_bat = value == "true"
         elif var_name == "RETRO_WALL_COLLECTION":
-            self._pending_collection = def_val
+            self._pending_collection = value
+        elif var_name == "WALL_SLIDESHOW_ACTIVE":
+            self._pending_slideshow = value == "true"
+        elif var_name == "WALL_SLIDESHOW_INTERVAL":
+            self._pending_interval = int(value) if value.isdigit() else None  # type: ignore[arg-type]
+        elif var_name == "WALL_RES_MAP":
+            self._pending_res_map = value
+        elif var_name == "WALL_GPU_OFFLOAD":
+            self._pending_gpu = value
+
+    def _clear_pending(self, var_name: str):
+        if var_name == "WALL_STATIC_FORCED":
+            self._pending_static = None
+        elif var_name == "WALL_STATIC_ON_BAT":
+            self._pending_static_bat = None
+        elif var_name == "RETRO_WALL_COLLECTION":
+            self._pending_collection = None
+        elif var_name == "WALL_SLIDESHOW_ACTIVE":
+            self._pending_slideshow = None
+        elif var_name == "WALL_SLIDESHOW_INTERVAL":
+            self._pending_interval = None
+        elif var_name == "WALL_RES_MAP":
+            self._pending_res_map = None
+        elif var_name == "WALL_GPU_OFFLOAD":
+            self._pending_gpu = None
+
+    def _set_widget_value(self, var_name: str, value: str):
+        self._setting_value = True
+        if var_name == "WALL_STATIC_FORCED":
+            if self._static_switch is not None:
+                self._static_switch.set_active(value == "true")  # type: ignore[union-attr]
+        elif var_name == "WALL_STATIC_ON_BAT":
+            if self._bat_switch is not None:
+                self._bat_switch.set_active(value == "true")  # type: ignore[union-attr]
+        elif var_name == "RETRO_WALL_COLLECTION":
+            def_val = value
             if self._col_row is not None and def_val in self._collections:
                 self._col_row.set_selected(self._collections.index(def_val))  # type: ignore[union-attr]
         elif var_name == "WALL_SLIDESHOW_ACTIVE":
-            self._pending_slideshow = def_val == "true"
             if self._slide_switch is not None:
-                self._slide_switch.set_active(self._pending_slideshow)  # type: ignore[union-attr]
+                self._slide_switch.set_active(value == "true")  # type: ignore[union-attr]
         elif var_name == "WALL_SLIDESHOW_INTERVAL":
-            self._pending_interval = int(def_val)
-            if self._interval_spin is not None:
-                self._interval_spin.set_value(float(self._pending_interval))
+            if self._interval_spin is not None and value.isdigit():
+                self._interval_spin.set_value(float(value))
         elif var_name == "WALL_RES_MAP":
-            w, h = (def_val.split("x") + ["1920", "1080"])[:2]
-            self._pending_res_map = f"{w}x{h}"
+            w, h = (value.split("x") + ["1920", "1080"])[:2]
             if self._spin_w is not None:
                 self._spin_w.set_value(float(w))
             if self._spin_h is not None:
                 self._spin_h.set_value(float(h))
         elif var_name == "WALL_GPU_OFFLOAD":
-            self._pending_gpu = def_val
-            if self._gpu_row is not None and def_val in self._gpu_modes:
-                self._gpu_row.set_selected(self._gpu_modes.index(def_val))  # type: ignore[union-attr]
+            if self._gpu_row is not None and value in self._gpu_modes:
+                self._gpu_row.set_selected(self._gpu_modes.index(value))  # type: ignore[union-attr]
+        self._setting_value = False
 
+    def _discard_var(self, var_name: str):
+        live = get_var(var_name, get_module_default(var_name))
+        self._set_widget_value(var_name, live)
+        self._clear_pending(var_name)
+        self._check_dirty()
+        self._refresh_managed()
+
+    def _reset_var(self, var_name: str):
+        default = get_module_default(var_name)
+        self._set_widget_value(var_name, default)
+        self._set_pending(var_name, default)
         self._dirty = True
         self._notify_dirty()
         self._refresh_managed()
+
+    def _check_dirty(self):
+        any_dirty = any(
+            self._has_pending(v)
+            for v in (
+                "WALL_STATIC_FORCED", "WALL_STATIC_ON_BAT", "RETRO_WALL_COLLECTION",
+                "WALL_SLIDESHOW_ACTIVE", "WALL_SLIDESHOW_INTERVAL", "WALL_RES_MAP",
+                "WALL_GPU_OFFLOAD",
+            )
+        )
+        if any_dirty != self._dirty:
+            self._dirty = any_dirty
+            if not any_dirty:
+                self._notify_dirty()
 
     def _parse_res(self, res_str: str) -> tuple[int, int]:
         try:
@@ -298,21 +391,31 @@ class WallpapersPage:
         static_row.set_subtitle("Forces all wallpapers to run in static mode")
         static_row.set_active(get_var("WALL_STATIC_FORCED", "false") == "true")
         static_row.connect("notify::active", self._on_static_toggled)
-        static_row.add_suffix(self._build_revert(static_row, "WALL_STATIC_FORCED"))
+        self._static_actions = RowActions(
+            static_row,
+            on_discard=lambda: self._discard_var("WALL_STATIC_FORCED"),
+            on_reset=lambda: self._reset_var("WALL_STATIC_FORCED"),
+        )
+        static_row.add_suffix(self._static_actions.box)
+        self._static_actions.reorder_first()
         pref_group.add(static_row)
         self._static_row = static_row
         self._static_switch = static_row
-        self._set_row_managed(static_row, "WALL_STATIC_FORCED")
 
         bat_row = Adw.SwitchRow(title="Static on Battery")
         bat_row.set_subtitle("Switches to static wallpapers when on battery power")
         bat_row.set_active(get_var("WALL_STATIC_ON_BAT", "false") == "true")
         bat_row.connect("notify::active", self._on_static_bat_toggled)
-        bat_row.add_suffix(self._build_revert(bat_row, "WALL_STATIC_ON_BAT"))
+        self._bat_actions = RowActions(
+            bat_row,
+            on_discard=lambda: self._discard_var("WALL_STATIC_ON_BAT"),
+            on_reset=lambda: self._reset_var("WALL_STATIC_ON_BAT"),
+        )
+        bat_row.add_suffix(self._bat_actions.box)
+        self._bat_actions.reorder_first()
         pref_group.add(bat_row)
         self._bat_row = bat_row
         self._bat_switch = bat_row
-        self._set_row_managed(bat_row, "WALL_STATIC_ON_BAT")
 
         col_result = subprocess.run(
             ["bash", str(WALLPAPER_CORE), "--collection", "list"],
@@ -330,22 +433,32 @@ class WallpapersPage:
         col_row.set_subtitle("Select the wallpaper collection to browse")
         col_row.set_model(col_model)
         col_row.set_selected(col_idx)
-        col_row.add_suffix(self._build_revert(col_row, "RETRO_WALL_COLLECTION"))
+        self._col_actions = RowActions(
+            col_row,
+            on_discard=lambda: self._discard_var("RETRO_WALL_COLLECTION"),
+            on_reset=lambda: self._reset_var("RETRO_WALL_COLLECTION"),
+        )
+        col_row.add_suffix(self._col_actions.box)
+        self._col_actions.reorder_first()
         col_row.connect("notify::selected", self._on_collection_changed, collections)
         pref_group.add(col_row)
         self._col_row = col_row
-        self._set_row_managed(col_row, "RETRO_WALL_COLLECTION")
 
         # Slideshow
         slide_row = Adw.SwitchRow(title="Enable Slideshow")
         slide_row.set_subtitle("Enables automatic cycling through multiple wallpapers in your collection.")
         slide_row.set_active(get_var("WALL_SLIDESHOW_ACTIVE", "false") == "true")
         slide_row.connect("notify::active", self._on_slideshow_toggled)
-        slide_row.add_suffix(self._build_revert(slide_row, "WALL_SLIDESHOW_ACTIVE"))
+        self._slide_actions = RowActions(
+            slide_row,
+            on_discard=lambda: self._discard_var("WALL_SLIDESHOW_ACTIVE"),
+            on_reset=lambda: self._reset_var("WALL_SLIDESHOW_ACTIVE"),
+        )
+        slide_row.add_suffix(self._slide_actions.box)
+        self._slide_actions.reorder_first()
         pref_group.add(slide_row)
         self._slide_row = slide_row
         self._slide_switch = slide_row
-        self._set_row_managed(slide_row, "WALL_SLIDESHOW_ACTIVE")
 
         adj = Gtk.Adjustment(value=int(get_var("WALL_SLIDESHOW_INTERVAL", "300")), lower=30, upper=86400, step_increment=30, page_increment=300)
         interval_row = Adw.ActionRow(title="Slideshow Interval (seconds)")
@@ -354,13 +467,18 @@ class WallpapersPage:
         interval_spin.set_valign(Gtk.Align.CENTER)
         interval_spin.connect("notify::value", self._on_interval_changed)
         interval_row.add_suffix(interval_spin)
-        interval_row.add_suffix(self._build_revert(interval_row, "WALL_SLIDESHOW_INTERVAL"))
+        self._interval_actions = RowActions(
+            interval_row,
+            on_discard=lambda: self._discard_var("WALL_SLIDESHOW_INTERVAL"),
+            on_reset=lambda: self._reset_var("WALL_SLIDESHOW_INTERVAL"),
+        )
+        interval_row.add_suffix(self._interval_actions.box)
+        self._interval_actions.reorder_first()
         interval_row.set_visible(slide_row.get_active())
         slide_row.connect("notify::active", lambda sw, _ps: interval_row.set_visible(sw.get_active()))
         pref_group.add(interval_row)
         self._interval_row = interval_row
         self._interval_spin = interval_spin
-        self._set_row_managed(interval_row, "WALL_SLIDESHOW_INTERVAL")
 
         # Resolution map — W x H spinners
         current_res = get_var("WALL_RES_MAP", "")
@@ -374,6 +492,7 @@ class WallpapersPage:
         except (ValueError, IndexError):
             cur_w, cur_h = "1920", "1080"
         res_row = Adw.ActionRow(title="Wallpaper Resolution")
+        current_res_str = f"{cur_w}x{cur_h}"
         res_row.set_subtitle("Set a custom width and height to optimize wallpapers for your display")
         adj_w = Gtk.Adjustment(value=int(cur_w), lower=1, upper=99999, step_increment=1, page_increment=100)
         adj_h = Gtk.Adjustment(value=int(cur_h), lower=1, upper=99999, step_increment=1, page_increment=100)
@@ -384,7 +503,13 @@ class WallpapersPage:
         spin_w.connect("notify::value", self._on_res_apply)
         spin_h.connect("notify::value", self._on_res_apply)
         res_row.add_suffix(spin_w)
-        res_row.add_suffix(self._build_revert(res_row, "WALL_RES_MAP"))
+        self._res_actions = RowActions(
+            res_row,
+            on_discard=lambda: self._discard_var("WALL_RES_MAP"),
+            on_reset=lambda: self._reset_var("WALL_RES_MAP"),
+        )
+        res_row.add_suffix(self._res_actions.box)
+        self._res_actions.reorder_first()
         res_row.add_suffix(spin_h)
         pref_group.add(res_row)
         self._res_row = res_row
@@ -403,10 +528,15 @@ class WallpapersPage:
         gpu_row.set_model(gpu_model)
         gpu_row.set_selected(gpu_idx)
         gpu_row.connect("notify::selected", self._on_gpu_changed, gpu_modes)
-        gpu_row.add_suffix(self._build_revert(gpu_row, "WALL_GPU_OFFLOAD"))
+        self._gpu_actions = RowActions(
+            gpu_row,
+            on_discard=lambda: self._discard_var("WALL_GPU_OFFLOAD"),
+            on_reset=lambda: self._reset_var("WALL_GPU_OFFLOAD"),
+        )
+        gpu_row.add_suffix(self._gpu_actions.box)
+        self._gpu_actions.reorder_first()
         pref_group.add(gpu_row)
         self._gpu_row = gpu_row
-        self._set_row_managed(gpu_row, "WALL_GPU_OFFLOAD")
 
         content_box.append(pref_group)
 
@@ -439,6 +569,7 @@ class WallpapersPage:
         self._rebuild()
         self._needs_opt = self._check_needs_optimization()
         self._refresh_opt_banner()
+        self._refresh_managed()
 
         return toolbar
 
@@ -528,26 +659,40 @@ class WallpapersPage:
         ]
 
     def _on_static_toggled(self, switch, _pspec):
+        if self._setting_value:
+            return
         self._pending_static = switch.get_active()
         self._dirty = True
         self._notify_dirty()
+        self._refresh_managed()
 
     def _on_static_bat_toggled(self, switch, _pspec):
+        if self._setting_value:
+            return
         self._pending_static_bat = switch.get_active()
         self._dirty = True
         self._notify_dirty()
+        self._refresh_managed()
 
     def _on_slideshow_toggled(self, switch, _pspec):
+        if self._setting_value:
+            return
         self._pending_slideshow = switch.get_active()
         self._dirty = True
         self._notify_dirty()
+        self._refresh_managed()
 
     def _on_interval_changed(self, spin, _pspec):
+        if self._setting_value:
+            return
         self._pending_interval = int(spin.get_value())
         self._dirty = True
         self._notify_dirty()
+        self._refresh_managed()
 
     def _on_res_apply(self, spin, _pspec):
+        if self._setting_value:
+            return
         w = int(self._spin_w.get_value()) if self._spin_w is not None else 1920
         h = int(self._spin_h.get_value()) if self._spin_h is not None else 1080
         text = f"{w}x{h}"
@@ -555,8 +700,11 @@ class WallpapersPage:
             self._pending_res_map = text
             self._dirty = True
             self._notify_dirty()
+            self._refresh_managed()
 
     def _on_collection_changed(self, row, _pspec, collections: list[str]):
+        if self._setting_value:
+            return
         idx = row.get_selected()
         if idx < 0 or idx >= len(collections):
             return
@@ -566,8 +714,11 @@ class WallpapersPage:
         self._pending_collection = name
         self._dirty = True
         self._notify_dirty()
+        self._refresh_managed()
 
     def _on_gpu_changed(self, row, _pspec, modes: list[str]):
+        if self._setting_value:
+            return
         idx = row.get_selected()
         if idx < 0 or idx >= len(modes):
             return
@@ -577,6 +728,7 @@ class WallpapersPage:
         self._pending_gpu = name
         self._dirty = True
         self._notify_dirty()
+        self._refresh_managed()
 
     def is_dirty(self) -> bool:
         return self._dirty
@@ -590,6 +742,7 @@ class WallpapersPage:
         self._pending_interval = None
         self._pending_res_map = None
         self._pending_gpu = None
+        self._refresh_managed()
 
     def flush_pending(self):
         if self._pending_static is not None:
@@ -646,7 +799,6 @@ class WallpapersPage:
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
         self.mark_saved()
-        self._refresh_managed()
 
     def _rebuild(self):
         if self._content_box is None:
