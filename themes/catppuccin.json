@@ -3,7 +3,7 @@
     "author": "Catppuccin",
     "palette": "palettes/catppuccin-mocha-palette.png",
     "link": "https://github.com/catppuccin/catppuccin",
-    "description": "Warm mauve tones, dark mocha variant",
+    "description": "Warm mauve and pink accents on a dark mocha-brown background, with soft teal and blue highlights — the beloved Catppuccin Mocha palette",
     "color_map": {
         "primary": "#cba6f7",
         "on_primary": "#1e1e2e",

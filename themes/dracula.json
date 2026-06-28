@@ -3,7 +3,7 @@
     "author": "Dracula Theme",
     "palette": "palettes/dracula-palette.png",
     "link": "https://draculatheme.com",
-    "description": "Deep purple accents, dark vampiric theme",
+    "description": "Deep purple and pink accents on a dark vampiric background, with bright cyan and green highlights — the iconic Dracula color scheme, widely used across editors and terminals worldwide",
     "color_map": {
         "primary": "#bd93f9",
         "on_primary": "#282a36",
