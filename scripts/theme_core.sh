@@ -738,8 +738,8 @@ rx_cursor_set() {
 [Icon Theme]
 Inherits=$name
 EOF
-    sudo mkdir -p /usr/share/icons/default
-    cat <<EOF | sudo tee /usr/share/icons/default/index.theme >/dev/null
+    mkdir -p "$HOME/.local/share/icons/default"
+    cat >"$HOME/.local/share/icons/default/index.theme" <<EOF
 [Icon Theme]
 Inherits=$name
 EOF
