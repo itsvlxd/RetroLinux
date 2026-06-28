@@ -695,11 +695,11 @@ rx_theme_get_setup_values() {
 
 rx_theme_deploy_root_config() {
     local dirs=("gtk-3.0" "gtk-4.0" "Kvantum" "qt5ct" "qt6ct")
-    sudo mkdir -p /root/.config
+    sudo -n mkdir -p /root/.config 2>/dev/null || return 0
     for dir in "${dirs[@]}"; do
         local src="$HOME/.config/$dir"
         mkdir -p "$src"
-        sudo ln -snf "$src" "/root/.config/$dir"
+        sudo -n ln -snf "$src" "/root/.config/$dir" 2>/dev/null
     done
     rx_log_file "info" "Root config symlinks deployed ($(get_var "RETRO_THEME_MODE" "dark"), $(get_var "GTK_FONT" "Inter") $(get_var "GTK_FONT_SIZE" "10"))"
 }

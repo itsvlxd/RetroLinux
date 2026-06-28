@@ -135,3 +135,23 @@ if command -v glib-compile-schemas >/dev/null 2>&1; then
         rx_log "info" "GSettings schema compiled for Retro Settings"
     fi
 fi
+
+# Setup passwordless sudo for theme operations
+setup_theme_sudoers() {
+    if command -v papirus-folders >/dev/null 2>&1; then
+        sudo rm -f /etc/sudoers.d/papirus-folders
+        cat <<EOF | sudo tee /etc/sudoers.d/papirus-folders >/dev/null
+%wheel ALL=(ALL) NOPASSWD: SETENV: /usr/bin/papirus-folders
+Defaults!/usr/bin/papirus-folders !env_reset
+EOF
+        sudo chmod 440 /etc/sudoers.d/papirus-folders
+        rx_log "success" "Sudoers rule added for papirus-folders"
+    fi
+
+    local sddm_dir="/usr/share/sddm/themes/retro"
+    if [[ -d $sddm_dir ]]; then
+        sudo chown -R "$USER:$USER" "$sddm_dir" 2>/dev/null || true
+        rx_log "success" "SDDM theme dir made writable for $USER"
+    fi
+}
+setup_theme_sudoers
