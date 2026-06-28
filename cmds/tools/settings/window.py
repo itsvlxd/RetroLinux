@@ -902,6 +902,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
                 opt_row = self._option_rows.get(o["key"])
                 if opt_row and state and state.live_value is not None:
                     opt_row.set_value_silent(state.live_value)
+        # has_dirty() checks _section_pages; cursor page is a side-effect
+        # in _build_page(), not a lazy section page, so append it here.
+        if gid == "cursor" and self._cursor_page is not None:
+            self._section_pages.append(self._cursor_page)
         self._refresh_all_modified_indicators()
 
     def _build_lazy_section_page(self, slug: str):
