@@ -12,6 +12,7 @@ from settings.ui.icons import (
     LAYOUTS_ICON,
     MONITORS_ICON,
     SETTINGS_ICON,
+    THEMES_ICON,
     WALLPAPERS_ICON,
     WINDOW_RULES_ICON,
     WORKSPACES_ICON,
@@ -181,11 +182,12 @@ class Sidebar:
                 return
             add_row(listbox, group_id, group["label"], group.get("icon"))
 
-        look_and_feel = new_category("Look & Feel")
+        look_and_feel = new_category("Style")
         add_schema_row(look_and_feel, "appearance")
         add_schema_row(look_and_feel, "decoration")
         add_schema_row(look_and_feel, "animations")
         add_schema_row(look_and_feel, "cursor")
+        add_row(look_and_feel, "themes", "Themes", THEMES_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)

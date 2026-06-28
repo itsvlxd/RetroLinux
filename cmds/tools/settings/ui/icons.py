@@ -21,6 +21,7 @@ LAYER_RULES_ICON = "overlapping-windows-symbolic"
 LAYOUTS_ICON = "view-grid-symbolic"
 ANIMATIONS_ICON = "bounce-symbolic"
 CURSOR_ICON = "settings-cursor-symbolic"
+THEMES_ICON = "preferences-color-symbolic"
 
 PENDING_ICON = "view-list-symbolic"
 PROFILES_ICON = "user-bookmarks-symbolic"
