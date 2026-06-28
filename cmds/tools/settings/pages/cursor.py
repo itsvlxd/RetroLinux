@@ -31,6 +31,22 @@ _SYSTEM_DEFAULT = "__system_default__"
 _THUMB_SIZE = 24
 _DEFAULT_SIZE = 24
 
+_MODULE_DEFAULT: "_State | None" = None
+
+
+def _get_module_default() -> "_State":
+    global _MODULE_DEFAULT
+    if _MODULE_DEFAULT is None:
+        from lib.python.variable import get_module_default as _md
+
+        t = _md("RETRO_CURSOR_THEME")
+        s = _md("RETRO_CURSOR_SIZE")
+        _MODULE_DEFAULT = _State(
+            t if t else _SYSTEM_DEFAULT,
+            int(s) if s and s.isdigit() else _DEFAULT_SIZE,
+        )
+    return _MODULE_DEFAULT
+
 
 class _State(NamedTuple):
     theme: str  # theme name, or _SYSTEM_DEFAULT
@@ -86,6 +102,7 @@ class CursorPage(SectionPage):
         self._baseline = self._parse_env(saved_sections or {})
         self._current = _State(self._baseline.theme, self._baseline.size)
         self._last_pushed = _State(self._current.theme, self._current.size)
+        self._module_default = _get_module_default()
 
         self._model: Gio.ListStore | None = None
         self._size_adjustment: Gtk.Adjustment | None = None
@@ -107,6 +124,25 @@ class CursorPage(SectionPage):
                 theme = ev.value
             elif ev.name in _SIZE_VARS and ev.value.isdigit():
                 size = int(ev.value)
+        # Fall back to variables.sh values if not set in env
+        if theme == _SYSTEM_DEFAULT:
+            from lib.python.variable import get_var as _g, get_module_default as _md
+            saved = _g("RETRO_CURSOR_THEME", "")
+            if saved:
+                theme = saved
+            else:
+                saved = _md("RETRO_CURSOR_THEME")
+                if saved:
+                    theme = saved
+        if size == _DEFAULT_SIZE:
+            from lib.python.variable import get_var as _g, get_module_default as _md
+            saved = _g("RETRO_CURSOR_SIZE", "")
+            if saved and saved.isdigit():
+                size = int(saved)
+            else:
+                saved = _md("RETRO_CURSOR_SIZE")
+                if saved and saved.isdigit():
+                    size = int(saved)
         return _State(theme, size)
 
     # ── Widget ──
@@ -158,7 +194,7 @@ class CursorPage(SectionPage):
 
         self._field = ManagedRow(
             row,
-            default=(_SYSTEM_DEFAULT, _DEFAULT_SIZE),
+            default=self._module_default,
             baseline=(self._baseline.theme, self._baseline.size),
             get_value=lambda: (self._current.theme, self._current.size),
             set_value_silent=self._set_state_silent,
@@ -307,6 +343,18 @@ class CursorPage(SectionPage):
         # change and repaints with the just-applied theme.
         self._window.set_cursor(Gdk.Cursor.new_from_name("none", None))
         GLib.timeout_add(30, lambda: self._window.set_cursor(None) or False)
+        # Persist to variables.sh and run retro commands in background
+        from lib.python.variable import set_var as _set_var
+        _set_var("RETRO_CURSOR_THEME", theme)
+        _set_var("RETRO_CURSOR_SIZE", str(size))
+        subprocess.Popen(
+            ["retro", "theme", "cursor", "set", theme],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        subprocess.Popen(
+            ["retro", "theme", "cursor", "size", str(size)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
         return GLib.SOURCE_REMOVE
 
     # ── SectionPage protocol ──
@@ -373,6 +421,9 @@ class CursorPage(SectionPage):
         the cursor at their own fallback. When only size differs from the
         default, emit just ``XCURSOR_SIZE``.
         """
+        # Value matches module default — no env override needed
+        if self._current == self._module_default:
+            return []
         theme_set = self._current.theme != _SYSTEM_DEFAULT
         size_set = self._current.size != _DEFAULT_SIZE
         if not theme_set and not size_set:
