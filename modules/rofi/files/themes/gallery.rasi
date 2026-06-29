@@ -19,7 +19,7 @@ window {
     fullscreen:                  false;
     width:                       800px;
     x-offset:                    0px;
-    y-offset:                    40%;
+    y-offset:                    @rofi-y-offset;
 
     enabled:                     true;
     margin:                      0px;
@@ -47,7 +47,7 @@ inputbar {
     enabled:                     true;
     spacing:                     15px;
     margin:                      10px;
-    padding:                     12px 20px;
+    padding:                     @rofi-input-padding;
     border:                      0px solid;
     border-radius:               @rofi-radius;
     border-color:                @selected;
@@ -95,7 +95,7 @@ listview {
     fixed-height:                true;
     fixed-columns:               true;
     
-    spacing:                     5px;
+    spacing:                     @rofi-spacing;
     margin:                      0px 5px;
     padding:                     @rofi-padding;
     border:                      0px solid;
@@ -133,7 +133,7 @@ element selected.normal {
 element-icon {
     background-color:            transparent;
     text-color:                  inherit;
-    size:                        128px;
+    size:                        @rofi-icon-size;
     cursor:                      inherit;
 }
 
@@ -150,7 +150,7 @@ element-text {
 
 mode-switcher {
     enabled:                     true;
-    spacing:                     10px;
+    spacing:                     @rofi-spacing;
     margin:                      10px;
     background-color:            transparent;
 }

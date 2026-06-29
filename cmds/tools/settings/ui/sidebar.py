@@ -5,6 +5,7 @@ from collections.abc import Callable
 from gi.repository import Adw, Gtk
 
 from settings.ui.icons import (
+    APPS_ICON,
     AUTOSTART_ICON,
     BINDS_ICON,
     ENV_VARS_ICON,
@@ -188,6 +189,7 @@ class Sidebar:
         add_schema_row(look_and_feel, "animations")
         add_schema_row(look_and_feel, "cursor")
         add_row(look_and_feel, "themes", "Themes", THEMES_ICON)
+        add_row(look_and_feel, "apps", "Applications", APPS_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)

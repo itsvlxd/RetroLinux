@@ -28,6 +28,7 @@ from settings.pages.pending import PendingChangesPage
 from settings.pages.section import SectionPage
 from settings.pages.settings import SettingsPage
 from settings.pages.themes import ThemesPage
+from settings.pages.apps import AppsPage
 from settings.pages.wallpapers import WallpapersPage
 from settings.pages.window_rules import WindowRulesPage
 from settings.pages.workspaces import WorkspacesPage
@@ -119,6 +120,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._layouts_page: LayoutsPage | None = None
         self._themes_page: ThemesPage | None = None
         self._wallpapers_page: WallpapersPage | None = None
+        self._apps_page: AppsPage | None = None
         self._settings_page: SettingsPage | None = None
         self._pending_page: PendingChangesPage | None = None
         self._pre_search_page_id: str | None = None
@@ -382,6 +384,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
         # Store standalone page specs for lazy building
         standalone_page_specs: list[tuple[type, str, str, str]] = [
+            (AppsPage, "_apps_page", "apps", "Applications"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
@@ -715,6 +718,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             counts["layer_rules"] += self._layer_rules_page.pending_change_count()
         if self._wallpapers_page is not None and self._wallpapers_page.needs_optimization():
             counts["wallpapers"] = 1
+        if self._apps_page is not None and self._apps_page.is_dirty():
+            counts["apps"] = 1
 
         # The pending-changes chip totals everything else
         counts["pending"] = sum(counts.values())
@@ -935,11 +940,13 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         widget = page.build(header=header)
         self._page_stack.add_named(widget, slug)
         self._page_titles[slug] = title
-        if cls is WallpapersPage:
+        if cls is AppsPage:
+            page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is WallpapersPage:
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ThemesPage:
-            page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
 
     def show_page(self, gid: str):
@@ -1112,7 +1119,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             return True
         if self._wallpapers_page is not None and self._wallpapers_page.is_dirty():
             return True
-        if self._themes_page is not None and self._themes_page.is_dirty():
+        if self._apps_page is not None and self._apps_page.is_dirty():
             return True
         return False
 
@@ -1294,8 +1301,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             section.mark_saved()
         if self._wallpapers_page is not None:
             self._wallpapers_page.flush_pending()
-        if self._themes_page is not None:
-            self._themes_page.flush_pending()
+        if self._apps_page is not None:
+            self._apps_page.flush_pending()
         self._undo.clear()
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()

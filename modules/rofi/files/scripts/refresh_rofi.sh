@@ -12,6 +12,10 @@ FONT_SIZE=$(get_var "ROFI_FONT_SIZE" "9.5")
 ROUNDING=$(get_var "ROFI_ROUNDING" "10")
 PADDING=$(get_var "ROFI_PADDING" "5")
 BORDER=$(get_var "ROFI_BORDER_SIZE" "2")
+ICON_SIZE=$(get_var "ROFI_ICON_SIZE" "128")
+SPACING=$(get_var "ROFI_SPACING" "5")
+Y_OFFSET=$(get_var "ROFI_Y_OFFSET" "40")
+INPUT_PADDING=$(get_var "ROFI_INPUT_PADDING" "12")
 
 cat <<EOF >"$TEMP_FILE"
 /**
@@ -23,6 +27,10 @@ cat <<EOF >"$TEMP_FILE"
     rofi-border:        ${BORDER}px solid;
     rofi-radius:        ${ROUNDING}px;
     rofi-padding:       ${PADDING}px;
+    rofi-icon-size:     ${ICON_SIZE}px;
+    rofi-spacing:       ${SPACING}px;
+    rofi-input-padding: ${INPUT_PADDING}px;
+    rofi-y-offset:      ${Y_OFFSET}%;
 }
 EOF
 
