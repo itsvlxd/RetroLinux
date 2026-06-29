@@ -146,7 +146,7 @@ hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" 
 hl.window_rule({
 	name = "kitty-windows-style",
 	match = { class = "kitty" },
-	opacity = "1.0 0.8",
+	opacity = vars.retro_kitty_active_opacity .. " 0.8",
 })
 
 hl.layer_rule({

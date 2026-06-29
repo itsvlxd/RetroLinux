@@ -60,6 +60,7 @@ SNAP_BORDER_OVERLAP=$(get_var "RETRO_SNAP_BORDER_OVERLAP" "false")
 SNAP_RESPECT_GAPS=$(get_var "RETRO_SNAP_RESPECT_GAPS" "false")
 LAYOUT=$(get_var "RETRO_LAYOUT" "dwindle")
 ANIMATIONS=$(get_var "RETRO_ANIMATIONS" "true")
+KITTY_ACTIVE_OPACITY=$(get_var "KITTY_OPACITY_ACTIVE" "1.0")
 
 if [ "$SHADOW" = "true" ] || [ "$SHADOW" = "1" ]; then SHADOW_BOOL="true"; else SHADOW_BOOL="false"; fi
 if [ "$BLUR" = "true" ] || [ "$BLUR" = "1" ]; then BLUR_BOOL="true"; else BLUR_BOOL="false"; fi
@@ -138,6 +139,7 @@ return {
     retro_snap_border_overlap = $SNAP_BORDER_OVERLAP_BOOL,
     retro_snap_respect_gaps = $SNAP_RESPECT_GAPS_BOOL,
     retro_layout = "$LAYOUT",
+    retro_kitty_active_opacity = $KITTY_ACTIVE_OPACITY,
     retro_animations = $ANIMATIONS_BOOL,
 }
 EOF
