@@ -8,9 +8,8 @@ from pathlib import Path
 
 from gi.repository import Adw, Gtk, GLib, Gdk, Pango
 
-from lib.python import get_module_default, get_var, set_var
+from lib.python import get_var, set_var
 from settings.ui import make_page_layout
-from settings.ui.row_actions import RowActions
 
 THEMES_DIR = Path(os.environ.get("RETRO_DIR", "")) / "themes"
 THEME_CORE = Path(os.environ.get("RETRO_DIR", "")) / "scripts" / "theme_core.sh"
@@ -149,9 +148,6 @@ def _make_swatches_row(color_map: dict) -> Gtk.Box:
 
 class ThemesPage:
 
-    MODE_MODES = ["dark", "light"]
-    MODE_DISPLAY = ["Dark", "Light"]
-
     def __init__(self, window):
         self._window = window
         self._themes: list[dict] = []
@@ -159,35 +155,20 @@ class ThemesPage:
         self._content_box: Gtk.Box | None = None
         self._flow_box: Gtk.FlowBox | None = None
         self._search_entry: Gtk.SearchEntry | None = None
-        self._dirty = False
-        self._notify_dirty = lambda: None
-        self._pending_mode: str | None = None
-        self._mode_row: Adw.ComboRow | None = None
-        self._mode_actions: RowActions | None = None
 
     def build(self, header: Adw.HeaderBar | None = None) -> Gtk.Widget:
         toolbar, _page_box, content_box, _scrolled = make_page_layout(header=header)
         self._content_box = content_box
 
-        pref_group = Adw.PreferencesGroup()
-        current_mode = get_var("RETRO_THEME_MODE", "dark")
-        mode_idx = self.MODE_MODES.index(current_mode) if current_mode in self.MODE_MODES else 0
-        mode_model = Gtk.StringList.new(self.MODE_DISPLAY)
-        mode_row = Adw.ComboRow(title="Theme Mode")
-        mode_row.set_subtitle("Choose between dark and light theme variants")
-        mode_row.set_model(mode_model)
-        mode_row.set_selected(mode_idx)
-        mode_row.connect("notify::selected", self._on_mode_changed)
-        self._mode_actions = RowActions(
-            mode_row,
-            on_discard=lambda: self._discard_mode(),
-            on_reset=lambda: self._reset_mode(),
-        )
-        mode_row.add_suffix(self._mode_actions.box)
-        self._mode_actions.reorder_first()
-        pref_group.add(mode_row)
-        self._mode_row = mode_row
-        content_box.append(pref_group)
+        if header:
+            current_mode = get_var("RETRO_THEME_MODE", "dark")
+            icon = "weather-clear-night-symbolic" if current_mode == "dark" else "weather-clear-symbolic"
+            tip = "Switch to Light Mode" if current_mode == "dark" else "Switch to Dark Mode"
+            mode_btn = Gtk.Button(icon_name=icon)
+            mode_btn.set_tooltip_text(tip)
+            mode_btn.add_css_class("flat")
+            mode_btn.connect("clicked", self._on_mode_toggle)
+            header.pack_start(mode_btn)
 
         self._search_entry = Gtk.SearchEntry()
         self._search_entry.set_placeholder_text("Search themes\u2026")
@@ -202,7 +183,6 @@ class ThemesPage:
         self._active_scheme = get_var("RETRO_THEME_SCHEME", "wallpaper")
         self._themes = _load_themes()
         self._rebuild()
-        self._refresh_managed()
 
         return toolbar
 
@@ -417,77 +397,20 @@ class ThemesPage:
     def _on_search(self, _entry: Gtk.SearchEntry) -> None:
         self._rebuild()
 
-    def _on_mode_changed(self, row, _pspec):
-        idx = row.get_selected()
-        if idx < 0 or idx >= len(self.MODE_MODES):
-            return
-        name = self.MODE_MODES[idx]
-        if name == get_var("RETRO_THEME_MODE", "dark"):
-            return
-        self._pending_mode = name
-        self._dirty = True
-        self._notify_dirty()
-        self._refresh_managed()
-
-    def _set_widget_value(self, mode: str):
-        if self._mode_row is not None and mode in self.MODE_MODES:
-            self._mode_row.set_selected(self.MODE_MODES.index(mode))
-
-    def _discard_mode(self):
-        live = get_var("RETRO_THEME_MODE", "dark")
-        self._set_widget_value(live)
-        self._pending_mode = None
-        self._check_dirty()
-        self._refresh_managed()
-
-    def _reset_mode(self):
-        default = get_module_default("RETRO_THEME_MODE")
-        self._set_widget_value(default)
-        self._pending_mode = default
-        self._dirty = True
-        self._notify_dirty()
-        self._refresh_managed()
-
-    def _check_dirty(self):
-        any_dirty = self._pending_mode is not None
-        if any_dirty != self._dirty:
-            self._dirty = any_dirty
-            if not any_dirty:
-                self._notify_dirty()
-
-    def _refresh_managed(self):
-        if self._mode_row is None or self._mode_actions is None:
-            return
-        live = get_var("RETRO_THEME_MODE", "dark")
-        default = get_module_default("RETRO_THEME_MODE")
-        if not default:
-            default = live
-        effective = self._pending_mode if self._pending_mode is not None else live
-        is_managed = effective != default
-        is_dirty = self._pending_mode is not None
-        is_saved = live != default
-        self._mode_actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
-
-    def is_dirty(self) -> bool:
-        return self._dirty
-
-    def mark_saved(self):
-        self._dirty = False
-        self._pending_mode = None
-        self._refresh_managed()
-
-    def flush_pending(self):
-        mode = self._pending_mode
-        if mode is not None:
-            proc = subprocess.Popen(
-                ["retro", "theme", "mode", mode],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-            GLib.child_watch_add(
-                proc.pid,
-                lambda _pid, _status, _m=mode: self._window.show_toast(f"Theme mode set to {_m.title()}"),
-            )
-        self.mark_saved()
+    def _on_mode_toggle(self, btn: Gtk.Button) -> None:
+        current = get_var("RETRO_THEME_MODE", "dark")
+        new_mode = "light" if current == "dark" else "dark"
+        btn.set_sensitive(False)
+        proc = subprocess.Popen(
+            ["retro", "theme", "mode", new_mode],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        GLib.child_watch_add(proc.pid, lambda _pid, _status, _btn=btn, _m=new_mode: (
+            _btn.set_sensitive(True),
+            _btn.set_icon_name("weather-clear-night-symbolic" if _m == "dark" else "weather-clear-symbolic"),
+            _btn.set_tooltip_text("Switch to Light Mode" if _m == "dark" else "Switch to Dark Mode"),
+            self._window.show_toast(f"Theme mode set to {_m.title()}"),
+        ))
 
     def get_search_entries(self) -> list[dict]:
         entries: list[dict] = []

@@ -1,6 +1,8 @@
 """Keybind management page — categorized list with override support."""
 
 import copy
+import os
+import re
 from collections.abc import Iterator
 from html import escape as html_escape
 
@@ -53,10 +55,20 @@ class BindsPage(SectionPage):
         ``bindm`` rejects a trailing comma (``bind: too many args``) so the
         argument is only appended when present. Other bind variants tolerate
         either form.
+
+        Retro Lua function dispatchers (``retro_open_terminal``, …) aren't real
+        Hyprland dispatchers — convert to their standard equivalents before
+        sending to the compositor.  The override file written on save still
+        uses the proper ``hl.bind("KEY", Retro.fn)`` format.
         """
-        value = f"{bind.mods_str}, {bind.key}, {bind.dispatcher}"
-        if bind.arg:
-            value += f", {bind.arg}"
+        disp = bind.dispatcher
+        arg = bind.arg
+        std = config.RETRO_STANDARD_MAP.get(disp)
+        if std:
+            disp, arg = std
+        value = f"{bind.mods_str}, {bind.key}, {disp}"
+        if arg:
+            value += f", {arg}"
         return try_with_toast(
             self._window.show_bug_toast,
             "Bind failed",
@@ -75,9 +87,83 @@ class BindsPage(SectionPage):
             catch=HyprlandError,
         )
 
+    def _pre_enrich_retro_binds(self) -> dict:
+        """Pre-scan known Retro source files for ``hl.bind(..., Retro.fn)``.
+
+        The hyprland-config Lua reader silently drops ``hl.bind(..., Retro.fn)``
+        calls, so the document has no keywords for these binds and the standard
+        :func:`enrich_lua_binds` pipeline can't resolve them.  Instead, read the
+        source files directly and match by **combo** (not line number), handling
+        both string literal combos (``"SUPER + K"``) and Lua expression combos
+        (``mainMod .. " + K"``) with known variable substitution.
+
+        Returns a ``{combo: dispatcher_name}`` mapping to apply to live binds
+        before the normal enrichment pass.
+        """
+        retro_map: dict = {}
+        _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+        _EXPR_RETRO = re.compile(
+            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]*?\+\s*(\w+))"\s*,\s*(Retro\.\w+)\)'
+        )
+        # Variable → modifier translation from the module's keybinds.lua.
+        _KNOWN_MOD_VARS: dict[str, str] = {"mainMod": "SUPER"}
+
+        retro_dir = os.environ.get("RETRO_DIR", "/opt/retrolinux")
+        sources: list[str] = [
+            os.path.join(retro_dir, "modules", "hyprland", "files", "keybinds.lua"),
+        ]
+        kb_override = config.keybinds_path()
+        if kb_override.exists():
+            sources.append(str(kb_override))
+
+        for source in sources:
+            if not os.path.exists(source):
+                continue
+            try:
+                with open(source) as _f:
+                    _content = _f.read()
+            except OSError:
+                continue
+
+            for _m in _LITERAL_RETRO.finditer(_content):
+                _combo_str, _fn_name = _m.groups()
+                _parts = _combo_str.split(" + ")
+                _key = _parts[-1]
+                _mods = tuple(_m.upper() for _m in _parts[:-1])
+                _combo = (_mods, _key.upper())
+                _disp = config.RETRO_FN_MAP.get(_fn_name)
+                if _disp:
+                    retro_map[_combo] = _disp
+
+            for _m in _EXPR_RETRO.finditer(_content):
+                _var_name, _suffix, _key, _fn_name = _m.groups()
+                _mod_str = _KNOWN_MOD_VARS.get(_var_name)
+                if _mod_str:
+                    _mods = tuple(_mod_str.split(" + "))
+                    _combo = (_mods, _key.upper())
+                    _disp = config.RETRO_FN_MAP.get(_fn_name)
+                    if _disp:
+                        retro_map[_combo] = _disp
+
+        return retro_map
+
     def _load_binds(self, saved_sections=None):
         live_binds = self._window.hypr.get_binds() or []
         all_hypr_binds = [live_bind_to_data(b) for b in live_binds]
+
+        # Pre-enrich: combo-based Retro function scan before the standard
+        # line-number-based enrichment (which can't resolve Retro.* closures).
+        retro_map = self._pre_enrich_retro_binds()
+        for i, b in enumerate(all_hypr_binds):
+            if b.dispatcher == "__lua" and b.combo in retro_map:
+                all_hypr_binds[i] = BindData(
+                    bind_type=b.bind_type,
+                    mods=list(b.mods),
+                    key=b.key,
+                    dispatcher=retro_map[b.combo],
+                    arg="",
+                )
+
         # Lua-mode IPC labels every bind ``__lua: <line>``; swap in real
         # dispatcher info from the parsed source so categorisation and
         # row labels match what the user actually configured.
@@ -90,10 +176,54 @@ class BindsPage(SectionPage):
             parsed = parse_bind_line(line)
             if parsed:
                 parsed_binds.append(parsed)
+        existing_combos = {b.combo for b in parsed_binds}
+
+        # Also load CLI-added keybinds from keybinds.lua
+        try:
+            kb_path = config.keybinds_path()
+            if kb_path.exists():
+                _, kb_sections, _ = config.read_all_sections(kb_path)
+                for line in config.collect_bind_section(kb_sections):
+                    parsed = parse_bind_line(line)
+                    if parsed and parsed.combo not in existing_combos:
+                        parsed_binds.append(parsed)
+                        existing_combos.add(parsed.combo)
+        except Exception:
+            pass
+
+        # Load Retro function binds from keybinds.lua (the library's Lua reader
+        # can't parse ``hl.bind("KEY", Retro.fn)``, so we scan the raw file).
+        try:
+            kb_path = config.keybinds_path()
+            if kb_path.exists():
+                _retro_re = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+                with open(kb_path) as _f:
+                    for _line in _f:
+                        _m = _retro_re.search(_line)
+                        if _m:
+                            _combo_str = _m.group(1)
+                            _fn_name = _m.group(2)
+                            _parts = _combo_str.split(" + ")
+                            _key = _parts[-1]
+                            _mods = _parts[:-1]
+                            _disp = config.RETRO_FN_MAP.get(_fn_name)
+                            if _disp:
+                                _bd = BindData(
+                                    bind_type="bind",
+                                    mods=[m.upper() for m in _mods],
+                                    key=_key,
+                                    dispatcher=_disp,
+                                    arg="",
+                                )
+                                if _bd.combo not in existing_combos:
+                                    parsed_binds.append(_bd)
+                                    existing_combos.add(_bd.combo)
+        except Exception:
+            pass
 
         self._overrides = OverrideTracker(
             all_hypr_binds,
-            managed_path=config.managed_path(),
+            managed_path=config.keybinds_path(),
             document=self._window.hypr.document,
         )
         self._overrides.parse_saved_overrides(parsed_binds)
@@ -288,18 +418,15 @@ class BindsPage(SectionPage):
 
         if not editable:
             row.add_css_class("option-default")
+            row.set_activatable(True)
+            row.connect("activated", lambda _row, b=bind: self._on_override(b))
 
-            override_btn = Gtk.Button(icon_name="document-edit-symbolic")
-            override_btn.set_valign(Gtk.Align.CENTER)
-            override_btn.add_css_class("flat")
-            override_btn.set_tooltip_text("Override this keybind")
-            override_btn.connect("clicked", lambda _btn, b=bind: self._on_override(b))
-            row.add_suffix(override_btn)
-
-            lock_icon = Gtk.Image.new_from_icon_name("changes-prevent-symbolic")
-            lock_icon.set_opacity(0.4)
-            row.add_suffix(lock_icon)
-            row.set_opacity(0.65)
+            edit_btn = Gtk.Button(icon_name="document-edit-symbolic")
+            edit_btn.set_valign(Gtk.Align.CENTER)
+            edit_btn.add_css_class("flat")
+            edit_btn.set_tooltip_text("Edit this keybind")
+            edit_btn.connect("clicked", lambda _btn, b=bind: self._on_override(b))
+            row.add_suffix(edit_btn)
         else:
             row.set_activatable(True)
             row.connect("activated", lambda _row, idx=index: self._on_edit_at(idx))

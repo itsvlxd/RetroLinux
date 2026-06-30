@@ -278,13 +278,21 @@ class AppsPage:
     def flush_pending(self):
         if not self._pending:
             return
+        needs_colors = False
         for var, val in self._pending.items():
             if val is not None:
                 set_var(var, val)
+                if var in ("GTK_FONT", "GTK_FONT_SIZE"):
+                    needs_colors = True
         subprocess.Popen(
             ["retro", "app", "all", "refresh"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        if needs_colors:
+            subprocess.Popen(
+                ["retro", "theme", "apply-colors"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
         self.mark_saved()
 
     # ── Callbacks ───────────────────────────────────────────────────────

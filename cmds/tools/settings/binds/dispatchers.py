@@ -6,6 +6,8 @@ labels, categories, and human-readable formatting.
 
 from typing import TypedDict
 
+from settings.core.config import RETRO_ACTIONS
+
 # ---------------------------------------------------------------------------
 # Bind types
 # ---------------------------------------------------------------------------
@@ -102,6 +104,15 @@ class DispatcherCategory(TypedDict):
 
 
 DISPATCHER_CATEGORIES: list[DispatcherCategory] = [
+    {
+        "id": "retro",
+        "label": "Retro Actions",
+        "icon": "applications-system-symbolic",
+        "dispatchers": {
+            k: {"label": v["label"], "arg_type": "none"}
+            for k, v in RETRO_ACTIONS.items()
+        },
+    },
     {
         "id": "apps",
         "label": "Launch Application",
