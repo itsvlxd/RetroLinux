@@ -127,7 +127,6 @@ sync_missing_variables() {
 
 sync_missing_variables
 
-# Compile GSettings schema for the Settings GUI
 if command -v glib-compile-schemas >/dev/null 2>&1; then
     schema_dir="$RETRO_DIR/cmds/tools/settings/data"
     if [[ -d $schema_dir ]]; then
@@ -136,7 +135,6 @@ if command -v glib-compile-schemas >/dev/null 2>&1; then
     fi
 fi
 
-# Setup passwordless sudo for theme operations
 setup_theme_sudoers() {
     if command -v papirus-folders >/dev/null 2>&1; then
         sudo rm -f /etc/sudoers.d/papirus-folders
