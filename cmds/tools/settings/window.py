@@ -1283,9 +1283,17 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             else:
                 settings_values[key] = val
 
+        sections = self.collect_save_sections()
+
+        # Write keybind overrides to keybinds.lua (separate file)
+        bind_lines = sections.binds
+        if bind_lines is not None:
+            config.write_binds(bind_lines)
+        sections.binds = None
+
         config.write_all(
             settings_values,
-            self.collect_save_sections(),
+            sections,
             hyprland_version=self.hypr.version,
         )
 

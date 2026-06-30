@@ -597,10 +597,34 @@ class BindEditDialog(Adw.Dialog):
             except HyprlandError as e:
                 log.error("could not reset Hyprland submap after capture; user may be stuck: %s", e)
 
+    @staticmethod
+    def _normalize_key_name(name: str, keyval: int = 0) -> str:
+        """Prepend ``XF86`` when GDK drops it from a multimedia keysym.
+
+        On Wayland, ``Gdk.keyval_name()`` sometimes returns bare names like
+        ``"Launch2"`` instead of ``"XF86Launch2"``.  Hyprland requires the
+        full ``XF86<Name>`` keysym.
+
+        When *keyval* is provided (capture path), check if it falls in the
+        XF86 vendor range (``0x1008FF00``–``0x1008FFFF``).  For manual entry
+        look up ``"XF86" + name`` in GDK's database and check its range.
+        """
+        if not name or name.startswith("XF86"):
+            return name
+        if keyval != 0:
+            if 0x1008FF00 <= keyval <= 0x1008FFFF:
+                return "XF86" + name
+            return name
+        xf86_val = Gdk.keyval_from_name("XF86" + name)
+        if xf86_val != 0 and 0x1008FF00 <= xf86_val <= 0x1008FFFF:
+            return "XF86" + name
+        return name
+
     def _on_key_captured(self, controller, keyval, keycode, state):
         key_name = Gdk.keyval_name(keyval)
         if not key_name:
             return True
+        key_name = self._normalize_key_name(key_name, keyval)
         if key_name == "Escape":
             self._stop_capture()
             return True
@@ -717,7 +741,7 @@ class BindEditDialog(Adw.Dialog):
 
     def _get_current_key_combo(self) -> BindData:
         mods = [name for name, row in self._mod_checks.items() if row.get_active()]
-        key = self._current_key_value()
+        key = self._normalize_key_name(self._current_key_value())
         return BindData(mods=mods, key=key)
 
     # -- Action section --

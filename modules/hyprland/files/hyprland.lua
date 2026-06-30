@@ -47,45 +47,6 @@ if not ok then
 	}
 end
 
--- FIX: make something to remove this
-if APPLY_COLORS_ONLY then
-	hl.config({
-		general = {
-			gaps_in = vars.retro_gap_in,
-			gaps_out = vars.retro_gap_out,
-			border_size = vars.retro_border_size,
-			col = {
-				active_border = { colors = { colors.source_color, colors.primary_container }, angle = 45 },
-				inactive_border = colors.surface_variant,
-			},
-		},
-		decoration = {
-			rounding = vars.retro_rounding,
-			rounding_power = vars.retro_rounding_power,
-			active_opacity = vars.retro_opacity,
-			inactive_opacity = vars.retro_inactive_opacity,
-			shadow = {
-				enabled = vars.retro_shadow,
-				range = vars.retro_shadow_range,
-				render_power = vars.retro_shadow_render_power,
-				color = colors.shadow,
-			},
-			blur = {
-				enabled = vars.retro_blur,
-				size = vars.retro_blur_size,
-				passes = vars.retro_blur_passes,
-				vibrancy = vars.retro_blur_vibrancy,
-			},
-		},
-	})
-	return
-end
-
-if APPLY_RULES_ONLY then
-	pcall(dofile, os.getenv("HOME") .. "/.config/retro/windowrules.lua")
-	return
-end
-
 pcall(dofile, os.getenv("HOME") .. "/.config/retro/windowrules.lua")
 
 local retro_dir = os.getenv("RETRO_DIR") or "/opt/retrolinux"
@@ -102,6 +63,13 @@ local ok, _ = pcall(dofile, retro_config .. "/input.lua")
 if not ok then
 	require("input")
 end
+
+hl.config({
+	ecosystem = {
+		no_donation_nag = true,
+		no_update_news = true,
+	},
+})
 
 require("programs")
 require("env")
