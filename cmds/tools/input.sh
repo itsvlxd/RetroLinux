@@ -28,11 +28,6 @@ cmd_input() {
 
     case "$action" in
         "status")
-            _status_line() {
-                local icon="$1" label="$2" value="$3"
-                printf " ${PINK}%s${RESET} %-22s ${PINK}%s${RESET}\n" "$icon" "$label" "$value"
-            }
-
             local layout variant repeat_rate repeat_delay
             local sensitivity accel_profile
             local natural_scroll tap_to_click
@@ -53,37 +48,36 @@ cmd_input() {
             device_name=$(get_var "INPUT_DEVICE_NAME" "")
             device_sensitivity=$(get_var "INPUT_DEVICE_SENSITIVITY" "0")
 
-            echo -e "\n ${PINK}󰌌 Input Status${RESET}"
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────${RESET}"
+            rx_table_header "󰌌" "Input Status"
 
             local variant_display=""
             [[ -n $variant ]] && variant_display=" / variant: $variant"
-            _status_line "󰌌" "Keyboard:" "${layout}${variant_display}  ${repeat_rate}rps/${repeat_delay}ms"
+            rx_table_row "󰌌" "Keyboard:" "${layout}${variant_display}  ${repeat_rate}rps/${repeat_delay}ms" "" "22"
 
-            _status_line "󰈟" "Mouse:" "${sensitivity} sens / ${accel_profile}"
+            rx_table_row "󰈟" "Mouse:" "${sensitivity} sens / ${accel_profile}" "" "22"
 
             local scroll_icon tap_icon
             [[ $natural_scroll == "true" ]] && scroll_icon="${SUCCESS}✓" || scroll_icon="${MUTE}○"
             [[ $tap_to_click == "true" ]] && tap_icon="${SUCCESS}✓" || tap_icon="${MUTE}○"
-            _status_line "󰒋" "Touchpad:" "natural scroll ${scroll_icon} / tap-to-click ${tap_icon}"
+            rx_table_row "󰒋" "Touchpad:" "natural scroll ${scroll_icon} / tap-to-click ${tap_icon}" "" "22"
 
             if [[ -n $gesture_fingers && $gesture_fingers != "0" ]]; then
-                _status_line "󰋜" "Gestures:" "${gesture_fingers}-finger ${gesture_direction} → ${gesture_action}"
+                rx_table_row "󰋜" "Gestures:" "${gesture_fingers}-finger ${gesture_direction} → ${gesture_action}" "" "22"
             fi
 
             if [[ -n $device_name ]]; then
-                _status_line "󰄾" "Per-Device:" "${device_name} (sens: ${device_sensitivity})"
+                rx_table_row "󰄾" "Per-Device:" "${device_name} (sens: ${device_sensitivity})" "" "22"
             fi
 
             local keybinds_file
             keybinds_file=$(_input_call "--keybinds-path")
             if [[ -f $keybinds_file ]]; then
                 local bind_count
-                bind_count=$(grep -c 'hl.bind(' "$keybinds_file" 2>/dev/null || echo 0)
-                _status_line "󰐧" "Keybinds:" "${bind_count} active (edit: ${PINK}retro input keybinds edit${RESET})"
+                bind_count=$(grep -c 'hl.bind(' "$keybinds_file" 2>/dev/null || true)
+                rx_table_row "󰐧" "Keybinds:" "${bind_count} active" "" "22"
             fi
 
-            echo -e " ${PINK}󰇝${MUTE} ───────────────────────────────────${RESET}"
+            rx_table_separator
             ;;
 
         "layout")
@@ -213,50 +207,6 @@ cmd_input() {
             esac
             ;;
 
-        "keybinds")
-            local keybinds_cmd="${1,,}"
-            shift 2>/dev/null || true
-
-            case "$keybinds_cmd" in
-                "list")
-                    local keybinds_file
-                    keybinds_file=$(_input_call "--keybinds-path")
-                    if [[ ! -f $keybinds_file ]]; then
-                        rx_log "warn" "No keybinds config found. Run ${PINK}retro input keybinds reset${RESET} first"
-                        return 1
-                    fi
-                    rx_log "info" "Keybinds file: ${PINK}$keybinds_file${RESET}"
-                    if command -v bat >/dev/null 2>&1; then
-                        bat -l lua "$keybinds_file"
-                    else
-                        cat "$keybinds_file"
-                    fi
-                    ;;
-                "edit")
-                    local keybinds_file
-                    keybinds_file=$(_input_call "--keybinds-path")
-                    if [[ ! -f $keybinds_file ]]; then
-                        rx_log "warn" "No keybinds config yet. Run ${PINK}retro input keybinds reset${RESET} first"
-                        return 1
-                    fi
-                    local editor="${EDITOR:-nvim}"
-                    rx_log "info" "Opening ${PINK}$keybinds_file${RESET} with ${PINK}$editor${RESET}"
-                    $editor "$keybinds_file"
-                    ;;
-                "reset")
-                    if _input_call "--keybinds-reset"; then
-                        rx_log "success" "Keybinds reset to module defaults"
-                    else
-                        rx_log "error" "Failed to reset keybinds — module template not found"
-                    fi
-                    ;;
-                *)
-                    rx_log "error" "Usage: retro input keybinds {list|edit|reset}"
-                    return 1
-                    ;;
-            esac
-            ;;
-
         "setup")
             rx_setup_parse "$@"
 
@@ -354,18 +304,17 @@ cmd_input() {
                 "list")
                     local data
                     data=$(_input_call "--binds-list" 2>/dev/null)
-                    if [[ -z $data ]]; then
-                        rx_log "warn" "No keybinds file found. Run ${PINK}retro input keybinds reset${RESET} first"
-                        return 1
-                    fi
 
                     local count=0
-                    echo -e "\n ${PINK}󰐧 Keybinds${RESET}"
-                    echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────────────────${RESET}"
-
                     while IFS='|' read -r line key type value flags; do
                         [[ -z $line ]] && continue
                         count=$((count + 1))
+                    done <<<"$data"
+
+                    rx_table_header "󰐧" "Keybinds: ${count}"
+
+                    while IFS='|' read -r line key type value flags; do
+                        [[ -z $line ]] && continue
 
                         local action_icon="󰇝"
                         case "$type" in
@@ -379,12 +328,11 @@ cmd_input() {
                             display_value="${display_value:0:47}..."
                         fi
 
-                        printf " ${PINK}%s${RESET} %-20s ${PINK}%-10s${RESET} %s\n" \
-                            "$action_icon" "$key" "$type" "$display_value"
+                        rx_table_list_row "$action_icon" "$key" "$type" "$display_value"
                     done <<<"$data"
 
-                    echo -e " ${PINK}󰇝${MUTE} ────────────────────────────────────────────────────────────────────────${RESET}"
-                    echo -e " ${PINK}󰐧${RESET} ${PINK}${count}${RESET} keybinds total"
+                    rx_table_separator
+                    rx_table_spacer
                     ;;
 
                 "add")
@@ -454,10 +402,6 @@ cmd_input() {
 
                     local data
                     data=$(_input_call "--binds-list" 2>/dev/null)
-                    if [[ -z $data ]]; then
-                        rx_log "warn" "No keybinds file found"
-                        return 1
-                    fi
 
                     local matches=0
                     while IFS='|' read -r line key type value flags; do
@@ -476,18 +420,26 @@ cmd_input() {
                     fi
                     ;;
 
+                "edit")
+                    local keybinds_file
+                    keybinds_file=$(_input_call "--keybinds-path")
+                    if [[ ! -f $keybinds_file ]]; then
+                        rx_log "warn" "No keybinds file yet — add one with ${PINK}retro input binds add${RESET}"
+                        return 1
+                    fi
+                    local editor="${EDITOR:-nvim}"
+                    rx_log "info" "Opening ${PINK}$keybinds_file${RESET} with ${PINK}$editor${RESET}"
+                    $editor "$keybinds_file"
+                    ;;
+
                 "export")
                     local data
                     data=$(_input_call "--binds-list" 2>/dev/null)
-                    if [[ -z $data ]]; then
-                        rx_log "error" "No keybinds file found"
-                        return 1
-                    fi
-                    echo "$data"
+                    echo "${data:- }"
                     ;;
 
                 *)
-                    rx_log "error" "Usage: retro input binds {list|add|remove|find|export}"
+                    rx_log "error" "Usage: retro input binds {list|add|remove|edit|find|export}"
                     return 1
                     ;;
             esac
@@ -504,8 +456,7 @@ cmd_input() {
             rx_help_cmd "touchpad <natural> [tap]" "Set touchpad natural scroll and tap-to-click"
             rx_help_cmd "gesture <f> <dir> <action>" "Set trackpad gesture binding"
             rx_help_cmd "device <name> [sens] [accel]" "Set per-device input config"
-            rx_help_cmd "keybinds {list|edit|reset}" "Manage keybinds config file"
-            rx_help_cmd "binds {list|add|remove|find|export}" "Manage individual keybinds"
+            rx_help_cmd "binds {list|add|remove|edit|find|export}" "Manage keybinds"
             rx_help_examples
             rx_help_example "retro input status" "Show current input settings"
             rx_help_example "retro input layout de" "Set keyboard to German layout"
@@ -516,8 +467,7 @@ cmd_input() {
             rx_help_example 'retro input binds add "SUPER + B" exec:firefox' "Add a keybind"
             rx_help_example 'retro input binds remove "SUPER + Z"' "Remove a keybind"
             rx_help_example "retro input binds find SUPER" "Search keybinds"
-            rx_help_example "retro input keybinds edit" 'Edit keybinds in $EDITOR'
-            rx_help_example "retro input keybinds reset" "Reset keybinds to defaults"
+            rx_help_example "retro input binds edit" 'Edit keybinds in $EDITOR'
             rx_help_spacer
             ;;
     esac
