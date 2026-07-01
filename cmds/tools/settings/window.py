@@ -1325,10 +1325,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._animations_page.load_owned_names()
             self._animations_page.load_hyprland_curves()
 
-        # Binds still need manual reload (no library-level state)
-        if self._binds_page is not None:
-            self._binds_page.reload_from_live()
-
         # Monitors ownership may differ between profiles
         if self._monitors_page is not None:
             self._monitors_page.reload_from_saved()

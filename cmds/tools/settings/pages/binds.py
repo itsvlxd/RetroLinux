@@ -8,7 +8,7 @@ from html import escape as html_escape
 
 from gi.repository import Adw, GLib, Gtk
 from hyprland_config import BindData, parse_bind_line
-from hyprland_socket import HyprlandError
+from hyprland_socket import HyprlandError, eval_lua
 
 from settings.binds import (
     CATEGORY_BY_ID,
@@ -47,6 +47,7 @@ class BindsPage(SectionPage):
         self._search_btn: Gtk.ToggleButton
         self._overrides: OverrideTracker
         self._owned_binds: SavedList[BindData]
+        self._module_retro_binds: dict[tuple, BindData] = {}
         self._load_binds(saved_sections)
 
     def _apply_bind_live(self, bind: BindData) -> bool:
@@ -56,13 +57,25 @@ class BindsPage(SectionPage):
         argument is only appended when present. Other bind variants tolerate
         either form.
 
-        Retro Lua function dispatchers (``retro_open_terminal``, …) aren't real
-        Hyprland dispatchers — convert to their standard equivalents before
-        sending to the compositor.  The override file written on save still
-        uses the proper ``hl.bind("KEY", Retro.fn)`` format.
+        In Lua mode, Retro Lua function dispatchers are emitted directly as
+        ``hl.bind("KEY", Retro.fn)`` via ``eval_lua`` — the legacy keyword
+        IPC can't handle custom Lua dispatchers. In legacy mode the
+        dispatcher is converted to its standard equivalent first.
         """
         disp = bind.dispatcher
         arg = bind.arg
+        print(f"[DBUG _apply] disp={disp!r} arg={arg!r} in_RETRO={disp in config.RETRO_DISPATCHER_MAP} lua={self._window.hypr.is_live_lua_mode()}", flush=True)
+
+        if disp in config.RETRO_DISPATCHER_MAP and self._window.hypr.is_live_lua_mode():
+            combo = bind.format_shortcut()
+            fn = config.RETRO_DISPATCHER_MAP[disp]
+            return try_with_toast(
+                self._window.show_bug_toast,
+                "Bind failed",
+                lambda: eval_lua(f'local Retro = require("lib.retro"); hl.bind("{combo}", {fn})'),
+                catch=HyprlandError,
+            )
+
         std = config.RETRO_STANDARD_MAP.get(disp)
         if std:
             disp, arg = std
@@ -78,6 +91,13 @@ class BindsPage(SectionPage):
 
     def _revert_bind_live(self, bind: BindData) -> bool:
         """Remove a bind from the running Hyprland instance."""
+        if self._window.hypr.is_live_lua_mode():
+            return try_with_toast(
+                self._window.show_bug_toast,
+                "Unbind failed",
+                lambda: eval_lua(f'hl.unbind("{bind.format_shortcut()}")'),
+                catch=HyprlandError,
+            )
         return try_with_toast(
             self._window.show_bug_toast,
             "Unbind failed",
@@ -146,6 +166,62 @@ class BindsPage(SectionPage):
                         retro_map[_combo] = _disp
 
         return retro_map
+
+    def _load_retro_binds(self):
+        """Parse Retro function binds from the module keybinds.lua file.
+
+        Stores parsed binds in ``_module_retro_binds`` (combo → BindData).
+        These serve as the fallback / "locked" entries shown in the Retro
+        Actions category when no override exists.
+        """
+        self._module_retro_binds.clear()
+        _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+        _EXPR_RETRO = re.compile(
+            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]*?\+\s*(\w+))"\s*,\s*(Retro\.\w+)\)'
+        )
+        _KNOWN_MOD_VARS: dict[str, str] = {"mainMod": "SUPER"}
+
+        retro_dir = os.environ.get("RETRO_DIR", "/opt/retrolinux")
+        source = os.path.join(retro_dir, "modules", "hyprland", "files", "keybinds.lua")
+        if not os.path.exists(source):
+            return
+        try:
+            with open(source) as _f:
+                _content = _f.read()
+        except OSError:
+            return
+
+        for _m in _LITERAL_RETRO.finditer(_content):
+            _combo_str, _fn_name = _m.groups()
+            _parts = _combo_str.split(" + ")
+            _key = _parts[-1]
+            _mods = [m.upper() for m in _parts[:-1]]
+            _disp = config.RETRO_FN_MAP.get(_fn_name)
+            if _disp:
+                _bd = BindData(
+                    bind_type="bind",
+                    mods=_mods,
+                    key=_key.upper(),
+                    dispatcher=_disp,
+                    arg="",
+                )
+                self._module_retro_binds[_bd.combo] = _bd
+
+        for _m in _EXPR_RETRO.finditer(_content):
+            _var_name, _suffix, _key, _fn_name = _m.groups()
+            _mod_str = _KNOWN_MOD_VARS.get(_var_name)
+            if _mod_str:
+                _mods = [m.upper() for m in _mod_str.split(" + ")]
+                _disp = config.RETRO_FN_MAP.get(_fn_name)
+                if _disp:
+                    _bd = BindData(
+                        bind_type="bind",
+                        mods=_mods,
+                        key=_key.upper(),
+                        dispatcher=_disp,
+                        arg="",
+                    )
+                    self._module_retro_binds[_bd.combo] = _bd
 
     def _load_binds(self, saved_sections=None):
         live_binds = self._window.hypr.get_binds() or []
@@ -221,12 +297,16 @@ class BindsPage(SectionPage):
         except Exception:
             pass
 
+        self._load_retro_binds()
         self._overrides = OverrideTracker(
             all_hypr_binds,
             managed_path=config.keybinds_path(),
             document=self._window.hypr.document,
         )
-        self._overrides.parse_saved_overrides(parsed_binds)
+        self._overrides.parse_saved_overrides(
+            parsed_binds,
+            module_retro=self._module_retro_binds,
+        )
         self._owned_binds = SavedList(parsed_binds, key=lambda b: b.to_line())
 
     # -- Undo / Redo --
@@ -286,6 +366,11 @@ class BindsPage(SectionPage):
     def build(self, header: Adw.HeaderBar | None = None) -> Adw.ToolbarView:
         page_header = header or Adw.HeaderBar()
 
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        refresh_btn.set_tooltip_text("Refresh keybinds from Hyprland")
+        refresh_btn.connect("clicked", lambda _: self.reload_from_live())
+        page_header.pack_start(refresh_btn)
+
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.set_tooltip_text("Add keybind")
         add_btn.connect("clicked", self._on_add)
@@ -343,10 +428,40 @@ class BindsPage(SectionPage):
         for bind in self._hypr_binds:
             if bind.combo in owned_combos:
                 continue
+            # Retro defaults are rendered from _module_retro_binds, not here.
+            if bind.combo in self._module_retro_binds:
+                continue
             cat_id = categorize_bind(bind.bind_type, bind.dispatcher)
             if cat_id not in categories:
                 cat_id = "advanced"
             categories[cat_id].append((bind, False, -1))
+
+        # Retro category: use module file defaults for non-overridden binds.
+        # Skip combos that are the original of a changed-combo override,
+        # and also skip combos that the override file explicitly unbinds.
+        originals = {orig.combo for orig in self._overrides._session_overrides.values()}
+        originals.update(orig.combo for orig in self._overrides._saved_overrides.values())
+        unbound_combos: set[tuple] = set()
+        try:
+            _kb = config.keybinds_path()
+            if _kb.exists():
+                _raw = _kb.read_text()
+                # Hyprlang unbind format
+                for _m in re.finditer(r'unbind\s*=\s*([^,]+),\s*(.+)', _raw):
+                    _mods = tuple(sorted(m.upper() for m in _m.group(1).split() if m.strip()))
+                    _key = _m.group(2).strip().upper()
+                    unbound_combos.add((_mods, _key))
+                # Lua hl.unbind format
+                for _m in re.finditer(r'hl\.unbind\("([^"]+)"\)', _raw):
+                    _parts = _m.group(1).split(" + ")
+                    _key = _parts[-1].upper()
+                    _mods = tuple(sorted(m.upper() for m in _parts[:-1]))
+                    unbound_combos.add((_mods, _key))
+        except Exception:
+            pass
+        for combo, bind in self._module_retro_binds.items():
+            if combo not in owned_combos and combo not in originals and combo not in unbound_combos:
+                categories.setdefault("retro", []).append((bind, False, -1))
 
         # Info note for locked binds
         if has_hypr_binds:
@@ -577,9 +692,19 @@ class BindsPage(SectionPage):
         with self._undo_track():
             removed = self._owned_binds.pop_at(idx)
             self._revert_bind_live(removed)
-            original = self._overrides.remove_at(idx, removed_bind=removed)
+            original = self._overrides.remove_at(idx)
+            print(f"[DBUG _on_delete_at] removed.combo={removed.combo} original={original is not None} disp={original.dispatcher if original else 'N/A'!r}", flush=True)
+            # Always purge the removed override combo so it doesn't
+            # leak back from _hypr_binds after the owned bind is gone.
+            hypr = self._overrides._hypr_binds
+            hypr_by = self._overrides._hypr_by_combo
+            hypr[:] = [b for b in hypr if b.combo != removed.combo]
+            hypr_by.pop(removed.combo, None)
             if original:
                 self._apply_bind_live(original)
+                if not any(b.combo == original.combo for b in hypr):
+                    hypr.append(original)
+                hypr_by[original.combo] = original
         self._notify_dirty()
         self._rebuild_list()
 
@@ -606,7 +731,7 @@ class BindsPage(SectionPage):
 
     def mark_saved(self):
         self._owned_binds.mark_saved()
-        self._overrides.mark_saved(self._owned_binds)  # type: ignore[arg-type]
+        self._overrides.mark_saved(self._owned_binds, module_retro=self._module_retro_binds)  # type: ignore[arg-type]
         self._rebuild_list()
 
     def reload_from_live(self):

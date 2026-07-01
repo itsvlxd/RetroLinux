@@ -3,6 +3,7 @@
 Tracks which Retro Settings-owned keybinds override Hyprland-runtime keybinds.
 """
 
+import re
 import copy
 from collections.abc import Sequence
 from pathlib import Path
@@ -15,6 +16,8 @@ from hyprland_config import (
     load_any,
     parse_bind_line,
 )
+
+from settings.core.config import RETRO_FN_MAP
 
 
 class OverrideTracker:
@@ -71,19 +74,19 @@ class OverrideTracker:
         """Get the original Hyprland bind for an owned override."""
         return self._session_overrides.get(owned_index, self._saved_overrides.get(owned_index))
 
-    def remove_at(self, owned_index: int, removed_bind: BindData | None = None) -> BindData | None:
+    def remove_at(self, owned_index: int) -> BindData | None:
         """Remove an owned bind at the given index and re-index remaining.
-
-        *removed_bind*: the owned bind that was removed. When provided, the
-        Hyprland bind list is updated: the stale override entry is swapped for
-        the restored original (needed after save + restart where live binds
-        included the override from GUI_CONF).
 
         Returns the original BindData if it was an override, else None.
         """
+        print(f"[DBUG remove_at({owned_index})] _session_overrides keys={list(self._session_overrides.keys())}, _saved_overrides keys={list(self._saved_overrides.keys())}", flush=True)
         original = self._session_overrides.pop(owned_index, None)
         if original is None:
             original = self._saved_overrides.pop(owned_index, None)
+        if original is not None:
+            print(f"[DBUG remove_at] → combo={original.combo} disp={original.dispatcher!r}", flush=True)
+        else:
+            print(f"[DBUG remove_at] → None", flush=True)
 
         # Re-index: shift all indices above owned_index down by 1
         self._session_overrides = {
@@ -92,9 +95,6 @@ class OverrideTracker:
         self._saved_overrides = {
             (k - 1 if k > owned_index else k): v for k, v in self._saved_overrides.items()
         }
-
-        if original is not None and removed_bind is not None:
-            self._swap_hypr_bind(removed_bind, original)
 
         return original
 
@@ -207,7 +207,11 @@ class OverrideTracker:
 
         return lines
 
-    def parse_saved_overrides(self, owned_binds: Sequence[BindData]) -> None:
+    def parse_saved_overrides(
+        self,
+        owned_binds: Sequence[BindData],
+        module_retro: dict[tuple, BindData] | None = None,
+    ) -> None:
         """Parse unbind+bind pairs from the saved config to restore override tracking.
 
         Reads the current managed config and matches unbind lines to owned
@@ -220,6 +224,10 @@ class OverrideTracker:
         leading block separated from their replacement binds — without it,
         ``unbind X`` ahead of unrelated binds would silently get paired
         with the wrong one and corrupt the override state.
+
+        When neither the config document nor live binds contain the
+        original (common for Retro Lua binds), *module_retro* is consulted
+        as a third fallback.
         """
         self._saved_overrides.clear()
         if self._managed_path is None or not self._managed_path.exists():
@@ -248,6 +256,33 @@ class OverrideTracker:
                 bind_data = parse_bind_line(node.raw.strip())
                 if bind_data is not None:
                     binds.append((idx, bind_data.combo))
+
+        # Scan raw file for Retro function binds and unbinds that the Lua
+        # reader drops — ``hl.bind("KEY", Retro.fn)`` and
+        # ``hl.unbind("KEY")`` don't produce Keyword nodes in the document.
+        try:
+            _raw = self._managed_path.read_text()
+            _retro_bind_re = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+            for _m in _retro_bind_re.finditer(_raw):
+                _combo_str, _fn_name = _m.groups()
+                _parts = _combo_str.split(" + ")
+                _key = _parts[-1].upper()
+                _mods = tuple(sorted(m.upper() for m in _parts[:-1]))
+                _combo = (_mods, _key)
+                _disp = RETRO_FN_MAP.get(_fn_name)
+                if _disp:
+                    _line_num = _raw[:_m.start()].count("\n")
+                    binds.append((_line_num, _combo))
+            _retro_unbind_re = re.compile(r'hl\.unbind\("([^"]+)"\)')
+            for _m in _retro_unbind_re.finditer(_raw):
+                _parts = _m.group(1).split(" + ")
+                _key = _parts[-1].upper()
+                _mods = tuple(sorted(m.upper() for m in _parts[:-1]))
+                _combo = (_mods, _key)
+                _line_num = _raw[:_m.start()].count("\n")
+                unbinds.append((_line_num, _combo))
+        except Exception:
+            pass
 
         # Two-pass match. Pass 1 claims same-combo binds (the common case —
         # same-combo overrides keep the user's bound key but change the
@@ -298,7 +333,10 @@ class OverrideTracker:
                     hypr = self._find_bind_in_config(ub_combo)
                     if hypr is None:
                         hypr = self._hypr_by_combo.get(ub_combo)
+                    if hypr is None and module_retro is not None:
+                        hypr = module_retro.get(ub_combo)
                     if hypr is not None:
+                        print(f"[DBUG parse_saved] _saved_overrides[{idx}] ← combo={hypr.combo} disp={hypr.dispatcher!r} (from _find={self._find_bind_in_config(ub_combo) is not None} _hypr={ub_combo in self._hypr_by_combo} _module={ub_combo in (module_retro or {})})", flush=True)
                         self._saved_overrides[idx] = hypr
                     break
 
@@ -317,15 +355,20 @@ class OverrideTracker:
             expanded = self._document.expand(kw.raw.strip())
             bd = parse_bind_line(expanded)
             if bd is not None and bd.combo == combo:
+                print(f"[DBUG _find_in_config] MATCHED combo={combo} kw.raw={kw.raw.strip()!r} expanded={expanded!r} disp={bd.dispatcher!r}", flush=True)
                 return bd
         return None
 
-    def mark_saved(self, owned_binds: Sequence[BindData]) -> None:
+    def mark_saved(
+        self,
+        owned_binds: Sequence[BindData],
+        module_retro: dict[tuple, BindData] | None = None,
+    ) -> None:
         """After a save: merge session overrides into saved, then re-parse."""
         # Clear session overrides
         self._session_overrides.clear()
         # Re-parse from disk
-        self.parse_saved_overrides(owned_binds)
+        self.parse_saved_overrides(owned_binds, module_retro=module_retro)
 
     def snapshot_session(self) -> dict[int, BindData]:
         """Return a deep copy of session overrides for undo tracking."""
