@@ -151,5 +151,13 @@ EOF
         sudo chown -R "$USER:$USER" "$sddm_dir" 2>/dev/null || true
         rx_log "success" "SDDM theme dir made writable for $USER"
     fi
+
+    local sddm_hidpi_conf="/etc/sddm.conf.d/hidpi.conf"
+    sudo rm -f /etc/sudoers.d/retro-sddm-hidpi
+    cat <<EOF | sudo tee /etc/sudoers.d/retro-sddm-hidpi >/dev/null
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee $sddm_hidpi_conf
+EOF
+    sudo chmod 440 /etc/sudoers.d/retro-sddm-hidpi
+    rx_log "success" "Sudoers rule added for SDDM HiDPI config"
 }
 setup_theme_sudoers

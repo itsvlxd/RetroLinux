@@ -165,6 +165,7 @@ _cmd_set_scale() {
     local dpi
     dpi=$(echo "$scale * 96" | bc -l | cut -d'.' -f1)
     _set_xft_dpi "$dpi"
+    _cmd_apply_sddm_hidpi "$name" "$scale" >/dev/null 2>&1 || true
     rx_log_file "info" "Set scale for $name to $scale"
 }
 
@@ -298,6 +299,49 @@ _cmd_set_transform() {
     hyprpaper >/dev/null 2>&1 &
 
     rx_log_file "info" "Set transform for $name to $t"
+}
+
+_cmd_apply_sddm_hidpi() {
+    local name="$1"
+    local scale="$2"
+
+    if [[ -z $scale ]]; then
+        if [[ -n $name ]]; then
+            scale=$(_get_monitor_field "$name" "scale")
+            [[ -z $scale || $scale == "null" ]] && echo "ERR_NO_MONITOR" && return 1
+        else
+            scale=$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused==true) | .scale' | head -1)
+            [[ -z $scale ]] && echo "ERR_NO_FOCUSED" && return 1
+        fi
+    fi
+
+    local dpi
+    dpi=$(echo "$scale * 96" | bc -l | cut -d'.' -f1)
+    [[ -z $dpi || $dpi == "0" ]] && dpi=96
+
+    local sddm_dir="/etc/sddm.conf.d"
+    local sddm_file="$sddm_dir/hidpi.conf"
+
+    sudo mkdir -p "$sddm_dir" 2>/dev/null || true
+
+    local content="[General]
+GreeterEnvironment=QT_SCREEN_SCALE_FACTORS=${scale},QT_FONT_DPI=${dpi}
+
+[Wayland]
+EnableHiDPI=true
+
+[X11]
+EnableHiDPI=true
+ServerArguments=-nolisten tcp -dpi ${dpi}
+"
+    if ! echo "$content" | sudo tee "$sddm_file" >/dev/null 2>&1; then
+        rx_log_file "error" "Failed to write SDDM HiDPI config"
+        echo "ERR_SDDM_FAILED"
+        return 1
+    fi
+
+    rx_log_file "info" "Applied SDDM HiDPI config: scale=$scale, dpi=$dpi"
+    echo "SDDM HiDPI config applied: scale=$scale, dpi=$dpi (takes effect on next login)"
 }
 
 _cmd_get_transform() {
