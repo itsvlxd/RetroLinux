@@ -64,7 +64,6 @@ class BindsPage(SectionPage):
         """
         disp = bind.dispatcher
         arg = bind.arg
-        print(f"[DBUG _apply] disp={disp!r} arg={arg!r} in_RETRO={disp in config.RETRO_DISPATCHER_MAP} lua={self._window.hypr.is_live_lua_mode()}", flush=True)
 
         if disp in config.RETRO_DISPATCHER_MAP and self._window.hypr.is_live_lua_mode():
             combo = bind.format_shortcut()
@@ -267,33 +266,44 @@ class BindsPage(SectionPage):
         except Exception:
             pass
 
-        # Load Retro function binds from keybinds.lua (the library's Lua reader
-        # can't parse ``hl.bind("KEY", Retro.fn)``, so we scan the raw file).
+        # Load binds from keybinds.lua (the library's Lua reader can't parse
+        # ``hl.bind("KEY", Retro.fn)`` or ``hl.dsp.exec_cmd("cmd")``, so we
+        # scan the raw file for any ``hl.bind("KEY", ...)`` call).
         try:
             kb_path = config.keybinds_path()
             if kb_path.exists():
-                _retro_re = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+                _bind_re = re.compile(r'hl\.bind\("([^"]+)",\s*(.+)\)')
                 with open(kb_path) as _f:
                     for _line in _f:
-                        _m = _retro_re.search(_line)
+                        _m = _bind_re.search(_line)
                         if _m:
-                            _combo_str = _m.group(1)
-                            _fn_name = _m.group(2)
+                            _combo_str, _fn = _m.groups()
                             _parts = _combo_str.split(" + ")
                             _key = _parts[-1]
-                            _mods = _parts[:-1]
-                            _disp = config.RETRO_FN_MAP.get(_fn_name)
-                            if _disp:
-                                _bd = BindData(
-                                    bind_type="bind",
-                                    mods=[m.upper() for m in _mods],
-                                    key=_key,
-                                    dispatcher=_disp,
-                                    arg="",
+                            _mods = [m.upper() for m in _parts[:-1]]
+                            _fn_stripped = _fn.strip()
+                            _disp = config.RETRO_FN_MAP.get(_fn_stripped)
+                            _arg = ""
+                            if _disp is None:
+                                _exec = re.match(
+                                    r'hl\.dsp\.exec_cmd\(?"?([^")]+)"?\)',
+                                    _fn_stripped,
                                 )
-                                if _bd.combo not in existing_combos:
-                                    parsed_binds.append(_bd)
-                                    existing_combos.add(_bd.combo)
+                                if _exec:
+                                    _disp = "exec"
+                                    _arg = _exec.group(1)
+                                else:
+                                    _disp = "__lua__"
+                            _bd = BindData(
+                                bind_type="bind",
+                                mods=_mods,
+                                key=_key,
+                                dispatcher=_disp,
+                                arg=_arg,
+                            )
+                            if _bd.combo not in existing_combos:
+                                parsed_binds.append(_bd)
+                                existing_combos.add(_bd.combo)
         except Exception:
             pass
 
@@ -693,7 +703,6 @@ class BindsPage(SectionPage):
             removed = self._owned_binds.pop_at(idx)
             self._revert_bind_live(removed)
             original = self._overrides.remove_at(idx)
-            print(f"[DBUG _on_delete_at] removed.combo={removed.combo} original={original is not None} disp={original.dispatcher if original else 'N/A'!r}", flush=True)
             # Always purge the removed override combo so it doesn't
             # leak back from _hypr_binds after the owned bind is gone.
             hypr = self._overrides._hypr_binds

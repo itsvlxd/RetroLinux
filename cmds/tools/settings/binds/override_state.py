@@ -17,7 +17,7 @@ from hyprland_config import (
     parse_bind_line,
 )
 
-from settings.core.config import RETRO_FN_MAP
+
 
 
 class OverrideTracker:
@@ -79,14 +79,9 @@ class OverrideTracker:
 
         Returns the original BindData if it was an override, else None.
         """
-        print(f"[DBUG remove_at({owned_index})] _session_overrides keys={list(self._session_overrides.keys())}, _saved_overrides keys={list(self._saved_overrides.keys())}", flush=True)
         original = self._session_overrides.pop(owned_index, None)
         if original is None:
             original = self._saved_overrides.pop(owned_index, None)
-        if original is not None:
-            print(f"[DBUG remove_at] → combo={original.combo} disp={original.dispatcher!r}", flush=True)
-        else:
-            print(f"[DBUG remove_at] → None", flush=True)
 
         # Re-index: shift all indices above owned_index down by 1
         self._session_overrides = {
@@ -257,24 +252,22 @@ class OverrideTracker:
                 if bind_data is not None:
                     binds.append((idx, bind_data.combo))
 
-        # Scan raw file for Retro function binds and unbinds that the Lua
-        # reader drops — ``hl.bind("KEY", Retro.fn)`` and
+        # Scan raw file for binds and unbinds that the Lua reader drops —
+        # ``hl.bind("KEY", Retro.fn)``, ``hl.dsp.exec_cmd("cmd")``, and
         # ``hl.unbind("KEY")`` don't produce Keyword nodes in the document.
         try:
             _raw = self._managed_path.read_text()
-            _retro_bind_re = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
-            for _m in _retro_bind_re.finditer(_raw):
-                _combo_str, _fn_name = _m.groups()
+            _bind_re = re.compile(r'hl\.bind\("([^"]+)",')
+            for _m in _bind_re.finditer(_raw):
+                _combo_str = _m.group(1)
                 _parts = _combo_str.split(" + ")
                 _key = _parts[-1].upper()
                 _mods = tuple(sorted(m.upper() for m in _parts[:-1]))
                 _combo = (_mods, _key)
-                _disp = RETRO_FN_MAP.get(_fn_name)
-                if _disp:
-                    _line_num = _raw[:_m.start()].count("\n")
-                    binds.append((_line_num, _combo))
-            _retro_unbind_re = re.compile(r'hl\.unbind\("([^"]+)"\)')
-            for _m in _retro_unbind_re.finditer(_raw):
+                _line_num = _raw[:_m.start()].count("\n")
+                binds.append((_line_num, _combo))
+            _unbind_re = re.compile(r'hl\.unbind\("([^"]+)"\)')
+            for _m in _unbind_re.finditer(_raw):
                 _parts = _m.group(1).split(" + ")
                 _key = _parts[-1].upper()
                 _mods = tuple(sorted(m.upper() for m in _parts[:-1]))
@@ -333,10 +326,11 @@ class OverrideTracker:
                     hypr = self._find_bind_in_config(ub_combo)
                     if hypr is None:
                         hypr = self._hypr_by_combo.get(ub_combo)
-                    if hypr is None and module_retro is not None:
+                    if hypr is not None and not hypr.dispatcher and module_retro is not None:
+                        hypr = module_retro.get(ub_combo, hypr)
+                    elif hypr is None and module_retro is not None:
                         hypr = module_retro.get(ub_combo)
                     if hypr is not None:
-                        print(f"[DBUG parse_saved] _saved_overrides[{idx}] ← combo={hypr.combo} disp={hypr.dispatcher!r} (from _find={self._find_bind_in_config(ub_combo) is not None} _hypr={ub_combo in self._hypr_by_combo} _module={ub_combo in (module_retro or {})})", flush=True)
                         self._saved_overrides[idx] = hypr
                     break
 
@@ -355,7 +349,6 @@ class OverrideTracker:
             expanded = self._document.expand(kw.raw.strip())
             bd = parse_bind_line(expanded)
             if bd is not None and bd.combo == combo:
-                print(f"[DBUG _find_in_config] MATCHED combo={combo} kw.raw={kw.raw.strip()!r} expanded={expanded!r} disp={bd.dispatcher!r}", flush=True)
                 return bd
         return None
 
