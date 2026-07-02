@@ -66,7 +66,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
 
         self.set_title("Retro Settings")
-        self.set_default_size(900, 650)
+        self.set_default_size(1025, 656)
+        self.set_size_request(1025, 656)
 
         self._settings = open_settings()
         apply_saved_config_path(self._settings)
@@ -604,6 +605,13 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             if saved is not None:
                 saved = coerce_config_value(saved, option.get("type", ""))
             self.app_state.register(key, option.get("default"), saved, digits=digits)
+
+        # Force rotation_lock options (no Hyprland IPC key) to show as available.
+        for key, option in options_flat.items():
+            if option.get("type") == "rotation_lock":
+                state = self.app_state.get(key)
+                if state:
+                    state.available = True
 
         # Hide rows for options the running Hyprland doesn't recognise —
         # both removed-in-this-version options and not-yet-introduced ones.

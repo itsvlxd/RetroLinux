@@ -1,7 +1,11 @@
 """Monitor management page — orchestrates cards, preview, and Hyprland IPC."""
 
 import copy
+import os
+import re
+import subprocess
 from collections.abc import Iterator
+from pathlib import Path
 
 from gi.repository import Adw, Gtk
 from hyprland_monitors import get_monitor_capabilities
@@ -95,7 +99,6 @@ class MonitorsPage(SectionPage):
         self._ownership = OwnershipSet()
         self._last_dragged_idx = -1
         self._drag_undo_state = None
-
         self._reload_monitors(saved_sections=saved_sections)
         self._save_snapshot()
         self._save_confirmed_snapshot()
@@ -169,46 +172,94 @@ class MonitorsPage(SectionPage):
         """Fetch monitors from IPC, snap scales, and merge saved config."""
         self._monitors = sorted(self._window.hypr.monitors.get_all() or [], key=lambda m: m.name)
         self._snap_scales()
-        sections = saved_sections if saved_sections is not None else self._window.saved_sections
-        saved = config.collect_section(sections, config.KEYWORD_MONITOR)
+        saved = self._parse_monitors_lua()
         if saved:
-            merge_saved_state(self._monitors, saved)
+            self._merge_saved_lua(saved)
+        self._ownership = OwnershipSet(self._managed_names_from_lua(saved))
 
-        self._ownership = OwnershipSet(self._managed_names_from_lines(saved))
-        # Since monitor= is all-or-nothing, our line replaces the user's
-        # entire line.  IPC may still report extras from the user's config
-        # that our line doesn't include — clear them so the UI shows what
-        # our config actually sets.
-        self._clear_unmanaged_extras(saved)
+    @staticmethod
+    def _parse_monitors_lua() -> list[dict]:
+        """Parse ``hl.monitor({...})`` blocks from ``~/.config/retro/monitors.lua``."""
+        f = Path.home() / ".config/retro/monitors.lua"
+        if not f.exists():
+            return []
+        text = f.read_text()
+        saved: list[dict] = []
+        for block in re.finditer(r"hl\.monitor\(\{([^}]+)\}\)", text, re.DOTALL):
+            entry: dict = {}
+            for line in block.group(1).splitlines():
+                m = re.match(r'\s*(\w+)\s*=\s*(.+?)[, ]*$', line)
+                if not m:
+                    continue
+                key, val = m.group(1), m.group(2).strip()
+                if val.startswith('"') and val.endswith('"'):
+                    val = val[1:-1]
+                elif val == "true":
+                    val = True
+                elif val == "false":
+                    val = False
+                else:
+                    try:
+                        val = int(val) if "." not in val else float(val)
+                    except ValueError:
+                        pass
+                entry[key] = val
+            if entry.get("output"):
+                saved.append(entry)
+        return saved
 
-    def _resolve_line_to_port(self, line: str) -> str | None:
-        """Resolve a ``monitor = ...`` config line's identifier to a live connector name.
-
-        Handles both port-name (``DP-1``) and description (``desc:Acme Pixel``) forms.
-        Returns ``None`` when no currently-connected monitor matches.
-        """
-        cleaned = line.removeprefix(config.KEYWORD_MONITOR).strip().removeprefix("=").strip()
-        token = cleaned.split(",")[0].strip()
-        if not token:
-            return None
-        mon = resolve_identifier(token, self._monitors)
-        return mon.name if mon else None
-
-    def _clear_unmanaged_extras(self, saved_lines: list[str]):
-        """Clear IPC-leaked extras on managed monitors not in our config."""
-        saved_extras: dict[str, set[str]] = {}
-        for line in saved_lines:
-            port = self._resolve_line_to_port(line)
-            if port is None:
+    def _managed_names_from_lua(self, saved: list[dict]) -> set[str]:
+        names: set[str] = set()
+        for entry in saved:
+            output = entry.get("output")
+            if not output:
                 continue
-            saved_extras[port] = set(parse_extras(line).keys())
-        for mon in self._monitors:
-            if not self._ownership.is_owned(mon.name):
+            mon = resolve_identifier(str(output), self._monitors)
+            if mon is not None:
+                names.add(mon.name)
+        return names
+
+    def _merge_saved_lua(self, saved: list[dict]):
+        """Apply saved monitors.lua entries onto live MonitorState objects."""
+        for entry in saved:
+            output = entry.get("output")
+            if not output:
                 continue
-            managed = saved_extras.get(mon.name, set())
-            for field in _EXTRA_FIELDS:
-                if field not in managed:
-                    setattr(mon, field, None)
+            mon = resolve_identifier(str(output), self._monitors)
+            if mon is None:
+                continue
+
+            if "mode" in entry:
+                parsed = parse_mode(str(entry["mode"]))
+                mon.width = parsed["width"]
+                mon.height = parsed["height"]
+                mon.refresh_rate = parsed["refresh_rate"]
+
+            if "position" in entry:
+                parts = str(entry["position"]).split("x")
+                if len(parts) == 2:
+                    try:
+                        mon.x = int(parts[0])
+                        mon.y = int(parts[1])
+                    except ValueError:
+                        pass
+
+            if "scale" in entry:
+                mon.scale = float(entry["scale"])
+            if "transform" in entry:
+                mon.transform = int(entry["transform"])
+            if "vrr" in entry:
+                mon.vrr = str(entry["vrr"])
+            if "cm" in entry:
+                mon.color_management = str(entry["cm"])
+            if "bitdepth" in entry:
+                mon.bit_depth = str(entry["bitdepth"])
+            if "mirror" in entry:
+                mon.mirror_of = str(entry["mirror"])
+            if "disabled" in entry:
+                mon.disabled = bool(entry["disabled"])
+            if str(output).startswith("desc:"):
+                mon.identify_by_description = True
 
     def _snap_scales(self):
         """Map 2dp scales from Hyprland to full-precision 1/120 values."""
@@ -223,11 +274,6 @@ class MonitorsPage(SectionPage):
 
             si = nearest_scale_index(vs, mon.scale)
             mon.scale = vs[si][0]
-
-    def _managed_names_from_lines(self, saved_lines: list[str]) -> set[str]:
-        ports = {self._resolve_line_to_port(line) for line in saved_lines}
-        ports.discard(None)
-        return ports  # type: ignore[return-value]
 
     def _description_is_unique(self, mon: MonitorState) -> bool:
         """Check if mon's truncated description is unique among connected monitors.
@@ -826,7 +872,67 @@ class MonitorsPage(SectionPage):
                 count += 1
         return count
 
+    def _write_monitors_lua(self):
+        managed = [m for m in self._monitors if self._ownership.is_owned(m.name)]
+        lines = ["-- Auto-generated by retro settings", ""]
+        for mon in managed:
+            lines.append("hl.monitor({")
+            if mon.identify_by_description and mon.description:
+                prefix = mon.description.split(",", 1)[0].strip()
+                lines.append(f'    output = "desc:{prefix}",')
+            else:
+                lines.append(f'    output = "{mon.name}",')
+            if mon.disabled:
+                lines.append("    disabled = true,")
+            else:
+                mode = f"{mon.width}x{mon.height}@{int(mon.refresh_rate)}"
+                lines.append(f'    mode = "{mode}",')
+                lines.append(f'    position = "{mon.x}x{mon.y}",')
+                lines.append(f"    scale = {mon.scale},")
+                if mon.vrr is not None:
+                    lines.append(f"    vrr = {mon.vrr},")
+                lines.append(f"    transform = {mon.transform},")
+                if mon.color_management is not None:
+                    lines.append(f'    cm = "{mon.color_management}",')
+                if mon.bit_depth is not None:
+                    lines.append(f"    bitdepth = {mon.bit_depth},")
+                if mon.mirror_of is not None:
+                    lines.append(f'    mirror = "{mon.mirror_of}",')
+            lines.append("})")
+            lines.append("")
+        lines.append("hl.monitor({")
+        lines.append('    output = "",')
+        lines.append('    mode = "preferred",')
+        lines.append('    position = "auto",')
+        lines.append("    scale = 1,")
+        lines.append("})")
+        lines.append("")
+        lua_dir = Path.home() / ".config/retro"
+        lua_dir.mkdir(parents=True, exist_ok=True)
+        (lua_dir / "monitors.lua").write_text("\n".join(lines))
+
     def mark_saved(self):
+        self._write_monitors_lua()
+        for mon in self._monitors:
+            if not self._ownership.is_owned(mon.name):
+                continue
+            subprocess.Popen(
+                ["retro", "display", "scale", mon.name, f"{mon.scale}"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            subprocess.Popen(
+                ["retro", "display", "resolution", mon.name, f"{mon.width}x{mon.height}@{int(mon.refresh_rate)}"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            subprocess.Popen(
+                ["retro", "display", "rotation", "set", mon.name, str(mon.transform)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            if mon.sdr_brightness is not None:
+                subprocess.Popen(
+                    ["retro", "display", "brightness", mon.name, mon.sdr_brightness],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
         self._ownership.mark_saved()
         self._save_snapshot()
         self._save_confirmed_snapshot()
@@ -892,5 +998,4 @@ class MonitorsPage(SectionPage):
         return entries
 
     def get_monitor_lines(self) -> list[str]:
-        managed = [m for m in self._monitors if self._ownership.is_owned(m.name)]
-        return [f"monitor = {line}" for line in lines_from_monitors(managed)]
+        return []
