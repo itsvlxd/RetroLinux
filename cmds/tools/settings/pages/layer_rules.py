@@ -43,7 +43,9 @@ release. Layer rule order is less critical than window rule order
 ``order N`` predictability — so the affordance has to exist.
 """
 
+import subprocess
 from html import escape as html_escape
+from pathlib import Path
 
 from gi.repository import Adw, Gtk
 from hyprland_config import render_rule_live
@@ -101,13 +103,25 @@ class LayerRulesPage(SavedListSectionPage[LayerRule]):
     # ── Loading ──
 
     def _load(self, saved_sections: dict[str, list[str]] | None) -> None:
-        # Layer rules come through as structured :class:`Rule` nodes from
-        # ``hyprland_config.migrate()``; the adapter converts them to UI
-        # :class:`LayerRule` entries (same pattern as windowrule page).
         del saved_sections
-        items = from_rule_nodes(self._window.saved_rules)
+        managed = from_rule_nodes(self._window.saved_rules)
+        managed_names = {r.name for r in managed if r.name}
+        retro_root = config.HYPRMOD_DIR.resolve()
+        self._external = []
+        retro_items: list[LayerRule] = []
+        for ext in load_external_layer_rules(config.user_entry_path(), config.managed_path()):
+            try:
+                src = ext.source_path.resolve()
+            except OSError:
+                src = ext.source_path
+            if retro_root in src.parents or src == retro_root:
+                if ext.rule.name not in managed_names:
+                    retro_items.append(ext.rule)
+                    managed_names.add(ext.rule.name)
+            else:
+                self._external.append(ext)
+        items = managed + retro_items
         self._owned = SavedList(items, key=lambda r: r.to_line())
-        self._external = load_external_layer_rules(config.user_entry_path(), config.managed_path())
 
     # Restore-snapshot default applies: layer rules need no per-surface
     # runtime sync. Hyprland reads dynamic layer rules every frame, so the
@@ -120,6 +134,11 @@ class LayerRulesPage(SavedListSectionPage[LayerRule]):
 
     def build(self, header: Adw.HeaderBar | None = None) -> Adw.ToolbarView:
         page_header = header or Adw.HeaderBar()
+
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        refresh_btn.set_tooltip_text("Refresh from file")
+        refresh_btn.connect("clicked", lambda _b: self._on_refresh())
+        page_header.pack_start(refresh_btn)
 
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.set_tooltip_text("Add layer rule")
@@ -155,9 +174,60 @@ class LayerRulesPage(SavedListSectionPage[LayerRule]):
     def _build_order_hint(self) -> Gtk.Widget:
         """Inline note: explains how rule order interacts with ``unset``."""
         return make_inline_hint(
-            "Rules accumulate per surface. ‘unset’ clears every prior rule for the "
+            "Rules accumulate per surface. 'unset' clears every prior rule for the "
             "matched namespace — place it first when you want to start fresh. "
-            "Reorder with Alt+↑ / Alt+↓ on a focused row."
+            "Reorder with Alt+\u2191 / Alt+\u2193 on a focused row."
+        )
+
+    def _on_refresh(self) -> None:
+        """Reload rules from the managed config and rebuild the list."""
+        self._load(None)
+        self._rebuild_list()
+
+    def _deleted_baselines(self) -> list[LayerRule]:
+        """Suppress the 'will be removed on save' group — rules vanish on delete."""
+        return []
+
+    def _on_delete_at(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._owned):
+            return
+        removed = self._owned[idx]
+        super()._on_delete_at(idx)
+        if removed.name:
+            self._remove_from_file(removed.name, "layer_rule")
+
+    def _remove_from_file(self, name: str, kind: str) -> None:
+        """Remove the named ``hl.{kind}({{...}})`` block from ``windowrules.lua``."""
+        path = config.HYPRMOD_DIR / "windowrules.lua"
+        if not path.exists():
+            return
+        content = path.read_text()
+        marker = f"hl.{kind}({{"
+        lines = content.split("\n")
+        new_lines: list[str] = []
+        i = 0
+        while i < len(lines):
+            stripped = lines[i].strip()
+            if stripped.startswith(marker):
+                depth = stripped.count("{") - stripped.count("}")
+                found = f"name = \"{name}\"" in lines[i]
+                block_start = i
+                i += 1
+                while i < len(lines) and depth > 0:
+                    s = lines[i].strip()
+                    if f"name = \"{name}\"" in s:
+                        found = True
+                    depth += s.count("{") - s.count("}")
+                    i += 1
+                if not found:
+                    new_lines.extend(lines[block_start:i])
+            else:
+                new_lines.append(lines[i])
+                i += 1
+        path.write_text("\n".join(new_lines))
+        subprocess.Popen(
+            ["retro", "window", "apply"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
 
     # Group + deleted-row + external-section rendering uses the base
