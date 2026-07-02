@@ -69,7 +69,9 @@ insufficient.
 """
 
 import re
+import subprocess
 from html import escape as html_escape
+from pathlib import Path
 
 from gi.repository import Adw, Gtk
 from hyprland_config import render_rule_live
@@ -138,23 +140,25 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
     # ── Loading ──
 
     def _load(self, saved_sections: dict[str, list[str]] | None) -> None:
-        # Window rules come through as structured :class:`Rule` nodes
-        # from ``hyprland_config.migrate()`` regardless of source shape
-        # (single-line, block-form, or Lua table); the page-level
-        # adapter converts them to UI :class:`WindowRule` entries.
-        # ``saved_sections`` is no longer load-bearing for windowrules
-        # — kept on the constructor for the shared base-class contract
-        # other pages still use.
         del saved_sections
-        items = from_rule_nodes(self._window.saved_rules)
+        managed = from_rule_nodes(self._window.saved_rules)
+        managed_names = {r.name for r in managed if r.name}
+        retro_root = config.HYPRMOD_DIR.resolve()
+        self._external = []
+        retro_items: list[WindowRule] = []
+        for ext in load_external_window_rules(config.user_entry_path(), config.managed_path()):
+            try:
+                src = ext.source_path.resolve()
+            except OSError:
+                src = ext.source_path
+            if retro_root in src.parents or src == retro_root:
+                if ext.rule.name not in managed_names:
+                    retro_items.append(ext.rule)
+                    managed_names.add(ext.rule.name)
+            else:
+                self._external.append(ext)
+        items = managed + retro_items
         self._owned = SavedList(items, key=lambda r: r.to_line())
-        # Surface any windowrule lines that live in the user's
-        # hyprland.conf or any file it sources (other than our managed
-        # file). These are advisory display only — Hyprland has no IPC
-        # to remove individual rules, so we can't offer an "override"
-        # action like the Binds page does. The escape hatch for the
-        # user is to edit the source file directly.
-        self._external = load_external_window_rules(config.user_entry_path(), config.managed_path())
 
     # ── Undo / Redo ──
 
@@ -178,6 +182,11 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
 
     def build(self, header: Adw.HeaderBar | None = None) -> Adw.ToolbarView:
         page_header = header or Adw.HeaderBar()
+
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        refresh_btn.set_tooltip_text("Refresh from file")
+        refresh_btn.connect("clicked", lambda _b: self._on_refresh())
+        page_header.pack_start(refresh_btn)
 
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.set_tooltip_text("Add window rule")
@@ -303,6 +312,49 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
         row.connect("activated", lambda _r, i=idx: self._on_edit_at(i))
         row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
         return row
+
+    def _on_refresh(self) -> None:
+        """Reload rules from the managed config and rebuild the list."""
+        self._load(None)
+        self._rebuild_list()
+
+    def _deleted_baselines(self) -> list[WindowRule]:
+        """Suppress the 'will be removed on save' group — rules vanish on delete."""
+        return []
+
+    def _remove_from_file(self, name: str, kind: str) -> None:
+        """Remove the named ``hl.{kind}({{...}})`` block from ``windowrules.lua``."""
+        path = config.HYPRMOD_DIR / "windowrules.lua"
+        if not path.exists():
+            return
+        content = path.read_text()
+        marker = f"hl.{kind}({{"
+        lines = content.split("\n")
+        new_lines: list[str] = []
+        i = 0
+        while i < len(lines):
+            stripped = lines[i].strip()
+            if stripped.startswith(marker):
+                depth = stripped.count("{") - stripped.count("}")
+                found = f'name = "{name}"' in lines[i]
+                block_start = i
+                i += 1
+                while i < len(lines) and depth > 0:
+                    s = lines[i].strip()
+                    if f'name = "{name}"' in s:
+                        found = True
+                    depth += s.count("{") - s.count("}")
+                    i += 1
+                if not found:
+                    new_lines.extend(lines[block_start:i])
+            else:
+                new_lines.append(lines[i])
+                i += 1
+        path.write_text("\n".join(new_lines))
+        subprocess.Popen(
+            ["retro", "window", "apply"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
 
     # ── Live apply (push to running compositor) ──
 
@@ -568,6 +620,8 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
         removed = self._owned[idx]
         super()._on_delete_at(idx)
         self._revert_to_existing(removed)
+        if removed.name:
+            self._remove_from_file(removed.name, "window_rule")
 
     def _discard_at(self, idx: int) -> None:
         """Revert the rule at *idx* and snap existing windows back live.
