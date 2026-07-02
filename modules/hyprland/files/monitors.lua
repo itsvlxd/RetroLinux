@@ -6,11 +6,9 @@
 
 local ok = pcall(dofile, os.getenv("HOME") .. "/.config/retro/monitors.lua")
 
-if not ok then
-	hl.monitor({
-		output = "",
-		mode = "preferred",
-		position = "auto",
-		scale = 1,
-	})
-end
+hl.monitor({
+	output = "",
+	mode = "preferred",
+	position = "auto",
+	scale = 1,
+})

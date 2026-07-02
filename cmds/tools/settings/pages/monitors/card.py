@@ -1,8 +1,9 @@
 """Editable card widget for a single monitor."""
 
+import subprocess
 from dataclasses import dataclass, replace
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, GLib, Gtk
 from hyprland_monitors.monitors import (
     TRANSFORMS,
     MonitorState,
@@ -52,20 +53,6 @@ class _HdrSliderSpec:
 
 
 HDR_SLIDER_SPECS = (
-    # Hyprland's 1.0 sdr_brightness over-brightens SDR-in-HDR;
-    # 0.5 is the community recommended starting point
-    _HdrSliderSpec(
-        field="sdr_brightness",
-        title="SDR Brightness",
-        subtitle="Brightness for SDR content in HDR mode",
-        default=0.5,
-        minimum=SDR_VALUE_MIN,
-        maximum=SDR_VALUE_MAX,
-        step=SDR_VALUE_STEP,
-        page=SDR_VALUE_STEP * 4,
-        digits=SDR_VALUE_DIGITS,
-        auto_default=True,
-    ),
     _HdrSliderSpec(
         field="sdr_saturation",
         title="SDR Saturation",
@@ -397,6 +384,50 @@ class MonitorCard(Gtk.Box):
         self._attach_row_actions(self._transform_row, lambda: self._discard_fields("transform"))
         display_group.add(self._transform_row)
 
+        # -- Brightness slider (real-time backlight, not config-managed) --
+        try:
+            _br_res = subprocess.run(
+                ["brightnessctl", "-m", "info"],
+                capture_output=True, text=True, timeout=1,
+            )
+            _br_val = int(_br_res.stdout.strip().split(",")[3].rstrip("%"))
+        except Exception:
+            _br_val = 100
+        self._brightness_row = Adw.ActionRow(
+            title="Brightness",
+            subtitle="Backlight level (0 – 100%)",
+        )
+        self._brightness_scale = Gtk.Scale(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            adjustment=Gtk.Adjustment(
+                value=_br_val,
+                lower=0,
+                upper=100,
+                step_increment=1,
+                page_increment=10,
+            ),
+        )
+        self._brightness_scale.set_digits(0)
+        self._brightness_scale.set_draw_value(False)
+        self._brightness_scale.set_size_request(220, -1)
+        self._brightness_scale.set_valign(Gtk.Align.CENTER)
+
+        self._brightness_value_label = Gtk.Label(
+            label=f"{_br_val}%",
+            width_chars=4,
+            xalign=1,
+        )
+        self._brightness_value_label.add_css_class("dim-label")
+        self._brightness_value_label.set_valign(Gtk.Align.CENTER)
+
+        self._brightness_row.add_suffix(self._brightness_scale)
+        self._brightness_row.add_suffix(self._brightness_value_label)
+        self._signals.connect(self._brightness_scale, "value-changed", self._on_brightness_changed)
+        display_group.add(self._brightness_row)
+
+        self._brightness_timer_id = GLib.timeout_add(500, self._poll_brightness)
+        self.connect("destroy", self._cleanup_brightness_timer)
+
         self.append(display_group)
 
         # -- Advanced group (expander) --
@@ -560,6 +591,7 @@ class MonitorCard(Gtk.Box):
             self._mode_row,
             self._scale_row,
             self._transform_row,
+            self._brightness_row,
             self._identify_row if flatten_advanced else self._advanced_expander,
         ]
         if monitor.disabled:
@@ -570,6 +602,7 @@ class MonitorCard(Gtk.Box):
             self._mode_row,
             self._scale_row,
             self._transform_row,
+            self._brightness_row,
             self._pos_row,
             self._mirror_row,
             self._cm_row,
@@ -581,6 +614,7 @@ class MonitorCard(Gtk.Box):
         ):
             if row is not None and row.get_visible():
                 self._searchable.append((row.get_title(), row.get_subtitle() or ""))
+
 
     @property
     def searchable_fields(self) -> list[tuple[str, str]]:
@@ -856,6 +890,7 @@ class MonitorCard(Gtk.Box):
                 self._mode_row,
                 self._scale_row,
                 self._transform_row,
+                self._brightness_row,
                 self._pos_row,
                 self._mirror_row,
                 self._cm_row,
@@ -877,6 +912,7 @@ class MonitorCard(Gtk.Box):
                 ),
                 (self._scale_row, mon.scale != baseline.scale),
                 (self._transform_row, mon.transform != baseline.transform),
+                (self._brightness_row, mon.sdr_brightness != baseline.sdr_brightness),
                 (self._pos_row, mon.x != baseline.x or mon.y != baseline.y),
                 (self._mirror_row, mon.mirror_of != baseline.mirror_of),
                 (self._cm_row, mon.color_management != baseline.color_management),
@@ -994,6 +1030,35 @@ class MonitorCard(Gtk.Box):
 
     def _on_transform_changed(self, *_args):
         self._emit({"transform": self._transform_row.get_selected()})
+
+    def _on_brightness_changed(self, scale: Gtk.Scale):
+        value = int(scale.get_value())
+        self._brightness_value_label.set_label(f"{value}%")
+        subprocess.Popen(
+            ["retro", "display", "brightness", self._monitor.name, f"{value}"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+    def _poll_brightness(self) -> bool:
+        try:
+            _res = subprocess.run(
+                ["brightnessctl", "-m", "info"],
+                capture_output=True, text=True, timeout=1,
+            )
+            _pct = int(_res.stdout.strip().split(",")[3].rstrip("%"))
+        except Exception:
+            return True
+        _cur = int(self._brightness_scale.get_value())
+        if _pct != _cur:
+            with self._signals:
+                self._brightness_scale.set_value(_pct)
+                self._brightness_value_label.set_label(f"{_pct}%")
+        return True
+
+    def _cleanup_brightness_timer(self, *_args):
+        if self._brightness_timer_id:
+            GLib.source_remove(self._brightness_timer_id)
+            self._brightness_timer_id = 0
 
     def _on_bitdepth_changed(self, row: Adw.ComboRow, *_args):
         idx = row.get_selected()

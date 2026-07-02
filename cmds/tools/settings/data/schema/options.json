@@ -1203,6 +1203,12 @@
             {
               "key": "misc:key_press_enables_dpms",
               "label": "Key press enables DPMS"
+            },
+            {
+              "key": "monitor_globals:rotation_lock",
+              "type": "rotation_lock",
+              "label": "Lock Auto rotation",
+              "description": "Lock screen orientation to prevent auto-rotation"
             }
           ]
         }

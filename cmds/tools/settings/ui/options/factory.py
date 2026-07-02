@@ -11,6 +11,7 @@ from settings.ui.options.numeric import (
     SwitchOptionRow,
     Vec2OptionRow,
 )
+from settings.ui.options.rotation import RotationLockRow
 from settings.ui.options.text import EntryOptionRow
 
 _ROW_CLASSES = {
@@ -22,6 +23,7 @@ _ROW_CLASSES = {
     "gradient": GradientOptionRow,
     "choice": ComboOptionRow,
     "vec2": Vec2OptionRow,
+    "rotation_lock": RotationLockRow,
 }
 
 
