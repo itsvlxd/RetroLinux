@@ -100,14 +100,14 @@ function Notify.battery_saver_disabled()
 end
 
 function Notify.battery_low(cap)
-	Notify.send("Battery Low", cap .. "%% remaining — find a plug soon", {
+	Notify.send("Battery Low", cap .. "% remaining — find a plug soon", {
 		icon = "battery-low",
 		app_name = "retro",
 	})
 end
 
 function Notify.battery_critical(cap)
-	Notify.send("Battery Critical", "Only " .. cap .. "%% left. Connect power now.", {
+	Notify.send("Battery Critical", "Only " .. cap .. "% left. Connect power now.", {
 		icon = "battery-empty",
 		urgency = "critical",
 		app_name = "retro",
