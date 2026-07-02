@@ -69,5 +69,6 @@ return {
 		Watcher.run_cmd("bash '" .. core .. "' --set-transform '" .. monitor .. "' " .. t .. " 2>/dev/null")
 		Watcher.log("rotation", "Applied transform " .. t .. " for " .. monitor .. " (" .. orient .. ")", "info")
 		engine:emit("on_display_rotation", monitor, tostring(t), orient)
+		coroutine.yield()
 	end,
 }
