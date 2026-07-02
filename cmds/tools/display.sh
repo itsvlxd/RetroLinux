@@ -86,9 +86,13 @@ cmd_display() {
             ;;
         "brightness" | "br")
             if [[ -z $arg1 ]]; then
-                rx_log "error" "Usage: retro display brightness <monitor>" && return 1
+                rx_log "error" "Usage: retro display brightness <monitor> [value]" && return 1
             fi
-            _display_get_brightness "$display_core" "$arg1"
+            if [[ -n $arg2 ]]; then
+                _display_set_brightness "$display_core" "$arg1" "$arg2"
+            else
+                _display_get_brightness "$display_core" "$arg1"
+            fi
             ;;
         "saturation" | "sat")
             if [[ -z $arg1 ]]; then
@@ -140,8 +144,11 @@ cmd_display() {
                     [[ $result == ERR_SET_FAILED ]] && rx_log "error" "Failed to set transform" && return 1
                     rx_log "success" "Set $arg2 transform to ${arg3}"
                     ;;
+                status)
+                    bash "$display_core" --lock-rotation status 2>/dev/null
+                    ;;
                 *)
-                    rx_log "error" "Usage: retro display rotation <lock|unlock|toggle|set>"
+                    rx_log "error" "Usage: retro display rotation <lock|unlock|toggle|set|status>"
                     return 1
                     ;;
             esac
@@ -176,7 +183,7 @@ cmd_display() {
             rx_help_cmd "enable <mon>" "Enable a disabled monitor" 26
             rx_help_cmd "disable <mon>" "Disable a monitor" 26
             rx_help_cmd "mirror <src> [dst]" "Mirror a monitor" 26
-            rx_help_cmd "brightness <mon>" "Show SDR brightness" 26
+            rx_help_cmd "brightness <mon> [val]" "Get or set backlight brightness (+5, -5, or 0-100)" 26
             rx_help_cmd "saturation <mon>" "Show SDR saturation" 26
             rx_help_cmd "transform <mon>" "Show rotation" 26
             rx_help_cmd "rotation lock|unlock|toggle" "Lock/unlock auto-rotation" 26
@@ -189,6 +196,9 @@ cmd_display() {
             rx_help_example "retro display res DP-1 1920x1080@144" "Set resolution" 26
             rx_help_example "retro display hz eDP-1 60" "Set refresh rate" 26
             rx_help_example "retro display scale eDP-1 1.5" "Set scaling" 26
+            rx_help_example "retro display br eDP-1 80" "Set brightness to 80%" 26
+rx_help_example "retro display br eDP-1 +5" "Increase by 5%" 26
+rx_help_example "retro display br eDP-1 -10" "Decrease by 10%" 26
             rx_help_example "retro display pos HDMI-A-1 1920 0" "Set position" 26
             rx_help_example "retro display dpms off" "Turn off monitors" 26
             rx_help_example "retro display setup" "Interactive config" 26
@@ -244,6 +254,11 @@ _display_status() {
         rx_table_row "" "Refresh:" "$hz_display" "$PINK" "16"
         rx_table_row "󰘶" "Position:" "$pos_display" "$GRAY" "16"
         rx_table_row "󰧑" "Scale:" "$scale_display" "$GRAY" "16"
+        local brightness
+        brightness=$(bash "$core" --get-brightness "$monitor" 2>/dev/null)
+        if [[ -n $brightness && $brightness != ERR_* ]]; then
+            rx_table_row "󰃟" "Brightness:" "${brightness}%" "$GRAY" "16"
+        fi
         local transform_names=("normal" "90°" "180°" "270°" "flipped" "flipped+90°" "flipped+180°" "flipped+270°")
         local tname="${transform_names[$tr]:-unknown}"
         local tcolor="$GRAY"
@@ -500,11 +515,23 @@ _display_get_brightness() {
     local core="$1"
     local monitor="$2"
     local raw
-    raw=$(bash "$core" --get "$monitor" "sdrBrightness" 2>/dev/null)
-    [[ -z $raw || $raw == ERR_NO_MONITOR ]] && rx_log "error" "Monitor not found: $monitor" && return 1
-    [[ -z $raw || $raw == "null" ]] && rx_log "info" "SDR brightness not reported for $monitor" && return 0
-    rx_table_simple "󰃟" "${monitor}: $raw" "$PINK"
-    rx_log "info" "Use ${PINK}retro display setup${RESET} to change brightness"
+    raw=$(bash "$core" --get-brightness "$monitor" 2>/dev/null)
+    [[ $raw == ERR_NO_BRIGHTNESSCTL ]] && rx_log "error" "brightnessctl not available" && return 1
+    [[ $raw == ERR_NO_BRIGHTNESS ]] && rx_log "error" "Failed to read brightness for $monitor" && return 1
+    [[ -z $raw ]] && rx_log "error" "Monitor not found: $monitor" && return 1
+    rx_table_simple "󰃟" "${monitor}: ${raw}%" "$PINK"
+}
+
+_display_set_brightness() {
+    local core="$1"
+    local monitor="$2"
+    local value="$3"
+    local result
+    result=$(bash "$core" --set-brightness "$monitor" "$value" 2>/dev/null)
+    [[ $result == ERR_NO_BRIGHTNESSCTL ]] && rx_log "error" "brightnessctl not available" && return 1
+    [[ $result == ERR_ARGS ]] && rx_log "error" "Usage: retro display brightness <monitor> <value>" && return 1
+    [[ $result == ERR_SET_FAILED ]] && rx_log "error" "Failed to set brightness for $monitor" && return 1
+    rx_log "success" "Set $monitor brightness to $value"
 }
 
 _display_get_saturation() {
