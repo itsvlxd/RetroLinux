@@ -13,7 +13,7 @@ _IS_STRING() {
 
 _IS_BOOL() {
     case "$1" in
-        disabled) return 0 ;;
+        disabled|identify_by_description) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -189,6 +189,51 @@ _cmd_set_position() {
     rx_log_file "info" "Set position for $name to $pos"
 }
 
+_cmd_set_brightness() {
+    local name="$1"
+    local value="$2"
+    [[ -z $name || -z $value ]] && echo "ERR_ARGS" && return 1
+
+    if ! command -v brightnessctl >/dev/null 2>&1; then
+        echo "ERR_NO_BRIGHTNESSCTL"
+        return 1
+    fi
+
+    if [[ $value != *%* ]]; then
+        if [[ $value == -* ]]; then
+            value="${value#-}%-"
+        else
+            value="${value}%"
+        fi
+    fi
+
+    if ! brightnessctl set "$value" >/dev/null 2>&1; then
+        rx_log_file "error" "Failed to set brightness for $name"
+        echo "ERR_SET_FAILED"
+        return 1
+    fi
+    rx_log_file "info" "Set brightness for $name to $value"
+}
+
+_cmd_get_brightness() {
+    local name="$1"
+    if ! command -v brightnessctl >/dev/null 2>&1; then
+        echo "ERR_NO_BRIGHTNESSCTL"
+        return 1
+    fi
+
+    local pct
+    pct=$(brightnessctl -m info 2>/dev/null | cut -d',' -f4 | tr -d '%')
+    if [[ -z $pct ]]; then
+        local cur max
+        cur=$(brightnessctl get 2>/dev/null)
+        max=$(brightnessctl max 2>/dev/null)
+        [[ -z $cur || -z $max || $max -eq 0 ]] && echo "ERR_NO_BRIGHTNESS" && return 1
+        pct=$((cur * 100 / max))
+    fi
+    echo "$pct"
+}
+
 _cmd_set_dpms() {
     local state="$1"
     local monitor="$2"
@@ -322,7 +367,7 @@ _cmd_apply_sddm_hidpi() {
     local sddm_dir="/etc/sddm.conf.d"
     local sddm_file="$sddm_dir/hidpi.conf"
 
-    sudo mkdir -p "$sddm_dir" 2>/dev/null || true
+    mkdir -p "$sddm_dir" 2>/dev/null || true
 
     local content="[General]
 GreeterEnvironment=QT_SCREEN_SCALE_FACTORS=${scale},QT_FONT_DPI=${dpi}
@@ -334,7 +379,7 @@ EnableHiDPI=true
 EnableHiDPI=true
 ServerArguments=-nolisten tcp -dpi ${dpi}
 "
-    if ! echo "$content" | sudo tee "$sddm_file" >/dev/null 2>&1; then
+    if ! echo "$content" | tee "$sddm_file" >/dev/null 2>&1; then
         rx_log_file "error" "Failed to write SDDM HiDPI config"
         echo "ERR_SDDM_FAILED"
         return 1
@@ -463,6 +508,12 @@ case "$1" in
         ;;
     "--set-position")
         _cmd_set_position "$2" "$3"
+        ;;
+    "--set-brightness")
+        _cmd_set_brightness "$2" "$3"
+        ;;
+    "--get-brightness")
+        _cmd_get_brightness "$2"
         ;;
     "--set-dpms")
         _cmd_set_dpms "$2" "$3"
