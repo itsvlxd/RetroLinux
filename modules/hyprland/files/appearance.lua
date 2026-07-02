@@ -61,7 +61,7 @@ hl.config({
 			sharp = vars.retro_shadow_sharp,
 			offset = vars.retro_shadow_offset,
 			scale = vars.retro_shadow_scale,
-			color = vars.retro_shadow_color,
+			color = colors.shadow,
 		},
 
 		-- https://wiki.hypr.land/Configuring/Variables/#blur
