@@ -10,6 +10,7 @@ cmd_load() {
 
     local startup_tasks=(
         "retro --setup|Initializing first boot system setup"
+
         "retro bluetooth restore|Initializing bluetooth radio cards"
         "retro audio easyeffects start|Initializing audio drivers"
         "retro daemon start|Initializing retro daemon engine and watchers"
@@ -30,11 +31,6 @@ cmd_load() {
         "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
     )
-
-    local auto_load=$(get_var "RETRO_SESSION_AUTOLOAD")
-    if [[ $auto_load == "true" ]]; then
-        startup_tasks+=("retro window restore|Restoring the last Hyprland window snapshot")
-    fi
 
     local custom_tasks=()
     local custom_raw=$(get_var "RETRO_CUSTOM_LOAD")
