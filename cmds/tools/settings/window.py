@@ -1231,24 +1231,13 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         # env-vars owns everything else. Cursor lines come first by
         # convention (theme + size are session-defining; later vars may
         # reference them indirectly).
-        cursor_env = (
-            emit_if(
-                self._cursor_page,
-                lambda p: p.has_managed_env(saved_sections),
-                lambda p: p.get_env_lines(),
-            )
-            or []
+        # Env variables are stored in ~/.config/retro/env.lua.
+        # Only the Cursor page still contributes to settings.lua.
+        sections.env = emit_if(
+            self._cursor_page,
+            lambda p: p.has_managed_env(saved_sections),
+            lambda p: p.get_env_lines(),
         )
-        general_env = (
-            emit_if(
-                self._env_vars_page,
-                lambda _p: EnvVarsPage.has_managed_section(saved_sections),
-                lambda p: p.get_env_lines(),
-            )
-            or []
-        )
-        if cursor_env or general_env:
-            sections.env = [*cursor_env, *general_env]
 
         # Autostart page uses RETRO_CUSTOM_LOAD variable, not settings.lua,
         # so it's not emitted here.

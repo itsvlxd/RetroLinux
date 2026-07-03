@@ -40,12 +40,13 @@ from gi.repository import Adw, Gtk
 from settings.core import config
 from settings.core.env_vars import (
     RESERVED_NAMES,
+    ENV_LUA_PATH,
     EnvVar,
     ExternalEnvVar,
     load_external_env_vars,
     overridden_external_names,
-    parse_env_lines,
-    serialize,
+    parse_env_lua_file,
+    serialize_env_lua,
 )
 from settings.core.ownership import SavedList
 from settings.pages.section import SavedListSectionPage
@@ -93,22 +94,28 @@ class EnvVarsPage(SavedListSectionPage[EnvVar]):
     # ── Loading ──
 
     def _load(self, saved_sections: dict[str, list[str]] | None) -> None:
-        if saved_sections is None:
-            saved_sections = self._window.saved_sections
-        raw_lines = config.collect_section(saved_sections, config.KEYWORD_ENV)
-        items = parse_env_lines(raw_lines)
-        # Strip out cursor-owned vars so they show up only on the Cursor
-        # page. We deliberately do this on the OWNED list (not just the
-        # display) so the page truly doesn't track them — that keeps
-        # save/discard/undo from accidentally rewriting cursor vars
-        # via this page's serializer.
+        del saved_sections
+        items = parse_env_lua_file(ENV_LUA_PATH)
         items = [item for item in items if item.name not in RESERVED_NAMES]
+        managed_names = {e.name for e in items}
+
+        # External entries from other sourced files (modules/hyprland/files/env.lua, etc.)
+        retro_root = config.RETRO_SETTINGS_DIR.resolve()
+        self._external = []
+        for ext in load_external_env_vars(config.user_entry_path(), config.managed_path()):
+            try:
+                src = ext.source_path.resolve()
+            except OSError:
+                src = ext.source_path
+            if retro_root in src.parents or src == retro_root:
+                if ext.var.name not in managed_names:
+                    items.append(ext.var)
+                    managed_names.add(ext.var.name)
+            else:
+                self._external.append(ext)
+
+        self._saved_items = list(items)
         self._owned = SavedList(items, key=lambda e: e.to_line())
-        # External entries — those defined in the user's hyprland.conf
-        # or any file it sources, excluding our managed file. The loader
-        # also drops cursor-owned names so they're surfaced only on the
-        # Cursor page.
-        self._external = load_external_env_vars(config.user_entry_path(), config.managed_path())
 
     # ── Build ──
 
@@ -323,31 +330,38 @@ class EnvVarsPage(SavedListSectionPage[EnvVar]):
 
     # ── Save plumbing ──
 
+    def is_dirty(self) -> bool:
+        return list(self._owned) != self._saved_items
+
+    def mark_saved(self) -> None:
+        # Preserve cursor vars from env.lua, write everything back
+        cursor_items = [item for item in parse_env_lua_file(ENV_LUA_PATH)
+                        if item.name in RESERVED_NAMES]
+        owned_names = {e.name for e in self._owned}
+        cursor_items = [c for c in cursor_items if c.name not in owned_names]
+        all_items = cursor_items + list(self._owned)
+        ENV_LUA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ENV_LUA_PATH.write_text(serialize_env_lua(all_items))
+        self._saved_items = list(self._owned)
+
+    def discard(self) -> None:
+        self._owned = SavedList(self._saved_items, key=lambda e: e.to_line())
+        self._rebuild_list()
+
+    def pending_change_count(self) -> int:
+        if not self.is_dirty():
+            return 0
+        count = 0
+        for item in self._owned:
+            if item not in self._saved_items:
+                count += 1
+        for item in self._saved_items:
+            if item not in self._owned:
+                count += 1
+        return count
+
     def get_env_lines(self) -> list[str]:
-        """Serialize the current entries for ``config.write_all``.
-
-        Order is preserved as-is — users may rely on, e.g., setting
-        ``XDG_RUNTIME_DIR`` before referencing it from a later
-        variable. Cursor-managed lines are emitted by the Cursor page
-        and concatenated upstream; this method returns only the
-        non-reserved entries.
-        """
-        return serialize(list(self._owned))
-
-    @staticmethod
-    def has_managed_section(sections: dict[str, list[str]]) -> bool:
-        """True if the saved config has any non-reserved env entries.
-
-        The Cursor page already triggers env emission for its four
-        reserved names, so we only need to check whether any *other*
-        env name lives in the file. If it does, this page must emit
-        on save (even if currently clean) to preserve it.
-        """
-        for raw in sections.get(config.KEYWORD_ENV, []):
-            entry = parse_env_lines([raw])
-            if entry and entry[0].name not in RESERVED_NAMES:
-                return True
-        return False
+        return []
 
 
 __all__ = ["EnvVarsPage"]
