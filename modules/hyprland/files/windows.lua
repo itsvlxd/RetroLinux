@@ -26,35 +26,51 @@
 -- Example windowrules that are useful
 
 hl.window_rule({
-    name = "suppress-maximize-events",
-    match = { class = ".*" },
-    suppress_event = "maximize",
+	name = "suppress-maximize-events",
+	match = { class = ".*" },
+	suppress_event = "maximize",
 })
 
 hl.window_rule({
-    name = "fix-xwayland-drags",
-    match = {
-        class = "^$",
-        title = "^$",
-        xwayland = true,
-        float = true,
-        fullscreen = false,
-        pin = false,
-    },
-    no_focus = true,
+	name = "fix-xwayland-drags",
+	match = {
+		class = "^$",
+		title = "^$",
+		xwayland = true,
+		float = true,
+		fullscreen = false,
+		pin = false,
+	},
+	no_focus = true,
+})
+
+hl.layer_rule({
+	name = "rofi-layer-style",
+	match = {
+		namespace = "^(rofi)$",
+	},
+	animation = "popin",
+	blur = true,
+	ignore_alpha = 0.5,
 })
 
 -- Hyprland-run windowrule
 hl.window_rule({
-    name = "move-hyprland-run",
-    match = { class = "hyprland-run" },
-    move = "20 monitor_h-120",
-    float = true,
+	name = "move-hyprland-run",
+	match = { class = "hyprland-run" },
+	move = "20 monitor_h-120",
+	float = true,
 })
 
 -- Settings app windowrule
 hl.window_rule({
-    name = "float-settings",
-    match = { class = "io.github.retrolinux.settings" },
-    float = true,
+	name = "float-settings",
+	match = { class = "io.github.retrolinux.settings" },
+	float = true,
+})
+
+hl.window_rule({
+	name = "kitty-windows-style",
+	match = { class = "kitty" },
+	opacity = vars.retro_kitty_active_opacity .. " 0.8",
 })
