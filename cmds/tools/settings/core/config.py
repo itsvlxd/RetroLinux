@@ -483,6 +483,7 @@ def _add_section(doc: Document, header: str, section_lines: list[str]) -> None:
     _add_comment(doc, header)
     body = "".join(line if line.endswith("\n") else line + "\n" for line in section_lines)
     parsed = parse_string(body, lenient=True)
+    migrate(parsed)
     doc.lines.extend(parsed.lines)
 
 

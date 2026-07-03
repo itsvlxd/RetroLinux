@@ -6,14 +6,12 @@ Two halves:
    key dropdown (class, title, xwayland, …) and a value entry. Plus
    a "Pick from open window" button that auto-fills class regex
    from a currently-running window.
-2. **Apply this action** — a single dropdown of common Hyprland
-   v3 effects (float, opacity, size, no_blur, …) with effect-specific
-   argument fields. A "Custom action…" entry covers anything we
-   haven't catalogued, including plugin actions.
+2. **Apply these effects** — a list of effect rows, each with an
+   action dropdown and per-preset argument fields. Add as many effects
+   as you want with the "+" button; remove any with the trash icon.
 
-A live preview at the bottom shows the exact ``windowrule = …`` line
-that will be written to the config — so users can see what the visual
-editor will produce, and power users can verify it before applying.
+A live preview at the bottom shows the exact config line that will
+be written.
 
 The dialog is opened via :meth:`SingletonDialogMixin.present_singleton`,
 not constructed directly.
@@ -47,6 +45,8 @@ from settings.ui import build_preview_group
 from settings.ui.dialog import SingletonDialogMixin
 from settings.ui.window_picker import WindowPickerDialog
 
+_PRESETS_WITH_CUSTOM: tuple[ActionPreset, ...] = (*ACTION_PRESETS, CUSTOM_PRESET)
+
 
 def _escape_regex(value: str) -> str:
     """Wrap a plain string into an exact-match RE2 regex.
@@ -77,7 +77,7 @@ def _preview_for(rule: WindowRule) -> str:
 
 
 class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
-    """Add/edit dialog for a single window rule."""
+    """Add/edit dialog for a single window rule with one or more effects."""
 
     def __init__(
         self,
@@ -90,39 +90,21 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._on_apply_callback = on_apply
 
         # Matcher rows are tracked imperatively so Add/Remove and the
-        # preview rebuild can find each row's current values. Each row
-        # carries a kind + key/value widgets exposed via the
-        # ``_MatcherRow`` helper class.
+        # preview rebuild can find each row's current values.
         self._matcher_rows: list[_MatcherRow] = []
         self._matchers_listbox: Gtk.ListBox
 
-        # Action picker state. ``_action_dropdown`` is the
-        # ``Adw.ComboRow`` that selects which preset is in play;
-        # ``_action_field_box`` holds the per-preset argument widgets,
-        # rebuilt every time the dropdown changes selection. The list
-        # is parallel to the active preset's ``fields`` tuple.
-        self._action_field_widgets: list[Gtk.Widget] = []
-        self._action_dropdown: Adw.ComboRow
-        self._action_field_box: Gtk.Box
-        self._action_description: Gtk.Label
-        # ``_PRESETS_WITH_CUSTOM`` is the dropdown's model, keeping
-        # ``Custom`` as the last option so users discover the
-        # structured presets first.
-        self._presets: tuple[ActionPreset, ...] = (*ACTION_PRESETS, CUSTOM_PRESET)
+        # Effect rows — each is an ``_EffectRow`` with its own dropdown,
+        # argument fields, and delete button. Users can add multiple.
+        self._effect_rows: list[_EffectRow] = []
+        self._effects_listbox: Gtk.ListBox
 
         # Live-preview label updated on every form change.
         self._preview_label: Gtk.Label
 
-        # Pass-through state for the rule's optional name and enabled
-        # flag — set via the Name section UI; preserved unchanged when
-        # editing an anonymous rule.
+        # Pass-through state for the rule's optional name and enabled flag.
         self._rule_name: str = ""
         self._rule_enabled: bool = True
-        # Trailing effects from a multi-effect block-form rule. The
-        # dialog only edits the first effect; the rest survive a
-        # round-trip via this shadow list so opening + Apply on a
-        # multi-effect rule doesn't silently drop the extras.
-        self._extra_effects: list[Effect] = []
 
         self.set_title("New Window Rule" if self._is_new else "Edit Window Rule")
         self.set_content_width(560)
@@ -166,13 +148,12 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         toolbar.set_content(scrolled)
         self.set_child(toolbar)
 
-        # Hydrate from the rule being edited (or seed with a default
-        # matcher row + the first action for new rules).
+        # Hydrate from the rule being edited (or seed with defaults).
         if rule is not None:
             self._load_from_rule(rule)
         else:
             self._add_matcher_row(MATCHER_KINDS[0])
-            self._set_action_preset(ACTION_PRESETS[0])
+            self._add_effect_row(ACTION_PRESETS[0])
 
         self._refresh()
 
@@ -243,39 +224,25 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         return group
 
     def _build_apply_section(self) -> Gtk.Widget:
-        """The 'Apply this action' group with the action dropdown + arg fields."""
-        group = Adw.PreferencesGroup(title="Apply this action")
-        group.set_description("Pick what Hyprland should do when a matching window opens.")
+        """The 'Apply these effects' group with effect cards + add button."""
+        group = Adw.PreferencesGroup(title="Apply these effects")
+        group.set_description(
+            "Add one or more effects. Each effect is a card with its own "
+            "dropdown and argument fields."
+        )
 
-        # Action selector — a ComboRow showing every preset's label.
-        self._action_dropdown = Adw.ComboRow(title="Action")
-        labels = Gtk.StringList.new([p.label for p in self._presets])
-        self._action_dropdown.set_model(labels)
-        self._action_dropdown.connect("notify::selected", self._on_action_changed)
-        group.add(self._action_dropdown)
+        add_btn = Gtk.Button.new_from_icon_name("list-add-symbolic")
+        add_btn.set_valign(Gtk.Align.CENTER)
+        add_btn.add_css_class("flat")
+        add_btn.set_tooltip_text("Add another effect")
+        add_btn.connect("clicked", lambda _b: self._on_add_effect())
+        group.set_header_suffix(add_btn)
 
-        # Per-preset description below the dropdown — keeps the user
-        # oriented when scanning unfamiliar action names.
-        self._action_description = Gtk.Label()
-        self._action_description.set_xalign(0)
-        self._action_description.set_wrap(True)
-        self._action_description.add_css_class("dim-label")
-        self._action_description.add_css_class("caption")
-        self._action_description.set_margin_start(12)
-        self._action_description.set_margin_end(12)
-        self._action_description.set_margin_top(2)
-        self._action_description.set_margin_bottom(8)
+        self._effects_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self._effects_box.set_margin_top(4)
+        group.add(self._effects_box)
 
-        # Argument fields live in their own group so the preview/preset
-        # description sits between the selector and the args without
-        # disrupting the action-row visual style.
-        self._action_field_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        outer.append(group)
-        outer.append(self._action_description)
-        outer.append(self._action_field_box)
-        return outer
+        return group
 
     def _build_preview_section(self) -> Gtk.Widget:
         """The bottom preview: shows the actual config line that will be written."""
@@ -286,15 +253,8 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
 
     def _load_from_rule(self, rule: WindowRule) -> None:
         """Populate widgets from an existing ``WindowRule`` for editing."""
-        # Block handler signals while seeding so the changed callbacks
-        # don't fire on hydration (they'd treat the load as a user edit
-        # and trigger a redundant preview refresh).
         self._rule_name = rule.name
         self._rule_enabled = rule.enabled
-        # Stash any extra effects (multi-effect block-form rule) so
-        # Apply doesn't drop them — the action picker only edits the
-        # first effect.
-        self._extra_effects = list(rule.effects[1:])
         if hasattr(self, "_name_entry"):
             self._name_entry.handler_block_by_func(self._on_name_changed)
             self._name_entry.set_text(rule.name)
@@ -303,39 +263,44 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
             self._enabled_row.handler_block_by_func(self._on_enabled_changed)
             self._enabled_row.set_active(rule.enabled)
             self._enabled_row.handler_unblock_by_func(self._on_enabled_changed)
-        # Matchers first — the dropdown field rebuild reads them when
-        # computing the preview, so seeding them ahead of the effect
-        # avoids a flash of "no matchers" during dialog open.
+        # Matchers
         if not rule.matchers:
-            # An invalid existing rule (no matchers) shouldn't open with
-            # an empty matcher list — the apply gate would lock the user
-            # out. Seed a class row so they can fix it.
             self._add_matcher_row(MATCHER_KINDS[0])
         for m in rule.matchers:
             kind = lookup_matcher_kind(m.key)
-            # When a matcher's key is parseable but not in our catalog
-            # (e.g. ``match:xdg_tag value`` or some plugin-specific
-            # key), ``lookup_matcher_kind`` falls through to Custom.
-            # Surface the *full* ``match:KEY VALUE`` token in the
-            # value field so save+reload round-trips byte-for-byte —
-            # otherwise the ``match:KEY`` prefix would be silently
-            # dropped on save.
             if kind is CUSTOM_MATCHER_KIND and m.key != RAW_KEY:
                 value = f"match:{m.key} {m.value}"
             else:
                 value = m.value
             self._add_matcher_row(kind, value=value, original_key=m.key)
+        # Effects — create one row per effect
+        for eff in rule.effects:
+            preset = lookup_preset(eff.name)
+            if preset is CUSTOM_PRESET:
+                self._add_effect_row(preset, args_str=eff.full)
+            else:
+                self._add_effect_row(preset, args_str=eff.args)
+    # ── Effect row management ─────────────────────────────────────────
 
-        # Effect: lookup_preset returns CUSTOM_PRESET for unknown leading
-        # tokens, so a plugin action like ``plugin:foo:bar`` becomes a
-        # Custom preset with the full effect string in its single field.
-        preset = lookup_preset(rule.effect_name)
-        if preset is CUSTOM_PRESET:
-            # Custom holds the entire effect verbatim (name + args).
-            full = rule.effect_full
-            self._set_action_preset(preset, args_str=full)
-        else:
-            self._set_action_preset(preset, args_str=rule.effect_args)
+    def _add_effect_row(self, preset: ActionPreset, *, args_str: str = "") -> None:
+        """Append a new effect row to the list."""
+        row = _EffectRow(
+            initial_preset=preset,
+            args_str=args_str,
+            on_remove=self._on_remove_effect,
+            on_changed=self._refresh,
+        )
+        self._effect_rows.append(row)
+        self._effects_box.append(row.widget)
+
+    def _on_add_effect(self) -> None:
+        self._add_effect_row(ACTION_PRESETS[0])
+        self._refresh()
+
+    def _on_remove_effect(self, row: "_EffectRow") -> None:
+        self._effect_rows.remove(row)
+        self._effects_box.remove(row.widget)
+        self._refresh()
 
     # ── Matcher row management ────────────────────────────────────────
 
@@ -358,16 +323,10 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._matchers_listbox.append(row.widget)
 
     def _on_add_matcher(self) -> None:
-        # Default new rows to "Class" — overwhelmingly the most common
-        # matcher people reach for.
         self._add_matcher_row(MATCHER_KINDS[0])
         self._refresh()
 
     def _on_remove_matcher(self, row: "_MatcherRow") -> None:
-        # Always keep at least one matcher row — Hyprland rejects
-        # bare ``windowrulev2 = float`` and the apply button would lock,
-        # so we replace the last row with a fresh blank rather than
-        # going to zero.
         if len(self._matcher_rows) <= 1:
             self._reset_last_matcher_row()
             self._refresh()
@@ -377,130 +336,12 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._refresh()
 
     def _reset_last_matcher_row(self) -> None:
-        """Reset the (only) remaining matcher row to a blank Class row."""
         if not self._matcher_rows:
             self._add_matcher_row(MATCHER_KINDS[0])
             return
         last = self._matcher_rows[0]
         last.set_kind(MATCHER_KINDS[0])
         last.set_value("")
-
-    # ── Action selection ──────────────────────────────────────────────
-
-    def _on_action_changed(self, *_args: object) -> None:
-        idx = self._action_dropdown.get_selected()
-        if idx < 0 or idx >= len(self._presets):
-            return
-        preset = self._presets[idx]
-        self._render_action_fields(preset)
-        self._refresh()
-
-    def _set_action_preset(self, preset: ActionPreset, args_str: str = "") -> None:
-        """Select a preset programmatically and populate its fields.
-
-        ``args_str`` is the *args portion* of the effect for structured
-        presets (e.g. ``"0.8 0.95"`` for opacity), or the *full effect*
-        verbatim (name + args) for the Custom preset.
-        """
-        idx = self._presets.index(preset) if preset in self._presets else 0
-        # Block the notify::selected handler while we set up the field
-        # widgets — otherwise it fires before ``_render_action_fields``
-        # gets a chance and we'd build empty widgets, then rebuild.
-        self._action_dropdown.handler_block_by_func(self._on_action_changed)
-        self._action_dropdown.set_selected(idx)
-        self._action_dropdown.handler_unblock_by_func(self._on_action_changed)
-        self._render_action_fields(preset, args_str=args_str)
-
-    def _render_action_fields(self, preset: ActionPreset, *, args_str: str = "") -> None:
-        """Rebuild the per-preset argument widgets."""
-        # Drop everything currently in the field box; widgets aren't
-        # reused across presets because their types vary (entry vs.
-        # spin) and their semantics differ.
-        child = self._action_field_box.get_first_child()
-        while child is not None:
-            self._action_field_box.remove(child)
-            child = self._action_field_box.get_first_child()
-        self._action_field_widgets = []
-
-        self._action_description.set_text(preset.description)
-
-        if not preset.fields:
-            return
-
-        # For Custom: pre-fill the single free-text field with the
-        # full effect string, so users opening a plugin rule see what
-        # they had.
-        # For structured presets: parse_args returns a per-field list
-        # padded to ``len(fields)``, so positional alignment is safe.
-        if preset is CUSTOM_PRESET:
-            initial_values = [args_str] if args_str else [""]
-        else:
-            parsed = preset.parse_args(args_str) if args_str else None
-            initial_values = parsed if parsed is not None else [f.default for f in preset.fields]
-
-        group = Adw.PreferencesGroup()
-        for field, initial in zip(preset.fields, initial_values, strict=False):
-            widget = self._build_action_field_widget(field, initial)
-            self._action_field_widgets.append(widget)
-            group.add(widget)
-        self._action_field_box.append(group)
-
-    def _build_action_field_widget(self, field: ActionField, initial: str) -> Gtk.Widget:
-        """Create the appropriate Adw row for a single action field."""
-        if field.kind == "number":
-            row = Adw.SpinRow.new_with_range(field.min_value, field.max_value, field.step)
-            row.set_title(field.label)
-            if field.hint:
-                row.set_subtitle(field.hint)
-            row.set_digits(field.digits)
-            try:
-                row.set_value(float(initial) if initial else float(field.default or "0"))
-            except ValueError:
-                # If the user's existing rule has a non-numeric token in
-                # this slot (e.g. ``size 100% 100%``), fall back to the
-                # field default rather than raising. Round-trip fidelity
-                # is preserved via the Custom preset path on re-open.
-                row.set_value(float(field.default or "0"))
-            row.connect("notify::value", self._on_field_changed)
-            return row
-
-        # Free-text: an EntryRow with placeholder + optional subtitle.
-        row = Adw.EntryRow(title=field.label)
-        if field.placeholder:
-            # ``EntryRow`` uses the title as a placeholder when empty,
-            # so we keep ``title=label`` and stash the placeholder in
-            # the subtitle for context. (Adw doesn't expose a separate
-            # placeholder API on EntryRow.)
-            pass
-        if field.hint:
-            # ``Adw.EntryRow`` does not expose ``set_subtitle``; we
-            # carry the hint via the field's input-purpose tooltip
-            # instead so it surfaces on hover without requiring a
-            # second row.
-            row.set_tooltip_text(field.hint)
-        row.set_text(initial)
-        row.connect("changed", self._on_field_changed)
-        return row
-
-    def _read_action_fields(self) -> list[str]:
-        """Snapshot current values of the action fields, in order."""
-        result: list[str] = []
-        for widget in self._action_field_widgets:
-            if isinstance(widget, Adw.SpinRow):
-                value = widget.get_value()
-                # Format with the field's display digits so an integer
-                # field doesn't emit ``1280.0`` and a float field
-                # doesn't lose its trailing zero.
-                digits = widget.get_digits()
-                if digits == 0:
-                    result.append(str(int(value)))
-                else:
-                    result.append(f"{value:.{digits}f}")
-            elif isinstance(widget, Adw.EntryRow):
-                result.append(widget.get_text())
-            else:
-                result.append("")
-        return result
 
     # ── Pick-from-window ──────────────────────────────────────────────
 
@@ -511,14 +352,6 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         WindowPickerDialog.present_singleton(self, on_pick=on_pick)
 
     def _apply_picked_window(self, window: Window) -> None:
-        """Replace the current matcher rows with class+title from the picked window.
-
-        Picking is treated as a "start over" gesture — anything the
-        user typed before is replaced. This is less surprising than
-        appending: the most common picker flow is "I want to make a
-        rule for THIS window," not "add THIS as a clause to an
-        existing rule."
-        """
         for row in list(self._matcher_rows):
             self._matchers_listbox.remove(row.widget)
         self._matcher_rows.clear()
@@ -528,10 +361,6 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
                 MATCHER_KINDS_BY_KEY["class"],
                 value=_escape_regex(window.class_name),
             )
-        # Title is usually too volatile to be useful as an exact match
-        # (browser tab changes change the whole title), so we only
-        # add it when class is empty — better to give the user one
-        # solid hook and let them add more if they want.
         elif window.title:
             self._add_matcher_row(
                 MATCHER_KINDS_BY_KEY["title"],
@@ -552,56 +381,52 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._rule_enabled = self._enabled_row.get_active()
         self._refresh()
 
-    def _on_field_changed(self, *_args: object) -> None:
-        self._refresh()
-
     def _refresh(self) -> None:
         rule = self._build_rule()
         if rule is None:
-            self._preview_label.set_text("(rule incomplete)")
+            has_any = any(
+                effect.name.strip()
+                for row in self._effect_rows
+                for effect in [row.read_effect()]
+                if effect.name.strip() or effect.args.strip()
+            )
+            if not has_any and self._effect_rows:
+                self._preview_label.set_text("No effects enabled — toggle at least one on")
+            else:
+                self._preview_label.set_text("(rule incomplete)")
         else:
             self._preview_label.set_text(_preview_for(rule))
-        # Apply gates on a non-empty effect name AND at least one
-        # non-empty matcher. This rejects both halves of an incomplete
-        # rule, both of which Hyprland would reject at runtime.
         ok = (
             rule is not None
-            and bool(rule.effect_name)
+            and any(
+                e.name for e in rule.effects if e.name or (hasattr(e, "full") and e.full.strip())
+            )
             and any(m.value.strip() for m in rule.matchers)
         )
         self._apply_btn.set_sensitive(ok)
 
     def _build_rule(self) -> WindowRule | None:
         """Snapshot the current dialog state into a ``WindowRule``."""
-        idx = self._action_dropdown.get_selected()
-        if idx < 0 or idx >= len(self._presets):
-            return None
-        preset = self._presets[idx]
-        if preset is CUSTOM_PRESET:
-            # Custom: the single field holds the full effect verbatim
-            # (name + args). Split the leading word as effect_name,
-            # the rest as effect_args.
-            values = self._read_action_fields()
-            full = values[0].strip() if values else ""
-            effect_name, _, effect_args = full.partition(" ")
-            effect_name = effect_name.strip()
-            effect_args = effect_args.strip()
-        else:
-            effect_name = preset.id
-            effect_args = preset.format(self._read_action_fields())
+        effects: list[Effect] = []
+        for row in self._effect_rows:
+            eff = row.read_effect()
+            if not eff.name.strip() and not eff.args.strip():
+                continue
+            effects.append(eff)
 
         matchers: list[Matcher] = []
         for row in self._matcher_rows:
             matcher = row.read_matcher()
-            # Drop fully-blank rows from serialization but keep the
-            # widget around (the user may still be typing).
             if not matcher.value.strip():
                 continue
             matchers.append(matcher)
 
+        if not effects:
+            return None
+
         return WindowRule(
             matchers=matchers,
-            effects=[Effect(name=effect_name, args=effect_args), *self._extra_effects],
+            effects=effects,
             name=self._rule_name,
             enabled=self._rule_enabled,
         )
@@ -610,13 +435,181 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
 
     def _on_apply(self, *_args: object) -> None:
         rule = self._build_rule()
-        if rule is None or not rule.effect_name or not rule.matchers:
-            # The apply gate should make this unreachable, but be
-            # defensive — a stale signal could fire after a rebuild.
+        if rule is None or not rule.matchers:
             return
         if self._on_apply_callback is not None:
             self._on_apply_callback(rule)
         self.close()
+
+
+# ---------------------------------------------------------------------------
+# Helper widget: a single effect row
+# ---------------------------------------------------------------------------
+
+
+class _EffectRow:
+    """Single effect card: dropdown + trash on top, argument fields below.
+
+    Layout::
+
+        [ PreferencesGroup                     ]
+        [   [Dropdown ▼]                 [✕]  ]
+        [   [Arg1 field]                      ]
+        [   [Arg2 field]                      ]
+
+    The preset dropdown and trash icon are in an ``Adw.ActionRow`` at the
+    top. Argument fields are ``Adw.EntryRow`` / ``Adw.SpinRow`` children
+    of the group, stacked below the action row.
+    """
+
+    def __init__(
+        self,
+        *,
+        initial_preset: ActionPreset,
+        args_str: str = "",
+        on_remove: Callable[["_EffectRow"], None],
+        on_changed: Callable[[], None],
+    ):
+        self._on_remove = on_remove
+        self._on_changed = on_changed
+        self._preset: ActionPreset = initial_preset
+        self._arg_widgets: list[Gtk.Widget] = []
+
+        self._group = Adw.PreferencesGroup()
+
+        # Top row: dropdown + trash
+        action_row = Adw.ActionRow()
+        action_row.set_title("")
+
+        labels = Gtk.StringList.new([p.label for p in _PRESETS_WITH_CUSTOM])
+        self._preset_dropdown = Gtk.DropDown(model=labels)
+        self._preset_dropdown.set_valign(Gtk.Align.CENTER)
+        self._preset_dropdown.set_size_request(250, -1)
+        try:
+            initial_idx = _PRESETS_WITH_CUSTOM.index(initial_preset)
+        except ValueError:
+            initial_idx = 0
+        self._preset_dropdown.set_selected(initial_idx)
+        self._preset_dropdown.connect("notify::selected", self._on_preset_changed)
+        action_row.add_prefix(self._preset_dropdown)
+
+        remove_btn = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+        remove_btn.set_valign(Gtk.Align.CENTER)
+        remove_btn.add_css_class("flat")
+        remove_btn.set_tooltip_text("Remove this effect")
+        remove_btn.connect("clicked", lambda _b: self._on_remove(self))
+        action_row.add_suffix(remove_btn)
+
+        self._group.add(action_row)
+        self._arg_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._group.add(self._arg_container)
+        self._rebuild_args(args_str)
+
+    @property
+    def widget(self) -> Gtk.Widget:
+        return self._group
+
+    def read_effect(self) -> Effect:
+        if self._preset is CUSTOM_PRESET:
+            values = self._read_arg_values()
+            full = values[0].strip() if values else ""
+            name, _, args = full.partition(" ")
+            return Effect(name=name.strip(), args=args.strip())
+        if not self._preset.fields and self._preset is not CUSTOM_PRESET:
+            # Boolean preset — use the switch state
+            switch = self._arg_widgets[0] if self._arg_widgets else None
+            if isinstance(switch, Adw.SwitchRow) and not switch.get_active():
+                return Effect(name="", args="")
+            return Effect(name=self._preset.id, args="on")
+        args = self._preset.format(self._read_arg_values())
+        return Effect(name=self._preset.id, args=args)
+
+    def _on_preset_changed(self, *_args: object) -> None:
+        idx = self._preset_dropdown.get_selected()
+        if idx < 0 or idx >= len(_PRESETS_WITH_CUSTOM):
+            return
+        new_preset = _PRESETS_WITH_CUSTOM[idx]
+        if new_preset is self._preset:
+            return
+        self._preset = new_preset
+        self._rebuild_args()
+        self._on_changed()
+
+    def _rebuild_args(self, args_str: str = "") -> None:
+        """Remove old arg rows and build new ones for the current preset."""
+        child = self._arg_container.get_first_child()
+        while child is not None:
+            self._arg_container.remove(child)
+            child = self._arg_container.get_first_child()
+        self._arg_widgets = []
+
+        if not self._preset.fields:
+            # Boolean preset — show a toggle instead of inline fields
+            switch_row = Adw.SwitchRow(
+                title="Enabled",
+                subtitle="Uncheck to disable this effect.",
+            )
+            switch_row.set_active(True)
+            # If args_str contains "on" (the canonical value for boolean effects)
+            # or the rule was loaded with the effect active, keep it checked.
+            active = args_str.strip().lower() in ("on", "true", "yes", "1", "") if args_str else True
+            switch_row.set_active(active)
+            switch_row.connect("notify::active", lambda *_: self._on_changed())
+            self._arg_widgets.append(switch_row)
+            self._arg_container.append(switch_row)
+            return
+
+        if self._preset is CUSTOM_PRESET:
+            initial_values = [args_str] if args_str else [""]
+        else:
+            parsed = self._preset.parse_args(args_str) if args_str else None
+            initial_values = (
+                parsed if parsed is not None else [f.default for f in self._preset.fields]
+            )
+
+        for field, initial in zip(self._preset.fields, initial_values, strict=False):
+            widget = self._build_arg_widget(field, initial)
+            self._arg_widgets.append(widget)
+            self._arg_container.append(widget)
+
+    def _build_arg_widget(self, field: ActionField, initial: str) -> Gtk.Widget:
+        if field.kind == "number":
+            row = Adw.SpinRow.new_with_range(field.min_value, field.max_value, field.step)
+            row.set_title(field.label)
+            if field.hint:
+                row.set_subtitle(field.hint)
+            row.set_digits(field.digits)
+            try:
+                row.set_value(float(initial) if initial else float(field.default or "0"))
+            except ValueError:
+                row.set_value(float(field.default or "0"))
+            row.connect("notify::value", lambda *_: self._on_changed())
+            return row
+
+        row = Adw.EntryRow(title=field.label)
+        if field.hint:
+            row.set_tooltip_text(field.hint)
+        row.set_text(initial)
+        row.connect("changed", lambda *_: self._on_changed())
+        return row
+
+    def _read_arg_values(self) -> list[str]:
+        result: list[str] = []
+        for w in self._arg_widgets:
+            if isinstance(w, Adw.SpinRow):
+                digits = w.get_digits()
+                val = w.get_value()
+                if digits == 0:
+                    result.append(str(int(val)))
+                else:
+                    result.append(f"{val:.{digits}f}")
+            elif isinstance(w, Adw.EntryRow):
+                result.append(w.get_text())
+            elif isinstance(w, Adw.SwitchRow):
+                result.append("true" if w.get_active() else "false")
+            else:
+                result.append("")
+        return result
 
 
 # ---------------------------------------------------------------------------

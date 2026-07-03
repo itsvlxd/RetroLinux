@@ -69,7 +69,6 @@ insufficient.
 """
 
 import re
-import subprocess
 from html import escape as html_escape
 from pathlib import Path
 
@@ -141,8 +140,11 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
 
     def _load(self, saved_sections: dict[str, list[str]] | None) -> None:
         del saved_sections
+        # Managed rules from settings.lua
         managed = from_rule_nodes(self._window.saved_rules)
         managed_names = {r.name for r in managed if r.name}
+        # Retro rules from ~/.config/retro/ files — loaded through the full
+        # Hyprland config context so Lua variable expressions evaluate properly.
         retro_root = config.HYPRMOD_DIR.resolve()
         self._external = []
         retro_items: list[WindowRule] = []
@@ -322,39 +324,9 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
         """Suppress the 'will be removed on save' group — rules vanish on delete."""
         return []
 
-    def _remove_from_file(self, name: str, kind: str) -> None:
-        """Remove the named ``hl.{kind}({{...}})`` block from ``windowrules.lua``."""
-        path = config.HYPRMOD_DIR / "windowrules.lua"
-        if not path.exists():
-            return
-        content = path.read_text()
-        marker = f"hl.{kind}({{"
-        lines = content.split("\n")
-        new_lines: list[str] = []
-        i = 0
-        while i < len(lines):
-            stripped = lines[i].strip()
-            if stripped.startswith(marker):
-                depth = stripped.count("{") - stripped.count("}")
-                found = f'name = "{name}"' in lines[i]
-                block_start = i
-                i += 1
-                while i < len(lines) and depth > 0:
-                    s = lines[i].strip()
-                    if f'name = "{name}"' in s:
-                        found = True
-                    depth += s.count("{") - s.count("}")
-                    i += 1
-                if not found:
-                    new_lines.extend(lines[block_start:i])
-            else:
-                new_lines.append(lines[i])
-                i += 1
-        path.write_text("\n".join(new_lines))
-        subprocess.Popen(
-            ["retro", "window", "apply"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
+    def get_all_rules(self) -> list[WindowRule]:
+        """Return all window rules for writing to ``windowrules.lua``."""
+        return list(self._owned)
 
     # ── Live apply (push to running compositor) ──
 
@@ -620,8 +592,6 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
         removed = self._owned[idx]
         super()._on_delete_at(idx)
         self._revert_to_existing(removed)
-        if removed.name:
-            self._remove_from_file(removed.name, "window_rule")
 
     def _discard_at(self, idx: int) -> None:
         """Revert the rule at *idx* and snap existing windows back live.

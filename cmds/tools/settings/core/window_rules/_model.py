@@ -513,6 +513,308 @@ ACTION_PRESETS: tuple[ActionPreset, ...] = (
             ),
         ),
     ),
+    ActionPreset(
+        id="pseudo",
+        label="Pseudotile",
+        description="Pseudotile the window (floating with tiling-like sizing).",
+    ),
+    ActionPreset(
+        id="animation",
+        label="Animation style",
+        description="Force an animation on this window, with optional style.",
+        fields=(
+            ActionField(
+                label="Animation",
+                placeholder="popin 80%",
+                hint="E.g. 'popin' or 'popin 80%'.",
+                default="popin",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="border_size",
+        label="Border size",
+        description="Override the border thickness for this window.",
+        fields=(
+            ActionField(
+                label="Pixels",
+                kind="number",
+                digits=0,
+                max_value=50,
+                step=1,
+                default="2",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="border_color",
+        label="Border color",
+        description="Force the border color. Accepts a color or gradient.",
+        fields=(
+            ActionField(
+                label="Color",
+                placeholder='rgb(FF0000) or {"rgba(...)", "rgba(...)"}',
+                hint="Solid: rgb(FF0000). Gradient with angle or two colors.",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="dim_around",
+        label="Dim around window",
+        description="Dim the background around this floating window.",
+    ),
+    ActionPreset(
+        id="group",
+        label="Group options",
+        description="Set window group properties: set, new, lock, barred, deny, invade, override, unset.",
+        fields=(
+            ActionField(
+                label="Options",
+                placeholder="set",
+                hint="Space-separated: set new lock barred deny invade override unset",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="no_screen_share",
+        label="Hide from screen share",
+        description="Block screen sharing by drawing black rectangles over this window.",
+    ),
+    ActionPreset(
+        id="fullscreen_state",
+        label="Fullscreen state",
+        description='Set the fullscreen mode. E.g. "1 2" (internal client). 0=none 1=maximize 2=fullscreen 3=both.',
+        fields=(
+            ActionField(
+                label="State",
+                placeholder="1 2",
+                hint="Two space-separated values: internal fullscreen_state and client fullscreen_state.",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="no_close_for",
+        label="Block close (ms)",
+        description="Prevent close with killactive for N ms after opening.",
+        fields=(
+            ActionField(
+                label="Milliseconds",
+                kind="number",
+                digits=0,
+                max_value=60000,
+                step=500,
+                default="5000",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="scrolling_width",
+        label="Scrolling column width",
+        description="Set the column width when opening on a scrolling-layout workspace.",
+        fields=(
+            ActionField(
+                label="Width",
+                kind="number",
+                digits=1,
+                max_value=9999,
+                step=10,
+                default="500",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="content",
+        label="Content type",
+        description='Hint at the window content type: none, photo, video, or game.',
+        fields=(
+            ActionField(
+                label="Type",
+                placeholder="none",
+                hint="One of: none, photo, video, game.",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="no_max_size",
+        label="Remove max size",
+        description="Remove max-size limits for this floating window.",
+    ),
+    ActionPreset(
+        id="keep_aspect_ratio",
+        label="Keep aspect ratio",
+        description="Lock aspect ratio when resizing with the mouse.",
+    ),
+    ActionPreset(
+        id="immediate",
+        label="Allow tearing",
+        description="Allow tearing (immediate presents) for this window.",
+    ),
+    ActionPreset(
+        id="xray",
+        label="Blur xray",
+        description="Enable blur xray mode for this window.",
+    ),
+    ActionPreset(
+        id="nearest_neighbor",
+        label="Nearest-neighbor filtering",
+        description="Force nearest-neighbor filtering (no bilinear interpolation).",
+    ),
+    ActionPreset(
+        id="allows_input",
+        label="Force input",
+        description="Force an XWayland window to receive input events.",
+    ),
+    ActionPreset(
+        id="decorate",
+        label="Draw decorations",
+        description="Whether to draw window decorations (titlebar, borders).",
+    ),
+    ActionPreset(
+        id="focus_on_activate",
+        label="Focus on activate",
+        description="Whether Hyprland should focus the window when it requests activation.",
+    ),
+    ActionPreset(
+        id="no_dim",
+        label="No dimming",
+        description="Disable window dimming for this window.",
+    ),
+    ActionPreset(
+        id="no_follow_mouse",
+        label="No mouse focus",
+        description="Prevent focus on mouse hover over this window.",
+    ),
+    ActionPreset(
+        id="no_shortcuts_inhibit",
+        label="No shortcut inhibit",
+        description="Prevent this window from inhibiting your keyboard shortcuts.",
+    ),
+    ActionPreset(
+        id="no_vrr",
+        label="No VRR",
+        description="Disable variable refresh rate for this window (needs misc:vrr 2 or 3).",
+    ),
+    ActionPreset(
+        id="no_auto_hdr",
+        label="No AutoHDR",
+        description="Disable AutoHDR for this window.",
+    ),
+    ActionPreset(
+        id="force_rgbx",
+        label="Force opaque pixels",
+        description="Force Hyprland to ignore the alpha channel entirely.",
+    ),
+    ActionPreset(
+        id="sync_fullscreen",
+        label="Sync fullscreen",
+        description="Sync the internal fullscreen mode with the one sent to the window.",
+    ),
+    ActionPreset(
+        id="render_unfocused",
+        label="Render when hidden",
+        description="Force the window to render even when not visible.",
+    ),
+    ActionPreset(
+        id="confine_pointer",
+        label="Confine pointer",
+        description="Lock the mouse cursor to the window area.",
+    ),
+    ActionPreset(
+        id="persistent_size",
+        label="Remember size",
+        description="Store and restore floating window size across opens (same class+title).",
+    ),
+    ActionPreset(
+        id="rounding_power",
+        label="Rounding power",
+        description="Override the rounding power/curve for this window.",
+        fields=(
+            ActionField(
+                label="Power",
+                kind="number",
+                digits=2,
+                min_value=0.0,
+                max_value=10.0,
+                step=0.1,
+                default="1.00",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="scroll_mouse",
+        label="Scroll speed (mouse)",
+        description="Override input.scroll_factor for this window.",
+        fields=(
+            ActionField(
+                label="Factor",
+                kind="number",
+                digits=2,
+                min_value=0.0,
+                max_value=10.0,
+                step=0.25,
+                default="1.00",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="scroll_touchpad",
+        label="Scroll speed (touchpad)",
+        description="Override input.touchpad.scroll_factor for this window.",
+        fields=(
+            ActionField(
+                label="Factor",
+                kind="number",
+                digits=2,
+                min_value=0.0,
+                max_value=10.0,
+                step=0.25,
+                default="1.00",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="tonemap",
+        label="Tonemap",
+        description='Tonemapping: on (default), off, clamp, or limited.',
+        fields=(
+            ActionField(
+                label="Mode",
+                placeholder="on",
+                hint="on, off, clamp, limited.",
+                default="on",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="tag",
+        label="Tag",
+        description="Apply a dynamic tag. Use +/- prefix to set/unset, no prefix to toggle.",
+        fields=(
+            ActionField(
+                label="Tag",
+                placeholder="+myTag",
+                hint="+name to add, -name to remove, name to toggle. Dynamic tags get * suffix.",
+            ),
+        ),
+    ),
+    ActionPreset(
+        id="max_size",
+        label="Max size",
+        description="Maximum size for the floating window.",
+        fields=(
+            ActionField(label="Width", kind="number", digits=0, max_value=16384, step=10, default="1920"),
+            ActionField(label="Height", kind="number", digits=0, max_value=16384, step=10, default="1080"),
+        ),
+    ),
+    ActionPreset(
+        id="min_size",
+        label="Min size",
+        description="Minimum size for the floating window.",
+        fields=(
+            ActionField(label="Width", kind="number", digits=0, max_value=16384, step=10, default="400"),
+            ActionField(label="Height", kind="number", digits=0, max_value=16384, step=10, default="300"),
+        ),
+    ),
 )
 
 ACTION_PRESETS_BY_ID: dict[str, ActionPreset] = {p.id: p for p in ACTION_PRESETS}
@@ -629,6 +931,39 @@ MATCHER_KINDS: tuple[MatcherKind, ...] = (
         description="Window has a specific tag.",
         value_kind="text",
         placeholder="my-tag",
+    ),
+    MatcherKind(
+        key="group",
+        label="Grouped",
+        description="Window is part of a group. Re-evaluates dynamically.",
+        value_kind="bool",
+    ),
+    MatcherKind(
+        key="fullscreen_state_client",
+        label="Fullscreen (client)",
+        description="Window's self-reported fullscreen state: 0=none, 1=maximize, 2=fullscreen, 3=both.",
+        value_kind="text",
+        placeholder="0",
+    ),
+    MatcherKind(
+        key="fullscreen_state_internal",
+        label="Fullscreen (internal)",
+        description="Hyprland's fullscreen state: 0=none, 1=maximize, 2=fullscreen, 3=both.",
+        value_kind="text",
+        placeholder="0",
+    ),
+    MatcherKind(
+        key="content",
+        label="Content type",
+        description="Window content type: none, photo, video, or game.",
+        value_kind="text",
+        placeholder="none",
+    ),
+    MatcherKind(
+        key="xdg_tag",
+        label="XDG tag",
+        description="Match by XDG tag (see hyprctl clients). Regex.",
+        placeholder="^(my-tag)$",
     ),
 )
 

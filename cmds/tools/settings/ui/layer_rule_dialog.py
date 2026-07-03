@@ -1,29 +1,17 @@
-"""Add/edit dialog for a single layer rule.
+"""Add/edit dialog for a single layer rule with one or more effects.
 
 Two halves:
 
 1. **Match this layer surface** — a single namespace regex entry.
-   Hyprland 0.54.3 layer rules only support ``match:namespace`` for
-   layer surfaces (the shared rule catalog includes other ``match:``
-   props like ``class`` and ``title``, but the layer rule resolver
-   silently ignores them at match time), so the dialog doesn't surface
-   any other matcher options. Surface-by-address targeting was removed
-   when the rule format was overhauled in 0.54.
-2. **Apply this rule** — a dropdown of common Hyprland layer-rule
-   effects (``blur``, ``ignore_alpha``, ``animation``, ``no_anim``, …)
-   with effect-specific argument fields. A "Custom rule…" entry
-   covers anything we haven't catalogued, including plugin rules and
-   future Hyprland additions.
+2. **Apply these effects** — a list of effect rows, each with an
+   action dropdown and per-preset argument fields. Add as many effects
+   as you want with the "+" button; remove any with the trash icon.
 
-A live preview at the bottom shows the exact ``layerrule = …`` line
-that will be written. Users can paste the preview straight into a
-config file if they prefer.
+A live preview at the bottom shows the exact config line that will
+be written.
 
-The dialog deliberately stays simple — one matcher (namespace), one
-effect per rule — to mirror the user's mental model. Multi-effect
-rules read from disk are split into one :class:`LayerRule` per effect
-upstream (see :func:`settings.core.layer_rules.parse_layer_rule_lines`),
-so the dialog can always assume single-effect editing.
+The dialog is opened via :meth:`SingletonDialogMixin.present_singleton`,
+not constructed directly.
 """
 
 from collections.abc import Callable
@@ -44,15 +32,10 @@ from settings.core.layer_rules import (
 from settings.ui import build_preview_group
 from settings.ui.dialog import SingletonDialogMixin
 
+_PRESETS_WITH_CUSTOM: tuple[LayerActionPreset, ...] = (*LAYER_ACTION_PRESETS, CUSTOM_PRESET)
+
 
 def _preview_for(rule: LayerRule) -> str:
-    """Render *rule* in the active mode's syntax for the dialog preview.
-
-    Mirrors :func:`settings.ui.window_rule_dialog._preview_for`: builds
-    the structured :class:`hyprland_config.Rule` node and feeds it to
-    the language-specific renderer so the preview is byte-faithful to
-    what would hit disk.
-    """
     node = rule.to_rule_node()
     if config.is_lua_mode():
         return render_rule_lua(node)
@@ -60,7 +43,7 @@ def _preview_for(rule: LayerRule) -> str:
 
 
 class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
-    """Add/edit dialog for a single ``layerrule`` entry."""
+    """Add/edit dialog for a single ``layerrule`` with one or more effects."""
 
     def __init__(
         self,
@@ -72,33 +55,20 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._is_new = rule is None
         self._on_apply_callback = on_apply
 
-        # Action picker state. ``_action_dropdown`` selects a preset;
-        # ``_action_field_box`` holds the per-preset argument widgets,
-        # rebuilt every time the dropdown changes selection.
-        self._action_field_widgets: list[Gtk.Widget] = []
-        self._action_dropdown: Adw.ComboRow
-        self._action_field_box: Gtk.Box
-        self._action_description: Gtk.Label
-        # Custom is appended to the catalog so users discover the
-        # structured presets first and the fall-through last.
-        self._presets: tuple[LayerActionPreset, ...] = (*LAYER_ACTION_PRESETS, CUSTOM_PRESET)
+        # Effect rows — each is an ``_EffectRow`` with its own dropdown,
+        # argument fields, and delete button.
+        self._effect_rows: list[_EffectRow] = []
+        self._effects_box: Gtk.Box
 
-        # Single namespace entry — Hyprland 0.54.3 only honours
-        # ``match:namespace`` for layer rules, so there's no value in
-        # surfacing other matcher options.
+        # Single namespace entry
         self._namespace_entry: Adw.EntryRow
 
-        # Live preview label, refreshed on every form change.
+        # Live preview label
         self._preview_label: Gtk.Label
 
-        # Pass-through state for the rule's optional name and enabled
-        # flag — set via the Name section UI; preserved unchanged when
-        # editing an anonymous rule.
+        # Pass-through state for name and enabled flag
         self._rule_name: str = ""
         self._rule_enabled: bool = True
-        # Trailing effects from a multi-effect block-form rule. See
-        # the windowrule dialog's identical comment.
-        self._extra_effects: list[LayerEffect] = []
 
         self.set_title("New Layer Rule" if self._is_new else "Edit Layer Rule")
         self.set_content_width(560)
@@ -142,23 +112,16 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         toolbar.set_content(scrolled)
         self.set_child(toolbar)
 
-        # Hydrate from the rule being edited (or seed defaults for new).
         if rule is not None:
             self._load_from_rule(rule)
         else:
-            self._set_action_preset(LAYER_ACTION_PRESETS[0])
+            self._add_effect_row(LAYER_ACTION_PRESETS[0])
 
         self._refresh()
 
     # ── Section builders ──────────────────────────────────────────────
 
     def _build_name_section(self) -> Gtk.Widget:
-        """Optional ``Name`` row plus disabled toggle for block-form rules.
-
-        Mirrors the windowrule dialog — naming a rule promotes it to
-        block form so Hyprland's Lua API / ``hyprctl`` can reference
-        it for dynamic enable/disable.
-        """
         group = Adw.PreferencesGroup(title="Name (optional)")
         group.set_description(
             "Naming a rule lets you enable / disable it at runtime via "
@@ -182,7 +145,6 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         return group
 
     def _build_match_section(self) -> Gtk.Widget:
-        """The 'Match this layer surface' group with the namespace entry."""
         group = Adw.PreferencesGroup(title="Match this layer surface")
         group.set_description(
             "Type the layer namespace as a regex. "
@@ -192,7 +154,7 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._namespace_entry = Adw.EntryRow(title="Namespace regex")
         self._namespace_entry.set_tooltip_text(
             "Regex matching the layer surface namespace. "
-            "Examples: ‘waybar’, ‘^(rofi|wofi)$’, ‘notifications’."
+            "Examples: 'waybar', '^(rofi|wofi)$', 'notifications'."
         )
         self._namespace_entry.connect("changed", lambda *_: self._refresh())
         group.add(self._namespace_entry)
@@ -200,47 +162,34 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         return group
 
     def _build_apply_section(self) -> Gtk.Widget:
-        """The 'Apply this rule' group with the action dropdown + arg fields."""
-        group = Adw.PreferencesGroup(title="Apply this rule")
-        group.set_description("Pick what Hyprland should do for matching layer surfaces.")
+        group = Adw.PreferencesGroup(title="Apply these effects")
+        group.set_description(
+            "Add one or more effects. Each gets its own action dropdown "
+            "and argument fields."
+        )
 
-        self._action_dropdown = Adw.ComboRow(title="Rule")
-        labels = Gtk.StringList.new([p.label for p in self._presets])
-        self._action_dropdown.set_model(labels)
-        self._action_dropdown.connect("notify::selected", self._on_action_changed)
-        group.add(self._action_dropdown)
+        add_btn = Gtk.Button.new_from_icon_name("list-add-symbolic")
+        add_btn.set_valign(Gtk.Align.CENTER)
+        add_btn.add_css_class("flat")
+        add_btn.set_tooltip_text("Add another effect")
+        add_btn.connect("clicked", lambda _b: self._on_add_effect())
+        group.set_header_suffix(add_btn)
 
-        self._action_description = Gtk.Label()
-        self._action_description.set_xalign(0)
-        self._action_description.set_wrap(True)
-        self._action_description.add_css_class("dim-label")
-        self._action_description.add_css_class("caption")
-        self._action_description.set_margin_start(12)
-        self._action_description.set_margin_end(12)
-        self._action_description.set_margin_top(2)
-        self._action_description.set_margin_bottom(8)
+        self._effects_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self._effects_box.set_margin_top(4)
+        group.add(self._effects_box)
 
-        # Argument fields rebuild on every preset change.
-        self._action_field_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        outer.append(group)
-        outer.append(self._action_description)
-        outer.append(self._action_field_box)
-        return outer
+        return group
 
     def _build_preview_section(self) -> Gtk.Widget:
-        """The bottom preview: shows the actual config line that will be written."""
         group, self._preview_label = build_preview_group()
         return group
 
     # ── Hydration / loading from an existing rule ─────────────────────
 
     def _load_from_rule(self, rule: LayerRule) -> None:
-        """Populate widgets from an existing :class:`LayerRule` for editing."""
         self._rule_name = rule.name
         self._rule_enabled = rule.enabled
-        self._extra_effects = list(rule.effects[1:])
         if hasattr(self, "_name_entry"):
             self._name_entry.handler_block_by_func(self._on_name_changed)
             self._name_entry.set_text(rule.name)
@@ -251,133 +200,33 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
             self._enabled_row.handler_unblock_by_func(self._on_enabled_changed)
         self._namespace_entry.set_text(rule.namespace)
 
-        # Effect: lookup_preset returns CUSTOM_PRESET for unknown leading
-        # tokens, so a plugin rule like ``plugin:foo bar`` becomes Custom
-        # with the full effect string in its single field.
-        preset = lookup_preset(rule.rule_name)
-        if preset is CUSTOM_PRESET:
-            full = rule.effect_full
-            self._set_action_preset(preset, args_str=full)
-        else:
-            # Bool effects auto-fill ``on`` on serialization but we don't
-            # surface that in the dialog — the bool presets have no
-            # fields. Pass empty args so ``parse_args`` doesn't try to
-            # populate a non-existent field.
-            args_str = "" if rule.rule_name in LAYER_BOOL_EFFECTS else rule.rule_args
-            self._set_action_preset(preset, args_str=args_str)
+        for eff in rule.effects:
+            preset = lookup_preset(eff.name)
+            if preset is CUSTOM_PRESET:
+                self._add_effect_row(preset, args_str=eff.full)
+            else:
+                args_str = "" if eff.name in LAYER_BOOL_EFFECTS else eff.args
+                self._add_effect_row(preset, args_str=args_str)
+    # ── Effect row management ─────────────────────────────────────────
 
-    # ── Action selection ──────────────────────────────────────────────
+    def _add_effect_row(self, preset: LayerActionPreset, *, args_str: str = "") -> None:
+        row = _EffectRow(
+            initial_preset=preset,
+            args_str=args_str,
+            on_remove=self._on_remove_effect,
+            on_changed=self._refresh,
+        )
+        self._effect_rows.append(row)
+        self._effects_box.append(row.widget)
 
-    def _on_action_changed(self, *_args: object) -> None:
-        idx = self._action_dropdown.get_selected()
-        if idx < 0 or idx >= len(self._presets):
-            return
-        preset = self._presets[idx]
-        self._render_action_fields(preset)
+    def _on_add_effect(self) -> None:
+        self._add_effect_row(LAYER_ACTION_PRESETS[0])
         self._refresh()
 
-    def _set_action_preset(self, preset: LayerActionPreset, args_str: str = "") -> None:
-        """Select a preset programmatically and populate its fields."""
-        idx = self._presets.index(preset) if preset in self._presets else 0
-        # Block the notify::selected handler while we set up the field
-        # widgets — otherwise it fires before ``_render_action_fields``
-        # gets a chance and we'd build empty widgets, then rebuild.
-        self._action_dropdown.handler_block_by_func(self._on_action_changed)
-        self._action_dropdown.set_selected(idx)
-        self._action_dropdown.handler_unblock_by_func(self._on_action_changed)
-        self._render_action_fields(preset, args_str=args_str)
-
-    def _render_action_fields(self, preset: LayerActionPreset, *, args_str: str = "") -> None:
-        """Rebuild the per-preset argument widgets."""
-        # Drop everything currently in the field box; widget types vary
-        # across presets (entry vs. spin) so reuse isn't safe.
-        child = self._action_field_box.get_first_child()
-        while child is not None:
-            self._action_field_box.remove(child)
-            child = self._action_field_box.get_first_child()
-        self._action_field_widgets = []
-
-        self._action_description.set_text(preset.description)
-
-        if not preset.fields:
-            return
-
-        # For Custom: pre-fill the single free-text field with the full
-        # rule string. For structured presets: parse_args returns a
-        # per-field list padded to ``len(fields)``.
-        if preset is CUSTOM_PRESET:
-            initial_values = [args_str] if args_str else [""]
-        else:
-            parsed = preset.parse_args(args_str) if args_str else None
-            initial_values = parsed if parsed is not None else [f.default for f in preset.fields]
-
-        group = Adw.PreferencesGroup()
-        for field, initial in zip(preset.fields, initial_values, strict=False):
-            widget = self._build_action_field_widget(field, initial)
-            self._action_field_widgets.append(widget)
-            group.add(widget)
-        self._action_field_box.append(group)
-
-    def _build_action_field_widget(self, field: LayerActionField, initial: str) -> Gtk.Widget:
-        """Create the appropriate Adw row for a single action field."""
-        if field.kind == "number":
-            row = Adw.SpinRow.new_with_range(field.min_value, field.max_value, field.step)
-            row.set_title(field.label)
-            if field.hint:
-                row.set_subtitle(field.hint)
-            row.set_digits(field.digits)
-            try:
-                row.set_value(float(initial) if initial else float(field.default or "0"))
-            except ValueError:
-                # Fall back to default if the saved string is non-numeric;
-                # round-trip fidelity for unusual values is preserved via
-                # the Custom preset path on re-open.
-                row.set_value(float(field.default or "0"))
-            row.connect("notify::value", self._on_field_changed)
-            return row
-
-        if field.kind == "bool":
-            row = Adw.SwitchRow(title=field.label)
-            if field.hint:
-                row.set_subtitle(field.hint)
-            row.set_active(initial.strip().lower() in {"1", "true", "yes", "on"})
-            row.connect("notify::active", self._on_field_changed)
-            return row
-
-        # Free-text: an EntryRow with optional tooltip hint.
-        row = Adw.EntryRow(title=field.label)
-        if field.hint:
-            # Adw.EntryRow doesn't expose ``set_subtitle``; carry the
-            # hint via tooltip so it surfaces on hover.
-            row.set_tooltip_text(field.hint)
-        row.set_text(initial)
-        row.connect("changed", self._on_field_changed)
-        return row
-
-    def _read_action_fields(self) -> list[str]:
-        """Snapshot current values of the action fields, in order."""
-        result: list[str] = []
-        for widget in self._action_field_widgets:
-            if isinstance(widget, Adw.SpinRow):
-                value = widget.get_value()
-                # Format with the field's display digits so an integer
-                # field doesn't emit ``5.0`` and a float field doesn't
-                # lose its trailing zero.
-                digits = widget.get_digits()
-                if digits == 0:
-                    result.append(str(int(value)))
-                else:
-                    result.append(f"{value:.{digits}f}")
-            elif isinstance(widget, Adw.SwitchRow):
-                # ``on``/``off`` matches Hyprland's documented bool
-                # syntax and round-trips via the parser without any
-                # special-case handling.
-                result.append("on" if widget.get_active() else "off")
-            elif isinstance(widget, Adw.EntryRow):
-                result.append(widget.get_text())
-            else:
-                result.append("")
-        return result
+    def _on_remove_effect(self, row: "_EffectRow") -> None:
+        self._effect_rows.remove(row)
+        self._effects_box.remove(row.widget)
+        self._refresh()
 
     # ── Refresh: preview + apply gating ───────────────────────────────
 
@@ -389,43 +238,46 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._rule_enabled = self._enabled_row.get_active()
         self._refresh()
 
-    def _on_field_changed(self, *_args: object) -> None:
-        self._refresh()
-
     def _refresh(self) -> None:
         rule = self._build_rule()
         if rule is None:
-            self._preview_label.set_text("(rule incomplete)")
+            has_any = any(
+                eff.name.strip()
+                for row in self._effect_rows
+                for eff in [row.read_effect()]
+                if eff.name.strip() or eff.args.strip()
+            )
+            if not has_any and self._effect_rows:
+                self._preview_label.set_text("No effects enabled — toggle at least one on")
+            else:
+                self._preview_label.set_text("(rule incomplete)")
         else:
             self._preview_label.set_text(_preview_for(rule))
-        # Apply gates on a non-empty namespace AND a non-empty rule name.
-        ok = rule is not None and bool(rule.rule_name) and bool(rule.namespace.strip())
+        ok = (
+            rule is not None
+            and any(
+                e.name for e in rule.effects if e.name or (hasattr(e, "full") and e.full.strip())
+            )
+            and bool(rule.namespace.strip())
+        )
         self._apply_btn.set_sensitive(ok)
 
     def _build_rule(self) -> LayerRule | None:
-        """Snapshot the current dialog state into a :class:`LayerRule`."""
-        idx = self._action_dropdown.get_selected()
-        if idx < 0 or idx >= len(self._presets):
-            return None
-        preset = self._presets[idx]
-        if preset is CUSTOM_PRESET:
-            # Custom: the single field holds the full rule verbatim
-            # (name + args). Split the leading word as rule_name,
-            # the rest as rule_args.
-            values = self._read_action_fields()
-            full = values[0].strip() if values else ""
-            rule_name, _, rule_args = full.partition(" ")
-            rule_name = rule_name.strip()
-            rule_args = rule_args.strip()
-        else:
-            rule_name = preset.id
-            rule_args = preset.format(self._read_action_fields())
+        effects: list[LayerEffect] = []
+        for row in self._effect_rows:
+            eff = row.read_effect()
+            if not eff.name.strip() and not eff.args.strip():
+                continue
+            effects.append(eff)
 
         namespace = self._namespace_entry.get_text().strip()
 
+        if not effects:
+            return None
+
         return LayerRule(
             namespace=namespace,
-            effects=[LayerEffect(name=rule_name, args=rule_args), *self._extra_effects],
+            effects=effects,
             name=self._rule_name,
             enabled=self._rule_enabled,
         )
@@ -434,13 +286,178 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
 
     def _on_apply(self, *_args: object) -> None:
         rule = self._build_rule()
-        if rule is None or not rule.rule_name or not rule.namespace.strip():
-            # The apply gate should make this unreachable, but be
-            # defensive — a stale signal could fire after a rebuild.
+        if rule is None or not rule.namespace.strip():
             return
         if self._on_apply_callback is not None:
             self._on_apply_callback(rule)
         self.close()
+
+
+# ---------------------------------------------------------------------------
+# Helper widget: a single effect row
+# ---------------------------------------------------------------------------
+
+
+class _EffectRow:
+    """Single effect card: dropdown + trash on top, argument fields below.
+
+    Layout::
+
+        [ PreferencesGroup                     ]
+        [   [Dropdown ▼]                 [✕]  ]
+        [   [Arg1 field]                      ]
+        [   [Arg2 field]                      ]
+    """
+
+    def __init__(
+        self,
+        *,
+        initial_preset: LayerActionPreset,
+        args_str: str = "",
+        on_remove: Callable[["_EffectRow"], None],
+        on_changed: Callable[[], None],
+    ):
+        self._on_remove = on_remove
+        self._on_changed = on_changed
+        self._preset: LayerActionPreset = initial_preset
+        self._arg_widgets: list[Gtk.Widget] = []
+
+        self._group = Adw.PreferencesGroup()
+
+        action_row = Adw.ActionRow()
+        action_row.set_title("")
+
+        labels = Gtk.StringList.new([p.label for p in _PRESETS_WITH_CUSTOM])
+        self._preset_dropdown = Gtk.DropDown(model=labels)
+        self._preset_dropdown.set_valign(Gtk.Align.CENTER)
+        self._preset_dropdown.set_size_request(250, -1)
+        try:
+            initial_idx = _PRESETS_WITH_CUSTOM.index(initial_preset)
+        except ValueError:
+            initial_idx = 0
+        self._preset_dropdown.set_selected(initial_idx)
+        self._preset_dropdown.connect("notify::selected", self._on_preset_changed)
+        action_row.add_prefix(self._preset_dropdown)
+
+        remove_btn = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+        remove_btn.set_valign(Gtk.Align.CENTER)
+        remove_btn.add_css_class("flat")
+        remove_btn.set_tooltip_text("Remove this effect")
+        remove_btn.connect("clicked", lambda _b: self._on_remove(self))
+        action_row.add_suffix(remove_btn)
+
+        self._group.add(action_row)
+        self._arg_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._group.add(self._arg_container)
+        self._rebuild_args(args_str)
+
+    @property
+    def widget(self) -> Gtk.Widget:
+        return self._group
+
+    def read_effect(self) -> LayerEffect:
+        if self._preset is CUSTOM_PRESET:
+            values = self._read_arg_values()
+            full = values[0].strip() if values else ""
+            name, _, args = full.partition(" ")
+            return LayerEffect(name=name.strip(), args=args.strip())
+        if not self._preset.fields and self._preset is not CUSTOM_PRESET:
+            sw = self._arg_widgets[0] if self._arg_widgets else None
+            if isinstance(sw, Adw.SwitchRow) and not sw.get_active():
+                return LayerEffect(name="", args="")
+            return LayerEffect(name=self._preset.id, args="on")
+        args = self._preset.format(self._read_arg_values())
+        return LayerEffect(name=self._preset.id, args=args)
+
+    def _on_preset_changed(self, *_args: object) -> None:
+        idx = self._preset_dropdown.get_selected()
+        if idx < 0 or idx >= len(_PRESETS_WITH_CUSTOM):
+            return
+        new_preset = _PRESETS_WITH_CUSTOM[idx]
+        if new_preset is self._preset:
+            return
+        self._preset = new_preset
+        self._rebuild_args()
+        self._on_changed()
+
+    def _rebuild_args(self, args_str: str = "") -> None:
+        child = self._arg_container.get_first_child()
+        while child is not None:
+            self._arg_container.remove(child)
+            child = self._arg_container.get_first_child()
+        self._arg_widgets = []
+
+        if not self._preset.fields:
+            sw = Adw.SwitchRow(
+                title="Enabled",
+                subtitle="Uncheck to disable this effect.",
+            )
+            active = args_str.strip().lower() in ("on", "true", "yes", "1", "") if args_str else True
+            sw.set_active(active)
+            sw.connect("notify::active", lambda *_: self._on_changed())
+            self._arg_widgets.append(sw)
+            self._arg_container.append(sw)
+            return
+
+        if self._preset is CUSTOM_PRESET:
+            initial_values = [args_str] if args_str else [""]
+        else:
+            parsed = self._preset.parse_args(args_str) if args_str else None
+            initial_values = (
+                parsed if parsed is not None else [f.default for f in self._preset.fields]
+            )
+
+        for field, initial in zip(self._preset.fields, initial_values, strict=False):
+            widget = self._build_arg_widget(field, initial)
+            self._arg_widgets.append(widget)
+            self._arg_container.append(widget)
+
+    def _build_arg_widget(self, field: LayerActionField, initial: str) -> Gtk.Widget:
+        if field.kind == "number":
+            row = Adw.SpinRow.new_with_range(field.min_value, field.max_value, field.step)
+            row.set_title(field.label)
+            if field.hint:
+                row.set_subtitle(field.hint)
+            row.set_digits(field.digits)
+            try:
+                row.set_value(float(initial) if initial else float(field.default or "0"))
+            except ValueError:
+                row.set_value(float(field.default or "0"))
+            row.connect("notify::value", lambda *_: self._on_changed())
+            return row
+
+        if field.kind == "bool":
+            row = Adw.SwitchRow(title=field.label)
+            if field.hint:
+                row.set_subtitle(field.hint)
+            row.set_active(initial.strip().lower() in {"1", "true", "yes", "on"})
+            row.connect("notify::active", lambda *_: self._on_changed())
+            return row
+
+        row = Adw.EntryRow(title=field.label)
+        if field.hint:
+            row.set_tooltip_text(field.hint)
+        row.set_text(initial)
+        row.connect("changed", lambda *_: self._on_changed())
+        return row
+
+    def _read_arg_values(self) -> list[str]:
+        result: list[str] = []
+        for w in self._arg_widgets:
+            if isinstance(w, Adw.SpinRow):
+                digits = w.get_digits()
+                val = w.get_value()
+                if digits == 0:
+                    result.append(str(int(val)))
+                else:
+                    result.append(f"{val:.{digits}f}")
+            elif isinstance(w, Adw.SwitchRow):
+                result.append("on" if w.get_active() else "off")
+            elif isinstance(w, Adw.EntryRow):
+                result.append(w.get_text())
+            else:
+                result.append("")
+        return result
 
 
 __all__ = ["LayerRuleEditDialog"]
