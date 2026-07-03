@@ -100,7 +100,7 @@ class ConfigSections:
     layer_rules: list[str] | None = None
 
 
-HYPRMOD_DIR = Path.home() / ".config" / "retro"
+RETRO_SETTINGS_DIR = Path.home() / ".config" / "retro"
 _DEFAULT_MANAGED_BASE = Path.home() / ".config" / "retro" / "settings"
 _KEYBINDS_FILENAME = "keybinds"
 # Public so UI strings can format a label off the same source of truth.
@@ -176,7 +176,7 @@ def managed_path() -> Path:
 
 def keybinds_path() -> Path:
     """Path to the keybinds override file (suffix matches active mode)."""
-    return _with_active_suffix(HYPRMOD_DIR / _KEYBINDS_FILENAME)
+    return _with_active_suffix(RETRO_SETTINGS_DIR / _KEYBINDS_FILENAME)
 
 
 def managed_lua_path() -> Path:

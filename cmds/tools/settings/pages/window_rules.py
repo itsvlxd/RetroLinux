@@ -80,7 +80,7 @@ from settings.core import config
 from settings.core.ownership import SavedList
 from settings.core.window_rules import (
     ACTION_PRESETS,
-    HYPRMOD_APP_ID,
+    RETRO_SETTINGS_APP_ID,
     RETROACTIVE_EFFECTS,
     Effect,
     ExternalWindowRule,
@@ -145,7 +145,7 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
         managed_names = {r.name for r in managed if r.name}
         # Retro rules from ~/.config/retro/ files — loaded through the full
         # Hyprland config context so Lua variable expressions evaluate properly.
-        retro_root = config.HYPRMOD_DIR.resolve()
+        retro_root = config.RETRO_SETTINGS_DIR.resolve()
         self._external = []
         retro_items: list[WindowRule] = []
         for ext in load_external_window_rules(config.user_entry_path(), config.managed_path()):
@@ -498,7 +498,7 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
             heading="Apply this rule to Retro Settings itself?",
             body=(
                 f"This rule's matchers also match Retro Settings's own window "
-                f"(class {HYPRMOD_APP_ID!r}). Applying it live can "
+                f"(class {RETRO_SETTINGS_APP_ID!r}). Applying it live can "
                 "disrupt this editor — for example, an ‘opacity’ or "
                 "‘float’ action would take effect on the window you "
                 "are using right now.\n\n"

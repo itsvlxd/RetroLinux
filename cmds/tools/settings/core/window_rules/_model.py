@@ -41,7 +41,7 @@ def _predates_v3_windowrule(version: str) -> bool:
 # for our window. Used by :func:`matches_settings` to gate live-apply
 # behind a confirmation dialog when a user-authored rule would target
 # the editor itself (e.g. floating or fading the running editor mid-edit).
-HYPRMOD_APP_ID: str = APPLICATION_ID
+RETRO_SETTINGS_APP_ID: str = APPLICATION_ID
 
 # Both keywords accepted on read. Output is always v3 ``windowrule``.
 # Legacy ``windowrulev2`` lines auto-migrate (see :mod:`._migrate`).

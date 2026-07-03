@@ -1,53 +1,29 @@
-"""Dialog for adding or editing a single autostart entry.
-
-Lives outside ``settings/pages/autostart.py`` so the page module isn't a
-catch-all; matches the existing pattern of putting reusable dialogs
-under ``settings/ui/`` (see ``app_picker.py``).
-"""
+"""Dialog for adding or editing a single retro startup command."""
 
 from collections.abc import Callable
 
 from gi.repository import Adw, Gtk
 
-from settings.core import config
-from settings.core.autostart import ExecData
 from settings.core.desktop_apps import DesktopApp
 from settings.ui.app_picker import AppPickerDialog
 from settings.ui.dialog import SingletonDialogMixin
 
 
-class AutostartEditDialog(SingletonDialogMixin, Adw.Dialog):
-    """Dialog for adding or editing a single autostart entry.
-
-    Two inputs:
-
-    1. **Command** — free-text, with a "Pick app" suffix that opens the
-       installed-apps picker. Picking auto-fills the command field; the
-       user can still edit before applying (e.g. to add args).
-    2. **Re-run on every config reload** — switch row, off by default.
-       When off, the entry is saved as ``exec-once`` (the common case);
-       when on, as ``exec``. Hidden inside the dialog as a single
-       advanced toggle rather than presented as an equal-weight choice.
-
-    Open via :meth:`SingletonDialogMixin.present_singleton` rather than
-    constructing directly — that path collapses rapid double-clicks
-    on the trigger button into a single dialog.
-    """
+class RetroStartupEditDialog(SingletonDialogMixin, Adw.Dialog):
+    """Dialog for adding or editing a single retro startup command."""
 
     def __init__(
         self,
         *,
-        entry: ExecData | None = None,
-        initial_advanced: bool = False,
-        on_apply: Callable[[ExecData], None] | None = None,
+        command: str = "",
+        on_apply: Callable[[str], None] | None = None,
     ):
         super().__init__()
-        self._is_new = entry is None
         self._on_apply_callback = on_apply
 
-        self.set_title("Add Autostart Entry" if self._is_new else "Edit Autostart Entry")
+        self.set_title("Add Startup Command" if not command else "Edit Startup Command")
         self.set_content_width(520)
-        self.set_content_height(360)
+        self.set_content_height(200)
 
         toolbar = Adw.ToolbarView()
 
@@ -59,7 +35,7 @@ class AutostartEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._apply_btn = Gtk.Button(label="Apply")
         self._apply_btn.add_css_class("suggested-action")
         self._apply_btn.connect("clicked", self._on_apply)
-        self._apply_btn.set_sensitive(False)
+        self._apply_btn.set_sensitive(bool(command))
         header.pack_end(self._apply_btn)
         toolbar.add_top_bar(header)
 
@@ -69,17 +45,13 @@ class AutostartEditDialog(SingletonDialogMixin, Adw.Dialog):
         content.set_margin_start(18)
         content.set_margin_end(18)
 
-        # Command group: entry row with a "pick app" suffix.
         cmd_group = Adw.PreferencesGroup(title="Command")
         cmd_group.set_description(
-            "Pick an installed app or type any shell command. "
-            "Hyprland passes this to /bin/sh -c, so quoting and "
-            "metacharacters work as in shell."
+            "Type a shell command to run during the Retro startup sequence."
         )
         self._cmd_entry = Adw.EntryRow(title="Command line")
-        self._cmd_entry.set_text(entry.command if entry else "")
+        self._cmd_entry.set_text(command)
         self._cmd_entry.connect("changed", self._on_changed)
-        # Apply on Enter.
         self._cmd_entry.connect("entry-activated", lambda _e: self._on_apply())
 
         pick_btn = Gtk.Button.new_from_icon_name("system-search-symbolic")
@@ -92,45 +64,18 @@ class AutostartEditDialog(SingletonDialogMixin, Adw.Dialog):
         cmd_group.add(self._cmd_entry)
         content.append(cmd_group)
 
-        # Behaviour group: a single switch instead of an exec/exec-once
-        # combo. Default off (= exec-once) matches the overwhelmingly
-        # common case; flipping it on is the "advanced" path.
-        when_group = Adw.PreferencesGroup(title="Behaviour")
-        self._reload_switch = Adw.SwitchRow(title="Re-run on every config reload")
-        self._reload_switch.set_subtitle(
-            "Off: run once at Hyprland startup (recommended).\n"
-            "On: re-run every time the config is reloaded — useful for "
-            "cleanup commands like pkill -SIGUSR1."
-        )
-        starting_advanced = entry.keyword == config.KEYWORD_EXEC if entry else initial_advanced
-        self._reload_switch.set_active(starting_advanced)
-        when_group.add(self._reload_switch)
-        content.append(when_group)
-
         toolbar.set_content(content)
         self.set_child(toolbar)
 
-        # Focus the command field so users can start typing right away
-        # (or hit the picker button, which is one Tab away).
         self._cmd_entry.grab_focus()
         self._refresh_apply_sensitive()
-
-    # ── App picker integration ──
 
     def _on_pick_app(self) -> None:
         def on_pick(app: DesktopApp) -> None:
             self._cmd_entry.set_text(app.command)
-            # Move focus back to the command field so the user can edit
-            # the auto-filled command (e.g. to add args) without an
-            # extra click.
             self._cmd_entry.grab_focus()
 
         AppPickerDialog.present_singleton(self, on_pick=on_pick)
-
-    # ── Apply gating ──
-
-    def _selected_keyword(self) -> str:
-        return config.KEYWORD_EXEC if self._reload_switch.get_active() else config.KEYWORD_EXEC_ONCE
 
     def _on_changed(self, *_args: object) -> None:
         self._refresh_apply_sensitive()
@@ -142,10 +87,9 @@ class AutostartEditDialog(SingletonDialogMixin, Adw.Dialog):
         command = self._cmd_entry.get_text().strip()
         if not command:
             return
-        new_entry = ExecData(keyword=self._selected_keyword(), command=command)
         if self._on_apply_callback is not None:
-            self._on_apply_callback(new_entry)
+            self._on_apply_callback(command)
         self.close()
 
 
-__all__ = ["AutostartEditDialog"]
+__all__ = ["RetroStartupEditDialog"]
