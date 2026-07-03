@@ -16,9 +16,10 @@ from settings.core.autostart import (
     serialize_retro_startup,
 )
 from settings.pages.section import SavedListSectionPage
-from settings.ui import clear_children, make_page_layout
+from settings.ui import clear_children, make_inline_hint, make_page_layout
 from settings.ui.icons import AUTOSTART_ICON
 from settings.ui.empty_state import EmptyState
+from settings.ui.reorder import RowReorderController
 
 
 class AutostartPage(SavedListSectionPage[RetroStartupData]):
@@ -39,6 +40,11 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         super().__init__(window, on_dirty_changed, push_undo)
         self._content_box: Gtk.Box
         self._scrolled: Gtk.ScrolledWindow
+        self._retro_rows: list[Gtk.Widget] = []
+        self._reorder = RowReorderController(
+            move=self._move_retro_item,
+            iter_rows=lambda: self._retro_rows,
+        )
         self._load(saved_sections)
 
     # ── Loading ──
@@ -49,6 +55,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         raw = get_var("RETRO_CUSTOM_LOAD", "")
         items = parse_retro_startup(raw)
         self._retro_owned: list[RetroStartupData] = items
+        self._retro_saved = list(items)
 
     # ── Build ──
 
@@ -115,6 +122,12 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
     def _rebuild_list(self) -> None:
         clear_children(self._content_box)
 
+        if len(self._retro_owned) >= 2:
+            self._content_box.append(make_inline_hint(
+                "Reorder with Alt+↑ / Alt+↓ on a focused row, or drag by the handle."
+            ))
+
+        self._retro_rows = [None] * len(self._retro_owned)
         for w in self._build_custom_group():
             self._content_box.append(w)
         for w in self._build_system_group():
@@ -131,19 +144,33 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
             primary_action=("Add Command…", self._on_add_retro),
         )
 
-    # ── Base-class overrides (variable-backed, no SavedList needed) ──
+    # ── Base-class overrides ──
 
     def is_dirty(self) -> bool:
-        return False
+        return self._retro_owned != self._retro_saved
 
     def mark_saved(self) -> None:
-        pass
+        from lib.python.variable import set_var
+        raw = serialize_retro_startup(self._retro_owned)
+        set_var("RETRO_CUSTOM_LOAD", raw)
+        self._retro_saved = list(self._retro_owned)
+        self._rebuild_list()
 
     def discard(self) -> None:
-        pass
+        self._retro_owned = list(self._retro_saved)
+        self._rebuild_list()
 
     def pending_change_count(self) -> int:
-        return 0
+        if not self.is_dirty():
+            return 0
+        count = 0
+        for item in self._retro_owned:
+            if item not in self._retro_saved:
+                count += 1
+        for item in self._retro_saved:
+            if item not in self._retro_owned:
+                count += 1
+        return count
 
     # ── Custom startup rows ──
 
@@ -155,6 +182,10 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         prefix.set_opacity(0.6)
         prefix.set_pixel_size(28)
         row.add_prefix(prefix)
+
+        self._reorder.attach(row, idx)
+        if idx < len(self._retro_rows):
+            self._retro_rows[idx] = row
 
         delete_btn = Gtk.Button(icon_name="user-trash-symbolic")
         delete_btn.set_valign(Gtk.Align.CENTER)
@@ -174,6 +205,15 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         row.connect("activated", lambda _r, i=idx: self._on_edit_retro_at(i))
         row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
         return row
+
+    def _move_retro_item(self, src: int, dst: int) -> bool:
+        if src == dst or not (0 <= src < len(self._retro_owned) and 0 <= dst < len(self._retro_owned)):
+            return False
+        item = self._retro_owned.pop(src)
+        self._retro_owned.insert(dst, item)
+        self._notify_dirty()
+        self._rebuild_list()
+        return True
 
     # ── Add / Edit / Remove ──
 
@@ -217,7 +257,8 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
             if not cmd:
                 return
             self._retro_owned.append(RetroStartupData(command=cmd))
-            self._sync_retro_variable()
+            self._notify_dirty()
+            self._rebuild_list()
             dialog.close()
 
         apply_btn.connect("clicked", on_apply)
@@ -265,7 +306,8 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
                 dialog.close()
                 return
             self._retro_owned[idx] = RetroStartupData(command=cmd)
-            self._sync_retro_variable()
+            self._notify_dirty()
+            self._rebuild_list()
             dialog.close()
 
         apply_btn.connect("clicked", on_apply)
@@ -275,13 +317,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         if idx < 0 or idx >= len(self._retro_owned):
             return
         del self._retro_owned[idx]
-        self._sync_retro_variable()
-
-    def _sync_retro_variable(self) -> None:
-        """Write retro startup entries to ``RETRO_CUSTOM_LOAD`` and refresh."""
-        from lib.python.variable import set_var
-        raw = serialize_retro_startup(self._retro_owned)
-        set_var("RETRO_CUSTOM_LOAD", raw)
+        self._notify_dirty()
         self._rebuild_list()
 
     def _on_refresh(self) -> None:
