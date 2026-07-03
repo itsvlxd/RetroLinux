@@ -98,6 +98,8 @@ class ConfigSections:
     exec_: list[str] | None = None
     window_rules: list[str] | None = None
     layer_rules: list[str] | None = None
+    window_rules_nodes: list["Rule"] | None = None
+    layer_rules_nodes: list["Rule"] | None = None
 
 
 RETRO_SETTINGS_DIR = Path.home() / ".config" / "retro"
@@ -543,9 +545,17 @@ def _build_document(values: dict[str, str], sections: ConfigSections) -> Documen
         _add_section(doc, "Keybinds", sections.binds)
     # Window rules sit before autostart so any rule overrides are in effect
     # before exec'd processes spawn matching windows on reload.
-    if sections.window_rules:
+    # Use pre-built Rule nodes when available (bypasses migrate's broken
+    # effect filtering for block-form rules); fall back to string lines.
+    if sections.window_rules_nodes:
+        _add_comment(doc, "Window rules")
+        doc.lines.extend(sections.window_rules_nodes)
+    elif sections.window_rules:
         _add_section(doc, "Window rules", sections.window_rules)
-    if sections.layer_rules:
+    if sections.layer_rules_nodes:
+        _add_comment(doc, "Layer rules")
+        doc.lines.extend(sections.layer_rules_nodes)
+    elif sections.layer_rules:
         _add_section(doc, "Layer rules", sections.layer_rules)
     # Autostart last: ``exec`` re-runs on every reload, so config later in
     # the file that affects the exec'd process (env vars, monitor layout)

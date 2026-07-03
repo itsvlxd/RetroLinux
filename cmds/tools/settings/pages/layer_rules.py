@@ -47,6 +47,7 @@ from html import escape as html_escape
 from pathlib import Path
 
 from gi.repository import Adw, Gtk
+import hyprland_config
 from hyprland_config import render_rule_live
 from hyprland_socket import HyprlandError
 
@@ -192,6 +193,10 @@ class LayerRulesPage(SavedListSectionPage[LayerRule]):
     def get_all_rules(self) -> list[LayerRule]:
         """Return all layer rules for writing to ``windowrules.lua``."""
         return list(self._owned)
+
+    def get_layer_rule_nodes(self) -> list[hyprland_config.Rule]:
+        """Return ``Rule`` nodes for direct insertion into the managed config."""
+        return [r.to_rule_node() for r in self._owned]
 
     # Group + deleted-row + external-section rendering uses the base
     # ``SavedListSectionPage`` template; only the per-row content is

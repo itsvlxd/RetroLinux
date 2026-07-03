@@ -73,6 +73,7 @@ from html import escape as html_escape
 from pathlib import Path
 
 from gi.repository import Adw, Gtk
+import hyprland_config
 from hyprland_config import render_rule_live
 from hyprland_socket import HyprlandError, get_windows
 
@@ -327,6 +328,10 @@ class WindowRulesPage(SavedListSectionPage[WindowRule]):
     def get_all_rules(self) -> list[WindowRule]:
         """Return all window rules for writing to ``windowrules.lua``."""
         return list(self._owned)
+
+    def get_window_rule_nodes(self) -> list[hyprland_config.Rule]:
+        """Return ``Rule`` nodes for direct insertion into the managed config."""
+        return [r.to_rule_node() for r in self._owned]
 
     # ── Live apply (push to running compositor) ──
 
