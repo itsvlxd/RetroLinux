@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from hyprland_config import (
+    ANIM_FLAT,
     V3_BOOL_EFFECTS,
     WINDOWRULE_V3_VERSION,
     Rule,
@@ -26,6 +27,10 @@ from hyprland_config import (
 from settings.constants import APPLICATION_ID
 from settings.core import config
 
+# All known animation style names from the Hyprland animation tree.
+_ANIMATION_STYLES: tuple[str, ...] = tuple(
+    sorted({s for _, _, _, styles in ANIM_FLAT for s in styles})
+)
 
 def _predates_v3_windowrule(version: str) -> bool:
     """True when *version* is older than Hyprland adopted v3 windowrule syntax.
@@ -247,12 +252,13 @@ class ActionField:
     label: str
     placeholder: str = ""
     hint: str = ""
-    kind: Literal["text", "number"] = "text"
+    kind: Literal["text", "number", "choice"] = "text"
     digits: int = 2
     min_value: float = 0.0
     max_value: float = 9999.0
     step: float = 1.0
     default: str = ""
+    choices: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,10 +279,13 @@ class ActionPreset:
     label: str
     description: str
     fields: tuple[ActionField, ...] = ()
+    override_fields: bool = False
 
     def format(self, values: list[str]) -> str:
         """Build the effect args string from user-supplied field values."""
         cleaned = [v.strip() for v in values]
+        if self.override_fields:
+            cleaned = [f"{v} override" if v else "" for v in cleaned]
         while cleaned and not cleaned[-1]:
             cleaned.pop()
         return " ".join(cleaned)
@@ -289,6 +298,8 @@ class ActionPreset:
         that an effect's ``id`` is the leading token of the line.
         """
         args = args_str.strip().split() if args_str.strip() else []
+        if self.override_fields:
+            args = [a for i, a in enumerate(args) if i % 2 == 0]
         while len(args) < len(self.fields):
             args.append("")
         return args
@@ -409,10 +420,8 @@ ACTION_PRESETS: tuple[ActionPreset, ...] = (
     ActionPreset(
         id="opacity",
         label="Set opacity",
-        description=(
-            "Override active and inactive opacity. Append ' override' to "
-            "set absolutely (else multiplied)."
-        ),
+        description="Active and inactive opacity. Values are set absolutely via 'override' suffix.",
+        override_fields=True,
         fields=(
             ActionField(
                 label="Active",
@@ -431,7 +440,7 @@ ACTION_PRESETS: tuple[ActionPreset, ...] = (
                 min_value=0.0,
                 max_value=1.0,
                 step=0.05,
-                default="1.00",
+                default="0.80",
             ),
         ),
     ),
@@ -521,13 +530,19 @@ ACTION_PRESETS: tuple[ActionPreset, ...] = (
     ActionPreset(
         id="animation",
         label="Animation style",
-        description="Force an animation on this window, with optional style.",
+        description="Force an animation style on this window, with optional percentage.",
         fields=(
             ActionField(
-                label="Animation",
-                placeholder="popin 80%",
-                hint="E.g. 'popin' or 'popin 80%'.",
+                label="Style",
+                kind="choice",
+                choices=_ANIMATION_STYLES,
                 default="popin",
+            ),
+            ActionField(
+                label="Amount",
+                placeholder="80%",
+                hint="Optional percentage like '80%'. Leave blank for default.",
+                default="",
             ),
         ),
     ),

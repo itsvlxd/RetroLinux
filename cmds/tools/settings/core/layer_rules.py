@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Literal
 
 from hyprland_config import (
+    ANIM_FLAT,
     LAYER_BOOL_EFFECTS,
     LAYERRULE_V3_VERSION,
     Rule,
@@ -68,6 +69,10 @@ from hyprland_config import (
 
 from settings.core import config
 from settings.core.external import load_external_rule_entries
+
+_ANIMATION_STYLES: tuple[str, ...] = tuple(
+    sorted({s for _, _, _, styles in ANIM_FLAT for s in styles})
+)
 
 
 def _predates_v3_layerrule(version: str) -> bool:
@@ -260,12 +265,13 @@ class LayerActionField:
     label: str
     placeholder: str = ""
     hint: str = ""
-    kind: Literal["text", "number", "bool"] = "text"
+    kind: Literal["text", "number", "bool", "choice"] = "text"
     digits: int = 2
     min_value: float = 0.0
     max_value: float = 9999.0
     step: float = 1.0
     default: str = ""
+    choices: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -368,8 +374,9 @@ LAYER_ACTION_PRESETS: tuple[LayerActionPreset, ...] = (
         fields=(
             LayerActionField(
                 label="Style",
-                placeholder="slide",
-                hint="One of: slide, popin, fade, none. (Style names depend on Hyprland version.)",
+                kind="choice",
+                choices=_ANIMATION_STYLES,
+                default="popin",
             ),
         ),
     ),

@@ -44,16 +44,6 @@ hl.window_rule({
 	no_focus = true,
 })
 
-hl.layer_rule({
-	name = "rofi-layer-style",
-	match = {
-		namespace = "^(rofi)$",
-	},
-	animation = "popin",
-	blur = true,
-	ignore_alpha = 0.5,
-})
-
 -- Hyprland-run windowrule
 hl.window_rule({
 	name = "move-hyprland-run",
@@ -62,7 +52,6 @@ hl.window_rule({
 	float = true,
 })
 
--- Settings app windowrule
 hl.window_rule({
 	name = "float-settings",
 	match = { class = "io.github.retrolinux.settings" },
@@ -73,4 +62,14 @@ hl.window_rule({
 	name = "kitty-windows-style",
 	match = { class = "kitty" },
 	opacity = vars.retro_kitty_active_opacity .. " 0.8",
+})
+
+hl.layer_rule({
+	name = "rofi-layer-style",
+	match = {
+		namespace = "^(rofi)$",
+	},
+	animation = "popin",
+	blur = true,
+	ignore_alpha = 0.5,
 })

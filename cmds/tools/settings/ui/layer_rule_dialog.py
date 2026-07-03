@@ -434,6 +434,25 @@ class _EffectRow:
             row.connect("notify::active", lambda *_: self._on_changed())
             return row
 
+        if field.kind == "choice":
+            choices = list(field.choices)
+            row = Adw.ActionRow(title=field.label)
+            if field.hint:
+                row.set_subtitle(field.hint)
+            model = Gtk.StringList.new(choices)
+            dropdown = Gtk.DropDown(model=model)
+            dropdown.set_valign(Gtk.Align.CENTER)
+            init = initial or field.default
+            try:
+                idx = choices.index(init) if init in choices else 0
+            except (ValueError, IndexError):
+                idx = 0
+            dropdown.set_selected(idx)
+            dropdown.connect("notify::selected", lambda *_: self._on_changed())
+            row.add_suffix(dropdown)
+            row._dropdown = dropdown
+            return row
+
         row = Adw.EntryRow(title=field.label)
         if field.hint:
             row.set_tooltip_text(field.hint)
@@ -455,6 +474,17 @@ class _EffectRow:
                 result.append("on" if w.get_active() else "off")
             elif isinstance(w, Adw.EntryRow):
                 result.append(w.get_text())
+            elif isinstance(w, Adw.ActionRow):
+                dd = getattr(w, '_dropdown', None)
+                if dd is not None:
+                    idx = dd.get_selected()
+                    model = dd.get_model()
+                    if 0 <= idx < len(model):
+                        result.append(model[idx].get_string())
+                    else:
+                        result.append("")
+                else:
+                    result.append("")
             else:
                 result.append("")
         return result
