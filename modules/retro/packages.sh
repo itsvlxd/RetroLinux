@@ -14,6 +14,7 @@ net-tools
 inetutils
 base-devel
 lm_sensors
+brightnessctl
 pacman-contrib
 iio-sensor-proxy
 
