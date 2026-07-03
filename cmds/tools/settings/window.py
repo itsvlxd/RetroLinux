@@ -1248,11 +1248,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         if cursor_env or general_env:
             sections.env = [*cursor_env, *general_env]
 
-        sections.exec_ = emit_if(
-            self._autostart_page,
-            lambda _p: AutostartPage.has_managed_section(saved_sections),
-            lambda p: p.get_exec_lines(),
-        )
+        # Autostart page uses RETRO_CUSTOM_LOAD variable, not settings.lua,
+        # so it's not emitted here.
         # Window and layer rules are written to ``~/.config/retro/windowrules.lua``
         # by :meth:`_write_rules_lua` instead of ``settings.lua``, so skip them here.
 
@@ -1308,7 +1305,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def _write_rules_lua(self) -> None:
         """Write all window + layer rules to ``~/.config/retro/windowrules.lua``."""
-        rules_file = config.HYPRMOD_DIR / "windowrules.lua"
+        rules_file = config.RETRO_SETTINGS_DIR / "windowrules.lua"
         w_rules = self._window_rules_page.get_all_rules() if self._window_rules_page else []
         l_rules = self._layer_rules_page.get_all_rules() if self._layer_rules_page else []
         if not w_rules and not l_rules:
@@ -1350,9 +1347,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         sections = self.saved_sections
         if self._cursor_page is not None:
             self._cursor_page.reload_from_saved(sections)
-
-        if self._autostart_page is not None:
-            self._autostart_page.reload_from_saved(sections)
 
         if self._env_vars_page is not None:
             self._env_vars_page.reload_from_saved(sections)

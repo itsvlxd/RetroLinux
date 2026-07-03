@@ -6,7 +6,7 @@ from pathlib import Path
 
 from hyprland_config import HYPRLAND_NATIVE_CURVES, BezierData, atomic_write
 
-from settings.core.config import HYPRMOD_DIR
+from settings.core.config import RETRO_SETTINGS_DIR
 from settings.data.bezier_presets import BUILTIN_PRESETS
 
 
@@ -148,4 +148,4 @@ class BezierCurveStore:
 @functools.cache
 def get_curve_store() -> BezierCurveStore:
     """Return the singleton BezierCurveStore, creating it on the first call."""
-    return BezierCurveStore(HYPRMOD_DIR / "user_curves.json")
+    return BezierCurveStore(RETRO_SETTINGS_DIR / "user_curves.json")

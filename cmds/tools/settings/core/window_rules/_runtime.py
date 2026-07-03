@@ -38,7 +38,7 @@ from hyprland_state import (
 )
 
 from settings.core.window_rules._model import (
-    HYPRMOD_APP_ID,
+    RETRO_SETTINGS_APP_ID,
     Matcher,
     WindowRule,
 )
@@ -172,11 +172,11 @@ class _HyprmodTarget:
 
     @property
     def class_name(self) -> str:
-        return HYPRMOD_APP_ID
+        return RETRO_SETTINGS_APP_ID
 
     @property
     def initial_class(self) -> str:
-        return HYPRMOD_APP_ID
+        return RETRO_SETTINGS_APP_ID
 
     @property
     def title(self) -> str:

@@ -107,7 +107,7 @@ class LayerRulesPage(SavedListSectionPage[LayerRule]):
         managed = from_rule_nodes(self._window.saved_rules)
         managed_names = {r.name for r in managed if r.name}
         # Retro rules from ~/.config/retro/ files
-        retro_root = config.HYPRMOD_DIR.resolve()
+        retro_root = config.RETRO_SETTINGS_DIR.resolve()
         self._external = []
         retro_items: list[LayerRule] = []
         for ext in load_external_layer_rules(config.user_entry_path(), config.managed_path()):
