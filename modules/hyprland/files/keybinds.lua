@@ -27,9 +27,9 @@ hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("hyprshot -m output -o ~/Pict
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a -n"))
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(prog.menu))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo()) -- dwindle
-hl.bind(mainMod .. " + F12", hl.dsp.exec_cmd("retro settings"))
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit")) -- dwindle
 
+hl.bind("F12", hl.dsp.exec_cmd("retro settings"))
 hl.bind("XF86Launch2", hl.dsp.exec_cmd("retro settings"))
 
 -- Move focus with mainMod + arrow keys
