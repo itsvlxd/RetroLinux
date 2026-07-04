@@ -20,6 +20,7 @@ from settings.pages.animations import AnimationsPage
 from settings.pages.autostart import AutostartPage
 from settings.pages.binds import BindsPage
 from settings.pages.cursor import CursorPage
+from settings.pages.disk import DiskPage
 from settings.pages.env_vars import EnvVarsPage
 from settings.pages.layer_rules import LayerRulesPage
 from settings.pages.layouts import LayoutsPage
@@ -314,6 +315,32 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         _bt4 = time.monotonic()
         print(f'[TIMING]   finalize={_bt4-_bt3:.3f}s', file=__import__('sys').stderr)
 
+        GLib.timeout_add(300, self._eager_disk_sidebar)
+
+    def _eager_disk_sidebar(self):
+        """Load initial disk stats so the sidebar progress bar shows immediately."""
+        from settings.pages.disk import DiskInfo, update_disk_sidebar
+        try:
+            result = subprocess.run(
+                ["bash", "/opt/retrolinux/scripts/disk_core.sh", "--status"],
+                capture_output=True, text=True, timeout=15,
+                stdin=subprocess.DEVNULL,
+            )
+            disks = []
+            if result.returncode == 0:
+                for line in result.stdout.strip().splitlines():
+                    parts = line.split("|")
+                    if len(parts) >= 9:
+                        disks.append(DiskInfo(
+                            device=parts[0], disk_type=parts[1], model=parts[2],
+                            size=parts[3], used_pct=parts[4], health=parts[5],
+                            temp=parts[6], mounts=parts[7], wear_pct=parts[8],
+                        ))
+            update_disk_sidebar(self, disks)
+        except Exception:
+            pass
+        return False
+
     def _build_content_pane(self):
         """Build the content pane with page stack and banner."""
         self._content_nav = Adw.NavigationPage(title="")
@@ -397,6 +424,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         # Store standalone page specs for lazy building
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (AppsPage, "_apps_page", "apps", "Applications"),
+            (DiskPage, "_disk_page", "disks", "Disks"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
@@ -968,6 +996,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ThemesPage:
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is DiskPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
 
     def show_page(self, gid: str):

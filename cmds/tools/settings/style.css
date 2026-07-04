@@ -336,3 +336,36 @@ row.dragging-row {
 .theme-card-link:hover {
     opacity: 0.85;
 }
+
+/* ── Disk page ── */
+
+.health-passed {
+    color: @success_color;
+    font-weight: 700;
+}
+
+.health-warning {
+    color: @warning_color;
+    font-weight: 700;
+}
+
+.health-failed {
+    color: @error_color;
+    font-weight: 700;
+}
+
+levelbar trough {
+    min-height: 6px;
+}
+
+levelbar block.filled {
+    min-height: 6px;
+}
+
+levelbar.level-bar-warning block.filled {
+    background-color: @warning_color;
+}
+
+levelbar.level-bar-critical block.filled {
+    background-color: @error_color;
+}

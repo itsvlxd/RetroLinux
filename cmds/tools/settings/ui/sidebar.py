@@ -8,6 +8,7 @@ from settings.ui.icons import (
     APPS_ICON,
     AUTOSTART_ICON,
     BINDS_ICON,
+    DISKS_ICON,
     ENV_VARS_ICON,
     LAYER_RULES_ICON,
     LAYOUTS_ICON,
@@ -214,6 +215,9 @@ class Sidebar:
         startup = new_category("Startup")
         add_row(startup, "autostart", "Autostart", AUTOSTART_ICON)
         add_row(startup, "env_vars", "Env Variables", ENV_VARS_ICON)
+
+        system = new_category("System")
+        add_row(system, "disks", "Disks", DISKS_ICON)
 
         advanced = new_category("Advanced")
         add_schema_row(advanced, "xwayland")
