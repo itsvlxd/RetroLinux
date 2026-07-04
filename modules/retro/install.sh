@@ -159,3 +159,17 @@ EOF
     fi
 }
 setup_theme_sudoers
+
+setup_smartctl_sudoers() {
+    if command -v smartctl &>/dev/null; then
+        local smartctl_path
+        smartctl_path="$(command -v smartctl)"
+        sudo rm -f /etc/sudoers.d/99-smartctl
+        echo "%wheel ALL=(ALL) NOPASSWD: ${smartctl_path}" | sudo tee /etc/sudoers.d/99-smartctl >/dev/null
+        sudo chmod 440 /etc/sudoers.d/99-smartctl
+        rx_log "success" "Sudoers rule added for smartctl"
+    else
+        rx_log "info" "smartctl not found — install smartmontools for SMART data"
+    fi
+}
+setup_smartctl_sudoers
