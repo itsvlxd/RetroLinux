@@ -11,7 +11,10 @@ else
 fi
 
 _smartctl() {
-    [[ $EUID -eq 0 ]] && { smartctl "$@" 2>/dev/null; return; }
+    [[ $EUID -eq 0 ]] && {
+        smartctl "$@" 2>/dev/null
+        return
+    }
     timeout 5 sudo -n smartctl "$@" 2>/dev/null
 }
 
@@ -48,10 +51,16 @@ _get_disk_type() {
 
 _get_wear_level() {
     local dev="$1"
-    command -v smartctl &>/dev/null || { echo "N/A"; return; }
+    command -v smartctl &>/dev/null || {
+        echo "N/A"
+        return
+    }
     local data
     data=$(_smartctl -A "/dev/${dev}" 2>/dev/null)
-    [[ -z $data ]] && { echo "N/A"; return; }
+    [[ -z $data ]] && {
+        echo "N/A"
+        return
+    }
 
     local pct
     pct=$(echo "$data" | grep -oP 'Percentage Used:\s+\K[0-9]+' | head -1)
@@ -83,7 +92,10 @@ _get_wear_level() {
 
 _get_smart_health() {
     local dev="$1"
-    command -v smartctl &>/dev/null || { echo "N/A"; return; }
+    command -v smartctl &>/dev/null || {
+        echo "N/A"
+        return
+    }
     local result
     result=$(_smartctl -H "/dev/${dev}" | grep -oP '(PASSED|FAILED|OK)' | head -1)
     echo "${result:-UNKNOWN}"
@@ -91,7 +103,10 @@ _get_smart_health() {
 
 _get_smart_temp() {
     local dev="$1"
-    command -v smartctl &>/dev/null || { echo "N/A"; return; }
+    command -v smartctl &>/dev/null || {
+        echo "N/A"
+        return
+    }
     local result
     result=$(_smartctl -A "/dev/${dev}" | awk '/^Temperature:/ {print $2; exit} /Temperature_Celsius/ {print $10; exit}')
     echo "${result:-N/A}"
@@ -114,13 +129,33 @@ _get_disk_usage() {
     local dev="$1"
     local parts mounts="" used="?"
     parts=$(lsblk -nlo NAME "/dev/${dev}" 2>/dev/null | tail -n +2)
+    declare -A crypt_map
+    local dm_name dm_path slave
+    for dm_path in /sys/block/dm-*/dm/name; do
+        [[ -f $dm_path ]] || continue
+        dm_name=$(<"$dm_path")
+        slave=$(readlink -f "${dm_path%/dm/name}/slaves/"* 2>/dev/null)
+        if [[ -n $slave ]]; then
+            slave="${slave##*/}"
+            crypt_map["$slave"]="$dm_name"
+        fi
+    done
     while IFS= read -r part; do
-        local mount
+        local mount pct
         mount=$(findmnt -nlo TARGET "/dev/${part}" 2>/dev/null | head -1)
+        if [[ -z $mount && -n ${crypt_map["$part"]} ]]; then
+            mount=$(findmnt -nlo TARGET "/dev/mapper/${crypt_map["$part"]}" 2>/dev/null | head -1)
+        fi
         if [[ -n $mount ]]; then
             [[ -n $mounts ]] && mounts="${mounts}, "
             mounts="${mounts}${mount}"
-            [[ $used == "?" ]] && used=$(df -h "$mount" 2>/dev/null | awk 'NR==2 {print $5}')
+            pct=$(df -h "$mount" 2>/dev/null | awk 'NR==2 {print $5}')
+            pct="${pct%\%}"
+            if [[ $pct =~ ^[0-9]+$ ]]; then
+                if [[ $used == "?" ]] || [[ ${pct} -gt ${used%\%} ]] 2>/dev/null; then
+                    used="${pct}%"
+                fi
+            fi
         fi
     done <<<"$parts"
     [[ -z $mounts ]] && mounts=""
@@ -228,7 +263,7 @@ case "$1" in
             health=$(_get_smart_health "$name")
             temp=$(_get_smart_temp "$name")
             wear=$(_get_wear_level "$name")
-            IFS='|' read -r used mounts <<< "$(_get_disk_usage "$name")"
+            IFS='|' read -r used mounts <<<"$(_get_disk_usage "$name")"
             echo "${name}|${human_type}|${model}|${size}|${used:-0}|${health}|${temp}|${mounts}|${wear}"
         done < <(_get_disks)
         ;;
@@ -268,13 +303,19 @@ case "$1" in
 
     "--btrfs-list")
         btrfs_path="${2:-/}"
-        _is_btrfs "$btrfs_path" || { echo "ERR|not_btrfs"; exit 1; }
+        _is_btrfs "$btrfs_path" || {
+            echo "ERR|not_btrfs"
+            exit 1
+        }
         _btrfs_subvol_list "$btrfs_path"
         ;;
 
     "--btrfs-quota")
         btrfs_path="${2:-/}"
-        _is_btrfs "$btrfs_path" || { echo "ERR|not_btrfs"; exit 1; }
+        _is_btrfs "$btrfs_path" || {
+            echo "ERR|not_btrfs"
+            exit 1
+        }
         _btrfs_quota_show "$btrfs_path"
         ;;
 
@@ -287,6 +328,21 @@ case "$1" in
         btrfs_quota=$(get_var "DISK_BTRFS_QUOTA" "false")
         echo "automount=${automount}"
         echo "btrfs_quota=${btrfs_quota}"
+        ;;
+
+    "--set-vars")
+        automount="true"
+        btrfs_quota="false"
+        for arg in "$@"; do
+            case "$arg" in
+                automount=*) automount="${arg#automount=}" ;;
+                btrfs_quota=*) btrfs_quota="${arg#btrfs_quota=}" ;;
+            esac
+        done
+        set_var "DISK_AUTOMOUNT" "$automount"
+        set_var "DISK_BTRFS_QUOTA" "$btrfs_quota"
+        echo "OK|automount=${automount}|btrfs_quota=${btrfs_quota}"
+        rx_log_file "success" "Disk vars: automount=${automount}, btrfs_quota=${btrfs_quota}"
         ;;
 
     "--setup-apply")
@@ -328,7 +384,7 @@ case "$1" in
         ;;
 
     *)
-        echo "Usage: $0 --{status|health|list|mount|umount|btrfs-list|btrfs-quota|btrfs-check|setup-get|setup-apply} [args]"
+        echo "Usage: $0 --{status|health|list|mount|umount|btrfs-list|btrfs-quota|btrfs-check|setup-get|set-vars|setup-apply} [args]"
         exit 1
         ;;
 esac
