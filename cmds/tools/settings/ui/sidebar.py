@@ -201,8 +201,8 @@ class Sidebar:
 
         display = new_category("Display")
         add_row(display, "monitors", "Monitors", MONITORS_ICON)
-        add_row(display, "workspaces", "Workspaces", WORKSPACES_ICON)
         add_row(display, "wallpapers", "Wallpapers", WALLPAPERS_ICON)
+        add_row(display, "workspaces", "Workspaces", WORKSPACES_ICON)
 
         windowing = new_category("Window Management")
         # Dwindle/Master/Scrolling are merged into a single Layouts page

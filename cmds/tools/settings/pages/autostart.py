@@ -22,6 +22,31 @@ from settings.ui.empty_state import EmptyState
 from settings.ui.reorder import RowReorderController
 
 
+def update_autostart_sidebar(window) -> None:
+    """Update the Autostart sidebar row with custom command count."""
+    try:
+        sidebar = getattr(window, "_sidebar", None)
+        if sidebar is None:
+            return
+        row = sidebar._rows_by_id.get("autostart")
+        if row is None:
+            return
+        if not hasattr(row, "_as_sidebar_label"):
+            lbl = Gtk.Label()
+            lbl.set_valign(Gtk.Align.CENTER)
+            lbl.add_css_class("badge")
+            row.add_suffix(lbl)
+            row._as_sidebar_label = lbl
+        from lib.python.variable import get_var
+        raw = get_var("RETRO_CUSTOM_LOAD", "")
+        count = len([e for e in raw.split("|") if e.strip()])
+        row._as_sidebar_label.set_visible(count > 0)
+        if count:
+            row._as_sidebar_label.set_label(str(count))
+    except Exception:
+        pass
+
+
 class AutostartPage(SavedListSectionPage[RetroStartupData]):
     """Retro startup sequence page."""
 

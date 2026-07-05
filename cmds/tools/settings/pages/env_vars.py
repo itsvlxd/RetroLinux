@@ -56,6 +56,31 @@ from settings.ui.env_var_edit_dialog import EnvVarEditDialog
 from settings.ui.icons import ENV_VARS_ICON
 from settings.ui.row_actions import RowActions
 
+
+def update_env_vars_sidebar(window) -> None:
+    """Update the Env Variables sidebar row with managed entry count."""
+    try:
+        sidebar = getattr(window, "_sidebar", None)
+        if sidebar is None:
+            return
+        row = sidebar._rows_by_id.get("env_vars")
+        if row is None:
+            return
+        if not hasattr(row, "_ev_sidebar_label"):
+            lbl = Gtk.Label()
+            lbl.set_valign(Gtk.Align.CENTER)
+            lbl.add_css_class("badge")
+            row.add_suffix(lbl)
+            row._ev_sidebar_label = lbl
+        from settings.core.env_vars import ENV_LUA_PATH, RESERVED_NAMES, parse_env_lua_file
+        count = len([e for e in parse_env_lua_file(ENV_LUA_PATH) if e.name not in RESERVED_NAMES])
+        row._ev_sidebar_label.set_visible(count > 0)
+        if count:
+            row._ev_sidebar_label.set_label(str(count))
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # EnvVarsPage
 # ---------------------------------------------------------------------------

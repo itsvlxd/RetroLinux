@@ -110,6 +110,30 @@ from settings.ui.window_picker import WindowPickerDialog
 from settings.ui.window_rule_dialog import WindowRuleEditDialog
 
 
+def update_window_rules_sidebar(window) -> None:
+    """Update the Window Rules sidebar row with custom rule count."""
+    try:
+        sidebar = getattr(window, "_sidebar", None)
+        if sidebar is None:
+            return
+        row = sidebar._rows_by_id.get("window_rules")
+        if row is None:
+            return
+        if not hasattr(row, "_wr_sidebar_label"):
+            lbl = Gtk.Label()
+            lbl.set_valign(Gtk.Align.CENTER)
+            lbl.add_css_class("badge")
+            row.add_suffix(lbl)
+            row._wr_sidebar_label = lbl
+        _, _, rules = config.read_cached()
+        count = sum(1 for r in rules if r.kind == "windowrule")
+        row._wr_sidebar_label.set_visible(count > 0)
+        if count:
+            row._wr_sidebar_label.set_label(str(count))
+    except Exception:
+        pass
+
+
 class WindowRulesPage(SavedListSectionPage[WindowRule]):
     """List editor for ``windowrule`` / ``windowrulev2`` entries."""
 
