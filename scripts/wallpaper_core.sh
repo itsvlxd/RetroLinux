@@ -457,6 +457,11 @@ sync_wallpapers() {
 
     local synced=0
     local skipped=0
+    local upgraded=0
+
+    local res_map=$(get_var "WALL_RES_MAP")
+    local map_w="${res_map%x*}"
+    local map_h="${res_map#*x}"
 
     for theme_dir in "$source_dir"/*/; do
         [[ -d $theme_dir ]] || continue
@@ -471,6 +476,24 @@ sync_wallpapers() {
             local target_file="$config_theme/$filename"
 
             if [[ -f $target_file || -L $target_file ]]; then
+                local src_res=$(get_image_resolution "$src_file")
+                local tgt_res=$(get_image_resolution "$target_file")
+                local src_w="${src_res%x*}" src_h="${src_res#*x}"
+                local tgt_w="${tgt_res%x*}" tgt_h="${tgt_res#*x}"
+
+                if [[ -n $src_w && -n $src_h && -n $tgt_w && -n $tgt_h
+                      && -n $map_w && -n $map_h ]]; then
+                    local src_area=$((src_w * src_h))
+                    local tgt_area=$((tgt_w * tgt_h))
+                    local map_area=$((map_w * map_h))
+
+                    if [[ $src_area -gt $tgt_area && $src_area -le $map_area ]]; then
+                        cp "$src_file" "$target_file"
+                        ((upgraded++))
+                        rx_log_file "info" "Upgraded $filename (${tgt_res} -> ${src_res})"
+                        continue
+                    fi
+                fi
                 ((skipped++))
             else
                 cp "$src_file" "$target_file"
@@ -479,10 +502,10 @@ sync_wallpapers() {
         done
     done
 
-    rx_log_file "info" "Wallpaper sync: ${synced} new, ${skipped} skipped"
+    local total=$((synced + upgraded))
+    rx_log_file "info" "Wallpaper sync: ${synced} new, ${upgraded} upgraded, ${skipped} skipped"
 
-    # Generate frame cache for newly synced files
-    if [[ $synced -gt 0 ]]; then
+    if [[ $total -gt 0 ]]; then
         while IFS= read -r f; do
             [[ -z $f ]] && continue
             rx_wallpaper_generate_cache "$f" >/dev/null
