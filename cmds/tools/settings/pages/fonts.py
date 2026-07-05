@@ -32,6 +32,34 @@ _SYSTEM_FONT_PKGS = {
 }
 
 
+def update_fonts_sidebar(window) -> None:
+    """Update the Fonts sidebar row with installed font count."""
+    try:
+        sidebar = getattr(window, "_sidebar", None)
+        if sidebar is None:
+            return
+        row = sidebar._rows_by_id.get("fonts")
+        if row is None:
+            return
+        if not hasattr(row, "_fonts_sidebar_label"):
+            lbl = Gtk.Label()
+            lbl.set_valign(Gtk.Align.CENTER)
+            lbl.add_css_class("badge")
+            row.add_suffix(lbl)
+            row._fonts_sidebar_label = lbl
+        result = subprocess.run(
+            ["bash", _FONT_CORE, "--list-installed"],
+            capture_output=True, text=True, timeout=10,
+            stdin=subprocess.DEVNULL,
+        )
+        count = len([l for l in result.stdout.strip().splitlines() if l.strip()])
+        row._fonts_sidebar_label.set_visible(count > 0)
+        if count:
+            row._fonts_sidebar_label.set_label(f"{count} fonts")
+    except Exception:
+        pass
+
+
 class FontsPage:
     """Font management — active fonts, installable list, package install."""
 
@@ -76,6 +104,8 @@ class FontsPage:
         self._populate_font_list(list_group)
         self._content_box.append(list_group)
 
+        update_fonts_sidebar(self._window)
+
         return toolbar_view
 
     # ── Data ──
@@ -115,6 +145,7 @@ class FontsPage:
         self._load_data()
         self._refresh_combo_rows()
         self._rebuild_font_list()
+        update_fonts_sidebar(self._window)
 
     # ── Active Fonts (Adw.ComboRow) ──
 

@@ -31,6 +31,34 @@ from settings.ui.icons import BINDS_ICON
 from settings.ui.row_actions import RowActions
 
 
+def update_binds_sidebar(window) -> None:
+    """Update the Keybinds sidebar row with managed bind count."""
+    try:
+        sidebar = getattr(window, "_sidebar", None)
+        if sidebar is None:
+            return
+        row = sidebar._rows_by_id.get("binds")
+        if row is None:
+            return
+        if not hasattr(row, "_binds_sidebar_label"):
+            lbl = Gtk.Label()
+            lbl.set_valign(Gtk.Align.CENTER)
+            lbl.add_css_class("badge")
+            row.add_suffix(lbl)
+            row._binds_sidebar_label = lbl
+        kb = config.keybinds_path()
+        count = 0
+        if kb.exists():
+            sections = config.read_all_sections(kb)[1]
+            count += len(config.collect_bind_section(sections))
+            count += len(re.findall(r'hl\.bind\(', kb.read_text(), re.MULTILINE))
+        row._binds_sidebar_label.set_visible(count > 0)
+        if count:
+            row._binds_sidebar_label.set_label(str(count))
+    except Exception:
+        pass
+
+
 class BindsPage(SectionPage):
     """Builds the keybinds management page with categorized layout."""
 

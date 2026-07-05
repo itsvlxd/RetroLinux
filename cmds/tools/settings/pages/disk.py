@@ -69,9 +69,11 @@ def update_disk_sidebar(window, disks: list[DiskInfo]) -> None:
             elif avg_pct > 80:
                 row._disk_sidebar_bar.add_css_class("level-bar-warning")
             row._disk_sidebar_pct.set_label(f"{avg_pct:.0f}%")
+            row._disk_sidebar_pct.set_visible(True)
         else:
             row._disk_sidebar_bar.set_value(0)
             row._disk_sidebar_pct.set_label("")
+            row._disk_sidebar_pct.set_visible(False)
     except Exception:
         pass
 

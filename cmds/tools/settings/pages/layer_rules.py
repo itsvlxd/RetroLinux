@@ -73,6 +73,30 @@ from settings.ui.layer_rule_dialog import LayerRuleEditDialog
 from settings.ui.row_actions import RowActions
 
 
+def update_layer_rules_sidebar(window) -> None:
+    """Update the Layer Rules sidebar row with custom rule count."""
+    try:
+        sidebar = getattr(window, "_sidebar", None)
+        if sidebar is None:
+            return
+        row = sidebar._rows_by_id.get("layer_rules")
+        if row is None:
+            return
+        if not hasattr(row, "_lr_sidebar_label"):
+            lbl = Gtk.Label()
+            lbl.set_valign(Gtk.Align.CENTER)
+            lbl.add_css_class("badge")
+            row.add_suffix(lbl)
+            row._lr_sidebar_label = lbl
+        _, _, rules = config.read_cached()
+        count = sum(1 for r in rules if r.kind == "layerrule")
+        row._lr_sidebar_label.set_visible(count > 0)
+        if count:
+            row._lr_sidebar_label.set_label(str(count))
+    except Exception:
+        pass
+
+
 class LayerRulesPage(SavedListSectionPage[LayerRule]):
     """List editor for ``layerrule`` entries."""
 

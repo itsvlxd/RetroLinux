@@ -316,12 +316,12 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         _bt4 = time.monotonic()
         print(f'[TIMING]   finalize={_bt4-_bt3:.3f}s', file=__import__('sys').stderr)
 
-        GLib.timeout_add(300, self._eager_disk_sidebar)
+        GLib.timeout_add(100, self._eager_all_sidebars)
 
-    def _eager_disk_sidebar(self):
-        """Load initial disk stats so the sidebar progress bar shows immediately."""
-        from settings.pages.disk import DiskInfo, update_disk_sidebar
+    def _eager_all_sidebars(self):
+        """Load all sidebar badges in one batch to avoid staggered layout shifts."""
         try:
+            from settings.pages.disk import DiskInfo, update_disk_sidebar
             result = subprocess.run(
                 ["bash", "/opt/retrolinux/scripts/disk_core.sh", "--status"],
                 capture_output=True, text=True, timeout=15,
@@ -338,6 +338,36 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
                             temp=parts[6], mounts=parts[7], wear_pct=parts[8],
                         ))
             update_disk_sidebar(self, disks)
+        except Exception:
+            pass
+        try:
+            from settings.pages.fonts import update_fonts_sidebar
+            update_fonts_sidebar(self)
+        except Exception:
+            pass
+        try:
+            from settings.pages.window_rules import update_window_rules_sidebar
+            update_window_rules_sidebar(self)
+        except Exception:
+            pass
+        try:
+            from settings.pages.layer_rules import update_layer_rules_sidebar
+            update_layer_rules_sidebar(self)
+        except Exception:
+            pass
+        try:
+            from settings.pages.binds import update_binds_sidebar
+            update_binds_sidebar(self)
+        except Exception:
+            pass
+        try:
+            from settings.pages.autostart import update_autostart_sidebar
+            update_autostart_sidebar(self)
+        except Exception:
+            pass
+        try:
+            from settings.pages.env_vars import update_env_vars_sidebar
+            update_env_vars_sidebar(self)
         except Exception:
             pass
         return False
