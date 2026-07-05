@@ -10,6 +10,7 @@ from settings.ui.icons import (
     BINDS_ICON,
     DISKS_ICON,
     ENV_VARS_ICON,
+    FONTS_ICON,
     LAYER_RULES_ICON,
     LAYOUTS_ICON,
     MONITORS_ICON,
@@ -188,6 +189,7 @@ class Sidebar:
         add_schema_row(look_and_feel, "appearance")
         add_schema_row(look_and_feel, "decoration")
         add_schema_row(look_and_feel, "animations")
+        add_row(look_and_feel, "fonts", "Fonts", FONTS_ICON)
         add_schema_row(look_and_feel, "cursor")
         add_row(look_and_feel, "themes", "Themes", THEMES_ICON)
         add_row(look_and_feel, "apps", "Applications", APPS_ICON)

@@ -22,6 +22,7 @@ from settings.pages.binds import BindsPage
 from settings.pages.cursor import CursorPage
 from settings.pages.disk import DiskPage
 from settings.pages.env_vars import EnvVarsPage
+from settings.pages.fonts import FontsPage
 from settings.pages.layer_rules import LayerRulesPage
 from settings.pages.layouts import LayoutsPage
 from settings.pages.monitors import MonitorsPage
@@ -425,6 +426,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (AppsPage, "_apps_page", "apps", "Applications"),
             (DiskPage, "_disk_page", "disks", "Disks"),
+            (FontsPage, "_fonts_page", "fonts", "Fonts"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
@@ -998,6 +1000,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         elif cls is ThemesPage:
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is DiskPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is FontsPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

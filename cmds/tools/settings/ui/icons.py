@@ -29,6 +29,7 @@ SETTINGS_ICON = "emblem-system-symbolic"
 WALLPAPERS_ICON = "computer-symbolic"
 APPS_ICON = "application-x-executable-symbolic"
 DISKS_ICON = "drive-harddisk-symbolic"
+FONTS_ICON = "preferences-desktop-font-symbolic"
 
 # Used by pages/pending.py when a change can't be matched to a known
 # group_id (defensive — should not happen in practice).
