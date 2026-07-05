@@ -231,10 +231,9 @@ case "$1" in
         query="$2"
 
         $helper -Ss "$query" |
-            grep -iE "font|ttf|otf|woff|emoji" |
-            grep -ivE "lib32-|lib64-|electron|nodejs|python-" |
             grep -E "^(aur|extra|community|multilib)/" |
-            sed 's/^[^\/]*\///'
+            sed 's/^[^\/]*\///' |
+            awk 'tolower($1) ~ /font|ttf|otf|woff|emoji|ttc|woff2/'
         ;;
     "--list-installed")
         fc-list : family | cut -d',' -f1 | sort -u | sed 's/^ //'
@@ -253,5 +252,13 @@ case "$1" in
         ;;
     "--install-file-cache")
         rx_font_file_cache
+        ;;
+    "--family-to-pkg")
+        files=$(fc-list ":family=$2" file 2>/dev/null | cut -d: -f1)
+        for f in $files; do
+            pkg=$(pacman -Qo "$f" 2>/dev/null | grep -oP 'owned by \K\S+')
+            [[ -n $pkg ]] && echo "$pkg" && exit 0
+        done
+        echo ""
         ;;
 esac
