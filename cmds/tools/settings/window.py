@@ -19,6 +19,7 @@ from settings.data.bezier_data import get_curve_store
 from settings.pages.animations import AnimationsPage
 from settings.pages.autostart import AutostartPage
 from settings.pages.binds import BindsPage
+from settings.pages.battery import BatteryPage
 from settings.pages.cursor import CursorPage
 from settings.pages.disk import DiskPage
 from settings.pages.env_vars import EnvVarsPage
@@ -372,6 +373,11 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             update_env_vars_sidebar(self)
         except Exception:
             pass
+        try:
+            from settings.pages.battery import update_battery_sidebar
+            update_battery_sidebar(self)
+        except Exception:
+            pass
         return False
 
     def _build_content_pane(self):
@@ -467,6 +473,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
         ]
+        import os
+        if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
+            standalone_page_specs.insert(5, (BatteryPage, "_battery_page", "battery", "Battery"))
+
         for cls, attr, slug, title in standalone_page_specs:
             self._lazy_standalone_specs[slug] = (cls, attr, title)
 
@@ -1046,6 +1056,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is PowerPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is BatteryPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

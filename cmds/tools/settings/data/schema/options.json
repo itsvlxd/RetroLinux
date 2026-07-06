@@ -1267,6 +1267,54 @@
           ]
         }
       ]
+    },
+    {
+      "id": "battery",
+      "label": "Battery",
+      "hidden": true,
+      "parent_page": "battery",
+      "sections": [
+        {
+          "id": "battery:config",
+          "label": "Configuration",
+          "options": [
+            {
+              "key": "battery:notify_threshold",
+              "label": "Low battery notification",
+              "description": "Show notification when battery drops below this percentage",
+              "type": "int",
+              "min": 5,
+              "max": 50,
+              "default": 30
+            },
+            {
+              "key": "battery:critical_threshold",
+              "label": "Critical battery notification",
+              "description": "Critical notification when battery drops below this percentage",
+              "type": "int",
+              "min": 5,
+              "max": 50,
+              "default": 15
+            },
+            {
+              "key": "battery:saver_threshold",
+              "label": "Auto saver threshold",
+              "description": "Enable battery saver below this charge level",
+              "type": "int",
+              "min": 0,
+              "max": 100,
+              "default": 50
+            },
+            {
+              "key": "battery:saver_on_disconnect",
+              "label": "Saver on power disconnect",
+              "description": "Auto-enable battery saver when disconnected from AC power",
+              "type": "bool",
+              "default": true
+            }
+          ]
+        }
+      ]
     }
   ]
 }
