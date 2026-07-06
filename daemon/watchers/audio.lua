@@ -173,18 +173,32 @@ return {
 
 			local ee_running = (io.popen("pgrep -x easyeffects 2>/dev/null"):read("*l") or "") ~= ""
 
-			if last_ee_running and not ee_running then
-				ee_crashed_at = os.time()
-				Watcher.log("audio", "EasyEffects stopped — waiting 20s before restart", "warn")
-			elseif ee_crashed_at and ee_running then
-				ee_crashed_at = nil
-				Watcher.log("audio", "EasyEffects recovered on its own", "info")
-			elseif ee_crashed_at and not ee_running then
-				if os.time() - ee_crashed_at >= 20 then
-					Watcher.log("audio", "EasyEffects still down after 20s — restarting", "warn")
-					io.popen("nohup retro audio ee restart &")
-					engine:emit("on_audio_ee_restarted")
+			local crash_restart = Watcher.get_var("AUDIO_RESTART_ON_CRASH", "true")
+			local crash_threshold = tonumber(Watcher.get_var("AUDIO_RESTART_ON_CRASH_THRESHOLD", "20")) or 20
+			local crash_notify = Watcher.get_var("AUDIO_RESTART_ON_CRASH_NOTIFY", "true")
+
+			if crash_restart == "true" then
+				if last_ee_running and not ee_running then
+					ee_crashed_at = os.time()
+					Watcher.log("audio", "EasyEffects stopped — waiting " .. crash_threshold .. "s before restart", "warn")
+				elseif ee_crashed_at and ee_running then
 					ee_crashed_at = nil
+					Watcher.log("audio", "EasyEffects recovered on its own", "info")
+				elseif ee_crashed_at and not ee_running then
+					if os.time() - ee_crashed_at >= crash_threshold then
+						Watcher.log("audio", "EasyEffects still down after " .. crash_threshold .. "s — restarting", "warn")
+						io.popen("nohup retro audio ee restart &")
+						if crash_notify == "true" then
+							engine:emit("on_audio_ee_restarted")
+						end
+						ee_crashed_at = nil
+					end
+				end
+			else
+				if last_ee_running and not ee_running then
+					Watcher.log("audio", "EasyEffects stopped (auto-restart disabled)", "info")
+				elseif not last_ee_running and ee_running then
+					Watcher.log("audio", "EasyEffects started", "info")
 				end
 			end
 
