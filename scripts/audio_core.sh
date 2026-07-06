@@ -746,7 +746,7 @@ get_pcore_threads() {
 }
 
 fix_stutter() {
-    local services=("pipewire" "wireplumber" "easyeffects")
+    local services=("pipewire" "wireplumber")
     local cpu_vendor=$(grep -m1 "vendor" /proc/cpuinfo | awk '{print $3}')
 
     local affinity=$(get_pcore_threads)
@@ -758,7 +758,18 @@ fix_stutter() {
 
     local method="P-cores"
     [[ $cpu_vendor != *"Intel"* ]] && method="all cores"
-    rx_log "info" "Pinning audio processing loop to: ${PINK}$method ($affinity)${RESET}"
+
+    local pw_config_dir="$HOME/.config/pipewire/pipewire.conf.d"
+    mkdir -p "$pw_config_dir"
+    cat >"$pw_config_dir/99-force-static.conf" <<EOF
+context.properties = {
+    default.clock.rate          = 48000
+    default.clock.allowed-rates = [ 48000 ]
+    default.clock.quantum       = 1024
+    default.clock.min-quantum   = 512
+    default.clock.max-quantum   = 2048
+}
+EOF
 
     for svc in "${services[@]}"; do
         local unit="${svc}.service"
@@ -772,10 +783,17 @@ Nice=-15
 LimitRTPRIO=95
 LimitMEMLOCK=infinity
 EOF
-        systemctl --user restart "$unit" 2>/dev/null
     done
 
     systemctl --user daemon-reload 2>/dev/null
+
+    for svc in "${services[@]}"; do
+        local unit="${svc}.service"
+        systemctl --user restart "$unit" 2>/dev/null
+    done
+
+    retro audio ee restart
+
     echo "$affinity"
 }
 
