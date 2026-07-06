@@ -32,6 +32,7 @@ DISKS_ICON = "drive-harddisk-symbolic"
 FONTS_ICON = "preferences-desktop-font-symbolic"
 GRUB_ICON = "system-restart-symbolic"
 POWER_ICON = "preferences-system-power-symbolic"
+BATTERY_ICON = "battery-symbolic"
 
 # Used by pages/pending.py when a change can't be matched to a known
 # group_id (defensive — should not happen in practice).
