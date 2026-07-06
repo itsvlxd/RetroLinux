@@ -1,7 +1,5 @@
 local Watcher = {}
 
-local _vars_file = nil
-
 local _log_caps = {}
 local _log_enabled = nil
 local _log_dir = "/tmp/retro_logs"
@@ -9,16 +7,12 @@ local _log_dir = "/tmp/retro_logs"
 os.execute("mkdir -p " .. _log_dir)
 
 local function _get_vars_file()
-	if _vars_file then
-		return _vars_file
-	end
 	local retro_config = os.getenv("RETRO_CONFIG")
 	if not retro_config or retro_config == "" then
 		local home = os.getenv("HOME") or "/tmp"
 		retro_config = home .. "/.config/retro"
 	end
-	_vars_file = retro_config .. "/variables.sh"
-	return _vars_file
+	return retro_config .. "/variables.sh"
 end
 
 local function _parse_vars_file()
