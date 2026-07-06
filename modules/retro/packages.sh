@@ -10,6 +10,7 @@ unzip
 expect
 udisks2
 usbutils
+gstreamer
 net-tools
 inetutils
 base-devel
