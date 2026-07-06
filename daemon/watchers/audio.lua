@@ -15,6 +15,7 @@ return {
 		local primary_sink_was_unavail = false
 		local primary_source_was_unavail = false
 		local last_ee_running = false
+		local ee_crashed_at = nil
 
 		while true do
 			local primary_sink = Watcher.get_var("AUDIO_PRIMARY_SINK", "")
@@ -171,11 +172,22 @@ return {
 			end
 
 			local ee_running = (io.popen("pgrep -x easyeffects 2>/dev/null"):read("*l") or "") ~= ""
+
 			if last_ee_running and not ee_running then
-				Watcher.log("audio", "EasyEffects crashed — restarting", "warn")
-				io.popen("nohup retro audio ee restart &")
-				engine:emit("on_audio_ee_restarted")
+				ee_crashed_at = os.time()
+				Watcher.log("audio", "EasyEffects stopped — waiting 20s before restart", "warn")
+			elseif ee_crashed_at and ee_running then
+				ee_crashed_at = nil
+				Watcher.log("audio", "EasyEffects recovered on its own", "info")
+			elseif ee_crashed_at and not ee_running then
+				if os.time() - ee_crashed_at >= 20 then
+					Watcher.log("audio", "EasyEffects still down after 20s — restarting", "warn")
+					io.popen("nohup retro audio ee restart &")
+					engine:emit("on_audio_ee_restarted")
+					ee_crashed_at = nil
+				end
 			end
+
 			last_ee_running = ee_running
 
 			coroutine.yield()
