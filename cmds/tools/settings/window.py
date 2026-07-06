@@ -815,6 +815,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             counts["wallpapers"] = 1
         if self._apps_page is not None and self._apps_page.is_dirty():
             counts["apps"] = 1
+        audio_page = getattr(self, "_audio_page", None)
+        if audio_page is not None and audio_page.is_dirty():
+            counts["audio"] = 1
 
         # The pending-changes chip totals everything else
         counts["pending"] = sum(counts.values())
