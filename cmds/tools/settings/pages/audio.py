@@ -17,6 +17,12 @@ if TYPE_CHECKING:
 _AUDIO_CORE = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "audio_core.sh")
 _AUDIO_ICON = "audio-volume-high-symbolic"
 
+_CRASH_DEFAULTS = {
+    "AUDIO_RESTART_ON_CRASH": "true",
+    "AUDIO_RESTART_ON_CRASH_THRESHOLD": "20",
+    "AUDIO_RESTART_ON_CRASH_NOTIFY": "true",
+}
+
 
 def _make_device_factory() -> Gtk.SignalListItemFactory:
     """Factory for device combo items that truncates the start of long names."""
@@ -86,6 +92,7 @@ class AudioPage:
 
         # Advanced (EasyEffects + fix stutter)
         ag = Adw.PreferencesGroup(title="Advanced")
+        self._build_crash_config(ag)
         self._build_ee_section(ag)
         self._build_advanced_section(ag)
         self._content_box.append(ag)
@@ -483,10 +490,19 @@ class AudioPage:
 
     def _refresh_managed(self) -> None:
         from lib.python.variable import get_var as _g
+        from lib.python.variable import get_module_default as _md
         for var, key, _row, actions, _dl, _fb in self._priority_rows:
             cur = self._pending.get(var, self._orig.get(key, ""))
             live = _g(var, "")
-            default = ""
+            default = _md(var) or ""
+            is_managed = cur != default
+            is_dirty = cur != live
+            is_saved = live != default
+            actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
+        for var, key, _widget, actions in self._crash_rows:
+            cur = self._get_crash_cur(key)
+            live = _g(var, "")
+            default = _CRASH_DEFAULTS.get(var, "")
             is_managed = cur != default
             is_dirty = cur != live
             is_saved = live != default
@@ -495,6 +511,11 @@ class AudioPage:
     def _check_dirty(self) -> None:
         was = self._dirty
         self._dirty = bool(self._pending)
+        if not self._dirty:
+            for var, key, _widget, _actions in self._crash_rows:
+                if self._get_crash_cur(key) != self._orig.get(key, ""):
+                    self._dirty = True
+                    break
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
 
@@ -767,6 +788,112 @@ class AudioPage:
 
     # ── Advanced ──
 
+    def _build_crash_config(self, group: Adw.PreferencesGroup) -> None:
+        self._crash_rows: list[tuple] = []
+
+        sw = Adw.SwitchRow(
+            title="Audio Auto-restart on crash",
+            subtitle="Restart EasyEffects daemon automatically when it crashes",
+        )
+        sw.set_active(self._orig.get("crash_restart", "true") == "true")
+        sw.connect("notify::active", self._on_crash_switch, "AUDIO_RESTART_ON_CRASH", "crash_restart")
+        group.add(sw)
+        sa = RowActions(sw,
+                        on_discard=lambda: self._discard_crash("AUDIO_RESTART_ON_CRASH", "crash_restart"),
+                        on_reset=lambda: self._reset_crash("AUDIO_RESTART_ON_CRASH", "crash_restart"))
+        sw.add_suffix(sa.box)
+        sa.reorder_first()
+        self._crash_rows.append(("AUDIO_RESTART_ON_CRASH", "crash_restart", sw, sa))
+
+        adj = Gtk.Adjustment(value=float(self._orig.get("crash_threshold", "20")), lower=5, upper=120, step_increment=5, page_increment=10)
+        spin = Gtk.SpinButton(adjustment=adj, digits=0)
+        spin.set_valign(Gtk.Align.CENTER)
+        spin.connect("notify::value", self._on_crash_spin)
+        tr = Adw.ActionRow(title="Audio Restart delay", subtitle="Seconds to wait before restarting crashed daemon")
+        tr.add_suffix(spin)
+        group.add(tr)
+        self._crash_spin = spin
+        ta = RowActions(tr,
+                        on_discard=lambda: self._discard_crash("AUDIO_RESTART_ON_CRASH_THRESHOLD", "crash_threshold"),
+                        on_reset=lambda: self._reset_crash("AUDIO_RESTART_ON_CRASH_THRESHOLD", "crash_threshold"))
+        tr.add_suffix(ta.box)
+        ta.reorder_first()
+        self._crash_rows.append(("AUDIO_RESTART_ON_CRASH_THRESHOLD", "crash_threshold", spin, ta))
+
+        nsw = Adw.SwitchRow(
+            title="Audio Crash notification",
+            subtitle="Show a desktop notification when EasyEffects is restarted",
+        )
+        nsw.set_active(self._orig.get("crash_notify", "true") == "true")
+        nsw.connect("notify::active", self._on_crash_switch, "AUDIO_RESTART_ON_CRASH_NOTIFY", "crash_notify")
+        group.add(nsw)
+        na = RowActions(nsw,
+                        on_discard=lambda: self._discard_crash("AUDIO_RESTART_ON_CRASH_NOTIFY", "crash_notify"),
+                        on_reset=lambda: self._reset_crash("AUDIO_RESTART_ON_CRASH_NOTIFY", "crash_notify"))
+        nsw.add_suffix(na.box)
+        na.reorder_first()
+        self._crash_rows.append(("AUDIO_RESTART_ON_CRASH_NOTIFY", "crash_notify", nsw, na))
+
+    def _on_crash_switch(self, sw: Adw.SwitchRow, _pspec, var: str, key: str) -> None:
+        if self._setting_value:
+            return
+        self._pending[var] = "true" if sw.get_active() else "false"
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        GLib.idle_add(self._refresh_managed)
+
+    def _on_crash_spin(self, spin: Gtk.SpinButton, _pspec) -> None:
+        if self._setting_value:
+            return
+        self._pending["AUDIO_RESTART_ON_CRASH_THRESHOLD"] = str(int(spin.get_value()))
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        GLib.idle_add(self._refresh_managed)
+
+    def _discard_crash(self, var: str, key: str) -> None:
+        from lib.python.variable import get_var as _g
+        live = _g(var, "")
+        self._set_crash_widget(key, live)
+        self._pending.pop(var, None)
+        self._check_dirty()
+        self._refresh_managed()
+
+    def _reset_crash(self, var: str, key: str) -> None:
+        default = _CRASH_DEFAULTS.get(var, "")
+        self._set_crash_widget(key, default)
+        self._pending[var] = default
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        self._refresh_managed()
+
+    def _set_crash_widget(self, key: str, val: str) -> None:
+        self._setting_value = True
+        if key == "crash_threshold":
+            try:
+                self._crash_spin.set_value(float(val))
+            except (ValueError, AttributeError):
+                self._crash_spin.set_value(20)
+        else:
+            for var, pk, widget, _actions in self._crash_rows:
+                if pk == key:
+                    widget.set_active(val == "true")
+                    break
+        self._setting_value = False
+
+    def _get_crash_cur(self, key: str) -> str:
+        if key == "crash_threshold":
+            try:
+                return str(int(self._crash_spin.get_value()))
+            except (ValueError, AttributeError):
+                return "20"
+        for var, pk, widget, _actions in self._crash_rows:
+            if pk == key:
+                return "true" if widget.get_active() else "false"
+        return ""
+
     def _build_advanced_section(self, group: Adw.PreferencesGroup) -> None:
         fix_btn = Gtk.Button(label="Fix Audio Stutter")
         fix_btn.add_css_class("destructive-action")
@@ -866,6 +993,9 @@ class AudioPage:
             "primary_source": pp,
             "fallback_source": fp,
             "eq_preset": self._status.get("eq_preset", ""),
+            "crash_restart": self._get_crash_cur("crash_restart"),
+            "crash_threshold": self._get_crash_cur("crash_threshold"),
+            "crash_notify": self._get_crash_cur("crash_notify"),
         }
         self._dirty = False
         self._refresh_managed()
@@ -873,6 +1003,8 @@ class AudioPage:
     def discard(self) -> None:
         for var, key, _row, _actions, _dl, _fb in self._priority_rows:
             self._set_priority_widget(key, self._orig.get(key, ""))
+        for var, key, _widget, _actions in self._crash_rows:
+            self._set_crash_widget(key, self._orig.get(key, ""))
         self._pending.clear()
         self._dirty = False
 
@@ -904,6 +1036,15 @@ class AudioPage:
             {"key": "audio:ee", "label": "EasyEffects",
              "description": "Start, stop, restart, and open EasyEffects GUI",
              "_group_id": "audio", "_group_label": "Audio", "_section_label": "EasyEffects"},
+            {"key": "audio:crash_restart", "label": "Audio Auto-restart on crash",
+             "description": "Restart EasyEffects automatically when it crashes",
+             "_group_id": "audio", "_group_label": "Audio", "_section_label": "Crash Recovery"},
+            {"key": "audio:crash_threshold", "label": "Audio Restart delay",
+             "description": "Seconds to wait before restarting crashed EasyEffects",
+             "_group_id": "audio", "_group_label": "Audio", "_section_label": "Crash Recovery"},
+            {"key": "audio:crash_notify", "label": "Audio Crash notification",
+             "description": "Show desktop notification when EasyEffects is restarted",
+             "_group_id": "audio", "_group_label": "Audio", "_section_label": "Crash Recovery"},
         ]
 
     def destroy(self) -> None:
