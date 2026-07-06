@@ -24,6 +24,7 @@ from settings.pages.disk import DiskPage
 from settings.pages.env_vars import EnvVarsPage
 from settings.pages.fonts import FontsPage
 from settings.pages.grub import GrubPage
+from settings.pages.power import PowerPage
 from settings.pages.layer_rules import LayerRulesPage
 from settings.pages.layouts import LayoutsPage
 from settings.pages.monitors import MonitorsPage
@@ -460,6 +461,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
             (GrubPage, "_grub_page", "grub", "Bootloader"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
+            (PowerPage, "_power_page", "power", "Power"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
@@ -1040,6 +1042,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is GrubPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is PowerPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
