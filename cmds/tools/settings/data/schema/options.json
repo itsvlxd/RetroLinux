@@ -1315,6 +1315,124 @@
           ]
         }
       ]
+    },
+    {
+      "id": "audio",
+      "label": "Audio",
+      "hidden": true,
+      "parent_page": "audio",
+      "sections": [
+        {
+          "id": "audio:status",
+          "label": "Status",
+          "options": [
+            {
+              "key": "audio:status_pw",
+              "label": "PipeWire",
+              "description": "PipeWire version",
+              "type": "string"
+            },
+            {
+              "key": "audio:status_wp",
+              "label": "WirePlumber",
+              "description": "WirePlumber version",
+              "type": "string"
+            },
+            {
+              "key": "audio:status_ee",
+              "label": "EasyEffects",
+              "description": "EasyEffects daemon status",
+              "type": "string"
+            },
+            {
+              "key": "audio:status_eq",
+              "label": "EQ Profile",
+              "description": "Current equalizer preset",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "id": "audio:volume",
+          "label": "Volume & Devices",
+          "options": [
+            {
+              "key": "audio:volume",
+              "label": "Volume",
+              "description": "Output volume level",
+              "type": "int",
+              "min": 0,
+              "max": 100
+            },
+            {
+              "key": "audio:mute",
+              "label": "Mute",
+              "description": "Toggle output mute",
+              "type": "bool"
+            },
+            {
+              "key": "audio:mic_mute",
+              "label": "Mic Mute",
+              "description": "Toggle microphone mute",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "id": "audio:priority",
+          "label": "Device Priority",
+          "options": [
+            {
+              "key": "audio:primary_sink",
+              "label": "Primary Output",
+              "description": "Preferred audio output device",
+              "type": "string"
+            },
+            {
+              "key": "audio:fallback_sink",
+              "label": "Fallback Output",
+              "description": "Fallback when primary is unavailable",
+              "type": "string"
+            },
+            {
+              "key": "audio:primary_source",
+              "label": "Primary Input",
+              "description": "Preferred audio input device",
+              "type": "string"
+            },
+            {
+              "key": "audio:fallback_source",
+              "label": "Fallback Input",
+              "description": "Fallback when primary is unavailable",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "id": "audio:eq",
+          "label": "Equalizer",
+          "options": [
+            {
+              "key": "audio:eq_preset",
+              "label": "EQ Profile",
+              "description": "Current equalizer preset",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "id": "audio:ee",
+          "label": "EasyEffects",
+          "options": [
+            {
+              "key": "audio:ee_status",
+              "label": "EasyEffects Status",
+              "description": "EasyEffects daemon running state",
+              "type": "string"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
