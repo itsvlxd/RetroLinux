@@ -19,11 +19,5 @@
  * {
     font-family: "REPLACE_RETRO_FONT", sans-serif;
     font-size: REPLACE_RETRO_SIZEpt;
-
-    -gtk-icon-transform: none;
-    -gtk-cursor-theme-name: "REPLACE_CURSOR";
-    font-smoothing: antialiased;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
 }
 
