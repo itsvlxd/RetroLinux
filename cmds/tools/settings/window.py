@@ -23,6 +23,7 @@ from settings.pages.cursor import CursorPage
 from settings.pages.disk import DiskPage
 from settings.pages.env_vars import EnvVarsPage
 from settings.pages.fonts import FontsPage
+from settings.pages.grub import GrubPage
 from settings.pages.layer_rules import LayerRulesPage
 from settings.pages.layouts import LayoutsPage
 from settings.pages.monitors import MonitorsPage
@@ -457,6 +458,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (AppsPage, "_apps_page", "apps", "Applications"),
             (DiskPage, "_disk_page", "disks", "Disks"),
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
+            (GrubPage, "_grub_page", "grub", "Bootloader"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
@@ -1037,6 +1039,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is GrubPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
 
     def show_page(self, gid: str):
         """Switch the content pane to the given page."""
@@ -1366,12 +1372,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             hyprland_version=self.hypr.version,
         )
 
-        if variable_values:
-            from lib.python.variable import set_var as _set_var
-            for var_name, val in variable_values.items():
-                _set_var(var_name, val)
-            subprocess.run(["retro", "app", "all", "refresh"], check=False)
-
         self.app_state.mark_saved()
         self.hypr.clear_pending()
         for section in self._section_pages:
@@ -1383,6 +1383,12 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._undo.clear()
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()
+
+        if variable_values:
+            from lib.python.variable import set_var as _set_var
+            for var_name, val in variable_values.items():
+                _set_var(var_name, val)
+            subprocess.run(["retro", "app", "all", "refresh"], check=False)
 
     def save(self, *, update_active_profile: bool = True):
         """Public save API — performs save and shows banner animation."""
