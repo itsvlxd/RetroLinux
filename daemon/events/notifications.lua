@@ -271,10 +271,20 @@ function Events.on_ssh_close(username, ip, reason)
 	end
 end
 
+function Events.on_audio_ee_restarted()
+	Notify.send(
+		"Audio Crashed",
+		"The Audio Daemon has crashed. Attempting to safely restart the engine...",
+		{ icon = "audio-card-symbolic", urgency = "normal", timeout = "10000" }
+	)
+end
+
 function Events.on_retro_update_available(commits)
 	log("Notification: retro_update | commits=" .. commits)
 	local retro_dir = os.getenv("RETRO_DIR")
-	local kitty_args = 'kitty -- bash -c "cd ' .. retro_dir .. ' && bash retro.sh --update; echo; echo Press Enter to close.; read"'
+	local kitty_args = 'kitty -- bash -c "cd '
+		.. retro_dir
+		.. ' && bash retro.sh --update; echo; echo Press Enter to close.; read"'
 	local kitty_esc = kitty_args:gsub('"', '\\"')
 	local lua_expr = 'hl.dsp.exec_cmd("' .. kitty_esc .. '" , { float = true, size = { 1000, 700 }, center = true })'
 	local update_cmd = "hyprctl dispatch '" .. lua_expr .. "'"
