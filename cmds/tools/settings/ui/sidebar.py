@@ -13,6 +13,7 @@ from settings.ui.icons import (
     FONTS_ICON,
     GRUB_ICON,
     LAYER_RULES_ICON,
+    POWER_ICON,
     LAYOUTS_ICON,
     MONITORS_ICON,
     SETTINGS_ICON,
@@ -222,6 +223,7 @@ class Sidebar:
         system = new_category("System")
         add_row(system, "disks", "Disks", DISKS_ICON)
         add_row(system, "grub", "Bootloader", GRUB_ICON)
+        add_row(system, "power", "Power", POWER_ICON)
 
         advanced = new_category("Advanced")
         add_schema_row(advanced, "xwayland")
