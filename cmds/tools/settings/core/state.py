@@ -3,11 +3,13 @@
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hyprland_config import value_to_conf
 from hyprland_socket import HyprlandError
-from hyprland_state import HyprlandState
+
+if TYPE_CHECKING:
+    from hyprland_state import HyprlandState
 
 from settings.core.undo import OptionChange
 
