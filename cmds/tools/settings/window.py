@@ -19,6 +19,7 @@ from settings.data.bezier_data import get_curve_store
 from settings.pages.animations import AnimationsPage
 from settings.pages.audio import AudioPage
 from settings.pages.bluetooth import BluetoothPage
+from settings.pages.network import NetworkPage
 from settings.pages.autostart import AutostartPage
 from settings.pages.binds import BindsPage
 from settings.pages.battery import BatteryPage
@@ -467,6 +468,16 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         _bt_widget = _bt_page.build(header=self._make_page_header("Bluetooth"))
         self._page_stack.add_named(_bt_widget, "bluetooth")
         self._page_titles["bluetooth"] = "Bluetooth"
+
+        # Build Network page eagerly so the sidebar switch is present on launch
+        _net_page = NetworkPage(self)
+        self._network_page = _net_page
+        _net_page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+        self._section_pages.append(_net_page)  # type: ignore[attr-defined]
+        self._search_page_builder.add_entries(_net_page.get_search_entries())
+        _net_widget = _net_page.build(header=self._make_page_header("Network"))
+        self._page_stack.add_named(_net_widget, "network")
+        self._page_titles["network"] = "Network"
 
         self._search_page_builder.add_entries(CursorPage.get_search_entries())
         _bt2 = time.monotonic()

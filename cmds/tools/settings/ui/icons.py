@@ -35,6 +35,7 @@ POWER_ICON = "preferences-system-power-symbolic"
 BATTERY_ICON = "battery-symbolic"
 AUDIO_ICON = "audio-volume-high-symbolic"
 BLUETOOTH_ICON = "bluetooth-active-symbolic"
+NETWORK_ICON = "network-wireless-symbolic"
 
 # Used by pages/pending.py when a change can't be matched to a known
 # group_id (defensive — should not happen in practice).
