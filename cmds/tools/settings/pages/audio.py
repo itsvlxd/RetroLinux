@@ -1,5 +1,6 @@
 """Audio management page — volume, devices, EQ, EasyEffects, stutter fix."""
 
+import json
 import os
 import subprocess
 from collections.abc import Iterable
@@ -8,8 +9,10 @@ from typing import TYPE_CHECKING
 from gi.repository import Adw, GLib, Gtk, Pango
 
 from settings.core.pending import PendingChange
+from settings.core.spectrum_engine import SpectrumEngine
 from settings.ui import make_page_layout
 from settings.ui.row_actions import RowActions
+from settings.ui.spectrum import AudioSpectrumWidget
 
 if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
@@ -22,6 +25,24 @@ _CRASH_DEFAULTS = {
     "AUDIO_RESTART_ON_CRASH_THRESHOLD": "20",
     "AUDIO_RESTART_ON_CRASH_NOTIFY": "true",
 }
+
+
+def _find_mic_source() -> str:
+    """Find the first hardware mic PulseAudio source name, skipping EasyEffects and monitors."""
+    try:
+        r = subprocess.run(["pactl", "list", "sources", "short"],
+                           capture_output=True, text=True, timeout=5)
+        for line in r.stdout.strip().splitlines():
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            name = parts[1]
+            if "Easy Effects" in name or "easyeffects" in name or ".monitor" in name:
+                continue
+            return name
+    except Exception:
+        pass
+    return "@DEFAULT_SOURCE@"
 
 
 def _make_device_factory() -> Gtk.SignalListItemFactory:
@@ -59,6 +80,10 @@ class AudioPage:
         self._sources: list[dict] = []
         self._profiles: list[str] = []
         self._tick_source = None
+        self._spectrum_widget: AudioSpectrumWidget | None = None
+        self._spectrum_engine: SpectrumEngine | None = None
+        self._spectrum_in_widget: AudioSpectrumWidget | None = None
+        self._spectrum_in_engine: SpectrumEngine | None = None
 
     # ── Build ──
 
@@ -76,6 +101,30 @@ class AudioPage:
         header.pack_start(add_btn)
 
         self._load_data()
+
+        # Output + Input spectrums side-by-side
+        spectrum_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        spectrum_box.set_homogeneous(True)
+
+        out_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        out_lbl = Gtk.Label(label="Output")
+        out_lbl.set_xalign(0.5)
+        out_lbl.add_css_class("heading")
+        out_lbl.set_margin_top(8)
+        out_col.append(out_lbl)
+        out_col.append(self._build_spectrum_widget("out"))
+        spectrum_box.append(out_col)
+
+        in_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        in_lbl = Gtk.Label(label="Input")
+        in_lbl.set_xalign(0.5)
+        in_lbl.add_css_class("heading")
+        in_lbl.set_margin_top(8)
+        in_col.append(in_lbl)
+        in_col.append(self._build_spectrum_widget("in"))
+        spectrum_box.append(in_col)
+
+        self._content_box.append(spectrum_box)
 
         # Audio Configuration (volume, devices, EQ)
         acg = Adw.PreferencesGroup(title="Audio Configuration")
@@ -373,6 +422,76 @@ class AudioPage:
                 ["bash", _AUDIO_CORE, "--set-source", sid],
                 capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
             )
+
+    # ── Spectrum visualizer ──
+
+    @staticmethod
+    def _make_section_label(text: str) -> Gtk.Label:
+        lbl = Gtk.Label(label=text)
+        lbl.set_xalign(0)
+        lbl.set_margin_top(16)
+        lbl.set_margin_start(4)
+        lbl.add_css_class("heading")
+        return lbl
+
+    def _build_spectrum_widget(self, kind: str) -> AudioSpectrumWidget:
+        widget = AudioSpectrumWidget()
+        if kind == "out":
+            self._spectrum_widget = widget
+            self._start_spectrum_engine("out")
+        else:
+            self._spectrum_in_widget = widget
+            self._start_spectrum_engine("in")
+        return widget
+
+    def _start_spectrum_engine(self, kind: str) -> None:
+        if kind == "out":
+            if self._spectrum_engine:
+                self._stop_spectrum_engine("out")
+            pipeline = (
+                "pulsesrc device=@DEFAULT_MONITOR@ "
+                "! audioconvert ! audio/x-raw,format=F32LE,channels=1 "
+                "! spectrum bands=512 interval=40000000 post-messages=true "
+                "! fakesink"
+            )
+            self._spectrum_engine = SpectrumEngine(
+                lambda b: self._on_spectrum_data(b, "out"),
+                pipeline,
+            )
+            self._spectrum_engine.start()
+        else:
+            if self._spectrum_in_engine:
+                self._stop_spectrum_engine("in")
+            mic_source = _find_mic_source()
+            pipeline = (
+                f"pulsesrc device='{mic_source}' "
+                "! audioconvert ! audio/x-raw,format=F32LE,channels=1 "
+                "! spectrum bands=512 interval=40000000 post-messages=true "
+                "! fakesink"
+            )
+            self._spectrum_in_engine = SpectrumEngine(
+                lambda b: self._on_spectrum_data(b, "in"),
+                pipeline,
+                db_floor=-65,
+                noise_gate=0.06,
+            )
+            self._spectrum_in_engine.start()
+
+    def _stop_spectrum_engine(self, kind: str) -> None:
+        if kind == "out":
+            if self._spectrum_engine:
+                self._spectrum_engine.stop()
+                self._spectrum_engine = None
+        else:
+            if self._spectrum_in_engine:
+                self._spectrum_in_engine.stop()
+                self._spectrum_in_engine = None
+
+    def _on_spectrum_data(self, bars: list[float], kind: str) -> None:
+        if kind == "out" and self._spectrum_widget:
+            self._spectrum_widget.set_bars(bars)
+        elif kind == "in" and self._spectrum_in_widget:
+            self._spectrum_in_widget.set_bars(bars)
 
     # ── Device priority (managed) ──
 
@@ -1060,9 +1179,20 @@ class AudioPage:
             {"key": "audio:crash_notify", "label": "Audio Crash notification",
              "description": "Show desktop notification when EasyEffects is restarted",
              "_group_id": "audio", "_group_label": "Audio", "_section_label": "Crash Recovery"},
+            {"key": "audio:spectrum", "label": "Audio Spectrum",
+             "description": "Enable real-time frequency spectrum visualizer",
+             "_group_id": "audio", "_group_label": "Audio", "_section_label": "Audio Spectrum"},
         ]
 
     def destroy(self) -> None:
         if self._tick_source:
             GLib.source_remove(self._tick_source)
             self._tick_source = None
+        self._stop_spectrum_engine("out")
+        self._stop_spectrum_engine("in")
+        if self._spectrum_widget:
+            self._spectrum_widget.stop()
+            self._spectrum_widget = None
+        if self._spectrum_in_widget:
+            self._spectrum_in_widget.stop()
+            self._spectrum_in_widget = None
