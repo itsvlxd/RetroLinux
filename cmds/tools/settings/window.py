@@ -18,6 +18,7 @@ from settings.core.undo import OptionChange, PairedOptionChange, UndoManager
 from settings.data.bezier_data import get_curve_store
 from settings.pages.animations import AnimationsPage
 from settings.pages.audio import AudioPage
+from settings.pages.bluetooth import BluetoothPage
 from settings.pages.autostart import AutostartPage
 from settings.pages.binds import BindsPage
 from settings.pages.battery import BatteryPage
@@ -456,6 +457,16 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._page_stack.add_named(widget, slug)
             self._page_titles[slug] = title
             self._section_pages.append(page)
+
+        # Build Bluetooth page eagerly so the sidebar switch is present on launch
+        _bt_page = BluetoothPage(self)
+        self._bluetooth_page = _bt_page
+        _bt_page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+        self._section_pages.append(_bt_page)  # type: ignore[attr-defined]
+        self._search_page_builder.add_entries(_bt_page.get_search_entries())
+        _bt_widget = _bt_page.build(header=self._make_page_header("Bluetooth"))
+        self._page_stack.add_named(_bt_widget, "bluetooth")
+        self._page_titles["bluetooth"] = "Bluetooth"
 
         self._search_page_builder.add_entries(CursorPage.get_search_entries())
         _bt2 = time.monotonic()
@@ -1072,6 +1083,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
+
 
     def show_page(self, gid: str):
         """Switch the content pane to the given page."""
