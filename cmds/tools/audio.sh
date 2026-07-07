@@ -314,20 +314,20 @@ cmd_audio() {
                 "download")
                     [[ -z $eq_val ]] && rx_log "error" "Usage: retro audio eq download <repo>" && return 1
 
-                    local valid_repos=("JackHack96" "wwmm" "Bundy01" "Digitalone1")
+                    local short="${eq_val%%/*}"
                     local valid=false
-                    for r in "${valid_repos[@]}"; do
-                        [[ $eq_val == "$r" ]] && valid=true && break
+                    for r in JackHack96 Bundy01; do
+                        [[ $short == "$r" ]] && valid=true && break
                     done
 
                     if [[ $valid == "false" ]]; then
                         rx_log "error" "Unknown repo: ${PINK}${eq_val}${RESET}"
-                        rx_log "info" "Available repos: ${valid_repos[*]}"
+                        rx_log "info" "Available repos: JackHack96 Bundy01"
                         return 1
                     fi
 
-                    rx_log "info" "Downloading presets from ${PINK}${eq_val}${RESET}..."
-                    bash "$audio_core" --eq-download "$eq_val"
+                    rx_log "info" "Downloading presets from ${PINK}${short}${RESET}..."
+                    bash "$audio_core" --eq-download "$short"
                     rx_log "success" "Download complete"
                     ;;
 
