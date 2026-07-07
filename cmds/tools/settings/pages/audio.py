@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import threading
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -89,11 +90,6 @@ class AudioPage:
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
-
-        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
-        refresh_btn.set_tooltip_text("Refresh audio status")
-        refresh_btn.connect("clicked", lambda _b: self._full_refresh())
-        header.pack_start(refresh_btn)
 
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.set_tooltip_text("Download EQ presets")
@@ -394,14 +390,16 @@ class AudioPage:
         )
 
     def _on_mute_switched(self, sw: Adw.SwitchRow, _pspec) -> None:
+        state = "true" if sw.get_active() else "false"
         subprocess.run(
-            ["bash", _AUDIO_CORE, "--toggle-mute"],
+            ["bash", _AUDIO_CORE, "--set-mute", state],
             capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
         )
 
     def _on_mic_mute_switched(self, sw: Adw.SwitchRow, _pspec) -> None:
+        state = "true" if sw.get_active() else "false"
         subprocess.run(
-            ["bash", _AUDIO_CORE, "--toggle-mic-mute"],
+            ["bash", _AUDIO_CORE, "--set-mic-mute", state],
             capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
         )
 
@@ -457,6 +455,7 @@ class AudioPage:
             self._spectrum_engine = SpectrumEngine(
                 lambda b: self._on_spectrum_data(b, "out"),
                 pipeline,
+                scale_floor=0.08,
             )
             self._spectrum_engine.start()
         else:
@@ -473,7 +472,8 @@ class AudioPage:
                 lambda b: self._on_spectrum_data(b, "in"),
                 pipeline,
                 db_floor=-65,
-                noise_gate=0.06,
+                noise_gate=0.12,
+                scale_floor=1.2,
             )
             self._spectrum_in_engine.start()
 
@@ -1061,30 +1061,63 @@ class AudioPage:
     # ── Periodic tick ──
 
     def _tick(self) -> bool:
+        threading.Thread(target=self._tick_worker, daemon=True).start()
+        return True
+
+    def _tick_worker(self) -> None:
         try:
             r = subprocess.run(
                 ["bash", _AUDIO_CORE, "--status"],
                 capture_output=True, text=True, timeout=5,
                 stdin=subprocess.DEVNULL,
             )
-            status: dict[str, str] = {}
-            for line in r.stdout.strip().splitlines():
-                if ":" in line:
-                    k, v = line.split(":", 1)
-                    status[k] = v
-            self._status.update(status)
-
-            ee = status.get("easyeffects", "")
-            if ee and hasattr(self, "_ee_status_lbl"):
-                self._ee_status_lbl.set_label(ee)
-                running = ee == "Running"
-                if hasattr(self, "_ee_start_btn"):
-                    self._ee_start_btn.set_sensitive(not running)
-                if hasattr(self, "_ee_stop_btn"):
-                    self._ee_stop_btn.set_sensitive(running)
+            GLib.idle_add(self._apply_status, r.stdout)
         except Exception:
             pass
-        return True
+
+    def _apply_status(self, output: str) -> None:
+        status: dict[str, str] = {}
+        for line in output.strip().splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                status[k] = v
+        self._status.update(status)
+
+        self._setting_value = True
+
+        if "sink_volume" in status and hasattr(self, "_volume_spin"):
+            self._volume_spin.set_value(float(status["sink_volume"]))
+        if "source_volume" in status and hasattr(self, "_mic_volume_spin"):
+            self._mic_volume_spin.set_value(float(status["source_volume"]))
+
+        if "sink_mute" in status and hasattr(self, "_mute_switch"):
+            self._mute_switch.set_active(status["sink_mute"] == "true")
+        if "source_mute" in status and hasattr(self, "_mic_mute_switch"):
+            self._mic_mute_switch.set_active(status["source_mute"] == "true")
+
+        cur_sink = status.get("sink", "")
+        cur_source = status.get("source", "")
+        if cur_sink and hasattr(self, "_output_combo"):
+            for i, s in enumerate(self._sinks):
+                if s["id"] == cur_sink:
+                    self._output_combo.set_selected(i)
+                    break
+        if cur_source and hasattr(self, "_input_combo"):
+            for i, s in enumerate(self._sources):
+                if s["id"] == cur_source:
+                    self._input_combo.set_selected(i)
+                    break
+
+        self._setting_value = False
+
+        ee = status.get("easyeffects", "")
+        if ee and hasattr(self, "_ee_status_lbl"):
+            self._ee_status_lbl.set_label(ee)
+            running = ee == "Running"
+            if hasattr(self, "_ee_start_btn"):
+                self._ee_start_btn.set_sensitive(not running)
+            if hasattr(self, "_ee_stop_btn"):
+                self._ee_stop_btn.set_sensitive(running)
 
     # ── Save lifecycle ──
 
