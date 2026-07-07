@@ -1,8 +1,11 @@
 """Main application window with sidebar navigation."""
 
+from __future__ import annotations
+
 import subprocess
 import time
 from collections import Counter
+from typing import TYPE_CHECKING
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,30 +20,31 @@ from settings.core.state import AppState
 from settings.core.undo import OptionChange, PairedOptionChange, UndoManager
 from settings.data.bezier_data import get_curve_store
 from settings.pages.animations import AnimationsPage
-from settings.pages.audio import AudioPage
-from settings.pages.bluetooth import BluetoothPage
-from settings.pages.daemon import DaemonPage
-from settings.pages.network import NetworkPage
-from settings.pages.autostart import AutostartPage
-from settings.pages.binds import BindsPage
-from settings.pages.battery import BatteryPage
 from settings.pages.cursor import CursorPage
-from settings.pages.disk import DiskPage
-from settings.pages.env_vars import EnvVarsPage
-from settings.pages.fonts import FontsPage
-from settings.pages.grub import GrubPage
-from settings.pages.power import PowerPage
-from settings.pages.layer_rules import LayerRulesPage
-from settings.pages.layouts import LayoutsPage
-from settings.pages.monitors import MonitorsPage
-from settings.pages.pending import PendingChangesPage
 from settings.pages.section import SectionPage
-from settings.pages.settings import SettingsPage
-from settings.pages.themes import ThemesPage
-from settings.pages.apps import AppsPage
-from settings.pages.wallpapers import WallpapersPage
-from settings.pages.window_rules import WindowRulesPage
-from settings.pages.workspaces import WorkspacesPage
+if TYPE_CHECKING:
+    from settings.pages.apps import AppsPage
+    from settings.pages.audio import AudioPage
+    from settings.pages.autostart import AutostartPage
+    from settings.pages.battery import BatteryPage
+    from settings.pages.binds import BindsPage
+    from settings.pages.bluetooth import BluetoothPage
+    from settings.pages.daemon import DaemonPage
+    from settings.pages.disk import DiskPage
+    from settings.pages.env_vars import EnvVarsPage
+    from settings.pages.fonts import FontsPage
+    from settings.pages.grub import GrubPage
+    from settings.pages.layer_rules import LayerRulesPage
+    from settings.pages.layouts import LayoutsPage
+    from settings.pages.monitors import MonitorsPage
+    from settings.pages.network import NetworkPage
+    from settings.pages.pending import PendingChangesPage
+    from settings.pages.power import PowerPage
+    from settings.pages.settings import SettingsPage
+    from settings.pages.themes import ThemesPage
+    from settings.pages.wallpapers import WallpapersPage
+    from settings.pages.window_rules import WindowRulesPage
+    from settings.pages.workspaces import WorkspacesPage
 from settings.ui import (
     KeyboardLayoutsOptionRow,
     OptionRow,
@@ -407,6 +411,29 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def _build_pages(self) -> tuple[list[dict], dict[str, dict]]:
         """Build the default schema page eagerly, defer the rest."""
+        # Lazy page imports — deferred to avoid pulling in 20+ page modules at startup
+        from settings.pages.apps import AppsPage
+        from settings.pages.audio import AudioPage
+        from settings.pages.autostart import AutostartPage
+        from settings.pages.battery import BatteryPage
+        from settings.pages.binds import BindsPage
+        from settings.pages.bluetooth import BluetoothPage
+        from settings.pages.daemon import DaemonPage
+        from settings.pages.disk import DiskPage
+        from settings.pages.env_vars import EnvVarsPage
+        from settings.pages.fonts import FontsPage
+        from settings.pages.grub import GrubPage
+        from settings.pages.layer_rules import LayerRulesPage
+        from settings.pages.layouts import LayoutsPage
+        from settings.pages.monitors import MonitorsPage
+        from settings.pages.network import NetworkPage
+        from settings.pages.pending import PendingChangesPage
+        from settings.pages.power import PowerPage
+        from settings.pages.settings import SettingsPage
+        from settings.pages.themes import ThemesPage
+        from settings.pages.wallpapers import WallpapersPage
+        from settings.pages.window_rules import WindowRulesPage
+        from settings.pages.workspaces import WorkspacesPage
         _bt0 = time.monotonic()
         self._page_titles: dict[str, str] = {}
         groups = schema.get_groups(self._schema)
@@ -1022,6 +1049,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._page_stack.add_named(widget, slug)
         self._page_titles[slug] = title
         self._section_pages.append(page)
+        from settings.pages.monitors import MonitorsPage
         if cls is MonitorsPage:
             self._search_page_builder.add_entries(page.get_search_entries())
         for key in self._option_rows:
@@ -1029,6 +1057,19 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def _build_lazy_standalone_page(self, slug: str):
         """Build a deferred standalone page (layouts, pending, wallpapers, settings)."""
+        from settings.pages.apps import AppsPage
+        from settings.pages.audio import AudioPage
+        from settings.pages.battery import BatteryPage
+        from settings.pages.bluetooth import BluetoothPage
+        from settings.pages.daemon import DaemonPage
+        from settings.pages.disk import DiskPage
+        from settings.pages.fonts import FontsPage
+        from settings.pages.grub import GrubPage
+        from settings.pages.network import NetworkPage
+        from settings.pages.pending import PendingChangesPage
+        from settings.pages.power import PowerPage
+        from settings.pages.themes import ThemesPage
+        from settings.pages.wallpapers import WallpapersPage
         cls, attr, title = self._lazy_standalone_specs.pop(slug)
         page = cls(self)
         setattr(self, attr, page)
@@ -1301,6 +1342,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
     # -- Save with animation --
 
     def collect_save_sections(self) -> config.ConfigSections:
+        from settings.pages.workspaces import WorkspacesPage
         """Collect sections to save: dirty sections + previously saved sections.
 
         A section is only included if it was already in settings's managed
