@@ -233,8 +233,8 @@ class BluetoothPage:
                 parts = line.split("|")
                 if len(parts) >= 6:
                     cat = parts[2]
-                    mac = parts[3]
-                    name = parts[4]
+                    mac = parts[3].strip()
+                    name = parts[4].strip()
                     connected = parts[5] == "yes"
                     self._paired_devices.append({
                         "mac": mac, "name": name, "cat": cat, "connected": connected,
@@ -247,8 +247,8 @@ class BluetoothPage:
                 parts = line.split("|")
                 if len(parts) >= 5:
                     cat = parts[2]
-                    mac = parts[3]
-                    name = parts[4]
+                    mac = parts[3].strip()
+                    name = parts[4].strip()
                     self._nearby_devices.append({
                         "mac": mac, "name": name, "cat": cat,
                     })
@@ -405,7 +405,7 @@ class BluetoothPage:
                 for line in raw.splitlines():
                     p = line.split("|")
                     if len(p) >= 5:
-                        cat, mac, name = p[2], p[3], p[4]
+                        cat, mac, name = p[2].strip(), p[3].strip(), p[4].strip()
                         row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
                         row_box.set_margin_top(6)
                         row_box.set_margin_bottom(6)
