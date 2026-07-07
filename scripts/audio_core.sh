@@ -565,10 +565,7 @@ apply_eq_profile() {
 
 get_remote_eq_repos() {
     echo "JackHack96|EasyEffects-Presets|Popular gaming EQ presets"
-    echo "wwmm/easyeffects|Official GitHub repo"
     echo "Bundy01|EasyEffects-presets|Various audio profiles"
-    echo "Digitalone1/EasyEffects-presets|DTS/Atmos alternatives"
-    echo "ShadowOne333|EasyEffects-Configs|Gaming presets"
 }
 
 eq_list_remote_profiles() {
@@ -584,53 +581,31 @@ eq_list_remote_profiles() {
 }
 
 download_eq_preset() {
-    local repo="$1"
-    local cache_dir="$RETRO_CONFIG/audio/eq"
+    local repo="${1%%/*}"
     local dest_dir="$HOME/.local/share/easyeffects/output"
-    mkdir -p "$cache_dir"
     mkdir -p "$dest_dir"
+
+    local url="" tmp="/tmp/ee-download.zip" extract_dir="/tmp/ee-extract"
+    rm -rf "$extract_dir"
 
     case "$repo" in
         "JackHack96")
-            local url="https://github.com/JackHack96/EasyEffects-Presets/archive/refs/heads/master.zip"
-            local tmp="/tmp/easyeffects-presets.zip"
-            curl -Ls "$url" -o "$tmp"
-            unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
-            local preset_dir="$cache_dir/EasyEffects-Presets-master"
-            [[ -d $preset_dir ]] && cp -r "$preset_dir"/* "$dest_dir/" 2>/dev/null
-            rm -f "$tmp"
-            ;;
-        "wwmm" | "wwmm/easyeffects")
-            local url="https://github.com/wwmm/easyeffects/archive/refs/heads/main.zip"
-            local tmp="/tmp/easyeffects.zip"
-            curl -Ls "$url" -o "$tmp"
-            unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
-            local preset_dir="$cache_dir/easyeffects-main"
-            [[ -d $preset_dir ]] && cp -r "$preset_dir"/* "$dest_dir/" 2>/dev/null
-            rm -f "$tmp"
+            url="https://github.com/JackHack96/EasyEffects-Presets/archive/refs/heads/master.zip"
             ;;
         "Bundy01")
-            local url="https://github.com/Bundy01/EasyEffects-presets/archive/refs/heads/main.zip"
-            local tmp="/tmp/bundy-presets.zip"
-            curl -Ls "$url" -o "$tmp"
-            unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
-            local preset_dir="$cache_dir/EasyEffects-presets-main"
-            [[ -d $preset_dir ]] && cp -r "$preset_dir"/* "$dest_dir/" 2>/dev/null
-            rm -f "$tmp"
-            ;;
-        "Digitalone1")
-            local url="https://github.com/Digitalone1/EasyEffects-presets/archive/refs/heads/main.zip"
-            local tmp="/tmp/digitalone-presets.zip"
-            curl -Ls "$url" -o "$tmp"
-            unzip -o "$tmp" -d "$cache_dir" 2>/dev/null
-            local preset_dir="$cache_dir/EasyEffects-presets-main"
-            [[ -d $preset_dir ]] && cp -r "$preset_dir"/* "$dest_dir/" 2>/dev/null
-            rm -f "$tmp"
+            url="https://github.com/Bundy01/EasyEffects-presets/archive/refs/heads/main.zip"
             ;;
         *)
             return 1
             ;;
     esac
+
+    curl -Ls "$url" -o "$tmp"
+    mkdir -p "$extract_dir"
+    unzip -o "$tmp" -d "$extract_dir" 2>/dev/null
+    find "$extract_dir" -name "*.json" -exec cp {} "$dest_dir/" \;
+    rm -f "$tmp"
+    rm -rf "$extract_dir"
 }
 
 start_easyeffects() {
