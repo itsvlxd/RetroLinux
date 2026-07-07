@@ -19,6 +19,7 @@ from settings.data.bezier_data import get_curve_store
 from settings.pages.animations import AnimationsPage
 from settings.pages.audio import AudioPage
 from settings.pages.bluetooth import BluetoothPage
+from settings.pages.daemon import DaemonPage
 from settings.pages.network import NetworkPage
 from settings.pages.autostart import AutostartPage
 from settings.pages.binds import BindsPage
@@ -487,6 +488,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (AppsPage, "_apps_page", "apps", "Applications"),
             (AudioPage, "_audio_page", "audio", "Audio"),
+            (DaemonPage, "_daemon_page", "daemon", "Daemon"),
             (DiskPage, "_disk_page", "disks", "Disks"),
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
             (GrubPage, "_grub_page", "grub", "Bootloader"),
@@ -1087,6 +1089,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is BatteryPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is DaemonPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
