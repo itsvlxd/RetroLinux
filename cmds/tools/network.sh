@@ -349,10 +349,21 @@ cmd_network() {
                     bash "$RETRO_DIR/scripts/network_core.sh" --dns-flush
                     rx_log "success" "DNS cache cleared"
                     ;;
+                set)
+                    [[ -z "$subarg2" ]] && rx_log "error" "Usage: network dns set <iface> <dns1> [dns2]" && return 1
+                    local dns_result=$(bash "$RETRO_DIR/scripts/network_core.sh" --set-dns "$subarg2" "$subarg3" "$subarg4")
+                    if echo "$dns_result" | grep -q "result=success"; then
+                        rx_log "success" "DNS set to ${PINK}$subarg3${RESET} on ${PINK}$subarg2${RESET}"
+                        [[ -n $subarg4 ]] && rx_log "info" "Secondary DNS: ${PINK}$subarg4${RESET}"
+                    else
+                        rx_log "error" "Failed to set DNS"
+                    fi
+                    ;;
                 *)
                     rx_help_usage "network dns <command>"
                     rx_help_commands "DNS commands"
                     rx_help_cmd "flush" "Clear DNS cache"
+                    rx_help_cmd "set <iface> <dns1> [dns2]" "Set DNS servers"
                     ;;
             esac
             ;;
@@ -371,6 +382,7 @@ cmd_network() {
             rx_help_cmd "dhcp <iface>" "Set DHCP"
             rx_help_cmd "vlan [args]" "VLAN management"
             rx_help_cmd "dns flush" "Clear DNS cache"
+            rx_help_cmd "dns set <iface> <dns1> [dns2]" "Set DNS servers"
             rx_help_cmd "interface [name]" "List/show interfaces"
             rx_help_examples
             rx_help_example "retro network wifi list" "Scan for WiFi networks"
@@ -380,6 +392,7 @@ cmd_network() {
             rx_help_example "retro network dhcp eth0" "Reset to DHCP"
             rx_help_example "retro network vlan create eth0 100" "Create VLAN 100"
             rx_help_example "retro network dns flush" "Clear DNS cache"
+            rx_help_example "retro network dns set eth0 1.1.1.1 8.8.8.8" "Set DNS servers"
             rx_help_spacer
             ;;
     esac

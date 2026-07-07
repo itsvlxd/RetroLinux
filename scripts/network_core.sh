@@ -262,27 +262,26 @@ manual_ip() {
         return 1
     fi
 
-    if ! ip link show "$iface" >/dev/null 2>&1; then
-        echo "result=error|reason=interface_not_found|iface=$iface"
+    local conn_name
+    conn_name=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$iface$" | cut -d: -f1)
+
+    if [[ -z $conn_name ]]; then
+        echo "result=error|reason=no_active_connection|iface=$iface"
         return 1
     fi
 
-    local ip_part="${ip_cidr%/*}"
-    local cidr="${ip_cidr#*/}"
-
-    if [[ -z $cidr || $cidr == "$ip_cidr" ]]; then
-        cidr=24
-    fi
-
-    ip addr flush dev "$iface" >/dev/null 2>&1
-    ip addr add "$ip_cidr" dev "$iface" >/dev/null 2>&1
-
+    nmcli connection modify "$conn_name" ipv4.method manual >/dev/null 2>&1
+    nmcli connection modify "$conn_name" ipv4.addresses "$ip_cidr" >/dev/null 2>&1
     if [[ -n $gateway ]]; then
-        ip route replace default via "$gateway" dev "$iface" >/dev/null 2>&1
+        nmcli connection modify "$conn_name" ipv4.gateway "$gateway" >/dev/null 2>&1
     fi
+    nmcli connection modify "$conn_name" ipv4.dns "" >/dev/null 2>&1
+    nmcli connection modify "$conn_name" ipv4.ignore-auto-dns yes >/dev/null 2>&1
 
-    nmcli connection modify "$iface" ipv4.method manual ipv4.addresses "$ip_cidr" >/dev/null 2>&1
-    [[ -n $gateway ]] && nmcli connection modify "$iface" ipv4.gateway "$gateway" >/dev/null 2>&1
+    nmcli connection down "$conn_name" >/dev/null 2>&1
+    ip addr flush dev "$iface" 2>/dev/null
+    sleep 1
+    nmcli connection up "$conn_name" >/dev/null 2>&1
 
     echo "result=success|iface=$iface|ip=$ip_cidr|gateway=${gateway:-none}"
 }
@@ -295,20 +294,24 @@ set_dhcp() {
         return 1
     fi
 
-    if ! ip link show "$iface" >/dev/null 2>&1; then
-        echo "result=error|reason=interface_not_found|iface=$iface"
+    local conn_name
+    conn_name=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$iface$" | cut -d: -f1)
+
+    if [[ -z $conn_name ]]; then
+        echo "result=error|reason=no_active_connection|iface=$iface"
         return 1
     fi
 
-    ip addr flush dev "$iface" >/dev/null 2>&1
-    ip link set "$iface" down
-    sleep 1
-    ip link set "$iface" up
+    nmcli connection modify "$conn_name" ipv4.method auto >/dev/null 2>&1
+    nmcli connection modify "$conn_name" ipv4.addresses "" >/dev/null 2>&1
+    nmcli connection modify "$conn_name" ipv4.gateway "" >/dev/null 2>&1
+    nmcli connection modify "$conn_name" ipv4.dns "" >/dev/null 2>&1
+    nmcli connection modify "$conn_name" ipv4.ignore-auto-dns no >/dev/null 2>&1
 
-    nmcli connection modify "$iface" ipv4.method auto >/dev/null 2>&1
-    nmcli connection down "$iface" >/dev/null 2>&1
+    nmcli connection down "$conn_name" >/dev/null 2>&1
+    ip addr flush dev "$iface" 2>/dev/null
     sleep 1
-    nmcli connection up "$iface" >/dev/null 2>&1
+    nmcli connection up "$conn_name" >/dev/null 2>&1
 
     echo "result=success|iface=$iface|method=dhcp"
 }
@@ -328,8 +331,11 @@ vlan_create() {
         return 1
     fi
 
-    ip link add link "$parent" name "$vlan_name" type vlan id "$vlan_id" 2>/dev/null
-    ip link set "$vlan_name" up
+    if ! ip link add link "$parent" name "$vlan_name" type vlan id "$vlan_id" 2>/dev/null; then
+        echo "result=error|reason=create_failed|parent=$parent|vlan_id=$vlan_id"
+        return 1
+    fi
+    ip link set "$vlan_name" up 2>/dev/null
 
     echo "result=success|vlan_name=$vlan_name|vlan_id=$vlan_id|parent=$parent"
 }
@@ -393,6 +399,31 @@ dns_flush() {
     echo "result=success"
 }
 
+set_dns() {
+    local iface="$1"
+    local dns1="$2"
+    local dns2="$3"
+
+    [[ -z $iface || -z $dns1 ]] && echo "result=error|reason=missing_params" && return 1
+
+    local conn_name
+    conn_name=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$iface$" | cut -d: -f1)
+
+    if [[ -n $conn_name ]]; then
+        nmcli connection modify "$conn_name" ipv4.dns "$dns1${dns2:+ $dns2}" >/dev/null 2>&1
+        nmcli connection modify "$conn_name" ipv4.ignore-auto-dns yes >/dev/null 2>&1
+        nmcli connection down "$conn_name" >/dev/null 2>&1
+        ip addr flush dev "$iface" 2>/dev/null
+        sleep 1
+        nmcli connection up "$conn_name" >/dev/null 2>&1
+    else
+        printf "nameserver %s\n" "$dns1" > /etc/resolv.conf
+        [[ -n $dns2 ]] && printf "nameserver %s\n" "$dns2" >> /etc/resolv.conf
+    fi
+
+    echo "result=success|iface=$iface|dns1=$dns1|dns2=${dns2:-none}"
+}
+
 interface_info() {
     local iface="$1"
 
@@ -422,6 +453,16 @@ interface_info() {
 
 check_internet() {
     ping -c 1 -W 3 1.1.1.1 &>/dev/null
+}
+
+wifi_saved() {
+    nmcli -t -f NAME,TYPE connection show 2>/dev/null | grep ":802-11-wireless" | sed 's/:802-11-wireless//'
+}
+
+wifi_forget() {
+    local name="$1"
+    [[ -z $name ]] && echo "result=error|reason=name_required" && return 1
+    nmcli connection delete "$name" 2>/dev/null && echo "result=success|name=$name" || echo "result=error|reason=delete_failed"
 }
 
 wifi_autoconnect() {
@@ -484,6 +525,8 @@ case "$1" in
     "--wifi-disconnect") wifi_disconnect "$2" ;;
     "--wifi-status") wifi_status "$2" ;;
     "--wifi-autoconnect") wifi_autoconnect ;;
+    "--wifi-saved") wifi_saved ;;
+    "--wifi-forget") wifi_forget "$2" ;;
     "--ethernet-status") ethernet_status "$2" ;;
     "--network-status") network_status ;;
     "--manual-ip") manual_ip "$2" "$3" "$4" ;;
@@ -492,6 +535,7 @@ case "$1" in
     "--vlan-delete") vlan_delete "$2" ;;
     "--vlan-list") vlan_list ;;
     "--dns-flush") dns_flush ;;
+    "--set-dns") set_dns "$2" "$3" "$4" ;;
     "--interface-info") interface_info "$2" ;;
     "--check-internet") check_internet && echo "result=online" || echo "result=offline" ;;
 esac
