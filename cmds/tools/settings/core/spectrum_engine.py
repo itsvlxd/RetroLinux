@@ -1,5 +1,3 @@
-"""GStreamer audio spectrum engine — captures system output and produces log-spaced bar data."""
-
 import re
 from collections.abc import Callable
 from gi.repository import GLib, Gst
@@ -10,8 +8,6 @@ _LOG_BAND_EDGES = [
     50, 97, 188, 365, 708, 1373, 2663, 5164, 10000,
 ]
 
-# CAVA-style pre-equalization curve multipliers.
-# Gently restrains overpowering sub-bass and gives high treble a healthy boost.
 _FREQUENCY_WEIGHTS = [
     0.45, 0.70, 0.95, 1.10, 1.30, 1.75, 2.50, 3.80,
 ]
@@ -23,14 +19,15 @@ _MAGNITUDE_RE = re.compile(r"magnitude=\(float\)\{([^}]+)\}")
 
 class SpectrumEngine:
     def __init__(self, on_data: Callable[[list[float]], None], pipeline_str: str,
-                 db_floor: float = -55.0, noise_gate: float = 0.04):
+                 db_floor: float = -55.0, noise_gate: float = 0.04, scale_floor: float = 0.08):
         self._on_data = on_data
         self._pipeline_str = pipeline_str
         self._pipeline: Gst.Element | None = None
         self._running = False
-        self._peak_buffer = 0.2
+        self._peak_buffer = 0.5
         self._db_floor = db_floor
         self._noise_gate = noise_gate
+        self._scale_floor = scale_floor
 
     def start(self) -> None:
         if self._running:
@@ -65,14 +62,18 @@ class SpectrumEngine:
 
         magnitudes = [float(x.strip()) for x in m.group(1).split(",")]
 
-        # 1. Fetch the raw 8-band audio data footprint
         raw_8_bars = self._map_to_bars(magnitudes)
+        true_hardware_peak = max(raw_8_bars) if raw_8_bars else 0.0
+        is_silent = true_hardware_peak < self._noise_gate
 
-        # 2. Mirror the channels: [Treble -> Bass] + [Bass -> Treble]
-        # raw_8_bars[::-1] reverses the array to place bass on the inside right
-        mirrored_bars = raw_8_bars[::-1] + raw_8_bars
+        if is_silent:
+            self._peak_buffer = self._peak_buffer * 0.95 + 0.1 * 0.05
+            GLib.idle_add(self._on_data, [0.0] * 16)
+            return
 
-        # 3. Apply Horizontal Monstercat Wave Smoothing across the whole 16-bar set
+        weighted_8_bars = [raw_8_bars[i] * _FREQUENCY_WEIGHTS[i] for i in range(len(raw_8_bars))]
+        mirrored_bars = weighted_8_bars[::-1] + weighted_8_bars
+
         smoothed_bars = mirrored_bars[:]
         for i in range(1, len(smoothed_bars)):
             if smoothed_bars[i] < smoothed_bars[i - 1] * 0.74:
@@ -81,19 +82,13 @@ class SpectrumEngine:
             if smoothed_bars[i] < smoothed_bars[i + 1] * 0.74:
                 smoothed_bars[i] = smoothed_bars[i + 1] * 0.74
 
-        # 4. Noise gate — silence below threshold outputs zeros and freezes AGC
         frame_max = max(smoothed_bars) if smoothed_bars else 0.0
-        if frame_max < self._noise_gate:
-            GLib.idle_add(self._on_data, [0.0] * len(smoothed_bars))
-            return
-
-        # 5. Dynamic Auto-Gain Management
         if frame_max > self._peak_buffer:
             self._peak_buffer = frame_max
         else:
             self._peak_buffer = self._peak_buffer * 0.96 + frame_max * 0.04
 
-        scale = max(0.08, self._peak_buffer)
+        scale = max(self._scale_floor, self._peak_buffer)
         scaled_bars = [min(1.0, b / scale) for b in smoothed_bars]
 
         GLib.idle_add(self._on_data, scaled_bars)
@@ -118,9 +113,6 @@ class SpectrumEngine:
             band_max = max(magnitudes[lo:hi + 1])
             db_floor = self._db_floor
             normalized = max(0.0, min(1.0, (band_max - db_floor) / (-db_floor)))
-
-            # 3. Apply the Frequency Weight Multiplier Curve here
-            weighted_val = normalized * _FREQUENCY_WEIGHTS[i]
-            result.append(weighted_val)
+            result.append(normalized)
 
         return result
