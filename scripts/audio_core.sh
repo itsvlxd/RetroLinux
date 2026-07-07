@@ -173,6 +173,17 @@ toggle_mute() {
     get_sink_mute
 }
 
+set_mute() {
+    local action="$1"
+    local sink=$(get_default_sink)
+    [[ -z $sink ]] && return 1
+    if [[ $action == "on" || $action == "true" ]]; then
+        wpctl set-mute "$sink" 1 2>/dev/null
+    else
+        wpctl set-mute "$sink" 0 2>/dev/null
+    fi
+}
+
 toggle_mic_mute() {
     local source=$(get_default_source)
     [[ -z $source ]] && return 1
@@ -181,6 +192,17 @@ toggle_mic_mute() {
     wpctl set-mute "$source" toggle 2>/dev/null
     local new_mute=$(get_source_mute)
     get_source_mute
+}
+
+set_mic_mute() {
+    local action="$1"
+    local source=$(get_default_source)
+    [[ -z $source ]] && return 1
+    if [[ $action == "on" || $action == "true" ]]; then
+        wpctl set-mute "$source" 1 2>/dev/null
+    else
+        wpctl set-mute "$source" 0 2>/dev/null
+    fi
 }
 
 set_sink() {
@@ -771,7 +793,9 @@ case "$1" in
     "--volume-up") volume_up "$2" ;;
     "--volume-down") volume_down "$2" ;;
     "--toggle-mute") toggle_mute ;;
+    "--set-mute") set_mute "$2" ;;
     "--toggle-mic-mute") toggle_mic_mute ;;
+    "--set-mic-mute") set_mic_mute "$2" ;;
     "--get-sinks") get_sinks ;;
     "--get-sources") get_sources ;;
     "--get-sink-name") get_sink_name "$2" ;;
