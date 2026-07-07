@@ -741,14 +741,29 @@ class AudioPage:
             on_confirm=do_delete,
         )
 
+    def _fetch_repos(self) -> list[tuple[str, str]]:
+        repos: list[tuple[str, str]] = []
+        try:
+            r = subprocess.run(
+                ["bash", _AUDIO_CORE, "--eq-list-remote"],
+                capture_output=True, text=True, timeout=5,
+                stdin=subprocess.DEVNULL,
+            )
+            for line in r.stdout.strip().splitlines():
+                if "|" in line:
+                    parts = line.split("|", 2)
+                    name = parts[0].strip()
+                    desc = parts[2].strip() if len(parts) > 2 else ""
+                    repos.append((name, desc))
+        except Exception:
+            pass
+        if not repos:
+            repos = [("JackHack96", "Popular gaming EQ presets"),
+                     ("Bundy01", "Various audio profiles")]
+        return repos
+
     def _show_download_dialog(self) -> None:
-        repos = [
-            ("JackHack96", "Popular gaming EQ presets"),
-            ("wwmm", "Official EasyEffects repo"),
-            ("Bundy01", "Various audio profiles"),
-            ("Digitalone1", "DTS/Atmos alternatives"),
-            ("ShadowOne333", "Gaming presets"),
-        ]
+        repos = self._fetch_repos()
 
         dialog = Adw.Dialog()
         dialog.set_title("Download EQ Presets")
