@@ -84,28 +84,16 @@ cmd_event() {
             ;;
 
         "events")
+            local events_raw=$(lua "$daemon_script" list-events 2>/dev/null)
             rx_table_header "󰓦" "Available Events"
             rx_table_row "󰓦" "Event" "Emitter → Handler(s)" "$PINK" "32"
             rx_table_separator
 
-            _event_row "on_audio_sink_fallback" "audio → —"
-            _event_row "on_audio_source_fallback" "audio → —"
-            _event_row "on_battery_saver_enabled" "battery → battery, notifications"
-            _event_row "on_battery_saver_disabled" "battery → battery, notifications"
-            _event_row "on_battery_low" "battery → notifications"
-            _event_row "on_battery_critical" "battery → notifications"
-            _event_row "on_power_disconnect" "power → power, notifications"
-            _event_row "on_power_connect" "power → power, notifications"
-            _event_row "on_power_profile_changed" "power → power"
-            _event_row "on_bluetooth_pairing_request" "bluetooth → notifications"
-            _event_row "on_bluetooth_connected" "bluetooth → notifications"
-            _event_row "on_bluetooth_disconnected" "bluetooth → notifications"
-            _event_row "on_slideshow_tick" "slideshow → wallpaper"
-            _event_row "on_pkg_updates_available" "timers → notifications"
-            _event_row "on_retro_update_available" "timers → notifications"
-            _event_row "on_usb_connected" "usb → notifications"
-            _event_row "on_usb_disconnected" "usb → notifications"
-            _event_row "on_event_loop_start" "engine → —"
+            if [[ -n $events_raw ]]; then
+                echo "$events_raw" | while IFS='|' read -r event emitter; do
+                    _event_row "$event" "$emitter → —"
+                done
+            fi
             rx_table_separator
             rx_table_spacer
             ;;
