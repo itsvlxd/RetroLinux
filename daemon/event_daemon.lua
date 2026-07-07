@@ -103,6 +103,24 @@ elseif action == "status" then
 		Help.table_spacer()
 		os.exit(1)
 	end
+elseif action == "list-events" then
+	local events_dir = daemon_dir .. "/events"
+	local ls = io.popen("ls -1 '" .. events_dir .. "'/*.lua 2>/dev/null")
+	if not ls then return end
+	local seen = {}
+	for file in ls:lines() do
+		local ok, mod = pcall(dofile, file)
+		if ok and type(mod) == "table" then
+			local module_name = file:match("([^/]+)%.lua$")
+			for event, handler in pairs(mod) do
+				if type(handler) == "function" and not seen[event] then
+					seen[event] = true
+					print(event .. "|" .. module_name)
+				end
+			end
+		end
+	end
+	ls:close()
 elseif action == "stop" then
 	Log.info("Stopping daemon engine...")
 	if engine:stop() then
