@@ -181,6 +181,9 @@ class AudioPage:
             "primary_source": _g("AUDIO_PRIMARY_SOURCE", ""),
             "fallback_source": _g("AUDIO_FALLBACK_SOURCE", ""),
             "eq_preset": _g("AUDIO_EQ_PRESET", ""),
+            "crash_restart": _g("AUDIO_RESTART_ON_CRASH", _CRASH_DEFAULTS["AUDIO_RESTART_ON_CRASH"]),
+            "crash_threshold": _g("AUDIO_RESTART_ON_CRASH_THRESHOLD", _CRASH_DEFAULTS["AUDIO_RESTART_ON_CRASH_THRESHOLD"]),
+            "crash_notify": _g("AUDIO_RESTART_ON_CRASH_NOTIFY", _CRASH_DEFAULTS["AUDIO_RESTART_ON_CRASH_NOTIFY"]),
         }
         self._status["eq_preset"] = self._orig["eq_preset"]
 
@@ -262,14 +265,26 @@ class AudioPage:
         group.add(mic_vol_row)
         self._mic_volume_spin = mic_spin
 
-        is_muted = self._status.get("sink_mute", "false") == "true"
+        # Mute switches — read directly from PipeWire aliases (stable across restarts)
+        def _read_mute(alias: str) -> bool:
+            try:
+                r = subprocess.run(
+                    ["wpctl", "get-volume", alias],
+                    capture_output=True, text=True, timeout=3,
+                    stdin=subprocess.DEVNULL,
+                )
+                return "[MUTED]" in r.stdout
+            except Exception:
+                return False
+
+        is_muted = _read_mute("@DEFAULT_AUDIO_SINK@")
         mute_row = Adw.SwitchRow(title="Mute output", subtitle="Toggle output mute")
         mute_row.set_active(is_muted)
         mute_row.connect("notify::active", self._on_mute_switched)
         group.add(mute_row)
         self._mute_switch = mute_row
 
-        is_mic_muted = self._status.get("source_mute", "false") == "true"
+        is_mic_muted = _read_mute("@DEFAULT_AUDIO_SOURCE@")
         mic_row = Adw.SwitchRow(title="Mute microphone", subtitle="Toggle microphone mute")
         mic_row.set_active(is_mic_muted)
         mic_row.connect("notify::active", self._on_mic_mute_switched)
@@ -501,7 +516,7 @@ class AudioPage:
             actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
         for var, key, _widget, actions in self._crash_rows:
             cur = self._get_crash_cur(key)
-            live = _g(var, "")
+            live = _g(var, _CRASH_DEFAULTS.get(var, ""))
             default = _CRASH_DEFAULTS.get(var, "")
             is_managed = cur != default
             is_dirty = cur != live
