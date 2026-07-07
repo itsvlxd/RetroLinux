@@ -445,40 +445,11 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (AutostartPage, "_autostart_page", "autostart", "Autostart"),
             (EnvVarsPage, "_env_vars_page", "env_vars", "Env Variables"),
         ]
-        for cls, attr, slug, title in section_page_specs:
-            self._lazy_section_specs[slug] = (cls, attr, title)
-
-        # Build window/layer rule pages eagerly so they're always in _section_pages
-        for cls, attr, slug, title in [
+        for cls, attr, slug, title in section_page_specs + [
             (WindowRulesPage, "_window_rules_page", "window_rules", "Window Rules"),
             (LayerRulesPage, "_layer_rules_page", "layer_rules", "Layer Rules"),
         ]:
-            page = cls(self, on_dirty_changed=self._on_section_dirty, push_undo=self._undo.push, saved_sections=self.saved_sections)
-            setattr(self, attr, page)
-            widget = page.build(header=self._make_page_header(title))
-            self._page_stack.add_named(widget, slug)
-            self._page_titles[slug] = title
-            self._section_pages.append(page)
-
-        # Build Bluetooth page eagerly so the sidebar switch is present on launch
-        _bt_page = BluetoothPage(self)
-        self._bluetooth_page = _bt_page
-        _bt_page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
-        self._section_pages.append(_bt_page)  # type: ignore[attr-defined]
-        self._search_page_builder.add_entries(_bt_page.get_search_entries())
-        _bt_widget = _bt_page.build(header=self._make_page_header("Bluetooth"))
-        self._page_stack.add_named(_bt_widget, "bluetooth")
-        self._page_titles["bluetooth"] = "Bluetooth"
-
-        # Build Network page eagerly so the sidebar switch is present on launch
-        _net_page = NetworkPage(self)
-        self._network_page = _net_page
-        _net_page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
-        self._section_pages.append(_net_page)  # type: ignore[attr-defined]
-        self._search_page_builder.add_entries(_net_page.get_search_entries())
-        _net_widget = _net_page.build(header=self._make_page_header("Network"))
-        self._page_stack.add_named(_net_widget, "network")
-        self._page_titles["network"] = "Network"
+            self._lazy_section_specs[slug] = (cls, attr, title)
 
         self._search_page_builder.add_entries(CursorPage.get_search_entries())
         _bt2 = time.monotonic()
@@ -488,6 +459,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (AppsPage, "_apps_page", "apps", "Applications"),
             (AudioPage, "_audio_page", "audio", "Audio"),
+            (BluetoothPage, "_bluetooth_page", "bluetooth", "Bluetooth"),
+            (NetworkPage, "_network_page", "network", "Network"),
             (DaemonPage, "_daemon_page", "daemon", "Daemon"),
             (DiskPage, "_disk_page", "disks", "Disks"),
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
@@ -1089,6 +1062,14 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is BatteryPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is BluetoothPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is NetworkPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
