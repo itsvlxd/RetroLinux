@@ -9,6 +9,7 @@ from gi.repository import Adw, Gtk
 from settings.ui.icons import (
     APPS_ICON,
     AUDIO_ICON,
+    BLUETOOTH_ICON,
     AUTOSTART_ICON,
     BATTERY_ICON,
     BINDS_ICON,
@@ -230,6 +231,7 @@ class Sidebar:
         add_row(system, "power", "Power", POWER_ICON)
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
             add_row(system, "battery", "Battery", BATTERY_ICON)
+        add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
         add_row(system, "audio", "Audio", AUDIO_ICON)
 
         advanced = new_category("Advanced")
