@@ -927,6 +927,108 @@ _fwupd_install() {
     return $status
 }
 
+_hardware_specs() {
+    # CPU cores/threads
+    local cpu_cores=$(grep -m1 "cpu cores" /proc/cpuinfo 2>/dev/null | awk -F': ' '{print $2}')
+    local cpu_threads=$(grep -m1 "siblings" /proc/cpuinfo 2>/dev/null | awk -F': ' '{print $2}')
+    [[ -n $cpu_cores && -n $cpu_threads ]] && echo "CPU|${cpu_cores}|${cpu_threads}"
+
+    # GPU compute units via device ID mapping
+    local gpu_line=$(lspci -nn 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
+    if [[ -n $gpu_line ]]; then
+        local pci_id=$(echo "$gpu_line" | awk '{print $1}')
+        local raw_model=$(echo "$gpu_line" | sed 's/^[0-9a-f:.]* //;s/ *\[[0-9a-f]*\] *//g;s/ *\[[0-9a-f]*:[0-9a-f]*\].*//;s/ (rev [0-9a-f]*)//;s/^[^:]*: //' | xargs)
+        local nn_line=$(lspci -nn -s "$pci_id" 2>/dev/null)
+        local vd_pair=$(echo "$nn_line" | grep -oP '\[([0-9a-f]{4}):([0-9a-f]{4})\]' | tr -d '[]')
+        local vendor_id="${vd_pair%%:*}"
+        local gpu_device="${vd_pair##*:}"
+        local vendor=""
+        case "$vendor_id" in
+            8086) vendor="intel" ;;
+            10de) vendor="nvidia" ;;
+            1002) vendor="amd" ;;
+        esac
+
+        if [[ $vendor == "intel" && -n $gpu_device ]]; then
+            local xe_cores=""
+            case "$gpu_device" in
+                7d45|7d55|7d40|7d60) xe_cores="8" ;;  # Meteor/Arrow Lake integrated
+                7d67|7d68) xe_cores="8" ;;             # Lunar Lake integrated
+                56a0|56a1) xe_cores="32" ;;             # Arc A770
+                56a2|56a3) xe_cores="28" ;;             # Arc A750
+                56b0|56b1) xe_cores="16" ;;             # Arc A580
+                56b2|56b3) xe_cores="8" ;;              # Arc A380
+                56c0|56c1) xe_cores="8" ;;              # Arc A310
+                *) xe_cores="" ;;
+            esac
+            echo "GPU|${vendor}|${xe_cores}|Xe Cores|${gpu_device}|${raw_model}"
+        elif [[ $vendor == "nvidia" && -n $gpu_device ]]; then
+            local cuda_cores=""
+            if command -v nvidia-smi >/dev/null 2>&1; then
+                local gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+                [[ -z $gpu_name ]] && gpu_name="$raw_model"
+                case "$gpu_name" in
+                    *RTX*4090*) cuda_cores="16384" ;; *RTX*4080*) cuda_cores="9728" ;;
+                    *RTX*4070*) cuda_cores="5888" ;;  *RTX*4060*) cuda_cores="3072" ;;
+                    *RTX*3090*) cuda_cores="10496" ;; *RTX*3080*) cuda_cores="8704" ;;
+                    *RTX*3070*) cuda_cores="5888" ;;  *RTX*3060*) cuda_cores="3584" ;;
+                    *RTX*2080*) cuda_cores="4352" ;;  *RTX*2070*) cuda_cores="2304" ;;
+                    *RTX*2060*) cuda_cores="2176" ;;  *GTX*1660*) cuda_cores="1408" ;;
+                    *GTX*1650*) cuda_cores="896" ;;
+                esac
+            fi
+            [[ -z $cuda_cores ]] || echo "GPU|${vendor}|${cuda_cores}|CUDA Cores|${gpu_device}|${raw_model}"
+        elif [[ $vendor == "amd" && -n $gpu_device ]]; then
+            local sp_count=""
+            case "$gpu_device" in
+                164e|164f|1650) sp_count="512" ;;  # RX 6400/6500
+                73df|73ff|743f) sp_count="2304" ;; # RX 7600
+                744c) sp_count="3840" ;;           # RX 7700 XT
+                747e) sp_count="5376" ;;           # RX 7800 XT
+                7643|74b5) sp_count="6144" ;;      # RX 7900 GRE
+            esac
+            [[ -z $sp_count ]] || echo "GPU|${vendor}|${sp_count}|Stream Processors|${gpu_device}|${raw_model}"
+        fi
+    fi
+
+    # NPU TOPS — prefer vpu driver or Processing accelerators class
+    local npu_line=$(lspci 2>/dev/null | grep -iE "Processing accelerators" | head -1)
+    if [[ -z $npu_line ]]; then
+        npu_line=$(lspci 2>/dev/null | grep -iE "NPU" | head -1)
+    fi
+    if [[ -n $npu_line ]]; then
+        local npu_desc=$(echo "$npu_line" | sed 's/^[0-9a-f:]* //;s/ (rev [0-9a-f]*)//;s/.*: //' | xargs)
+        local npu_tops="11"
+        if echo "$npu_desc" | grep -qi "lunar\|lnl\|258V\|268V\|288V"; then
+            npu_tops="48"
+        elif echo "$npu_desc" | grep -qi "200H\|200V\|arrow"; then
+            npu_tops="13"
+        fi
+        echo "NPU|${npu_tops}|TOPS|${npu_desc}"
+    fi
+}
+
+_list_recommended_packages() {
+    local scan_data=$(run_full_scan)
+    local seen=""
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
+        [[ -z $pkgs ]] && continue
+        for p in $pkgs; do
+            if ! echo " $seen " | grep -q " $p "; then
+                seen+=" $p"
+                local ver=$(pacman -Q "$p" 2>/dev/null | awk '{print $2}')
+                if [[ -n $ver ]]; then
+                    echo "PKG|${type}|${p}|${ver}|installed"
+                else
+                    echo "PKG|${type}|${p}||missing"
+                fi
+            fi
+        done
+    done <<<"$scan_data"
+}
+
 _fwupd_status() {
     if ! command -v fwupdmgr >/dev/null 2>&1; then
         echo "ERROR:fwupdmgr_missing"
@@ -975,50 +1077,62 @@ generate_hypr_env() {
         esac
     fi
 
+    # Ensure file exists with header
+    if [[ ! -f $env_file ]]; then
+        echo "-- GPU driver environment (generated by retro driver)" > "$env_file"
+    fi
+
+    # Strip old GPU env lines and surrounding blank/comment lines
+    for var in LIBVA_DRIVER_NAME __GLX_VENDOR_LIBRARY_NAME GBM_BACKEND NVD_BACKEND VDPAU_DRIVER mesa_glthread; do
+        sed -i "/hl.env(\"${var}\"/d" "$env_file" 2>/dev/null
+    done
+    sed -i '/^-- .*GPU.*$/d' "$env_file" 2>/dev/null
+    sed -i '/^$/N;/^\n$/D' "$env_file" 2>/dev/null
+
+    # Build new GPU section
+    local new_section=""
+    local result_line=""
+    if $is_hybrid; then
+        new_section+="-- Intel + NVIDIA Hybrid\n"
+        new_section+='hl.env("LIBVA_DRIVER_NAME", "iHD")\n'
+        new_section+='hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")\n'
+        new_section+='hl.env("GBM_BACKEND", "nvidia-drm")\n'
+        result_line="result=success|type=hybrid"
+    elif $has_nvidia; then
+        new_section+="-- NVIDIA GPU\n"
+        new_section+='hl.env("GBM_BACKEND", "nvidia-drm")\n'
+        new_section+='hl.env("LIBVA_DRIVER_NAME", "nvidia")\n'
+        new_section+='hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")\n'
+        new_section+='hl.env("NVD_BACKEND", "direct")\n'
+        result_line="result=success|type=nvidia"
+    elif $has_amd; then
+        new_section+="-- AMD GPU\n"
+        new_section+='hl.env("LIBVA_DRIVER_NAME", "radeonsi")\n'
+        new_section+='hl.env("VDPAU_DRIVER", "radeonsi")\n'
+        new_section+='hl.env("mesa_glthread", "true")\n'
+        result_line="result=success|type=amd"
+    elif $has_intel; then
+        new_section+="-- Intel GPU\n"
+        new_section+='hl.env("LIBVA_DRIVER_NAME", "iHD")\n'
+        new_section+='hl.env("VDPAU_DRIVER", "va_gl")\n'
+        new_section+='hl.env("mesa_glthread", "true")\n'
+        result_line="result=success|type=intel"
+    else
+        new_section+="-- No GPU detected - using default settings\n"
+        new_section+='hl.env("LIBVA_DRIVER_NAME", "iHD")\n'
+        new_section+='hl.env("mesa_glthread", "true")\n'
+        result_line="result=warn|no_gpu_detected"
+    fi
+
+    # Insert GPU section after the first line (header), before remaining content
+    local tmp=$(mktemp)
     {
-        echo "-- This file has been generated by retro driver"
-        echo
-
-        local result_line=""
-        if $is_hybrid; then
-            echo "-- Intel + NVIDIA Hybrid"
-            echo "hl.env(\"LIBVA_DRIVER_NAME\", \"iHD\")"
-            echo "hl.env(\"__GLX_VENDOR_LIBRARY_NAME\", \"nvidia\")"
-            echo "hl.env(\"GBM_BACKEND\", \"nvidia-drm\")"
-            result_line="result=success|type=hybrid"
-        elif $has_nvidia; then
-            echo "-- NVIDIA GPU"
-            echo "hl.env(\"GBM_BACKEND\", \"nvidia-drm\")"
-            echo "hl.env(\"LIBVA_DRIVER_NAME\", \"nvidia\")"
-            echo "hl.env(\"__GLX_VENDOR_LIBRARY_NAME\", \"nvidia\")"
-            echo "hl.env(\"NVD_BACKEND\", \"direct\")"
-            result_line="result=success|type=nvidia"
-        elif $has_amd; then
-            echo "-- AMD GPU"
-            echo "hl.env(\"LIBVA_DRIVER_NAME\", \"radeonsi\")"
-            echo "hl.env(\"VDPAU_DRIVER\", \"radeonsi\")"
-            echo "hl.env(\"mesa_glthread\", \"true\")"
-            result_line="result=success|type=amd"
-        elif $has_intel; then
-            echo "-- Intel GPU"
-            echo "hl.env(\"LIBVA_DRIVER_NAME\", \"iHD\")"
-            echo "hl.env(\"VDPAU_DRIVER\", \"va_gl\")"
-            echo "hl.env(\"mesa_glthread\", \"true\")"
-            result_line="result=success|type=intel"
-        else
-            echo "-- No GPU detected - using default settings"
-            echo "hl.env(\"LIBVA_DRIVER_NAME\", \"iHD\")"
-            echo "hl.env(\"mesa_glthread\", \"true\")"
-            result_line="result=warn|no_gpu_detected"
-        fi
-
-        echo
-        echo "-- Cursor theme (from retro theme cursor set)"
-        echo "hl.env(\"XCURSOR_THEME\", \"$(get_var 'RETRO_CURSOR_THEME' 'auto')\")"
-        echo "hl.env(\"XCURSOR_SIZE\", \"$(get_var 'RETRO_CURSOR_SIZE' '24')\")"
-        echo "hl.env(\"HYPRCURSOR_THEME\", \"$(get_var 'RETRO_CURSOR_THEME' 'auto')\")"
-        echo "hl.env(\"HYPRCURSOR_SIZE\", \"$(get_var 'RETRO_CURSOR_SIZE' '24')\")"
-    } >"$env_file"
+        sed -n '1p' "$env_file"
+        echo ""
+        echo -e "$new_section"
+        sed -n '2,$p' "$env_file" | awk 'NF{found=1} found' | awk '!NF && !blank{blank=1; print ""; next} NF{blank=0; print}'
+    } > "$tmp"
+    mv "$tmp" "$env_file"
 
     echo "$result_line"
     echo "$env_file"
@@ -1114,6 +1228,59 @@ generate_grub_cmdline() {
     echo "$cmdline"
 }
 
+_thermal_readings() {
+    local cpu_temp=""
+    local gpu_temp=""
+    local npu_temp=""
+
+    # CPU — x86_pkg_temp or similar
+    local cpu_zone=$(find /sys/class/thermal -maxdepth 1 -name "thermal_zone*" 2>/dev/null | while read z; do
+        [[ $(cat "$z/type" 2>/dev/null) == "x86_pkg_temp" ]] && echo "$z" && break
+    done)
+    [[ -z $cpu_zone ]] && cpu_zone=$(find /sys/class/thermal -maxdepth 1 -name "thermal_zone*" 2>/dev/null | while read z; do
+        [[ $(cat "$z/type" 2>/dev/null) == "cpu-thermal" ]] && echo "$z" && break
+    done)
+    if [[ -n $cpu_zone && -f $cpu_zone/temp ]]; then
+        cpu_temp=$(($(cat "$cpu_zone/temp") / 1000))
+    fi
+    [[ -n $cpu_temp ]] && echo "CPU|${cpu_temp}"
+
+    # GPU — DRM hwmon
+    local gpu_hwmon=$(find /sys/class/drm -maxdepth 2 -path "*/hwmon/hwmon*/temp1_input" 2>/dev/null | head -1)
+    if [[ -z $gpu_hwmon ]]; then
+        gpu_hwmon=$(find /sys/class/drm -maxdepth 3 -path "*/device/hwmon/hwmon*/temp1_input" 2>/dev/null | head -1)
+    fi
+    if [[ -n $gpu_hwmon ]]; then
+        gpu_temp=$(($(cat "$gpu_hwmon") / 1000))
+    elif command -v nvidia-smi >/dev/null 2>&1; then
+        gpu_temp=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null | head -1)
+    fi
+    [[ -n $gpu_temp ]] && echo "GPU|${gpu_temp}"
+
+    # NPU — look for thermal zone with npu/vpu in type name
+    local npu_zone=$(find /sys/class/thermal -maxdepth 1 -name "thermal_zone*" 2>/dev/null | while read z; do
+        local t=$(cat "$z/type" 2>/dev/null)
+        [[ $t == *"npu"* || $t == *"vpu"* || $t == *"NPU"* ]] && echo "$z" && break
+    done)
+    if [[ -n $npu_zone && -f $npu_zone/temp ]]; then
+        npu_temp=$(($(cat "$npu_zone/temp") / 1000))
+    fi
+    [[ -n $npu_temp ]] && echo "NPU|${npu_temp}"
+}
+
+_check_env() {
+    local env_file="$RETRO_CONFIG/env.lua"
+    if [[ ! -f $env_file ]]; then
+        echo "ENV|missing"
+        return
+    fi
+    if grep -qE "LIBVA_DRIVER_NAME|GBM_BACKEND|__GLX_VENDOR_LIBRARY_NAME|NVD_BACKEND|VDPAU_DRIVER|mesa_glthread" "$env_file" 2>/dev/null; then
+        echo "ENV|ok"
+    else
+        echo "ENV|stale"
+    fi
+}
+
 case "$1" in
     "--scan") run_full_scan ;;
     "--install") run_full_install ;;
@@ -1135,6 +1302,10 @@ case "$1" in
     "--device-id") _get_intel_gpu_device_id ;;
     "--current-driver") _get_current_driver ;;
     "--profile") get_profile_packages "$2" ;;
+    "--temps") _thermal_readings ;;
+    "--check-env") _check_env ;;
+    "--packages") _list_recommended_packages ;;
+    "--hardware-specs") _hardware_specs ;;
     "--firmware-scan") _fwupd_scan ;;
     "--firmware-install") _fwupd_install ;;
     "--firmware-status") _fwupd_status ;;
