@@ -11,6 +11,7 @@ from settings.ui.icons import (
     AUDIO_ICON,
     BLUETOOTH_ICON,
     DAEMON_ICON,
+    DRIVER_ICON,
     KEYRING_ICON,
     LOGS_ICON,
     NETWORK_ICON,
@@ -239,6 +240,7 @@ class Sidebar:
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
         add_row(system, "audio", "Audio", AUDIO_ICON)
+        add_row(system, "driver", "Drivers", DRIVER_ICON)
 
         advanced = new_category("Advanced")
         add_row(advanced, "keyring", "Keyring", KEYRING_ICON)
