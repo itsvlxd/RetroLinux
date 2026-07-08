@@ -1,7 +1,5 @@
 """Main application window with sidebar navigation."""
 
-from __future__ import annotations
-
 import subprocess
 import time
 from collections import Counter
@@ -122,21 +120,21 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
         # Optional page/widget references (populated during _build_ui)
         self._anim_details_box: Gtk.Box | None = None
-        self._animations_page: AnimationsPage | None = None
-        self._monitors_page: MonitorsPage | None = None
-        self._workspaces_page: WorkspacesPage | None = None
-        self._binds_page: BindsPage | None = None
-        self._cursor_page: CursorPage | None = None
-        self._autostart_page: AutostartPage | None = None
-        self._env_vars_page: EnvVarsPage | None = None
-        self._window_rules_page: WindowRulesPage | None = None
-        self._layer_rules_page: LayerRulesPage | None = None
-        self._layouts_page: LayoutsPage | None = None
-        self._themes_page: ThemesPage | None = None
-        self._wallpapers_page: WallpapersPage | None = None
-        self._apps_page: AppsPage | None = None
-        self._settings_page: SettingsPage | None = None
-        self._pending_page: PendingChangesPage | None = None
+        self._animations_page: object | None = None
+        self._monitors_page: object | None = None
+        self._workspaces_page: object | None = None
+        self._binds_page: object | None = None
+        self._cursor_page: object | None = None
+        self._autostart_page: object | None = None
+        self._env_vars_page: object | None = None
+        self._window_rules_page: object | None = None
+        self._layer_rules_page: object | None = None
+        self._layouts_page: object | None = None
+        self._themes_page: object | None = None
+        self._wallpapers_page: object | None = None
+        self._apps_page: object | None = None
+        self._settings_page: object | None = None
+        self._pending_page: object | None = None
         self._pre_search_page_id: str | None = None
         self._search_results: list | None = None
         # Populated at the end of _build_ui() once section pages exist;
@@ -390,7 +388,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def _build_content_pane(self):
         """Build the content pane with page stack and banner."""
-        self._content_nav = Adw.NavigationPage(title="")
+        self._content_nav = Adw.NavigationPage(title="Retro Settings")
 
         self._page_stack = Gtk.Stack()
         self._page_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -1126,6 +1124,14 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def show_page(self, gid: str):
         """Switch the content pane to the given page."""
+        if gid == "keyring":
+            cmd = "seahorse"
+            lua = f'hl.dsp.exec_cmd("{cmd}", {{ float = true, size = {{ 1000, 700 }}, center = true }})'
+            subprocess.Popen(
+                ["hyprctl", "dispatch", lua],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            return
         if gid in self._deferred_groups:
             self._build_lazy_group_page(gid)
         elif gid in self._lazy_section_specs:
