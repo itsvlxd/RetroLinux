@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from settings.pages.grub import GrubPage
     from settings.pages.layer_rules import LayerRulesPage
     from settings.pages.layouts import LayoutsPage
+    from settings.pages.logs import LogsPage
     from settings.pages.monitors import MonitorsPage
     from settings.pages.network import NetworkPage
     from settings.pages.pending import PendingChangesPage
@@ -422,6 +423,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
         from settings.pages.layer_rules import LayerRulesPage
+        from settings.pages.logs import LogsPage
         from settings.pages.layouts import LayoutsPage
         from settings.pages.monitors import MonitorsPage
         from settings.pages.network import NetworkPage
@@ -490,6 +492,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (DiskPage, "_disk_page", "disks", "Disks"),
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
             (GrubPage, "_grub_page", "grub", "Bootloader"),
+            (LogsPage, "_logs_page", "logs", "Logs"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PowerPage, "_power_page", "power", "Power"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
@@ -1063,6 +1066,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.disk import DiskPage
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
+        from settings.pages.logs import LogsPage
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
@@ -1113,6 +1117,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is DaemonPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is LogsPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

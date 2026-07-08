@@ -12,6 +12,7 @@ from settings.ui.icons import (
     BLUETOOTH_ICON,
     DAEMON_ICON,
     KEYRING_ICON,
+    LOGS_ICON,
     NETWORK_ICON,
     AUTOSTART_ICON,
     BATTERY_ICON,
@@ -234,16 +235,17 @@ class Sidebar:
         add_row(system, "power", "Power", POWER_ICON)
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
             add_row(system, "battery", "Battery", BATTERY_ICON)
-        add_row(system, "keyring", "Keyring", KEYRING_ICON)
         add_row(system, "daemon", "Daemon", DAEMON_ICON)
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
         add_row(system, "audio", "Audio", AUDIO_ICON)
 
         advanced = new_category("Advanced")
+        add_row(advanced, "keyring", "Keyring", KEYRING_ICON)
         add_schema_row(advanced, "xwayland")
         add_schema_row(advanced, "ecosystem")
         add_schema_row(advanced, "misc")
+        add_row(advanced, "logs", "Logs", LOGS_ICON)
 
         # Pinned list is NOT added to _lists so select_first() ignores it.
 
