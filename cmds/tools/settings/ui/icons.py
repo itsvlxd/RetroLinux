@@ -37,6 +37,7 @@ AUDIO_ICON = "audio-volume-high-symbolic"
 BLUETOOTH_ICON = "bluetooth-active-symbolic"
 NETWORK_ICON = "network-wireless-symbolic"
 DAEMON_ICON = "system-run-symbolic"
+DRIVER_ICON = "preferences-other-symbolic"
 KEYRING_ICON = "dialog-password-symbolic"
 LOGS_ICON = "document-properties-symbolic"
 

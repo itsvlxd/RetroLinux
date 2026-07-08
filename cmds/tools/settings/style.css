@@ -28,6 +28,31 @@ row:hover .reset-button,
     opacity: 1;
 }
 
+/* Temperature badge in hardware overview rows */
+.temp-badge {
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 0 6px;
+    opacity: 0.8;
+}
+
+/* Hero hardware status card */
+.hero-card {
+    background-color: alpha(@accent_bg_color, 0.07);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+/* Hero status pill badge */
+.pill {
+    border-radius: 9999px;
+    padding: 4px 14px;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
 /* Error flash: red tint */
 .option-error {
     background-color: alpha(@error_bg_color, 0.18);

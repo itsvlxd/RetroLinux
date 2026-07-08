@@ -419,6 +419,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.bluetooth import BluetoothPage
         from settings.pages.daemon import DaemonPage
         from settings.pages.disk import DiskPage
+        from settings.pages.driver import DriverPage
         from settings.pages.env_vars import EnvVarsPage
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
@@ -490,6 +491,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (NetworkPage, "_network_page", "network", "Network"),
             (DaemonPage, "_daemon_page", "daemon", "Daemon"),
             (DiskPage, "_disk_page", "disks", "Disks"),
+            (DriverPage, "_driver_page", "driver", "Drivers"),
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
             (GrubPage, "_grub_page", "grub", "Bootloader"),
             (LogsPage, "_logs_page", "logs", "Logs"),
@@ -843,6 +845,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         audio_page = getattr(self, "_audio_page", None)
         if audio_page is not None and audio_page.is_dirty():
             counts["audio"] = 1
+        driver_page = getattr(self, "_driver_page", None)
+        if driver_page is not None and driver_page.missing_count() > 0:
+            counts["driver"] = driver_page.missing_count()
 
         # The pending-changes chip totals everything else
         counts["pending"] = sum(counts.values())
@@ -1064,6 +1069,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.bluetooth import BluetoothPage
         from settings.pages.daemon import DaemonPage
         from settings.pages.disk import DiskPage
+        from settings.pages.driver import DriverPage
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
         from settings.pages.logs import LogsPage
@@ -1089,6 +1095,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         elif cls is ThemesPage:
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is DiskPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is DriverPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
