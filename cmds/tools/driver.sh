@@ -780,9 +780,9 @@ cmd_driver() {
             if echo "$hypr_raw" | head -1 | grep -q "result=success"; then
                 local gpu_type
                 gpu_type=$(echo "$hypr_raw" | head -1 | grep -oP "type=\K[^|]+")
-                rx_log "success" "Generated ${gpu_type^^} env.conf"
+                rx_log "success" "Generated ${gpu_type^^} env.lua"
             elif echo "$hypr_raw" | head -1 | grep -q "result=warn"; then
-                rx_log "warn" "No GPU detected, generated generic env.conf"
+                rx_log "warn" "No GPU detected, generated generic env.lua"
             fi
 
             if [[ -f $env_path ]]; then
@@ -790,10 +790,10 @@ cmd_driver() {
                 cat "$env_path" | sed 's/^/ /'
                 rx_table_separator
                 rx_table_simple "󰈐" "Location: $env_path" "$GRAY"
-                rx_table_simple "󰈐" "Source in Hyprland: source = ~/.config/retro/env.conf" "$GRAY"
+                rx_table_simple "󰈐" "Source in Hyprland: source = ~/.config/retro/env.lua" "$GRAY"
                 rx_table_spacer
             else
-                rx_log "error" "env.conf not found. Run: retro driver hypr"
+                rx_log "error" "env.lua not found. Run: retro driver hypr"
             fi
             ;;
 
