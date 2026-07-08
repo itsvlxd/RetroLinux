@@ -67,6 +67,8 @@ case "$1" in
             else
                 keyring_state="locked"
             fi
+        else
+            keyring_state="locked"
         fi
 
         echo "service_gnome_keyring=${service_gk}"
@@ -82,13 +84,16 @@ case "$1" in
 
     --lock)
         rx_log_file "info" "Locking keyring..."
+        systemctl --user stop gnome-keyring-daemon.socket 2>/dev/null
+        systemctl --user stop gnome-keyring-daemon.service 2>/dev/null
+        sleep 0.5
         if systemctl --user is-active gnome-keyring-daemon.service &>/dev/null; then
-            systemctl --user stop gnome-keyring-daemon.service 2>&1
+            echo "result=error|reason=lock_failed"
+            rx_log_file "error" "Lock failed — daemon still active"
+            exit 1
+        else
             rx_log_file "success" "Keyring locked (daemon stopped)"
             echo "OK|locked"
-        else
-            rx_log_file "warn" "Keyring daemon not running"
-            echo "OK|already_locked"
         fi
         ;;
 
@@ -110,14 +115,9 @@ case "$1" in
         ;;
 
     --list)
-        rx_log_file "info" "Listing stored secrets..."
-         output
-        if output=$(secret-tool search --all xdg:schema org.retrolinux.GenericSecret 2>&1) && [[ -n $output ]]; then
-            echo "$output"
-            rx_log_file "info" "Listed secrets successfully"
-        else
-            rx_log_file "warn" "No secrets found"
-        fi
+        rx_log_file "info" "Listing all keyring items..."
+        python3 "$RETRO_DIR/scripts/python/keyring_list.py" 2>/dev/null || true
+        rx_log_file "info" "Listed secrets"
         ;;
 
     --store)

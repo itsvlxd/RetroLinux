@@ -44,11 +44,10 @@ cmd_keyring() {
             [[ $keyring_state == "unlocked" ]] && vault_color="$SUCCESS" && vault_display="● Unlocked"
             [[ $keyring_state == "locked" ]] && vault_color="$WARN" && vault_display="○ Locked"
 
-            rx_table_header "󰒓" "Keyring Infrastructure Status"
-            rx_table_row "󰒋" "GNOME Keyring:" "$gk_status" "$gk_color" "24"
-            rx_table_row "󱂷" "PAM Module:" "${pam_auth_display} (${pam_file})" "$pam_auth_color" "24"
-            rx_table_row "󰌊" "Vault State:" "$vault_display" "$vault_color" "24"
-            rx_table_row "󰋚" "Stored Credentials:" "${item_count} items" "$GRAY" "24"
+            rx_table_header "" "Keyring Infrastructure Status"
+rx_table_row "" "GNOME Keyring:" "$gk_status" "$gk_color" "24"
+            rx_table_row "" "PAM Module:" "${pam_auth_display} (${pam_file})" "$pam_auth_color" "24"
+            rx_table_row "" "Stored Credentials:" "${item_count} items" "$GRAY" "24"
             rx_table_separator
             rx_table_spacer
             ;;
@@ -84,7 +83,7 @@ cmd_keyring() {
                     [[ $current_service_gk == "active" ]] && gk_display="Active" || gk_display="Inactive"
                     local pam_display="${current_pam_auth^}"
 
-                    rx_setup_current "󰒓" "Current Keyring Configuration" \
+                    rx_setup_current "" "Current Keyring Configuration" \
                         "Service" "$gk_display" \
                         "PAM" "$pam_display" || true
 
@@ -126,7 +125,7 @@ cmd_keyring() {
                     esac
                 done <<<"$result_data"
 
-                rx_setup_summary "󰒓" "Keyring Setup Summary" \
+                rx_setup_summary "" "Keyring Setup Summary" \
                     "GNOME Keyring" "${result_gk^}" \
                     "PAM" "${result_pam^}" \
                     "Vault" "${result_state^}" \
@@ -134,7 +133,7 @@ cmd_keyring() {
 
                 rx_setup_confirm || return 0
 
-                rx_setup_success "󰒓" "Keyring Configured" \
+                rx_setup_success "" "Keyring Configured" \
                     "GNOME Keyring" "${result_gk^}" \
                     "PAM" "${result_pam^}" \
                     "Vault" "${result_state^}" \
@@ -173,40 +172,22 @@ cmd_keyring() {
                 return 0
             fi
 
-            rx_table_header "🔐" "Stored Credentials"
-
             local count=0
-            local current_label=""
-            local current_attrs=""
-            local in_entry=false
-
-            while IFS= read -r line; do
-                if [[ $line =~ ^\[/[0-9]+\] ]]; then
-                    if [[ -n $current_label ]]; then
-                        ((count++))
-                        rx_table_row "🔑" "$current_label" "$current_attrs" "$GRAY" "36"
-                    fi
-                    current_label=""
-                    current_attrs=""
-                    in_entry=true
-                elif [[ $in_entry == true && $line =~ ^label[[:space:]]*=[[:space:]]*(.*) ]]; then
-                    current_label="${BASH_REMATCH[1]}"
-                elif [[ $in_entry == true && $line =~ ^attribute\.([^[:space:]=]+)[[:space:]]*=[[:space:]]*(.*) ]]; then
-                    local attr_key="${BASH_REMATCH[1]}"
-                    local attr_val="${BASH_REMATCH[2]}"
-                    if [[ -n $current_attrs ]]; then
-                        current_attrs="${current_attrs}, "
-                    fi
-                    current_attrs="${current_attrs}${attr_key}=${attr_val}"
-                fi
+            while IFS='|' read -r label attrs _path; do
+                [[ -n $label ]] && ((count++))
             done <<<"$data"
-            if [[ -n $current_label ]]; then
+
+            rx_table_header "" "Stored Credentials (${count})"
+
+            count=0
+            while IFS='|' read -r label attrs _path; do
+                [[ -z $label ]] && continue
                 ((count++))
-                rx_table_row "🔑" "$current_label" "$current_attrs" "$GRAY" "36"
-            fi
+                local display_attrs="${attrs//|/, }"
+                rx_table_row "" "$label" "$display_attrs" "$GRAY" "36"
+            done <<<"$data"
 
             rx_table_separator
-            rx_table_row "" "Total:" "${count} credentials" "$PINK" "36"
             rx_table_spacer
             ;;
 
@@ -320,6 +301,36 @@ cmd_keyring() {
             rx_log "success" "Launching seahorse — navigate to Login keyring > Change Password"
             ;;
 
+        "auto-lock")
+            local sub="${2,,}"
+            local val3="$3"
+            case "$sub" in
+                on|enable)
+                    local timeout="${val3:-300}"
+                    set_var "KEYRING_AUTO_LOCK" "true"
+                    set_var "KEYRING_AUTO_LOCK_TIMEOUT" "$timeout"
+                    rx_log "success" "Auto-lock enabled (${timeout}s timeout)"
+                    ;;
+                off|disable)
+                    set_var "KEYRING_AUTO_LOCK" "false"
+                    rx_log "info" "Auto-lock disabled"
+                    ;;
+                status)
+                    local enabled=$(get_var "KEYRING_AUTO_LOCK" "false")
+                    local timeout=$(get_var "KEYRING_AUTO_LOCK_TIMEOUT" "300")
+                    rx_table_header "" "Auto-Lock Configuration"
+                    rx_table_row "" "Enabled:" "${enabled^^}" "$PINK" "24"
+                    rx_table_row "󰈐" "Timeout:" "${timeout}s" "$PINK" "24"
+                    rx_table_separator
+                    rx_table_spacer
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro keyring auto-lock <on|off|status> [timeout]"
+                    return 1
+                    ;;
+            esac
+            ;;
+
         "help" | "")
             rx_help_usage "retro keyring <command>"
             rx_help_commands "Available commands"
@@ -331,6 +342,7 @@ cmd_keyring() {
             rx_help_cmd "store <label>" "Store a new credential (pipe stdin or prompt)" 24
             rx_help_cmd "retrieve <attr> <val>" "Copy credential to clipboard (--show for stdout)" 24
             rx_help_cmd "delete <attr> <val>" "Remove a credential" 24
+            rx_help_cmd "auto-lock <on|off|status>" "Manage auto-lock settings" 24
             rx_help_cmd "password" "Change keyring master password" 24
             rx_help_examples
             rx_help_example "retro keyring status" "Show full keyring status" "38"
