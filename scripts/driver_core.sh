@@ -511,6 +511,13 @@ run_full_scan() {
     results+="SYS|rebar|${rebar}|||\n"
     local kern_warn=$(_kernel_warnings)
     [[ -n $kern_warn ]] && results+="WARN|${kern_warn}||||\n"
+    # GuC firmware check for Meteor Lake+
+    local gpu_line=$(lspci -nn 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
+    if echo "$gpu_line" | grep -qiE "meteor.*lake|Meteor|Arrow|Lunar|Battlemage"; then
+        if [[ ! -d /lib/firmware/intel ]]; then
+            results+="WARN|Intel GuC firmware not found — xe driver may fail. Install linux-firmware-intel.||||\n"
+        fi
+    fi
     echo -e "$results" | sed '/^$/d'
 }
 
@@ -1097,6 +1104,7 @@ generate_hypr_env() {
         new_section+='hl.env("LIBVA_DRIVER_NAME", "iHD")\n'
         new_section+='hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")\n'
         new_section+='hl.env("GBM_BACKEND", "nvidia-drm")\n'
+        new_section+='hl.env("INTEL_DEBUG", "norbc")\n'
         result_line="result=success|type=hybrid"
     elif $has_nvidia; then
         new_section+="-- NVIDIA GPU\n"
@@ -1116,11 +1124,13 @@ generate_hypr_env() {
         new_section+='hl.env("LIBVA_DRIVER_NAME", "iHD")\n'
         new_section+='hl.env("VDPAU_DRIVER", "va_gl")\n'
         new_section+='hl.env("mesa_glthread", "true")\n'
+        new_section+='hl.env("INTEL_DEBUG", "norbc")\n'
         result_line="result=success|type=intel"
     else
         new_section+="-- No GPU detected - using default settings\n"
         new_section+='hl.env("LIBVA_DRIVER_NAME", "iHD")\n'
         new_section+='hl.env("mesa_glthread", "true")\n'
+        new_section+='hl.env("INTEL_DEBUG", "norbc")\n'
         result_line="result=warn|no_gpu_detected"
     fi
 
@@ -1268,6 +1278,53 @@ _thermal_readings() {
     [[ -n $npu_temp ]] && echo "NPU|${npu_temp}"
 }
 
+_check_updates() {
+    local all_pkgs=$(_list_recommended_packages | awk -F'|' '{print $3}')
+    local updatable=""
+    local count=0
+    for p in $all_pkgs; do
+        if pacman -Qu "$p" 2>/dev/null | grep -q "^$p "; then
+            updatable+=" $p"
+            ((count++))
+        fi
+    done
+    if [[ $count -gt 0 ]]; then
+        echo "UPDATES|${count}|${updatable}"
+    else
+        echo "UPDATES|0|"
+    fi
+}
+
+_configure_intel() {
+    local device_id=$(_get_intel_gpu_device_id)
+    [[ -z $device_id ]] && echo "ERROR|no_intel_gpu" && return 1
+
+    local conf_file="/usr/lib/modprobe.d/intel.conf"
+    local conf_dir=$(dirname "$conf_file")
+    if [[ ! -d $conf_dir ]]; then
+        sudo mkdir -p "$conf_dir" 2>/dev/null || { echo "ERROR|mkdir_failed"; return 1; }
+    fi
+    echo "options i915 force_probe=!${device_id}" | sudo tee "$conf_file" >/dev/null
+    echo "options xe force_probe=${device_id}" | sudo tee -a "$conf_file" >/dev/null
+    echo "MODPROBE_CONFIGURED|${device_id}"
+
+    # Set INTEL_DEBUG=norbc globally
+    local env_file="/etc/environment"
+    if grep -q "^INTEL_DEBUG=" "$env_file" 2>/dev/null; then
+        sudo sed -i "s|^INTEL_DEBUG=.*|INTEL_DEBUG=norbc|" "$env_file"
+    else
+        echo "INTEL_DEBUG=norbc" | sudo tee -a "$env_file" >/dev/null
+    fi
+    echo "INTEL_DEBUG_SET|norbc"
+
+    # Ensure firmware is installed
+    if ! _is_pkg_installed "linux-firmware-intel" && ! ls /lib/firmware/intel/*.bin 2>/dev/null | head -1 | grep -q .; then
+        echo "WARN|linux-firmware-intel recommended for xe driver"
+    fi
+
+    echo "CONFIGURE_COMPLETE"
+}
+
 _check_env() {
     local env_file="$RETRO_CONFIG/env.lua"
     if [[ ! -f $env_file ]]; then
@@ -1303,6 +1360,8 @@ case "$1" in
     "--current-driver") _get_current_driver ;;
     "--profile") get_profile_packages "$2" ;;
     "--temps") _thermal_readings ;;
+    "--configure-intel") _configure_intel ;;
+    "--check-updates") _check_updates ;;
     "--check-env") _check_env ;;
     "--packages") _list_recommended_packages ;;
     "--hardware-specs") _hardware_specs ;;
