@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import threading
 from pathlib import Path
 
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk
@@ -565,17 +566,50 @@ class WallpapersPage:
         self._content_box = content_box
         self._flow_box = flow
         self._search_entry = search_entry
-        self._all_wallpapers = _list_wallpapers()
+
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_margin_top(48)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(32, 32)
+        spinner.start()
+        spinner_box.append(spinner)
+        lbl = Gtk.Label(label="Loading wallpapers\u2026")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+        self._spinner_box = spinner_box
+        content_box.append(spinner_box)
+
+        self._load_wallpapers_async()
+
+        return toolbar
+
+    def _load_wallpapers_async(self) -> None:
+        def worker():
+            wallpapers = _list_wallpapers()
+            GLib.idle_add(self._on_wallpapers_loaded, wallpapers)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_wallpapers_loaded(self, wallpapers: list[dict]) -> None:
+        self._all_wallpapers = wallpapers
+        if self._spinner_box is not None and self._content_box is not None:
+            self._content_box.remove(self._spinner_box)
+            self._spinner_box = None
         self._rebuild()
         self._needs_opt = self._check_needs_optimization()
         self._refresh_opt_banner()
         self._refresh_managed()
 
-        return toolbar
-
     def _refresh(self):
-        self._all_wallpapers = _list_wallpapers()
         self._search_term = self._search_entry.get_text().strip().lower() if self._search_entry else ""
+        def worker():
+            wallpapers = _list_wallpapers()
+            GLib.idle_add(self._on_refreshed, wallpapers)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_refreshed(self, wallpapers: list[dict]) -> None:
+        self._all_wallpapers = wallpapers
         self._rebuild()
         self._refresh_opt_banner()
 

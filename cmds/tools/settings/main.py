@@ -1,7 +1,6 @@
 """Retro Settings application entry point."""
 
 import signal
-import subprocess
 import sys
 from pathlib import Path
 
@@ -32,11 +31,6 @@ class RetroSettingsApp(Adw.Application):
         if not isinstance(win, RetroSettingsWindow):
             win = RetroSettingsWindow(application=self)
         win.present()
-        subprocess.Popen(
-            ["retro", "app", "all", "refresh"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
 
 
 def main():

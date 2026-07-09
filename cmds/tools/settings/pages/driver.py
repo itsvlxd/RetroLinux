@@ -45,6 +45,10 @@ class DriverPage:
         self._specs: dict[str, dict] = {}
         self._env_status: str = ""
         self._temps: dict[str, int] = {}
+        self._updates: list[str] = []
+        self._pending_driver_switch: str | None = None
+        self._current_driver: str = ""
+        self._driver_switch_drop: Gtk.Widget | None = None
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -79,16 +83,28 @@ class DriverPage:
             specs = _run(["--hardware-specs"])
             env = _run(["--check-env"])
             temps = _run(["--temps"])
-            GLib.idle_add(self._on_data_loaded, scan, pkgs, conflicts, specs, env, temps)
+            updates = _run(["--check-updates"])
+            current = _run(["--current-driver"])
+            GLib.idle_add(self._on_data_loaded, scan, pkgs, conflicts, specs, env, temps, updates, current)
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_data_loaded(self, scan: str, pkgs: str, conflicts: str, specs: str, env: str, temps: str) -> None:
+    def _on_data_loaded(self, scan: str, pkgs: str, conflicts: str, specs: str, env: str, temps: str, updates: str, current: str) -> None:
         self._parse_scan(scan)
         self._parse_packages(pkgs)
         self._conflicts = [c for c in conflicts.splitlines() if c.strip()]
         self._parse_specs(specs)
         self._env_status = env.replace("ENV|", "").strip() if "ENV|" in env else ""
         self._parse_temps(temps)
+
+        self._updates = []
+        if "UPDATES|" in updates:
+            parts = updates.split("|", 2)
+            if len(parts) >= 3 and parts[1].isdigit() and int(parts[1]) > 0:
+                self._updates = parts[2].strip().split()
+
+        self._current_driver = current.strip() if current else ""
+        self._pending_driver_switch = None
+        self._driver_switch_drop = None
 
         self._missing_pkgs = []
         for comp in self._scan_data:
@@ -219,6 +235,28 @@ class DriverPage:
             ))
             any_warning = True
 
+        # If Intel Meteor Lake+ is on i915 instead of xe, warn
+        for comp in self._scan_data:
+            if comp["type"] == "GPU" and comp["vendor"] == "intel" and self._current_driver == "i915":
+                if any(k in comp["model"] for k in ("Meteor", "Arrow", "Lunar", "Battlemage")):
+                    group.add(self._make_warning_row(
+                        "Legacy i915 driver in use",
+                        "Meteor Lake+ GPU should use the modern xe driver for better performance and power management",
+                        "Configure Intel", lambda _b: self._run_terminal("retro driver configure-intel"),
+                    ))
+                    any_warning = True
+                    break
+
+        if self._updates:
+            sub = ", ".join(self._updates[:5])
+            if len(self._updates) > 5:
+                sub += f" and {len(self._updates) - 5} more"
+            group.add(self._make_warning_row(
+                f"{len(self._updates)} driver update{'s' if len(self._updates) > 1 else ''} available",
+                sub, "Update All", lambda _b: self._run_terminal("retro driver update"),
+            ))
+            any_warning = True
+
         if any_warning:
             self._content_box.append(group)
 
@@ -284,10 +322,10 @@ class DriverPage:
 
         def _make_logo(path: str) -> None:
             try:
-                src = GdkPixbuf.Pixbuf.new_from_file(path)
-                pb = src.scale_simple(100, 100, GdkPixbuf.InterpType.NEAREST)
+                pb = GdkPixbuf.Pixbuf.new_from_file(path)
                 pic = Gtk.Picture.new_for_pixbuf(pb)
-                pic.set_size_request(100, 100)
+                pic.set_content_fit(Gtk.ContentFit.CONTAIN)
+                pic.set_size_request(64, 64)
                 logo_box.append(pic)
             except Exception:
                 pass
@@ -455,6 +493,15 @@ class DriverPage:
             tlbl.set_valign(Gtk.Align.CENTER)
             row.add_suffix(tlbl)
 
+        if comp["type"] == "GPU" and comp["vendor"] == "intel":
+            opts = Gtk.StringList.new(["i915", "xe"])
+            drop = Gtk.DropDown(model=opts)
+            drop.set_selected(1 if self._current_driver == "xe" else 0)
+            drop.set_valign(Gtk.Align.CENTER)
+            drop.connect("notify::selected", self._on_driver_switch, drop)
+            row.add_suffix(drop)
+            self._driver_switch_drop = drop
+
         group.add(row)
 
     def _build_packages_section(self) -> None:
@@ -506,6 +553,18 @@ class DriverPage:
         group.add(expander)
         self._content_box.append(group)
 
+    def _on_driver_switch(self, _drop, _pspec, drop) -> None:
+        idx = drop.get_selected()
+        target = "xe" if idx == 1 else "i915"
+        if target == self._current_driver:
+            self._pending_driver_switch = None
+            self._dirty = False
+        else:
+            self._pending_driver_switch = target
+            self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+
     def _install_missing(self) -> None:
         if not self._missing_pkgs:
             self._window.show_toast("No missing drivers to install")
@@ -539,19 +598,28 @@ class DriverPage:
         self._dirty = False
 
     def discard(self) -> None:
+        self._pending_driver_switch = None
         self._dirty = False
+        if self._driver_switch_drop is not None:
+            self._driver_switch_drop.set_selected(1 if self._current_driver == "xe" else 0)
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:
         if self._dirty:
             yield PendingChange(
                 category="Drivers",
-                title="Driver Configuration",
-                subtitle="Driver settings changed",
+                title="GPU Kernel Driver",
+                subtitle=f"Switch to {self._pending_driver_switch}" if self._pending_driver_switch else "Driver settings changed",
                 navigate_to="driver",
                 icon=_DRIVER_ICON,
                 kind="modified",
                 revert=self.discard,
             )
+
+    def flush_pending(self) -> None:
+        if self._pending_driver_switch:
+            self._run_terminal(f"retro driver switch {self._pending_driver_switch}")
+            self._pending_driver_switch = None
+            self._dirty = False
 
     def get_search_entries(self) -> list[dict]:
         return [
