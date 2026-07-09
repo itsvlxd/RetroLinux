@@ -9,7 +9,7 @@ cmd_clipboard() {
 
     if [[ $action == "history" ]]; then
         if [[ -z $selection ]]; then
-            cliphist list | grep -vE "\[\[.*binary.*data" | head -n 150 || echo "Clipboard history is empty..."
+            cliphist list | grep -vE "\[\[.*binary.*data" | head -n 150 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g' || echo "Clipboard history is empty..."
             exit 0
         else
             if echo "$selection" | cliphist decode | wl-copy 2>/dev/null; then
