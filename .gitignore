@@ -5,6 +5,7 @@ MangoHud.conf
 modules/cava/files/themes/
 
 TODO
+retro-settings.pyz
 
 # ISO build artifacts
 .env
