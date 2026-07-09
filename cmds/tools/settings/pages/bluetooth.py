@@ -190,9 +190,34 @@ class BluetoothPage:
         scan_btn.connect("clicked", lambda _b: self._show_scan_dialog())
         header.pack_start(scan_btn)
 
-        self._load_data()
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_margin_top(48)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(32, 32)
+        spinner.start()
+        spinner_box.append(spinner)
+        lbl = Gtk.Label(label="Scanning Bluetooth\u2026")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+        self._content_box.append(spinner_box)
 
-        # Sidebar switch must be added after sidebar is populated (happens after build)
+        self._load_data_async()
+
+        return toolbar_view
+
+    def _load_data_async(self) -> None:
+        def worker():
+            self._load_data()
+            GLib.idle_add(self._on_data_loaded)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_data_loaded(self) -> None:
+        for child in list(self._content_box):
+            self._content_box.remove(child)
+
+        # Sidebar switch must be added after sidebar is populated
         GLib.idle_add(self._add_sidebar_switch)
 
         # Bluetooth Status
@@ -206,8 +231,6 @@ class BluetoothPage:
         self._content_box.append(pg)
 
         self._tick_source = GLib.timeout_add(5000, self._tick)
-
-        return toolbar_view
 
     def _load_data(self) -> None:
         self._status = {}
@@ -254,8 +277,10 @@ class BluetoothPage:
                     })
 
     def _full_refresh(self) -> None:
-        self._load_data()
-        GLib.idle_add(self._rebuild_device_list)
+        def worker():
+            self._load_data()
+            GLib.idle_add(self._rebuild_device_list)
+        threading.Thread(target=worker, daemon=True).start()
 
     def _build_status_section(self, group: Adw.PreferencesGroup) -> None:
         radio_on = self._status.get("radio", "no") == "yes"

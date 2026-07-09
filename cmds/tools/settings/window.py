@@ -1485,6 +1485,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._wallpapers_page.flush_pending()
         if self._apps_page is not None:
             self._apps_page.flush_pending()
+        driver_page = getattr(self, "_driver_page", None)
+        if driver_page is not None:
+            driver_page.flush_pending()
         self._undo.clear()
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()

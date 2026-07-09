@@ -96,7 +96,32 @@ class AudioPage:
         add_btn.connect("clicked", lambda _b: self._show_download_dialog())
         header.pack_start(add_btn)
 
-        self._load_data()
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_margin_top(48)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(32, 32)
+        spinner.start()
+        spinner_box.append(spinner)
+        lbl = Gtk.Label(label="Loading audio devices\u2026")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+        self._content_box.append(spinner_box)
+
+        self._load_data_async()
+
+        return toolbar_view
+
+    def _load_data_async(self) -> None:
+        def worker():
+            self._load_data()
+            GLib.idle_add(self._on_data_loaded)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_data_loaded(self) -> None:
+        for child in list(self._content_box):
+            self._content_box.remove(child)
 
         # Output + Input spectrums side-by-side
         spectrum_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -145,8 +170,6 @@ class AudioPage:
         self._tick_source = GLib.timeout_add(5000, self._tick)
 
         GLib.idle_add(self._refresh_managed)
-
-        return toolbar_view
 
     # ── Data loading ──
 
@@ -270,11 +293,16 @@ class AudioPage:
                 break
 
     def _full_refresh(self) -> None:
-        self._load_data()
-        GLib.idle_add(self._rebuild_priority_models)
-        GLib.idle_add(self._rebuild_eq_list)
-        GLib.idle_add(self._rebuild_volume_models)
-        GLib.idle_add(self._refresh_managed)
+        def worker():
+            self._load_data()
+            GLib.idle_add(self._on_full_refreshed)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_full_refreshed(self) -> None:
+        self._rebuild_priority_models()
+        self._rebuild_eq_list()
+        self._rebuild_volume_models()
+        self._refresh_managed()
 
     # ── Volume controls (immediate) ──
 
