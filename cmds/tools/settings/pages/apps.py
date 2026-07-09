@@ -693,6 +693,11 @@ class AppsPage:
 
         # ── Rofi (global) ─────────────────────────────────────────────
         rofi_group = Adw.PreferencesGroup(title="Rofi")
+        rofi_group.set_description(
+            "Global settings for all Rofi launchers and dialogs — "
+            "font family and size applied to the clipboard picker, "
+            "application launcher, gallery, and any other Rofi-based UIs."
+        )
 
         rofi_font_row = self._make_font_combo(
             var="ROFI_FONT",
