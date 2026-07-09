@@ -2,11 +2,10 @@
 
 import signal
 import sys
-from pathlib import Path
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from settings.constants import APPLICATION_ID
+from settings.constants import APPLICATION_ID, settings_pkg_dir
 from settings.window import RetroSettingsWindow
 
 
@@ -19,7 +18,7 @@ class RetroSettingsApp(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
-        icon_dir = str(Path(__file__).resolve().parent / "data" / "icons")
+        icon_dir = str(settings_pkg_dir() / "data" / "icons")
         display = Gdk.Display.get_default()
         if display is not None:
             theme = Gtk.IconTheme.get_for_display(display)

@@ -70,7 +70,8 @@ GESTURES_TOUCHPAD = "gestures:touchpad"
 GESTURES_TOUCHSCREEN = "gestures:touchscreen"
 
 
-CSS_PATH = Path(__file__).parent / "style.css"
+from settings.constants import settings_pkg_dir
+CSS_PATH = settings_pkg_dir() / "style.css"
 
 
 class RetroSettingsWindow(Adw.ApplicationWindow):

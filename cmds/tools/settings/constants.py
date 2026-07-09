@@ -15,3 +15,16 @@ and the GSettings schema.
 # as ``class`` for our window (used by :func:`matches_settings` to gate
 # self-targeting window rules behind a confirmation dialog).
 APPLICATION_ID: str = "io.github.retrolinux.settings"
+
+import os
+from pathlib import Path
+
+
+def settings_pkg_dir() -> Path:
+    """Absolute path to the settings package directory.
+    Works from source tree, zipapp, and installed packages.
+    """
+    retro = os.environ.get("RETRO_DIR")
+    if retro:
+        return Path(retro) / "cmds" / "tools" / "settings"
+    return Path(__file__).resolve().parent
