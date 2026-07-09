@@ -9,9 +9,8 @@ that node type and settings's UI-facing :class:`WindowRule` dataclass:
 - :func:`from_rule_node` adapts one ``Rule`` into a settings
   :class:`WindowRule` (matchers → :class:`Matcher`, effects → :class:`Effect`).
 - :func:`from_rule_nodes` filters / converts a Document's full Rule list,
-  splitting anonymous multi-effect rules into N single-effect rules so
-  the page UI's "one effect per row" model holds (named rules stay
-  bundled — that's how the user authored them).
+  keeping multi-effect rules bundled as a single WindowRule — the dialog
+  already supports editing multiple effects per rule.
 - :func:`serialize` produces the Hyprlang text per rule for the write
   path; the language-specific serializer in ``hyprland-config`` picks
   block vs. single-line based on the rule's contents.
@@ -53,32 +52,16 @@ def from_rule_node(node: Rule) -> WindowRule | None:
 def from_rule_nodes(nodes: list[Rule]) -> list[WindowRule]:
     """Convert a Document's :class:`Rule` list into UI :class:`WindowRule`s.
 
-    Named rules stay bundled as one multi-effect WindowRule — that's how
-    the user authored them and :meth:`WindowRule.to_line` round-trips
-    them back to block form. *Anonymous* multi-effect rules get split
-    into N single-effect rules so the page's "one row per effect"
-    interaction model holds; on save, identical-matcher anonymous rules
-    serialize as separate single-line entries (semantically equivalent
-    to a bundled rule for Hyprland but matching how anonymous rules
-    are typically authored).
+    Every rule stays bundled as one WindowRule — multi-effect anonymous
+    rules are NOT split. The dialog already supports adding/removing
+    multiple effects per rule, so a multi-effect line round-trips
+    correctly through the UI as a single row instead of N separate rows.
     """
     out: list[WindowRule] = []
     for node in nodes:
         wr = from_rule_node(node)
-        if wr is None:
-            continue
-        if wr.name or len(wr.effects) <= 1:
+        if wr is not None:
             out.append(wr)
-            continue
-        # Anonymous multi-effect → split per effect.
-        for effect in wr.effects:
-            out.append(
-                WindowRule(
-                    matchers=list(wr.matchers),
-                    effects=[effect],
-                    enabled=wr.enabled,
-                )
-            )
     return out
 
 
@@ -103,8 +86,7 @@ def parse_window_rule_line(line: str) -> WindowRule | None:
     broken lines, or rules with no effects.
 
     Multi-effect / named blocks return one :class:`WindowRule` with all
-    effects bundled. Anonymous multi-effect single-line input returns
-    the *first* effect (use :func:`parse_window_rule_lines` to get all).
+    effects bundled.
     """
     rules = parse_window_rule_lines([line])
     return rules[0] if rules else None
@@ -113,11 +95,9 @@ def parse_window_rule_line(line: str) -> WindowRule | None:
 def parse_window_rule_lines(lines: list[str]) -> list[WindowRule]:
     """Parse multiple Hyprlang rule lines via the canonical pipeline.
 
-    Same routing as :func:`parse_window_rule_line` but processes a list
-    and splits anonymous multi-effect rules into N single-effect rules
-    (the page UI's one-row-per-effect model). Named rules stay bundled.
-    Lines that aren't windowrules (or that fail to produce a Rule) are
-    silently dropped.
+    Each line becomes one WindowRule — multi-effect anonymous rules
+    stay bundled. Lines that aren't windowrules (or that fail to
+    produce a Rule) are silently dropped.
     """
     doc = _parse_string("\n".join(lines) + "\n", lenient=True)
     _migrate(doc)

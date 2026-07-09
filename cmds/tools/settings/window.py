@@ -3,7 +3,7 @@
 import subprocess
 import time
 from collections import Counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 from pathlib import Path
 
@@ -16,11 +16,11 @@ from settings.core import config, schema
 from settings.core.settings import apply_saved_config_path, open_settings
 from settings.core.state import AppState
 from settings.core.undo import OptionChange, PairedOptionChange, UndoManager
-from settings.data.bezier_data import get_curve_store
-from settings.pages.animations import AnimationsPage
-from settings.pages.cursor import CursorPage
 from settings.pages.section import SectionPage
 if TYPE_CHECKING:
+    from settings.data.bezier_data import get_curve_store as _get_curve_store_type
+    from settings.pages.animations import AnimationsPage as AnimationsPageType
+    from settings.pages.cursor import CursorPage as CursorPageType
     from settings.pages.apps import AppsPage
     from settings.pages.audio import AudioPage
     from settings.pages.autostart import AutostartPage
@@ -465,8 +465,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         _bt1 = time.monotonic()
         print(f'[TIMING]    schema_groups={_bt1-_bt0:.3f}s', file=__import__('sys').stderr)
 
-        # Store section page specs for lazy building (window/layer rules excluded
-        # — they must be eagerly built so save flows access both consistently).
+        # Store section page specs for lazy building.
         section_page_specs: list[tuple[type, str, str, str]] = [
             (BindsPage, "_binds_page", "binds", "Keybinds"),
             (MonitorsPage, "_monitors_page", "monitors", "Monitors"),
@@ -474,13 +473,25 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (AutostartPage, "_autostart_page", "autostart", "Autostart"),
             (EnvVarsPage, "_env_vars_page", "env_vars", "Env Variables"),
         ]
-        for cls, attr, slug, title in section_page_specs + [
+        for cls, attr, slug, title in section_page_specs:
+            self._lazy_section_specs[slug] = (cls, attr, title)
+
+        # Window rules and layer rules are eagerly built at startup so their
+        # state (parsed config, external rules) is always loaded — lazy
+        # construction would discard already-tracked rules on page navigation.
+        for cls, attr, slug, title in [
             (WindowRulesPage, "_window_rules_page", "window_rules", "Window Rules"),
             (LayerRulesPage, "_layer_rules_page", "layer_rules", "Layer Rules"),
         ]:
-            self._lazy_section_specs[slug] = (cls, attr, title)
+            page = cls(self, on_dirty_changed=self._on_section_dirty, push_undo=self._undo.push, saved_sections=self.saved_sections)
+            setattr(self, attr, page)
+            widget = page.build(header=self._make_page_header(title))
+            self._page_stack.add_named(widget, slug)
+            self._page_titles[slug] = title
+            self._section_pages.append(page)
 
-        self._search_page_builder.add_entries(CursorPage.get_search_entries())
+        from settings.pages.cursor import CursorPage as _CursorPage
+        self._search_page_builder.add_entries(_CursorPage.get_search_entries())
         _bt2 = time.monotonic()
         print(f'[TIMING]    section_pages={_bt2-_bt1:.3f}s', file=__import__('sys').stderr)
 
@@ -573,6 +584,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         is_cursor = group.get("id") == "cursor"
 
         if is_animations:
+            from settings.pages.animations import AnimationsPage
             self._animations_page = AnimationsPage(
                 self,
                 on_dirty_changed=self._on_section_dirty,
@@ -582,6 +594,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             content_box.append(self._animations_page.build_curve_editor_widget())
 
         if is_cursor:
+            from settings.pages.cursor import CursorPage
             self._cursor_page = CursorPage(
                 self,
                 on_dirty_changed=self._on_section_dirty,
@@ -700,12 +713,39 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             if pref_group not in groups_with_visible:
                 pref_group.set_visible(False)
 
+    def _prefetch_live_values(self, items: list[tuple[str, Any]]) -> dict[str, tuple[Any, bool]]:
+        """Fetch live values for all *(key, default)* pairs in parallel.
+
+        Returns a dict keyed by option key, each value being ``(live_value, available)``.
+        Falls back to ``(None, False)`` for any key the compositor couldn't resolve.
+        """
+        if not self._hyprland_available or not items:
+            return {}
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def fetch(key: str, default: Any) -> tuple[str, Any, bool]:
+            try:
+                val, avail = self.hypr.get_live(key, default)
+                return key, val, avail
+            except Exception:
+                return key, None, False
+
+        results: dict[str, tuple[Any, bool]] = {}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(fetch, k, d): k for k, d in items}
+            for f in as_completed(futures):
+                key, val, avail = f.result()
+                results[key] = (val, avail)
+        return results
+
     def _register_state(self):
         options_flat = self._options_flat
         saved_values = self.saved_values
+
+        # Phase 1 — prepare registration data for all options (no IPC yet)
+        reg_items: list[tuple[str, Any, Any, int | None]] = []
         for key, option in options_flat.items():
-            # Compute display digits for float options so AppState can
-            # normalize values to widget precision on ingress.
             digits = None
             if option.get("type") == "float":
                 digits = digits_for_step(option.get("step", 0.01))
@@ -714,12 +754,22 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
                 from lib.python.variable import get_var as _get_var
                 saved_str = _get_var(var_name)
                 saved = coerce_config_value(saved_str, option.get("type", "")) if saved_str else None
-                self.app_state.register(key, option.get("default"), saved, digits=digits)
-                continue
-            saved = saved_values.get(key)
-            if saved is not None:
-                saved = coerce_config_value(saved, option.get("type", ""))
-            self.app_state.register(key, option.get("default"), saved, digits=digits)
+            else:
+                saved = saved_values.get(key)
+                if saved is not None:
+                    saved = coerce_config_value(saved, option.get("type", ""))
+            reg_items.append((key, option.get("default"), saved, digits))
+
+        # Phase 2 — fetch live values from the compositor in parallel
+        live_map = self._prefetch_live_values([(item[0], item[1]) for item in reg_items])
+
+        # Phase 3 — register every option using the pre-fetched values
+        for key, default, saved, digits in reg_items:
+            live = live_map.get(key)
+            if live is not None:
+                self.app_state.register(key, default, saved, digits=digits, live_value=live[0], available=live[1])
+            else:
+                self.app_state.register(key, default, saved, digits=digits)
 
         # Force rotation_lock options (no Hyprland IPC key) to show as available.
         for key, option in options_flat.items():
@@ -776,6 +826,15 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._pending_page.schedule_refresh()
 
     def _refresh_all_modified_indicators(self):
+        from lib.python.variable import get_var as _get_var
+        from lib.python.variable import get_module_default as _get_def
+        import re as _re
+
+        def _norm(v: str) -> str:
+            v = v.strip().lower()
+            v = _re.sub(r'[,\s]+', ' ', v).strip()
+            return v
+
         for key, opt_row in self._option_rows.items():
             state = self.app_state.get(key)
             if state:
@@ -783,13 +842,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
                 option = self._options_flat.get(key)
                 var_name = option.get("variable") if option else None
                 if var_name:
-                    from lib.python.variable import get_var as _get_var
-                    from lib.python.variable import get_module_default as _get_def
-                    import re as _re
-                    def _norm(v: str) -> str:
-                        v = v.strip().lower()
-                        v = _re.sub(r'[,\s]+', ' ', v).strip()
-                        return v
                     user_v = _norm(_get_var(var_name))
                     mod_v = _norm(_get_def(var_name))
                     if user_v == mod_v:
@@ -1415,6 +1467,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             if anim_dirty or existing_anims:
                 sections.animations, used_curves = self._animations_page.get_animation_lines()
                 if used_curves:
+                    from settings.data.bezier_data import get_curve_store
                     sections.beziers = get_curve_store().get_curve_definitions(used_curves)
 
         # Cursor and env-vars pages both contribute to ``sections.env``.

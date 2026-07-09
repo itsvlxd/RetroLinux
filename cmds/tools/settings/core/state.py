@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from hyprland_config import value_to_conf
 from hyprland_socket import HyprlandError
 
+_UNSET = object()
+
 if TYPE_CHECKING:
     from hyprland_state import HyprlandState
 
@@ -62,6 +64,8 @@ class AppState:
         was_managed_value: Any,
         *,
         digits: int | None = None,
+        live_value: Any = _UNSET,
+        available: bool | None = None,
     ):
         """Register an option, seeding the saved baseline from the live value.
 
@@ -72,11 +76,16 @@ class AppState:
         than "live differs from disk." Without that, every startup where
         a user previously ran ``hyprctl keyword …`` by hand would show
         the unsaved-changes banner immediately.
+
+        When *live_value* and *available* are provided (pre-fetched from
+        a batched IPC read), the per-option ``get_live`` socket call is
+        skipped to avoid N sequential round-trips at startup.
         """
         if digits is not None:
             self._precisions[key] = digits
 
-        live_value, available = self._hypr.get_live(key, default_value)
+        if live_value is _UNSET:
+            live_value, available = self._hypr.get_live(key, default_value)
         if not available:
             live_value = was_managed_value if was_managed_value is not None else default_value
         live_value = self.normalize(key, live_value)
