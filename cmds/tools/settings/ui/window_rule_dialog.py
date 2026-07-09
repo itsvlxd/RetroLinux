@@ -298,9 +298,20 @@ class WindowRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         self._refresh()
 
     def _on_remove_effect(self, row: "_EffectRow") -> None:
+        if len(self._effect_rows) <= 1:
+            self._reset_last_effect_row()
+            self._refresh()
+            return
         self._effect_rows.remove(row)
         self._effects_box.remove(row.widget)
         self._refresh()
+
+    def _reset_last_effect_row(self) -> None:
+        if not self._effect_rows:
+            self._add_effect_row(ACTION_PRESETS[0])
+            return
+        last = self._effect_rows[0]
+        last.set_preset(ACTION_PRESETS[0])
 
     # ── Matcher row management ────────────────────────────────────────
 
@@ -523,6 +534,19 @@ class _EffectRow:
             return Effect(name=self._preset.id, args="on")
         args = self._preset.format(self._read_arg_values())
         return Effect(name=self._preset.id, args=args)
+
+    def set_preset(self, preset: ActionPreset) -> None:
+        """Programmatically set the preset (used by the reset-last-row path)."""
+        try:
+            idx = _PRESETS_WITH_CUSTOM.index(preset)
+        except ValueError:
+            return
+        self._preset_dropdown.handler_block_by_func(self._on_preset_changed)
+        self._preset_dropdown.set_selected(idx)
+        self._preset_dropdown.handler_unblock_by_func(self._on_preset_changed)
+        self._preset = preset
+        self._rebuild_args()
+        self._on_changed()
 
     def _on_preset_changed(self, *_args: object) -> None:
         idx = self._preset_dropdown.get_selected()

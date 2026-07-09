@@ -46,11 +46,10 @@ Effect             Type  Notes
 ``match:`` prefix) is also accepted on read so users with hand-rolled
 old configs see their rules in the UI; we emit the v3 form on save.
 
-The data model stays simple — one matcher (``namespace``) + one effect
-per :class:`LayerRule`. Multi-effect lines are split into N rules
-sharing a namespace at parse time, and N rules sharing a namespace
-serialize back out as N separate lines (which Hyprland evaluates
-identically).
+The data model supports multiple effects per :class:`LayerRule` — the
+dialog lets users add/remove effects, and multi-effect lines round-trip
+as a single rule. The dialog's :class:`_EffectRow` list handles adding,
+removing, and editing multiple effects.
 """
 
 from dataclasses import dataclass
@@ -662,26 +661,16 @@ def from_rule_node(node: "Rule") -> LayerRule | None:
 def from_rule_nodes(nodes: list["Rule"]) -> list[LayerRule]:
     """Convert a Document's :class:`Rule` list into UI :class:`LayerRule`s.
 
-    Mirrors :func:`settings.core.window_rules.from_rule_nodes`: named
-    rules stay bundled, anonymous multi-effect rules split per effect
-    so the page UI's "one row per effect" model holds.
+    Every rule stays bundled as one LayerRule — multi-effect anonymous
+    rules are NOT split. The dialog already supports adding/removing
+    multiple effects per rule, so a multi-effect line round-trips
+    correctly through the UI as a single row.
     """
     out: list[LayerRule] = []
     for node in nodes:
         lr = from_rule_node(node)
-        if lr is None:
-            continue
-        if lr.name or len(lr.effects) <= 1:
+        if lr is not None:
             out.append(lr)
-            continue
-        for effect in lr.effects:
-            out.append(
-                LayerRule(
-                    namespace=lr.namespace,
-                    effects=[effect],
-                    enabled=lr.enabled,
-                )
-            )
     return out
 
 
