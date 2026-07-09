@@ -303,6 +303,28 @@ cmd_driver() {
             fi
             ;;
 
+        "update")
+            local upd_data=$(bash "$driver_script" --check-updates)
+            IFS='|' read -r key count pkgs <<<"$upd_data"
+            if [[ -z $count || $count -eq 0 ]]; then
+                rx_log "success" "All driver packages are up to date"
+                return 0
+            fi
+            rx_log "info" "Updating ${count} driver package(s): ${PINK}$pkgs${RESET}"
+            local helper="yay"
+            command -v paru >/dev/null 2>&1 && helper="paru"
+            if command -v "$helper" >/dev/null 2>&1; then
+                $helper -S --needed --noconfirm $pkgs 2>&1
+            else
+                sudo pacman -S --needed --noconfirm $pkgs 2>&1
+            fi
+            if [[ $? -eq 0 ]]; then
+                rx_log "success" "All driver packages updated"
+            else
+                rx_log "error" "Failed to update some packages"
+            fi
+            ;;
+
         "env")
             local ai_env
             ai_env=$(bash "$driver_script" --sys-ai-env)
@@ -830,6 +852,7 @@ cmd_driver() {
             rx_help_commands "Available commands"
             rx_help_cmd "status" "Scan hardware and report driver status"
             rx_help_cmd "install [--yes|-y]" "Install missing drivers"
+            rx_help_cmd "update" "Update installed driver packages"
             rx_help_cmd "env" "Show GPU compute env (CUDA/ONEAPI/RADV)"
             rx_help_cmd "info <keyword>" "Show detailed device info"
             rx_help_cmd "switch [xe|i915]" "Switch Intel GPU kernel driver"
