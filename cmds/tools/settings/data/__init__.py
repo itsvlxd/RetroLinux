@@ -1,6 +1,9 @@
 """Bundled data assets and persistence helpers (bezier curves, user data)."""
 
+import os
 from pathlib import Path
+
+from settings.constants import settings_pkg_dir
 
 _PACKAGE_DATA = Path(__file__).parent
 _REPO_DATA = _PACKAGE_DATA.parent.parent / "data"
@@ -20,4 +23,5 @@ def bundled_data_dir(*parts: str) -> Path:
     repo_path = _REPO_DATA.joinpath(*parts)
     if repo_path.exists():
         return repo_path
-    return pkg_path
+    # Fallback for zipapp — resolve via RETRO_DIR
+    return settings_pkg_dir() / "data" / parts[0] if parts else settings_pkg_dir() / "data"

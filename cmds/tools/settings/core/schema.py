@@ -3,6 +3,8 @@
 import json
 import logging
 from collections.abc import Mapping
+
+from settings.constants import settings_pkg_dir
 from pathlib import Path
 
 import hyprland_schema
@@ -52,7 +54,7 @@ def _resolve_schema_options(version: str | None) -> Mapping[str, HyprOption]:
 
 def _load_options_json(path: Path | None = None) -> dict:
     if path is None:
-        path = Path(__file__).parent.parent / "data" / "schema" / "options.json"
+        path = settings_pkg_dir() / "data" / "schema" / "options.json"
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
