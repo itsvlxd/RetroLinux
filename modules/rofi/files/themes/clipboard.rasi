@@ -5,6 +5,7 @@ configuration {
     show-icons:                  true;
     display-Clipboard:           "  "; 
     display-Emoji:               " 󰞅 "; 
+    display-Screenshots:         " 󰋼 "; 
     display-Bitwarden:           "  "; 
 
     kb-move-char-back:           "";
@@ -33,13 +34,13 @@ window {
     fullscreen:                  false;
     width:                       350px;
     x-offset:                    0px;
-    y-offset:                    @rofi-y-offset;
+    y-offset:                    @clip-y-offset;
 
     enabled:                     true;
     margin:                      0px;
     padding:                     0px;
-    border:                      @rofi-border;
-    border-radius:               @rofi-radius;
+    border:                      @clip-border;
+    border-radius:               @clip-radius;
     border-color:                @background-alt;
     background-color:            @background;
     cursor:                      "default";
@@ -61,9 +62,9 @@ inputbar {
     enabled:                     true;
     spacing:                     15px;
     margin:                      10px;
-    padding:                     @rofi-input-padding;
+    padding:                     @clip-input-padding;
     border:                      0px solid;
-    border-radius:               @rofi-radius;
+    border-radius:               @clip-rounding;
     border-color:                @selected;
     text-color:                  @foreground;
     children:                    [ "textbox-icon", "entry" ];
@@ -99,9 +100,9 @@ listview {
     fixed-height:                true;
     fixed-columns:               true;
     
-    spacing:                     @rofi-spacing;
+    spacing:                     @clip-spacing;
     margin:                      0px 5px;
-    padding:                     @rofi-padding;
+    padding:                     @clip-padding;
     border:                      0px solid;
     border-radius:               0px;
     border-color:                @selected;
@@ -114,9 +115,9 @@ element {
     enabled:                     true;
     spacing:                     0px;
     margin:                      0px;
-    padding:                     @rofi-padding;
+    padding:                     @clip-padding;
     border:                      0px solid;
-    border-radius:               @rofi-radius;
+    border-radius:               @clip-rounding;
     border-color:                @selected;
     background-color:            transparent;
     text-color:                  @foreground;
@@ -131,13 +132,6 @@ element normal.normal {
 element selected.normal {
     text-color:                  @foreground; 
     border-color:                @selected;
-}
-
-element-icon {
-    background-color:            transparent;
-    text-color:                  inherit;
-    size:                        0px;
-    cursor:                      inherit;
 }
 
 element-text {
@@ -159,8 +153,8 @@ mode-switcher {
 }
 
 button {
-    padding:                     @rofi-padding;
-    border-radius:               @rofi-radius;
+    padding:                     @clip-padding;
+    border-radius:               @clip-rounding;
     background-color:            @background-alt;
     text-color:                  @foreground;
     cursor:                      pointer;
