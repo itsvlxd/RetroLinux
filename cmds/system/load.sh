@@ -30,6 +30,7 @@ cmd_load() {
 
         "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
+        "hypridle -c ${XDG_CONFIG_HOME}/retro/hypridle.conf|Starting Hyprland idle daemon"
     )
 
     local custom_tasks=()
@@ -66,6 +67,12 @@ cmd_load() {
 
             rx_table_separator
             rx_table_spacer
+            ;;
+
+        "list-raw")
+            for task in "${startup_tasks[@]}"; do
+                echo "$task"
+            done
             ;;
 
         "all" | "")
@@ -111,3 +118,8 @@ cmd_load() {
 }
 
 register_command "SYSTEM" "-l|--load" "Execute or list the system startup sequence" "cmd_load"
+
+# Allow direct execution (used by the settings page to read tasks)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    cmd_load "$@"
+fi
