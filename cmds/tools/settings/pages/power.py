@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
 
 _PWR_CORE = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "power_core.sh")
+_SYS_CORE = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "system_core.sh")
 _PWR_ICON = "preferences-system-power-symbolic"
 _PROFILES = ["performance", "balanced", "saver"]
 
@@ -35,6 +36,11 @@ class PowerPage:
         self._on_dirty_changed = None
         self._orig: dict[str, str] = {}
         self._spin_rows: dict[str, Gtk.SpinButton] = {}
+        self._pwr_btn_row: Adw.ComboRow | None = None
+        self._pwr_btn_long_row: Adw.ComboRow | None = None
+        self._lid_row: Adw.ComboRow | None = None
+        self._has_hibernate = False
+        self._check_hibernate()
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -89,7 +95,73 @@ class PowerPage:
         group.add(opt_row)
 
         self._content_box.append(group)
+
+        # ── Hardware Buttons ──────────────────────────────────────────
+        btn_group = Adw.PreferencesGroup(title="Hardware Buttons")
+        btn_group.set_description(
+            "What happens when you press the power button, hold it, or "
+            "close the laptop lid. Changes are applied via systemd-logind "
+            "and require a restart to take full effect."
+        )
+
+        from settings.ui.managed_row import make_combo_row
+
+        def _make_logind_combo(var: str, title: str, subtitle: str) -> Adw.ComboRow:
+            actions, labels = self._get_logind_options()
+            val = self._orig.get(var, "suspend")
+            if val not in actions:
+                val = "suspend"
+            try:
+                idx = actions.index(val)
+            except ValueError:
+                idx = 0
+            model = Gtk.StringList.new(labels)
+            row = make_combo_row(title, subtitle=subtitle, model=model, selected=idx)
+            row.connect("notify::selected", self._on_logind_changed, var)
+            return row
+
+        self._pwr_btn_row = _make_logind_combo(
+            "pwr_btn", "Power Button",
+            "Action when the power button is pressed briefly",
+        )
+        btn_group.add(self._pwr_btn_row)
+
+        self._pwr_btn_long_row = _make_logind_combo(
+            "pwr_btn_long", "Power Button Long Press",
+            "Action when the power button is held for 5+ seconds",
+        )
+        btn_group.add(self._pwr_btn_long_row)
+
+        self._lid_row = _make_logind_combo(
+            "lid_close", "Lid Close",
+            "Action when the laptop lid is closed",
+        )
+        btn_group.add(self._lid_row)
+
+        self._content_box.append(btn_group)
         return toolbar_view
+
+    def _check_hibernate(self) -> None:
+        try:
+            r = subprocess.run(
+                ["bash", _SYS_CORE, "--hibernate-available"],
+                capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL,
+            )
+            self._has_hibernate = "available" in r.stdout
+        except Exception:
+            self._has_hibernate = False
+
+    _LOGIND_ACTIONS = ["suspend", "hibernate", "poweroff", "reboot", "ignore", "lock"]
+    _LOGIND_LABELS = ["Suspend", "Hibernate", "Power Off", "Reboot", "Do Nothing", "Lock Screen"]
+
+    def _get_logind_options(self) -> tuple[list[str], list[str]]:
+        actions = list(self._LOGIND_ACTIONS)
+        labels = list(self._LOGIND_LABELS)
+        if not self._has_hibernate:
+            idx = actions.index("hibernate")
+            actions.pop(idx)
+            labels.pop(idx)
+        return actions, labels
 
     # ── Data ──
 
@@ -104,6 +176,9 @@ class PowerPage:
             ("PWR_BAT_SAVER", "bat_saver"),
             ("PWR_BAT_BALANCED", "bat_balanced"),
             ("PWR_BAT_PERFORMANCE", "bat_performance"),
+            ("PWR_POWER_BTN", "pwr_btn"),
+            ("PWR_POWER_BTN_LONG", "pwr_btn_long"),
+            ("PWR_LID_CLOSE", "lid_close"),
         ]:
             self._orig[key] = get_var(var) or ""
 
@@ -135,6 +210,22 @@ class PowerPage:
         set_var(var_name, val)
         _restore()
         GLib.idle_add(self._check_dirty)
+
+    _LOGIND_ACTIONS = ["suspend", "hibernate", "poweroff", "reboot", "ignore", "lock"]
+
+    def _on_logind_changed(self, row: Adw.ComboRow, _pspec, var: str) -> None:
+        actions, _labels = self._get_logind_options()
+        idx = row.get_selected()
+        if 0 <= idx < len(actions):
+            val = actions[idx]
+            var_name = {
+                "pwr_btn": "PWR_POWER_BTN", "pwr_btn_long": "PWR_POWER_BTN_LONG",
+                "lid_close": "PWR_LID_CLOSE",
+            }.get(var, "")
+            if var_name:
+                from lib.python.variable import set_var
+                set_var(var_name, val)
+            self._check_dirty()
 
     def _run_optimize(self) -> None:
         try:
@@ -173,6 +264,9 @@ class PowerPage:
 
     # ── Dirty ──
 
+    _LOGIND_KEYS = ("pwr_btn", "pwr_btn_long", "lid_close")
+    _LOGIND_VARS = ("PWR_POWER_BTN", "PWR_POWER_BTN_LONG", "PWR_LID_CLOSE")
+
     def _check_dirty(self) -> None:
         was = self._dirty
         self._dirty = False
@@ -180,6 +274,13 @@ class PowerPage:
             if str(int(spin.get_value())) != self._orig.get(key, ""):
                 self._dirty = True
                 break
+        if not self._dirty:
+            for key in self._LOGIND_KEYS:
+                from lib.python.variable import get_var
+                var_name = dict(zip(self._LOGIND_KEYS, self._LOGIND_VARS))[key]
+                if get_var(var_name, "") != self._orig.get(key, ""):
+                    self._dirty = True
+                    break
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
 
@@ -191,7 +292,7 @@ class PowerPage:
     def mark_saved(self) -> None:
         if not self._dirty:
             return
-        from lib.python.variable import set_var
+        from lib.python.variable import set_var, get_var
         for key, spin in self._spin_rows.items():
             val = str(int(spin.get_value()))
             var_name = next(v for v, k in [
@@ -201,6 +302,8 @@ class PowerPage:
             ] if k == key)
             set_var(var_name, val)
             self._orig[key] = val
+        for key, var_name in [("pwr_btn", "PWR_POWER_BTN"), ("pwr_btn_long", "PWR_POWER_BTN_LONG"), ("lid_close", "PWR_LID_CLOSE")]:
+            self._orig[key] = get_var(var_name, "suspend")
         self._dirty = False
         _restore()
 
@@ -208,7 +311,31 @@ class PowerPage:
         for key, spin in self._spin_rows.items():
             val = int(self._orig.get(key, "15")) if self._orig.get(key, "").isdigit() else 15
             spin.set_value(val)
+        actions, _labels = self._get_logind_options()
+        for key, row in [("pwr_btn", self._pwr_btn_row), ("pwr_btn_long", self._pwr_btn_long_row), ("lid_close", self._lid_row)]:
+            if row is not None:
+                val = self._orig.get(key, "suspend")
+                if val not in actions:
+                    val = "suspend"
+                try:
+                    idx = actions.index(val)
+                except ValueError:
+                    idx = 0
+                row.set_selected(idx)
         self._dirty = False
+
+    def flush_pending(self) -> None:
+        self._run_terminal("retro system apply")
+
+    @staticmethod
+    def _run_terminal(command: str) -> None:
+        escaped = command.replace("'", "'\\''")
+        cmd = f"kitty -- bash -c '{escaped}; echo; echo Press Enter to close.; read'"
+        lua = f'hl.dsp.exec_cmd("{cmd}", {{ float = true, size = {{ 800, 500 }}, center = true }})'
+        subprocess.Popen(
+            ["hyprctl", "dispatch", lua],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:
         if self._dirty:

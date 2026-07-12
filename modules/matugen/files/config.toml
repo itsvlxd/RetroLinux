@@ -9,6 +9,11 @@ pre_hook = 'bash ~/.config/hypr/scripts/refresh_hyprland.sh'
 input_path = '~/.config/matugen/templates/hyprland.lua'
 output_path = '~/.config/retro/themes/hyprland-colors.lua'
 
+[templates.hyprland-conf]
+pre_hook = 'bash ~/.config/hypr/scripts/refresh_hyprland.sh'
+input_path = '~/.config/matugen/templates/hyprland.conf'
+output_path = '~/.config/retro/themes/hyprland-colors.conf'
+
 [templates.kitty]
 input_path = '~/.config/matugen/templates/kitty.conf'
 output_path = '~/.config/retro/themes/kitty-colors.conf'

@@ -1,32 +1,38 @@
 """Retro startup sequence — system tasks and custom user commands.
 
 The startup sequence is managed by the Retro init system (``load.sh``).
-System tasks are hardcoded in this module; custom user commands are
-stored in the ``RETRO_CUSTOM_LOAD`` variable as a pipe-separated list.
+System tasks are read dynamically from ``load.sh list-raw``; custom user
+commands are stored in the ``RETRO_CUSTOM_LOAD`` variable as a
+pipe-separated list.
 """
 
+import subprocess
 from dataclasses import dataclass
 
-# System startup tasks — mirroring the fixed tasks in load.sh.
-# Each entry is (command, description).
-SYSTEM_TASKS: list[tuple[str, str]] = [
-    ("retro --setup", "Initializing first boot system setup"),
-    ("retro bluetooth restore", "Initializing bluetooth radio cards"),
-    ("retro audio easyeffects start", "Initializing audio drivers"),
-    ("retro daemon start", "Initializing retro daemon engine and watchers"),
-    ("retro polkit start", "Starting auth agent and keyring daemon"),
-    ("retro power restore", "Restoring hardware power profiles"),
-    ("retro wallpaper restore", "Applying last used wallpaper"),
-    ("retro xdg dirs reset", "Ensuring XDG user directories exist"),
-    ("retro xdg portal inject", "Injecting session env into XDG portal daemon"),
-    ("retro xdg flatpak", "Bridging host MIME defaults into Flatpak sandbox"),
-    ("retro benchmark hud load", "Loads mangohud and benchmark variables"),
-    ("retro display scale --from-dpi", "Applying display scaling to XWayland DPI"),
-    ("wl-paste --type text --watch cliphist store -ignore-secrets", "Starting cliphist text store watcher"),
-    ("wl-paste --type image --watch cliphist store -ignore-secrets", "Starting cliphist image store watcher"),
-    ("rbw config set sync_interval 1800", "Synchronizing vault refresh interval with global security policy"),
-    ("rbw config set lock_timeout 900", "Enforcing automated vault hibernation and session locking"),
-]
+
+def get_system_tasks() -> list[tuple[str, str]]:
+    """Run ``retro --load list-raw`` and parse ``command|description`` lines.
+
+    This is the single source of truth — the same list ``retro --load``
+    runs on startup.
+    """
+    try:
+        result = subprocess.run(
+            ["retro", "--load", "list-raw"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return []
+        tasks: list[tuple[str, str]] = []
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if not line or "|" not in line:
+                continue
+            cmd, _, desc = line.partition("|")
+            tasks.append((cmd.strip(), desc.strip()))
+        return tasks
+    except (OSError, subprocess.TimeoutExpired):
+        return []
 
 # ---------------------------------------------------------------------------
 # Custom user startup entries (variable-backed, not in settings.lua)

@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from settings.pages.env_vars import EnvVarsPage
     from settings.pages.fonts import FontsPage
     from settings.pages.grub import GrubPage
+    from settings.pages.hypridle import HypridlePage
     from settings.pages.layer_rules import LayerRulesPage
     from settings.pages.layouts import LayoutsPage
     from settings.pages.logs import LogsPage
@@ -424,6 +425,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.env_vars import EnvVarsPage
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
+        from settings.pages.hypridle import HypridlePage
         from settings.pages.layer_rules import LayerRulesPage
         from settings.pages.logs import LogsPage
         from settings.pages.layouts import LayoutsPage
@@ -506,6 +508,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (DriverPage, "_driver_page", "driver", "Drivers"),
             (FontsPage, "_fonts_page", "fonts", "Fonts"),
             (GrubPage, "_grub_page", "grub", "Bootloader"),
+            (HypridlePage, "_hypridle_page", "hypridle", "Sleep"),
             (LogsPage, "_logs_page", "logs", "Logs"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PowerPage, "_power_page", "power", "Power"),
@@ -1125,6 +1128,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.driver import DriverPage
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
+        from settings.pages.hypridle import HypridlePage
         from settings.pages.logs import LogsPage
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
@@ -1189,6 +1193,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is AudioPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is HypridlePage:
+            page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
 
@@ -1542,6 +1550,12 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         driver_page = getattr(self, "_driver_page", None)
         if driver_page is not None:
             driver_page.flush_pending()
+        hypridle_page = getattr(self, "_hypridle_page", None)
+        if hypridle_page is not None:
+            hypridle_page.flush_pending()
+        power_page = getattr(self, "_power_page", None)
+        if power_page is not None:
+            power_page.flush_pending()
         self._undo.clear()
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()
