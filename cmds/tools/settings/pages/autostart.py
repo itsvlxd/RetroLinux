@@ -10,8 +10,8 @@ from html import escape as html_escape
 from gi.repository import Adw, Gtk
 
 from settings.core.autostart import (
-    SYSTEM_TASKS,
     RetroStartupData,
+    get_system_tasks,
     parse_retro_startup,
     serialize_retro_startup,
 )
@@ -81,6 +81,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         items = parse_retro_startup(raw)
         self._retro_owned: list[RetroStartupData] = items
         self._retro_saved = list(items)
+        self._system_tasks = get_system_tasks()
 
     # ── Build ──
 
@@ -106,8 +107,8 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
 
     def _build_system_group(self) -> list[Gtk.Widget]:
         group = Adw.PreferencesGroup(title="System Startup Sequence")
-        group.set_description(f"{len(SYSTEM_TASKS)} system tasks")
-        for cmd, desc in SYSTEM_TASKS:
+        group.set_description(f"{len(self._system_tasks)} system tasks")
+        for cmd, desc in self._system_tasks:
             row = Adw.ActionRow(title=html_escape(cmd), subtitle=html_escape(desc))
             row.set_title_lines(1)
             row.set_subtitle_lines(1)
@@ -124,7 +125,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
             lock_icon.set_valign(Gtk.Align.CENTER)
             row.add_suffix(lock_icon)
             group.add(row)
-        return [group] if SYSTEM_TASKS else []
+        return [group] if self._system_tasks else []
 
     def _build_custom_group(self) -> list[Gtk.Widget]:
         group = Adw.PreferencesGroup(title="Startup Commands")
@@ -158,7 +159,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         for w in self._build_system_group():
             self._content_box.append(w)
 
-        if not self._retro_owned and not SYSTEM_TASKS:
+        if not self._retro_owned and not self._system_tasks:
             self._content_box.append(self._build_empty_state())
 
     def _build_empty_state(self) -> EmptyState:

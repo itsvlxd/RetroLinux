@@ -9,24 +9,25 @@ from gi.repository import Adw, Gtk
 from settings.ui.icons import (
     APPS_ICON,
     AUDIO_ICON,
-    BLUETOOTH_ICON,
-    DAEMON_ICON,
-    DRIVER_ICON,
-    KEYRING_ICON,
-    LOGS_ICON,
-    NETWORK_ICON,
     AUTOSTART_ICON,
     BATTERY_ICON,
     BINDS_ICON,
+    BLUETOOTH_ICON,
+    DAEMON_ICON,
     DISKS_ICON,
+    DRIVER_ICON,
     ENV_VARS_ICON,
     FONTS_ICON,
     GRUB_ICON,
+    KEYRING_ICON,
     LAYER_RULES_ICON,
     LAYOUTS_ICON,
+    LOGS_ICON,
     MONITORS_ICON,
+    NETWORK_ICON,
     POWER_ICON,
     SETTINGS_ICON,
+    SLEEP_ICON,
     THEMES_ICON,
     WALLPAPERS_ICON,
     WINDOW_RULES_ICON,
@@ -236,6 +237,7 @@ class Sidebar:
         add_row(system, "power", "Power", POWER_ICON)
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
             add_row(system, "battery", "Battery", BATTERY_ICON)
+        add_row(system, "hypridle", "Sleep", SLEEP_ICON)
         add_row(system, "daemon", "Daemon", DAEMON_ICON)
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)

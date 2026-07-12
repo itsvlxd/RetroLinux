@@ -205,9 +205,10 @@ class GrubPage:
         self._dirty = False
 
         try:
-            cmd = f'kitty -- bash -c "source /opt/retrolinux/scripts/grub_core.sh && update_grub_config && regenerate_grub; echo; echo Press Enter to close.; read"'
-            escaped = cmd.replace('"', '\\"')
-            lua = f'hl.dsp.exec_cmd("{escaped}", {{ float = true, size = {{ 800, 500 }}, center = true }})'
+            cmd = "retro grub apply; echo; echo 'Press Enter to close.'; read"
+            escaped = cmd.replace("'", "'\\''")
+            terminal = f"kitty -- bash -c '{escaped}'"
+            lua = f'hl.dsp.exec_cmd("{terminal}", {{ float = true, size = {{ 800, 500 }}, center = true }})'
             subprocess.Popen(
                 ["hyprctl", "dispatch", lua],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

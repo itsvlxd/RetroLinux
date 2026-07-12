@@ -46,9 +46,7 @@ class DriverPage:
         self._env_status: str = ""
         self._temps: dict[str, int] = {}
         self._updates: list[str] = []
-        self._pending_driver_switch: str | None = None
         self._current_driver: str = ""
-        self._driver_switch_drop: Gtk.Widget | None = None
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -103,8 +101,6 @@ class DriverPage:
                 self._updates = parts[2].strip().split()
 
         self._current_driver = current.strip() if current else ""
-        self._pending_driver_switch = None
-        self._driver_switch_drop = None
 
         self._missing_pkgs = []
         for comp in self._scan_data:
@@ -242,7 +238,7 @@ class DriverPage:
                     group.add(self._make_warning_row(
                         "Legacy i915 driver in use",
                         "Meteor Lake+ GPU should use the modern xe driver for better performance and power management",
-                        "Configure Intel", lambda _b: self._run_terminal("retro driver configure-intel"),
+                        "Switch to xe", lambda _b: self._run_terminal("retro driver switch xe"),
                     ))
                     any_warning = True
                     break
@@ -498,9 +494,8 @@ class DriverPage:
             drop = Gtk.DropDown(model=opts)
             drop.set_selected(1 if self._current_driver == "xe" else 0)
             drop.set_valign(Gtk.Align.CENTER)
-            drop.connect("notify::selected", self._on_driver_switch, drop)
+            drop.connect("notify::selected", self._on_dropdown_driver_switch, drop)
             row.add_suffix(drop)
-            self._driver_switch_drop = drop
 
         group.add(row)
 
@@ -553,17 +548,13 @@ class DriverPage:
         group.add(expander)
         self._content_box.append(group)
 
-    def _on_driver_switch(self, _drop, _pspec, drop) -> None:
+    def _on_dropdown_driver_switch(self, _drop, _pspec, drop) -> None:
         idx = drop.get_selected()
         target = "xe" if idx == 1 else "i915"
         if target == self._current_driver:
-            self._pending_driver_switch = None
-            self._dirty = False
-        else:
-            self._pending_driver_switch = target
-            self._dirty = True
-        if self._on_dirty_changed:
-            self._on_dirty_changed()
+            return
+        self._run_terminal(f"retro driver switch {target}")
+        self._window.show_toast(f"Switching to {target} driver in terminal\u2026", timeout=3)
 
     def _install_missing(self) -> None:
         if not self._missing_pkgs:
@@ -598,28 +589,13 @@ class DriverPage:
         self._dirty = False
 
     def discard(self) -> None:
-        self._pending_driver_switch = None
         self._dirty = False
-        if self._driver_switch_drop is not None:
-            self._driver_switch_drop.set_selected(1 if self._current_driver == "xe" else 0)
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:
-        if self._dirty:
-            yield PendingChange(
-                category="Drivers",
-                title="GPU Kernel Driver",
-                subtitle=f"Switch to {self._pending_driver_switch}" if self._pending_driver_switch else "Driver settings changed",
-                navigate_to="driver",
-                icon=_DRIVER_ICON,
-                kind="modified",
-                revert=self.discard,
-            )
+        return iter([])
 
     def flush_pending(self) -> None:
-        if self._pending_driver_switch:
-            self._run_terminal(f"retro driver switch {self._pending_driver_switch}")
-            self._pending_driver_switch = None
-            self._dirty = False
+        pass
 
     def get_search_entries(self) -> list[dict]:
         return [
