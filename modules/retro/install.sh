@@ -127,6 +127,13 @@ sync_missing_variables() {
 
 sync_missing_variables
 
+HYPRIDLE_SRC="$RETRO_DIR/modules/hyprland/files/hypridle.conf"
+HYPRIDLE_DST="$RETRO_CONFIG/hypridle.conf"
+if [[ ! -f "$HYPRIDLE_DST" ]] || cmp -s "$HYPRIDLE_SRC" "$HYPRIDLE_DST"; then
+    cp "$HYPRIDLE_SRC" "$HYPRIDLE_DST"
+    rx_log "success" "Copied default hypridle.conf"
+fi
+
 if command -v glib-compile-schemas >/dev/null 2>&1; then
     schema_dir="$RETRO_DIR/cmds/tools/settings/data"
     if [[ -d $schema_dir ]]; then
@@ -173,3 +180,19 @@ setup_smartctl_sudoers() {
     fi
 }
 setup_smartctl_sudoers
+
+SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"
+if [[ -f $SYSTEM_SCRIPT ]]; then
+    sudo rm -f /etc/sudoers.d/99-retro-system /etc/sudoers.d/99-retro-logind
+    echo "%wheel ALL=(ALL) NOPASSWD: ${SYSTEM_SCRIPT}" | sudo tee /etc/sudoers.d/99-retro-system >/dev/null
+    sudo chmod 440 /etc/sudoers.d/99-retro-system
+    rx_log "success" "Sudoers rule added for retro system (power, lid, zram, swap)"
+fi
+
+if [[ ! -f /swapfile ]]; then
+    if rx_confirm "Set up swap + hibernation? (auto-calculated from RAM)" "N"; then
+        rx_log "info" "Applying system defaults (swap, zram, power, hibernation)..."
+        bash "$SYSTEM_SCRIPT" --apply
+        rx_log "success" "System defaults applied — reboot to activate hibernation"
+    fi
+fi
