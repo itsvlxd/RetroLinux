@@ -5,6 +5,7 @@ rx_log_register "driver"
 
 RETRO_DIR="${RETRO_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
 source "$RETRO_DIR/lib/colors.sh"
+source "$RETRO_DIR/lib/helpers.sh"
 
 _is_pkg_installed() {
     pacman -Qq "$1" >/dev/null 2>&1
@@ -644,19 +645,6 @@ sys_check_ai_env() {
     echo "intel:${intel_env:-not_set}|nvidia:${nvidia_env:-not_set}|amd:${amd_env:-not_set}"
 }
 
-_detect_bootloader() {
-    if [[ -f /boot/grub/grub.cfg ]]; then
-        echo "grub|/etc/default/grub|GRUB_CMDLINE_LINUX_DEFAULT|grub-mkconfig -o /boot/grub/grub.cfg"
-    elif [[ -d /boot/loader/entries ]]; then
-        local entry=$(ls /boot/loader/entries/*.conf 2>/dev/null | head -1)
-        echo "systemd-boot|${entry}|options|systemctl reboot"
-    elif [[ -f /boot/refind_linux.conf ]]; then
-        echo 'refind|/boot/refind_linux.conf|"Boot with standard options"|refind-install'
-    else
-        echo "unknown|||"
-    fi
-}
-
 _get_intel_gpu_device_id() {
     local device_id=$(lspci -nn -d 8086: 2>/dev/null | grep -iE "VGA|3D|Display" | grep -oP '\[([0-9a-f]{4}):([0-9a-f]{4})\]' | head -1 | tr -d '[]' | cut -d: -f2)
     echo "$device_id"
@@ -669,26 +657,13 @@ _get_current_driver() {
     lspci -k -s "$pci_id" 2>/dev/null | grep "Kernel driver in use:" | awk -F': ' '{print $2}'
 }
 
-_get_kernel_params() {
-    local bl_info=$(_detect_bootloader)
-    IFS='|' read -r bl_type bl_file bl_key bl_update_cmd <<<"$bl_info"
-    if [[ $bl_type == "grub" && -f $bl_file ]]; then
-        grep "^${bl_key}=" "$bl_file" | cut -d'"' -f2
-    elif [[ $bl_type == "systemd-boot" && -n $bl_file ]]; then
-        grep "^options " "$bl_file" | sed 's/^options //'
-    elif [[ $bl_type == "refind" && -f $bl_file ]]; then
-        grep '^"' "$bl_file" | head -1 | sed 's/^[^"]*"\([^"]*\)".*/\1/'
-    fi
-}
-
 _switch_driver() {
     local target="$1"
     local device_id=$(_get_intel_gpu_device_id)
     local current=$(_get_current_driver)
-    local bl_info=$(_detect_bootloader)
-    IFS='|' read -r bl_type bl_file bl_key bl_update_cmd <<<"$bl_info"
 
-    if [[ $bl_type == "unknown" ]]; then
+    local bl_type=$(bash "$RETRO_DIR/scripts/grub_core.sh" --detect-bootloader 2>/dev/null | cut -d'|' -f1)
+    if [[ $bl_type == "unknown" || -z $bl_type ]]; then
         echo "ERROR|bootloader_not_detected"
         return 1
     fi
@@ -702,28 +677,17 @@ _switch_driver() {
             echo "ALREADY|xe"
             return 0
         fi
-        local params=$(_get_kernel_params)
-        params=$(echo "$params" | sed 's/xe\.force_probe=[^ ]*//g; s/i915\.force_probe=[^ ]*//g' | xargs)
-        params+=" i915.force_probe=!${device_id} xe.force_probe=${device_id}"
+        local params="i915.force_probe=!${device_id} xe.force_probe=${device_id}"
     elif [[ $target == "i915" ]]; then
         if [[ $current == "i915" ]]; then
             echo "ALREADY|i915"
             return 0
         fi
-        local params=$(_get_kernel_params)
-        params=$(echo "$params" | sed 's/xe\.force_probe=[^ ]*//g; s/i915\.force_probe=[^ ]*//g' | xargs)
+        local params=""
     fi
 
-    if [[ $bl_type == "grub" ]]; then
-        sudo sed -i "s|^${bl_key}=.*|${bl_key}=\"${params}\"|" "$bl_file"
-        sudo $bl_update_cmd >/dev/null 2>&1
-    elif [[ $bl_type == "systemd-boot" ]]; then
-        for f in /boot/loader/entries/*.conf; do
-            sudo sed -i "s|^options .*|options ${params}|" "$f"
-        done
-    elif [[ $bl_type == "refind" ]]; then
-        sudo sed -i "s|^\"[^\"]*\"|\"Boot with standard options\" \"${params}\"|" "$bl_file"
-    fi
+    bash "$RETRO_DIR/scripts/grub_core.sh" --apply-kernel-params "$params" >/dev/null
+    set_var "DRIVER_KERNEL_PARAMS" "$params"
 
     echo "SUCCESS|${target}|${device_id}|reboot_required"
 }
@@ -1192,7 +1156,7 @@ show_hypr_env() {
     fi
 }
 
-generate_grub_cmdline() {
+_generate_hw_cmdline() {
     local gpu_vendors=()
     local cpu_vendor=""
     local cmdline=""
@@ -1212,8 +1176,6 @@ generate_grub_cmdline() {
             gpu_vendors+=("$vendor")
         done <<<"$gpus"
     fi
-
-    cmdline="quiet splash loglevel=3 net.ifnames=0"
 
     if [[ " ${gpu_vendors[*]} " =~ " intel" ]]; then
         cmdline+=" i915.enable_psr=1 i915.enable_fbc=1 i915.enable_guc=3"
@@ -1347,7 +1309,6 @@ case "$1" in
     "--services") get_service_hints ;;
     "--sys-ai-env") sys_check_ai_env ;;
     "--kernel-warn") _kernel_warnings ;;
-    "--bootloader") _detect_bootloader ;;
     "--switch") _switch_driver "$2" ;;
     "--modules") _list_module_params "${@:2}" ;;
     "--modules-set") _set_module_param "$2" "$3" "$4" ;;
@@ -1373,5 +1334,5 @@ case "$1" in
     "--hypr-show") show_hypr_env ;;
     "--hypr-env-show") show_hypr_env ;;
     "--mkinit") configure_mkinitcpio_nvidia ;;
-    "--grub-cmdline") generate_grub_cmdline ;;
+    "--hw-cmdline") _generate_hw_cmdline ;;
 esac

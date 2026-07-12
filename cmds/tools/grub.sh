@@ -54,7 +54,11 @@ cmd_grub() {
             local gfxmode=$(grep "^GRUB_GFXMODE=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
             local theme=$(grep "^GRUB_THEME=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
             local os_prober=$(grep "^GRUB_DISABLE_OS_PROBER=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2)
-            local cmdline=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
+            local cmdline=""
+            if [[ -f /boot/grub/grub.cfg ]]; then
+                cmdline=$(grep -A10 "^menuentry 'RetroLinux'" /boot/grub/grub.cfg | grep "^\s*linux\s" | head -1 | sed 's/^\s*linux\s\+[^ ]\+\s\+//')
+            fi
+            [[ -z $cmdline ]] && cmdline=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
             local distributor=$(grep "^GRUB_DISTRIBUTOR=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
 
             local current_kernel=$(uname -r)
@@ -127,6 +131,15 @@ cmd_grub() {
             rx_table_row "󰂱" "Detected Hardware:" "$hw_info" "$PINK" "32"
             rx_table_row "󰏗" "Kernel:" "$kernel_display" "$PINK" "32"
             rx_table_row "󰈔" "Boot Cmdline:" "$cmdline" "$PINK" "32"
+
+            local hibernation_status="Disabled"
+            local hibernation_color="$MUTE"
+            if echo "$cmdline" | grep -q "resume="; then
+                hibernation_status="Ready"
+                hibernation_color="$SUCCESS"
+            fi
+            rx_table_row "󰑖" "Hibernation:" "$hibernation_status" "$hibernation_color" "32"
+
             rx_table_row "󰓅" "Boot Timeout:" "${timeout}s" "$PINK" "32"
             rx_table_row "󰉋" "Snapshot Daemon:" "$snapshot_status" "$snapshot_color" "32"
             rx_table_row "󰍹" "OS Prober:" "$os_prober_status" "$os_prober_color" "32"
@@ -135,7 +148,7 @@ cmd_grub() {
             rx_table_row "󰆍" "Distributor:" "$distributor" "$PINK" "32"
             rx_table_separator
 
-                local grub_cfg="/boot/grub/grub.cfg"
+            local grub_cfg="/boot/grub/grub.cfg"
             if [[ -f $grub_cfg ]]; then
                 local entries=()
                 local entry_details=()
@@ -602,7 +615,15 @@ cmd_grub() {
                     fi
                 fi
 
-                _gcd() { local a=$1 b=$2; while [[ $b -ne 0 ]]; do local t=$b; b=$((a % b)); a=$t; done; echo $a; }
+                _gcd() {
+                    local a=$1 b=$2
+                    while [[ $b -ne 0 ]]; do
+                        local t=$b
+                        b=$((a % b))
+                        a=$t
+                    done
+                    echo $a
+                }
 
                 local gcd=$(_gcd $res_x $res_y)
                 local ar_x=$((res_x / gcd)) ar_y=$((res_y / gcd))
@@ -620,14 +641,14 @@ cmd_grub() {
                     local ax=${alt%%x*} ay=${alt##*x}
                     local g=$(_gcd $ax $ay)
                     local exists=false
-                    for existing in "${res_options[@]}"; do [[ "$existing" == "$alt" ]] && exists=true && break; done
+                    for existing in "${res_options[@]}"; do [[ $existing == "$alt" ]] && exists=true && break; done
                     [[ $exists == false && $((ax / g)) -le 16 && $((ay / g)) -le 10 ]] && res_options+=("$alt")
                 done
 
                 local native="${res_x}x${res_y}"
                 local final_options=("$native (Native)")
                 for opt in "${res_options[@]}"; do
-                    [[ "$opt" == "$native" ]] && continue
+                    [[ $opt == "$native" ]] && continue
                     local g=$(_gcd ${opt%%x*} ${opt##*x})
                     final_options+=("$opt ($((${opt%%x*} / g)):$((${opt##*x} / g)))")
                 done

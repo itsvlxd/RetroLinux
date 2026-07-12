@@ -387,7 +387,7 @@ cmd_driver() {
 
             local device_id=$(bash "$driver_script" --device-id)
             local current=$(bash "$driver_script" --current-driver)
-            local bl_info=$(bash "$driver_script" --bootloader)
+            local bl_info=$(bash "$RETRO_DIR/scripts/grub_core.sh" --detect-bootloader)
             IFS='|' read -r bl_type bl_file bl_key bl_cmd <<<"$bl_info"
 
             rx_table_header "󰢮" "Kernel Driver Switch"
@@ -424,8 +424,9 @@ cmd_driver() {
 
             case "$status" in
                 SUCCESS)
-                    rx_log "success" "Switched to ${driver_name} driver for device ${dev_id}"
-                    rx_log "warn" "Reboot required for changes to take effect"
+                    local pending_driver="$driver_name"
+                    rx_log "success" "Switched to ${PINK}${pending_driver}${RESET} driver for device ${PINK}${dev_id}${RESET}"
+                    rx_log "warn" "Reboot required — pending: ${PINK}${pending_driver}${RESET} (active: ${current})"
                     ;;
                 ALREADY)
                     rx_log "success" "Already using ${driver_name} driver"
