@@ -11,7 +11,7 @@ The **RetroLinux Installer** (`retroinstall`) is a guided, interactive TUI insta
 - Hyprland desktop environment with SDDM greeter
 - Optional LUKS disk encryption
 - Bluetooth and printing service support
-- PipeWire audio, UFW firewall, and more
+- PipeWire audio, nftables firewall, and more
 
 ---
 
@@ -207,8 +207,8 @@ After completing all steps:
    - **Boot:** GRUB with UKI support (FAT32 boot partition) or systemd-boot
    - **DE:** Hyprland + SDDM
    - **Audio:** PipeWire
-   - **Firewall:** UFW enabled
-   - **Snapshots:** Timeshift configured
+    - **Firewall:** nftables enabled
+    - **Snapshots:** Timeshift configured
 
 5. **Complete** - Reboot prompt on success
 
