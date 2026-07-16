@@ -30,6 +30,8 @@ qt5ct
 qt6ct
 kvantum
 kvantum-qt5
+qt6-wayland
+hyprland-qt-support
 
 # XDG
 xdg-utils
@@ -38,7 +40,7 @@ xdg-dbus-proxy
 xdg-terminal-exec
 xdg-desktop-portal
 xdg-desktop-portal-gtk
-xdg-desktop-portal-hyprland
+xdg-desktop-portal-hyprland-git
 
 # Icons
 papirus-folders
