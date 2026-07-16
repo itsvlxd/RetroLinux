@@ -361,19 +361,19 @@ _docker_build() {
     fi
 
     rx_log "info" "Copying RetroLinux to airootfs..."
-    mkdir -p "$PROFILE_DIR/airootfs/opt/retrolinux"
-    rsync -av --delete \
+    sudo mkdir -p "$PROFILE_DIR/airootfs/opt/retrolinux"
+    sudo rsync -av --delete \
         "$RETRO_DIR/bin/" \
         "$PROFILE_DIR/airootfs/opt/retrolinux/bin/"
     
     if [[ $INCLUDE_REPO == true ]]; then
         rx_log "info" "Including full repo in ISO (--repo flag)..."
-        rsync -av \
+        sudo rsync -av \
             --exclude='.env' \
             --exclude='.git/' \
             "$RETRO_DIR/" \
             "$PROFILE_DIR/airootfs/opt/retrolinux/" || true
-        find "$PROFILE_DIR/airootfs/opt/retrolinux" -type f -name "*.sh" -exec chmod +x {} \;
+        sudo find "$PROFILE_DIR/airootfs/opt/retrolinux" -type f -name "*.sh" -exec chmod +x {} \;
         rx_log "success" "Full repo included in ISO"
     fi
 
