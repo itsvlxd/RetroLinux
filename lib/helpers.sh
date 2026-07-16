@@ -296,6 +296,13 @@ rx_apply_color_map() {
             fi
         fi
 
+        if [[ -z $slot ]]; then
+            file="$output_dir/hyprland-colors.conf"
+            if [[ -f $file ]]; then
+                sed -i "s/^\$${key} = .*$/\$${key} = #${hex}/" "$file"
+            fi
+        fi
+
         for gtk_file in "$HOME/.config/gtk-3.0/gtk.css" "$HOME/.config/gtk-4.0/gtk.css"; do
             [[ -f $gtk_file ]] || continue
             case "$key" in
