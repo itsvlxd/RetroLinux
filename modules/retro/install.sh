@@ -190,9 +190,7 @@ if [[ -f $SYSTEM_SCRIPT ]]; then
 fi
 
 if [[ ! -f /swapfile ]]; then
-    if rx_confirm "Set up swap + hibernation? (auto-calculated from RAM)" "N"; then
-        rx_log "info" "Applying system defaults (swap, zram, power, hibernation)..."
-        bash "$SYSTEM_SCRIPT" --apply
-        rx_log "success" "System defaults applied — reboot to activate hibernation"
-    fi
+    rx_log "info" "Setting up swap + hibernation (auto-calculated from RAM)..."
+    bash "$SYSTEM_SCRIPT" --apply
+    rx_log "success" "System defaults applied — reboot to activate hibernation"
 fi
