@@ -177,10 +177,11 @@ cmd_xdg() {
                     fi
                     ;;
                 "inject")
-                    dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=Hyprland 2>/dev/null
-                    export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-Hyprland}"
-                    export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
-                    systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null
+                    export XDG_CURRENT_DESKTOP=Hyprland
+                    export XDG_SESSION_TYPE=wayland
+                    export XDG_SESSION_DESKTOP=Hyprland
+                    dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP
+                    systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP
 
                     local backend=$(bash "$xdg_script" --portal-status 2>/dev/null | grep -oP 'backend=\K[^|]+')
                     : ${backend:="none"}
@@ -192,6 +193,17 @@ cmd_xdg() {
                         systemctl --user restart --wait xdg-desktop-portal 2>/dev/null
                         rx_log "success" "Session env injected, base portal restarted"
                     fi
+                    ;;
+                "screenshare")
+                    if ! command -v xwaylandvideobridge >/dev/null 2>&1; then
+                        rx_log "error" "xwaylandvideobridge not installed"
+                        rx_log "info" "Install with: sudo pacman -S xwaylandvideobridge"
+                        return 1
+                    fi
+                    pkill -f xwaylandvideobridge 2>/dev/null || true
+                    nohup xwaylandvideobridge >/dev/null 2>&1 &
+                    disown
+                    rx_log "success" "XWayland video bridge started for screen sharing"
                     ;;
                 *)
                     rx_log "error" "Unknown portal action: $sub"
@@ -590,7 +602,7 @@ EOF
             rx_help_cmd "dirs [set|reset]" "Manage XDG user directories" "40"
             rx_help_cmd "defaults [set|reset]" "Manage default applications" "40"
             rx_help_cmd "handlers <mime>" "Find apps that handle a MIME type" "40"
-            rx_help_cmd "portal [set|inject]" "Manage XDG portal backend" "40"
+            rx_help_cmd "portal [set|inject|screenshare]" "Manage XDG portal backend" "40"
             rx_help_cmd "xdg-open" "Configure xdg-open for Hyprland" "40"
             rx_help_cmd "flatpak" "Bridge host defaults into Flatpak sandbox" "40"
             rx_help_cmd "query <file|ext>" "Reverse lookup: find app for a file or extension" "40"
