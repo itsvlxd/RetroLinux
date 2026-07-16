@@ -628,6 +628,12 @@ rx_theme_apply_colors() {
     rx_set_papirus_folder_color
     rx_theme_deploy_browsers
     rx_sddm_refresh
+
+    local wc=$(get_var "WALL_CURRENT" "")
+    if [[ -f $wc ]]; then
+        mkdir -p "$HOME/.config/retro/wallpaper"
+        cp "$wc" "$HOME/.config/retro/wallpaper/current.png"
+    fi
 }
 
 rx_theme_get_status_lines() {
