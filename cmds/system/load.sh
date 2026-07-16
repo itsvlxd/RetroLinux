@@ -9,7 +9,11 @@ cmd_load() {
     local action="$1"
 
     local startup_tasks=(
+        "retro xdg portal inject|Injecting session env into XDG portal daemon"
+
         "retro --setup|Initializing first boot system setup"
+
+        "retro firewall on|Enabling nftables firewall"
 
         "retro bluetooth restore|Initializing bluetooth radio cards"
         "retro audio easyeffects start|Initializing audio drivers"
@@ -18,7 +22,7 @@ cmd_load() {
         "retro power restore|Restoring hardware power profiles"
         "retro wallpaper restore|Applying last used wallpaper"
         "retro xdg dirs reset|Ensuring XDG user directories exist"
-        "retro xdg portal inject|Injecting session env into XDG portal daemon"
+        "retro xdg portal screenshare|Starting XWayland video bridge for screen sharing"
         "retro xdg flatpak|Bridging host MIME defaults into Flatpak sandbox"
 
         "retro benchmark hud load|Loads mangohud and benchmark variables"
