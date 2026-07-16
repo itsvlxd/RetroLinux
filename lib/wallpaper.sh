@@ -144,13 +144,16 @@ rx_wallpaper_set_image() {
     local source="$1"
     local quick="${2:-false}"
     local is_first="$3"
+    local monitor="${4:-}"
+    local mon_opt=""
+    [[ -n $monitor ]] && mon_opt="-o $monitor"
 
     if [[ $is_first == "true" || $quick == "true" ]]; then
-        awww img "$source" --transition-type none
+        awww img "$source" $mon_opt --transition-type none
     else
         local rand_x=$((RANDOM % 1920))
         local rand_y=$((RANDOM % 1080))
-        awww img "$source" \
+        awww img "$source" $mon_opt \
             --transition-type random \
             --transition-duration 2.4 \
             --transition-fps 120 \
@@ -252,6 +255,7 @@ rx_wallpaper_launch_mpvpaper() {
     local video_path="$1"
     local theme_dir="$2"
     local filename="$3"
+    local target_monitor="${4:-}"
 
     [[ -z $video_path ]] && return 1
 
@@ -265,6 +269,7 @@ rx_wallpaper_launch_mpvpaper() {
 
     hyprctl monitors -j 2>/dev/null | jq -r '.[] | "\(.name)|\(.description)"' | while IFS='|' read -r m_name m_desc; do
         [[ -z $m_name ]] && continue
+        [[ -n $target_monitor && $m_name != "$target_monitor" ]] && continue
 
         local target_video="$video_path"
 
@@ -285,6 +290,7 @@ rx_wallpaper_launch_mpvpaper() {
 rx_wallpaper_start() {
     local input_path="$1"
     local quick="${2:-false}"
+    local monitor="${3:-}"
 
     local wall_path=$(rx_wallpaper_resolve_path "$input_path")
     [[ -z $wall_path ]] && return 1
@@ -314,9 +320,13 @@ rx_wallpaper_start() {
     local gen_timestamp=$(date +%s%N)
     echo "$gen_timestamp" >/tmp/retro_wallpaper_gen
 
-    set_var "WALL_CURRENT" "$wall_path"
+    if [[ -z $monitor ]]; then
+        set_var "WALL_CURRENT" "$wall_path"
+    else
+        set_var "WALL_MONITOR_$monitor" "$wall_path"
+    fi
 
-    rx_wallpaper_set_image "$static_source" "$quick" "$is_first_load"
+    rx_wallpaper_set_image "$static_source" "$quick" "$is_first_load" "$monitor"
 
     if [[ $needs_colors == "true" || $is_video == "true" ]]; then
         (
@@ -350,7 +360,7 @@ rx_wallpaper_start() {
                 return 0
             fi
 
-            rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename"
+            rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename" "$monitor"
         fi
     ) &>/dev/null &
 fi
@@ -358,6 +368,19 @@ fi
 
 rx_wallpaper_restore() {
     local quick="${1:-false}"
+
+    while IFS='=' read -r var value; do
+        if [[ $var =~ ^export\ WALL_MONITOR_ ]]; then
+            local mon="${var#export WALL_MONITOR_}"
+            mon="${mon%%=*}"
+            local path="${value#\"}"
+            path="${path%\"}"
+            if [[ -f $path ]]; then
+                rx_wallpaper_start "$path" "$quick" "$mon"
+            fi
+        fi
+    done < <(grep "^export WALL_MONITOR_" "$RETRO_CONFIG/variables.sh" 2>/dev/null)
+
     local last_wall=$(get_var "WALL_CURRENT")
     if [[ -z $last_wall || $last_wall == "null" ]]; then
         rx_log_file "ERROR" "Restore failed: WALL_CURRENT is not set"
@@ -367,7 +390,13 @@ rx_wallpaper_restore() {
         rx_log_file "ERROR" "Restore failed: wallpaper file not found: $last_wall"
         return 1
     fi
-    rx_wallpaper_start "$last_wall" "$quick"
+
+    for mon in $(hyprctl monitors -j 2>/dev/null | jq -r '.[].name'); do
+        local existing=$(get_var "WALL_MONITOR_$mon")
+        if [[ -z $existing || $existing == "null" ]]; then
+            rx_wallpaper_start "$last_wall" "$quick" "$mon"
+        fi
+    done
 }
 
 rx_wallpaper_pause() {

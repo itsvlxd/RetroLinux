@@ -218,6 +218,8 @@ list_wallpapers_with_resolution() {
 
 set_wallpaper() {
     local input="$1"
+    local quick="${2:-false}"
+    local monitor="${3:-}"
     local name=$(basename "$input")
     rx_log_file "INFO" "Setting wallpaper: $(rx_format_string "${name%.*}")"
 
@@ -236,7 +238,13 @@ set_wallpaper() {
         fi
     fi
 
-    if ! rx_wallpaper_start "$input" "${2:-false}"; then
+    if [[ -n $monitor ]]; then
+        set_var "WALL_MONITOR_$monitor" "$input"
+    else
+        set_var "WALL_CURRENT" "$input"
+    fi
+
+    if ! rx_wallpaper_start "$input" "$quick" "$monitor"; then
         rx_log_file "ERROR" "Failed to start wallpaper: $input"
         echo "ERR|wallpaper_start_failed|$input"
         return 1
@@ -519,7 +527,8 @@ sync_wallpapers() {
 }
 
 case "$1" in
-    "--set") set_wallpaper "$2" "${3:-false}" ;;
+    "--current") get_var "WALL_CURRENT" ;;
+    "--set") set_wallpaper "$2" "${3:-false}" "$4" ;;
     "--add") add_wallpaper "$2" ;;
     "--slideshow-next") slideshow_next ;;
     "--optimize") optimize_wallpapers ;;

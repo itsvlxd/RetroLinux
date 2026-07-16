@@ -13,22 +13,43 @@ cmd_wallpaper() {
 
     case "$action" in
         "set")
-            [[ -z $value ]] && rx_log "error" "Provide a wallpaper name or path." && return 1
+            local monitor=""
+            local wall_path=""
+
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --monitor) monitor="$2"; shift 2 ;;
+                    *) wall_path="$1"; shift ;;
+                esac
+            done
+
+            [[ -z $wall_path ]] && rx_log "error" "Provide a wallpaper name or path." && return 1
 
             local resolved=""
-            resolved=$(bash "$wall_script" --resolve-name "$value" 2>/dev/null)
+            resolved=$(bash "$wall_script" --resolve-name "$wall_path" 2>/dev/null)
 
             if [[ -n $resolved ]]; then
-                value="$resolved"
+                wall_path="$resolved"
             fi
 
-            if bash "$wall_script" --set "$value"; then
-                local display="${value##*/}"
-                display="${display%.*}"
-                display=$(rx_format_string "$display")
-                rx_log "success" "Wallpaper set to: ${PINK}${display}${RESET}"
+            if [[ -n $monitor ]]; then
+                if bash "$wall_script" --set "$wall_path" "false" "$monitor"; then
+                    local display="${wall_path##*/}"
+                    display="${display%.*}"
+                    display=$(rx_format_string "$display")
+                    rx_log "success" "Wallpaper set for ${PINK}$monitor${RESET}: ${PINK}${display}${RESET}"
+                else
+                    rx_log "error" "Wallpaper not found: ${PINK}${wall_path}${RESET}"
+                fi
             else
-                rx_log "error" "Wallpaper not found: ${PINK}${value}${RESET}"
+                if bash "$wall_script" --set "$wall_path"; then
+                    local display="${wall_path##*/}"
+                    display="${display%.*}"
+                    display=$(rx_format_string "$display")
+                    rx_log "success" "Wallpaper set to: ${PINK}${display}${RESET}"
+                else
+                    rx_log "error" "Wallpaper not found: ${PINK}${wall_path}${RESET}"
+                fi
             fi
             ;;
 
