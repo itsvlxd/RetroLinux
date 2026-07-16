@@ -242,6 +242,9 @@ set_wallpaper() {
         return 1
     fi
 
+    mkdir -p "$HOME/.config/retro/wallpaper"
+    cp "$input" "$HOME/.config/retro/wallpaper/current.png"
+
     echo "OK|$input"
 }
 
@@ -286,6 +289,8 @@ restore_wallpaper() {
     fi
 
     rx_wallpaper_start "$last_wall" "${1:-false}"
+    mkdir -p "$HOME/.config/retro/wallpaper"
+    cp "$last_wall" "$HOME/.config/retro/wallpaper/current.png"
     echo "OK|$last_wall"
 }
 
