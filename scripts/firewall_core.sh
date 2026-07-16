@@ -8,36 +8,17 @@ rx_log_register "firewall"
 SUDO_CMD="sudo"
 [[ $EUID -eq 0 ]] && SUDO_CMD=""
 
-_engines_available() {
-    local list=()
-    command -v nft &>/dev/null && list+=("nftables")
-    command -v ufw &>/dev/null && list+=("ufw")
-    command -v firewall-cmd &>/dev/null && list+=("firewalld")
-    command -v iptables &>/dev/null && list+=("iptables")
-    echo "${list[@]}"
-}
-
 _engine_get() {
-    local configured
-    configured=$(get_var "FIREWALL_ENGINE" "auto")
-    if [[ -z $configured || $configured == "auto" ]]; then
-        configured=$(_engines_available | awk '{print $1}')
-        [[ -z $configured ]] && configured="none"
-    fi
-    echo "$configured"
+    echo "nftables"
 }
 
 _disable_competing() {
-    local active="$1"
-    for eng in nftables ufw firewalld iptables; do
-        [[ $eng == $active ]] && continue
+    for eng in ufw firewalld iptables; do
         $SUDO_CMD systemctl stop "$eng" 2>/dev/null || true
         $SUDO_CMD systemctl disable "$eng" 2>/dev/null || true
         $SUDO_CMD systemctl mask "$eng" 2>/dev/null || true
     done
-    if [[ $active != "ufw" ]]; then
-        $SUDO_CMD ufw --force disable 2>/dev/null || true
-    fi
+    $SUDO_CMD ufw --force disable 2>/dev/null || true
 }
 
 _nft_chain_exists() {
@@ -59,16 +40,25 @@ _nft_ensure_basic() {
         $SUDO_CMD nft add chain inet filter output '{ type filter hook output priority 0; policy accept; }' 2>/dev/null || true
     fi
 
-    local _chain_rules
-    _chain_rules=$($SUDO_CMD nft list chain inet filter input 2>/dev/null)
-    echo "$_chain_rules" | grep -q "ct state established,related" || \
+    local _input_rules
+    _input_rules=$($SUDO_CMD nft list chain inet filter input 2>/dev/null)
+    echo "$_input_rules" | grep -q "ct state established,related" || \
         $SUDO_CMD nft add rule inet filter input ct state established,related accept 2>/dev/null || true
-    echo "$_chain_rules" | grep -q 'iif "lo" accept' || \
+    echo "$_input_rules" | grep -q 'iif "lo" accept' || \
         $SUDO_CMD nft add rule inet filter input iif lo accept 2>/dev/null || true
-    echo "$_chain_rules" | grep -q "icmp type echo-request" || \
+    echo "$_input_rules" | grep -q "icmp type echo-request" || \
         $SUDO_CMD nft add rule inet filter input ip protocol icmp icmp type echo-request accept 2>/dev/null || true
-    echo "$_chain_rules" | grep -q "icmpv6 type echo-request" || \
+    echo "$_input_rules" | grep -q "icmpv6 type echo-request" || \
         $SUDO_CMD nft add rule inet filter input ip6 nexthdr icmpv6 icmpv6 type echo-request accept 2>/dev/null || true
+
+    local _fwd_rules
+    _fwd_rules=$($SUDO_CMD nft list chain inet filter forward 2>/dev/null)
+    echo "$_fwd_rules" | grep -q "ct state established,related" || \
+        $SUDO_CMD nft add rule inet filter forward ct state established,related accept 2>/dev/null || true
+    echo "$_fwd_rules" | grep -q 'iifname "docker0"' || \
+        $SUDO_CMD nft add rule inet filter forward iifname "docker0" accept 2>/dev/null || true
+    echo "$_fwd_rules" | grep -q 'iifname "br-*"' || \
+        $SUDO_CMD nft add rule inet filter forward iifname "br-*" accept 2>/dev/null || true
 
     $SUDO_CMD sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
     echo "net.ipv4.ip_forward=1" | $SUDO_CMD tee /etc/sysctl.d/99-retro-docker.conf >/dev/null 2>&1 || true
@@ -81,15 +71,6 @@ _nft_ensure_basic() {
     _nat_rules=$($SUDO_CMD nft list chain inet nat postrouting 2>/dev/null)
     echo "$_nat_rules" | grep -q "172.17.0.0/16" || \
         $SUDO_CMD nft add rule inet nat postrouting ip saddr 172.17.0.0/16 oif != docker0 masquerade 2>/dev/null || true
-
-    local _fwd_rules
-    _fwd_rules=$($SUDO_CMD nft list chain inet filter forward 2>/dev/null)
-    echo "$_fwd_rules" | grep -q "ct state established,related" || \
-        $SUDO_CMD nft add rule inet filter forward ct state established,related accept 2>/dev/null || true
-    echo "$_fwd_rules" | grep -q "iif docker0 oif != docker0" || \
-        $SUDO_CMD nft add rule inet filter forward iif docker0 oif != docker0 accept 2>/dev/null || true
-    echo "$_fwd_rules" | grep -q "oif docker0" || \
-        $SUDO_CMD nft add rule inet filter forward oif docker0 iif != docker0 accept 2>/dev/null || true
 }
 
 _nft_commit() {
@@ -104,13 +85,19 @@ _nft_status() {
 }
 
 _nft_on() {
-    _disable_competing "nftables"
+    _disable_competing
     $SUDO_CMD systemctl unmask nftables 2>/dev/null || true
     _nft_ensure_basic
     _nft_commit
     $SUDO_CMD nft flush ruleset 2>/dev/null || true
     $SUDO_CMD mkdir -p /etc/systemd/system/nftables.service.d 2>/dev/null || true
     printf '[Service]\nRemainAfterExit=yes\n' | $SUDO_CMD tee /etc/systemd/system/nftables.service.d/retro.conf >/dev/null 2>&1 || true
+    $SUDO_CMD mkdir -p /etc/systemd/system/docker.service.d 2>/dev/null || true
+    cat <<EOF | $SUDO_CMD tee /etc/systemd/system/docker.service.d/retro-nftables.conf >/dev/null 2>&1 || true
+[Unit]
+After=nftables.service
+BindsTo=nftables.service
+EOF
     $SUDO_CMD systemctl daemon-reload 2>/dev/null || true
     $SUDO_CMD systemctl enable nftables 2>/dev/null || true
     $SUDO_CMD systemctl start nftables 2>/dev/null || true
@@ -225,20 +212,15 @@ _nft_delete() {
 
 _nft_delete_by_id() {
     local id_range="$1"
-
     local start end
     if [[ $id_range =~ ^([0-9]+)-([0-9]+)$ ]]; then
-        start="${BASH_REMATCH[1]}"
-        end="${BASH_REMATCH[2]}"
+        start="${BASH_REMATCH[1]}"; end="${BASH_REMATCH[2]}"
     else
-        start="$id_range"
-        end="$id_range"
+        start="$id_range"; end="$id_range"
     fi
-
     if [[ $end -lt $start ]]; then
         local tmp=$start; start=$end; end=$tmp
     fi
-
     local deleted=0
     for ((idx=end; idx>=start; idx--)); do
         local handle
@@ -247,7 +229,6 @@ _nft_delete_by_id() {
             $SUDO_CMD nft delete rule inet filter input handle "${handle}" 2>/dev/null && ((deleted++)) || true
         fi
     done
-
     if [[ $deleted -gt 0 ]]; then
         _nft_commit
         return 0
@@ -390,307 +371,14 @@ _nft_default() {
     fi
 }
 
-_ufw_open_ports() {
-    local ports=()
-    while IFS= read -r line; do
-        if [[ $line =~ ^([0-9]+)/(tcp|udp) ]]; then
-            ports+=("${BASH_REMATCH[1]}/${BASH_REMATCH[2]}")
-        fi
-    done < <(ufw status verbose 2>/dev/null | grep "^[0-9]")
-    local IFS=","
-    echo "${ports[*]}"
-}
-
-_ufw_status() {
-    local status="inactive"
-    ufw status 2>/dev/null | head -1 | grep -qi "active" && status="active"
-    echo "engine=ufw"
-    echo "daemon_status=${status}"
-}
-
-_ufw_on() {
-    _disable_competing "ufw"
-    $SUDO_CMD systemctl unmask ufw 2>/dev/null || true
-    $SUDO_CMD ufw --force enable 2>/dev/null || true
-}
-
-_ufw_off() {
-    $SUDO_CMD ufw --force disable 2>/dev/null || true
-}
-
-_ufw_restart() {
-    _ufw_off && _ufw_on
-}
-
-_ufw_rule_count() {
-    ufw status numbered 2>/dev/null | grep -cE '^\[\s*[0-9]+\]' || true
-}
-
-_ufw_rules() {
-    local count=0
-    while IFS= read -r line; do
-        if [[ $line =~ ^\[\s*([0-9]+)\]\s+([0-9]+)/(tcp|udp)\s+([A-Z]+) ]]; then
-            ((count++))
-            echo "entry=${BASH_REMATCH[1]}|chain=input|port=${BASH_REMATCH[2]}|proto=${BASH_REMATCH[3]}|action=${BASH_REMATCH[4],,}"
-        fi
-    done < <(ufw status numbered 2>/dev/null)
-    echo "count=${count}"
-}
-
-_ufw_allow() {
-    local port="$1" proto="${2:-tcp}"
-    $SUDO_CMD ufw allow "${port}/${proto}" 2>/dev/null || true
-}
-
-_ufw_deny() {
-    local port="$1" proto="${2:-tcp}"
-    $SUDO_CMD ufw deny "${port}/${proto}" 2>/dev/null || true
-}
-
-_ufw_delete() {
-    local port="$1" proto="${2:-tcp}"
-    local num
-    num=$(ufw status numbered 2>/dev/null | grep -E "^\s*\[\s*[0-9]+\]\s+${port}/${proto}\s" | grep -oP '(?<=\[)\s*\d+\s*(?=\])' | head -1 | xargs)
-    [[ -n $num ]] && $SUDO_CMD ufw --force delete "${num}" 2>/dev/null || true
-}
-
-_ufw_block() {
-    local ip="$1"
-    $SUDO_CMD ufw deny from "${ip}" 2>/dev/null || true
-}
-
-_ufw_default() {
-    local policy="$1"
-    $SUDO_CMD ufw default "${policy}" 2>/dev/null || true
-}
-
-_ufw_default_policy() {
-    ufw status verbose 2>/dev/null | grep "Default:" | grep -oP '(deny|allow|reject)' | head -1 || echo "unknown"
-}
-
-_fwd_open_ports() {
-    local ports
-    ports=$(firewall-cmd --list-ports 2>/dev/null)
-    echo "${ports:-}" | tr ' ' ','
-}
-
-_fwd_status() {
-    local status="inactive"
-    firewall-cmd --state 2>/dev/null | grep -qi "running" && status="active"
-    echo "engine=firewalld"
-    echo "daemon_status=${status}"
-}
-
-_fwd_on() {
-    _disable_competing "firewalld"
-    $SUDO_CMD systemctl unmask firewalld 2>/dev/null || true
-    $SUDO_CMD systemctl enable firewalld 2>/dev/null || true
-    $SUDO_CMD systemctl start firewalld 2>/dev/null || true
-}
-
-_fwd_off() {
-    $SUDO_CMD systemctl disable firewalld 2>/dev/null || true
-    $SUDO_CMD systemctl stop firewalld 2>/dev/null || true
-}
-
-_fwd_restart() {
-    $SUDO_CMD systemctl restart firewalld 2>/dev/null || true
-}
-
-_fwd_rule_count() {
-    local count=0
-    for zone in $(firewall-cmd --get-zones 2>/dev/null); do
-        local zcount
-        zcount=$(firewall-cmd --zone="$zone" --list-ports 2>/dev/null | wc -w)
-        ((count += zcount))
-    done
-    echo "${count}"
-}
-
-_fwd_rules() {
-    local count=0
-    for zone in $(firewall-cmd --get-zones 2>/dev/null); do
-        for entry in $(firewall-cmd --zone="$zone" --list-ports 2>/dev/null); do
-            ((count++))
-            if [[ $entry =~ ^([0-9]+)/(tcp|udp)$ ]]; then
-                echo "entry=${count}|zone=${zone}|port=${BASH_REMATCH[1]}|proto=${BASH_REMATCH[2]}|action=accept"
-            fi
-        done
-    done
-    echo "count=${count}"
-}
-
-_fwd_allow() {
-    local port="$1" proto="${2:-tcp}"
-    $SUDO_CMD firewall-cmd --add-port="${port}/${proto}" 2>/dev/null || true
-    $SUDO_CMD firewall-cmd --runtime-to-permanent 2>/dev/null || true
-}
-
-_fwd_deny() {
-    local port="$1" proto="${2:-tcp}"
-    $SUDO_CMD firewall-cmd --remove-port="${port}/${proto}" 2>/dev/null || true
-    $SUDO_CMD firewall-cmd --runtime-to-permanent 2>/dev/null || true
-}
-
-_fwd_delete() {
-    _fwd_deny "$1" "$2"
-}
-
-_fwd_block() {
-    local ip="$1"
-    $SUDO_CMD firewall-cmd --add-rich-rule="rule family='ipv4' source address='${ip}' drop" 2>/dev/null || true
-    $SUDO_CMD firewall-cmd --runtime-to-permanent 2>/dev/null || true
-}
-
-_fwd_default() {
-    local policy="$1"
-    local zone
-    zone=$(firewall-cmd --get-default-zone 2>/dev/null || echo "public")
-    $SUDO_CMD firewall-cmd --zone="${zone}" --set-target="${policy}" 2>/dev/null || true
-    $SUDO_CMD firewall-cmd --runtime-to-permanent 2>/dev/null || true
-}
-
-_fwd_default_policy() {
-    local zone
-    zone=$(firewall-cmd --get-default-zone 2>/dev/null || echo "public")
-    firewall-cmd --zone="${zone}" --list-all 2>/dev/null | grep "target:" | awk '{print $2}' || echo "unknown"
-}
-
-_ipt_open_ports() {
-    local ports=()
-    while IFS= read -r line; do
-        if [[ $line =~ dpt:([0-9]+) ]]; then
-            local p="${BASH_REMATCH[1]}"
-            local proto
-            proto=$(echo "$line" | awk '{print $4}')
-            ports+=("${p}/${proto}")
-        fi
-    done < <($SUDO_CMD iptables -L INPUT -n 2>/dev/null)
-    local IFS=","
-    echo "${ports[*]}"
-}
-
-_ipt_status() {
-    local status="inactive"
-    $SUDO_CMD iptables -L -n &>/dev/null && status="active"
-    echo "engine=iptables"
-    echo "daemon_status=${status}"
-}
-
-_ipt_on() {
-    _disable_competing "iptables"
-    $SUDO_CMD systemctl unmask iptables 2>/dev/null || true
-    _ipt_ensure_basic
-    $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-    $SUDO_CMD systemctl enable iptables 2>/dev/null || true
-    $SUDO_CMD systemctl start iptables 2>/dev/null || true
-}
-
-_ipt_off() {
-    $SUDO_CMD iptables -P INPUT ACCEPT 2>/dev/null || true
-    $SUDO_CMD iptables -P FORWARD ACCEPT 2>/dev/null || true
-    $SUDO_CMD iptables -P OUTPUT ACCEPT 2>/dev/null || true
-    $SUDO_CMD iptables -F 2>/dev/null || true
-    $SUDO_CMD iptables -X 2>/dev/null || true
-    $SUDO_CMD systemctl disable iptables 2>/dev/null || true
-    $SUDO_CMD systemctl stop iptables 2>/dev/null || true
-}
-
-_ipt_ensure_basic() {
-    $SUDO_CMD iptables -C INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-        $SUDO_CMD iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
-    $SUDO_CMD iptables -C INPUT -i lo -j ACCEPT 2>/dev/null || \
-        $SUDO_CMD iptables -A INPUT -i lo -j ACCEPT 2>/dev/null || true
-    $SUDO_CMD iptables -C INPUT -p icmp --icmp-type echo-request -j ACCEPT 2>/dev/null || \
-        $SUDO_CMD iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT 2>/dev/null || true
-}
-
-_ipt_restart() {
-    $SUDO_CMD systemctl restart iptables 2>/dev/null || true
-}
-
-_ipt_rule_count() {
-    $SUDO_CMD iptables -L INPUT -n 2>/dev/null | grep -cE '^\s*[0-9]+' || true
-}
-
-_ipt_rules() {
-    local count=0
-    while IFS= read -r line; do
-        if [[ $line =~ ^([0-9]+)\s+([0-9]+)\s+([A-Z]+)\s+([a-z0-9]+) ]]; then
-            ((count++))
-            local num="${BASH_REMATCH[1]}"
-            local target="${BASH_REMATCH[3]}"
-            local proto="${BASH_REMATCH[4]}"
-            local port=""
-            if [[ $line =~ dpt:([0-9]+) ]]; then
-                port="${BASH_REMATCH[1]}"
-            fi
-            echo "entry=${num}|chain=input|port=${port}|proto=${proto}|action=${target,,}"
-        fi
-    done < <($SUDO_CMD iptables -L INPUT -n --line-numbers 2>/dev/null | tail -n +2)
-    echo "count=${count}"
-}
-
-_ipt_allow() {
-    local port="$1" proto="${2:-tcp}"
-    $SUDO_CMD iptables -A INPUT -p "${proto}" --dport "${port}" -j ACCEPT 2>/dev/null || true
-    $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-}
-
-_ipt_deny() {
-    local port="$1" proto="${2:-tcp}"
-    $SUDO_CMD iptables -A INPUT -p "${proto}" --dport "${port}" -j DROP 2>/dev/null || true
-    $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-}
-
-_ipt_delete() {
-    local port="$1" proto="${2:-tcp}"
-    local num
-    num=$($SUDO_CMD iptables -L INPUT -n --line-numbers 2>/dev/null | grep "dpt:${port}" | head -1 | awk '{print $1}')
-    [[ -n $num ]] && $SUDO_CMD iptables -D INPUT "${num}" 2>/dev/null || true
-    $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-}
-
-_ipt_block() {
-    local ip="$1"
-    $SUDO_CMD iptables -A INPUT -s "${ip}" -j DROP 2>/dev/null || true
-    $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-}
-
-_ipt_default() {
-    local policy="$1"
-    $SUDO_CMD iptables -P INPUT "${policy^^}" 2>/dev/null || true
-    $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-}
-
-_ipt_default_policy() {
-    $SUDO_CMD iptables -L INPUT -n 2>/dev/null | head -1 | grep -oP 'policy \K\w+' || echo "unknown"
-}
-
 case "$1" in
     --status)
         engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "engine=none"; echo "daemon_status=inactive"; echo "rule_count=0"; echo "default_policy="; echo "open_ports="; exit 0; }
-
-        case "$engine" in
-            nftables) _nft_status ;;
-            ufw) _ufw_status ;;
-            firewalld) _fwd_status ;;
-            iptables) _ipt_status ;;
-        esac
-
-        case "$engine" in
-            nftables)
-                _nft_shell=$($SUDO_CMD nft list chain inet filter input 2>/dev/null)
-                rule_count=$(echo "$_nft_shell" | grep -cE '^\s+(tcp|udp)\s+dport' || true)
-                default_policy=$(_nft_default_policy)
-                open_ports=$(echo "$_nft_shell" | grep -E '^\s+(tcp|udp)\s+dport' | awk '{printf "%s/%s,", $3, $1}' | sed 's/,$//')
-                ;;
-            ufw) rule_count=$(_ufw_rule_count); default_policy=$(_ufw_default_policy); open_ports=$(_ufw_open_ports) ;;
-            firewalld) rule_count=$(_fwd_rule_count); default_policy=$(_fwd_default_policy); open_ports=$(_fwd_open_ports) ;;
-            iptables) rule_count=$(_ipt_rule_count); default_policy=$(_ipt_default_policy); open_ports=$(_ipt_open_ports) ;;
-        esac
-
+        _nft_status
+        _nft_shell=$($SUDO_CMD nft list chain inet filter input 2>/dev/null)
+        rule_count=$(echo "$_nft_shell" | grep -cE '^\s+(tcp|udp)\s+dport' || true)
+        default_policy=$(_nft_default_policy)
+        open_ports=$(echo "$_nft_shell" | grep -E '^\s+(tcp|udp)\s+dport' | awk '{printf "%s/%s,", $3, $1}' | sed 's/,$//')
         echo "rule_count=${rule_count:-0}"
         echo "default_policy=${default_policy:-unknown}"
         echo "open_ports=${open_ports:-}"
@@ -701,419 +389,212 @@ case "$1" in
         _engine_get
         ;;
 
-    --list-engines)
-        _engines_available
-        ;;
-
     --setup-get)
         engine=$(_engine_get)
         status="inactive"
-        case "$engine" in
-            nftables) systemctl is-active nftables &>/dev/null && status="active" ;;
-            ufw) ufw status 2>/dev/null | head -1 | grep -qi "active" && status="active" ;;
-            firewalld) firewall-cmd --state 2>/dev/null | grep -qi "running" && status="active" ;;
-            iptables) $SUDO_CMD iptables -L -n &>/dev/null && status="active" ;;
-        esac
-        local policy=""
-        case "$engine" in
-            nftables) policy=$(_nft_default_policy) ;;
-            ufw) policy=$(_ufw_default_policy) ;;
-            firewalld) policy=$(_fwd_default_policy) ;;
-            iptables) policy=$(_ipt_default_policy) ;;
-        esac
+        systemctl is-active nftables &>/dev/null && status="active"
+        policy=$(_nft_default_policy)
         echo "engine=${engine}"
         echo "daemon_status=${status}"
         echo "default_policy=${policy}"
         ;;
 
     --setup-apply)
-        engine="${2:-nftables}"
-        set_var "FIREWALL_ENGINE" "$engine"
-        _disable_competing "$engine"
-
-        case "$engine" in
-            nftables)
-                _nft_ensure_basic
-                _nft_commit
-                $SUDO_CMD nft flush ruleset 2>/dev/null || true
-                $SUDO_CMD systemctl unmask nftables 2>/dev/null || true
-                $SUDO_CMD mkdir -p /etc/systemd/system/nftables.service.d 2>/dev/null || true
-                printf '[Service]\nRemainAfterExit=yes\n' | $SUDO_CMD tee /etc/systemd/system/nftables.service.d/retro.conf >/dev/null 2>&1 || true
-                $SUDO_CMD systemctl daemon-reload 2>/dev/null || true
-                $SUDO_CMD systemctl enable nftables 2>/dev/null || true
-                $SUDO_CMD systemctl start nftables 2>/dev/null || true
-                ;;
-            ufw)
-                $SUDO_CMD systemctl unmask ufw 2>/dev/null || true
-                $SUDO_CMD ufw --force enable 2>/dev/null || true
-                ;;
-            firewalld)
-                $SUDO_CMD systemctl unmask firewalld 2>/dev/null || true
-                $SUDO_CMD systemctl enable firewalld 2>/dev/null || true
-                $SUDO_CMD systemctl start firewalld 2>/dev/null || true
-                ;;
-            iptables)
-                $SUDO_CMD systemctl unmask iptables 2>/dev/null || true
-                _ipt_ensure_basic
-                $SUDO_CMD iptables-save 2>/dev/null | $SUDO_CMD tee /etc/iptables/iptables.rules >/dev/null 2>&1 || true
-                $SUDO_CMD systemctl enable iptables 2>/dev/null || true
-                $SUDO_CMD systemctl start iptables 2>/dev/null || true
-                ;;
-        esac
+        set_var "FIREWALL_ENGINE" "nftables"
+        _disable_competing
+        _nft_ensure_basic
+        _nft_commit
+        $SUDO_CMD nft flush ruleset 2>/dev/null || true
+        $SUDO_CMD systemctl unmask nftables 2>/dev/null || true
+        $SUDO_CMD mkdir -p /etc/systemd/system/nftables.service.d 2>/dev/null || true
+        printf '[Service]\nRemainAfterExit=yes\n' | $SUDO_CMD tee /etc/systemd/system/nftables.service.d/retro.conf >/dev/null 2>&1 || true
+        $SUDO_CMD mkdir -p /etc/systemd/system/docker.service.d 2>/dev/null || true
+        cat <<EOF | $SUDO_CMD tee /etc/systemd/system/docker.service.d/retro-nftables.conf >/dev/null 2>&1 || true
+[Unit]
+After=nftables.service
+BindsTo=nftables.service
+EOF
+        $SUDO_CMD systemctl daemon-reload 2>/dev/null || true
+        $SUDO_CMD systemctl enable nftables 2>/dev/null || true
+        $SUDO_CMD systemctl start nftables 2>/dev/null || true
 
         shift 2
         while [[ $# -ge 2 ]]; do
             pport="$1"; pproto="$2"; shift 2
-            case "$engine" in
-                nftables) _nft_allow "$pport" "$pproto" ;;
-                ufw) _ufw_allow "$pport" "$pproto" ;;
-                firewalld) _fwd_allow "$pport" "$pproto" ;;
-                iptables) _ipt_allow "$pport" "$pproto" ;;
-            esac
+            _nft_allow "$pport" "$pproto"
         done
 
-        [[ $engine == "nftables" ]] && _nft_commit
-
-        echo "OK|configured|engine=${engine}"
-        rx_log_file "success" "Firewall configured (engine=${engine})"
+        _nft_commit
+        echo "OK|configured|engine=nftables"
+        rx_log_file "success" "Firewall configured (engine=nftables)"
         ;;
 
     --on)
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_on ;;
-            ufw) _ufw_on ;;
-            firewalld) _fwd_on ;;
-            iptables) _ipt_on ;;
-        esac
-
+        _nft_on
         ok=false
-        case "$engine" in
-            nftables) systemctl is-active nftables &>/dev/null && ok=true ;;
-            ufw) ufw status 2>/dev/null | head -1 | grep -qi "active" && ok=true ;;
-            firewalld) firewall-cmd --state 2>/dev/null | grep -qi "running" && ok=true ;;
-            iptables) $SUDO_CMD iptables -L -n &>/dev/null && ok=true ;;
-        esac
-
+        systemctl is-active nftables &>/dev/null && ok=true
         if [[ $ok == true ]]; then
             echo "OK|enabled"
-            rx_log_file "success" "Firewall enabled (${engine})"
+            rx_log_file "success" "Firewall enabled (nftables)"
         else
             echo "result=error|reason=enable_failed"
-            rx_log_file "error" "Failed to enable firewall (${engine})"
+            rx_log_file "error" "Failed to enable firewall (nftables)"
             exit 1
         fi
         ;;
 
     --off)
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_off ;;
-            ufw) _ufw_off ;;
-            firewalld) _fwd_off ;;
-            iptables) _ipt_off ;;
-        esac
+        _nft_off
         echo "OK|disabled"
-        rx_log_file "success" "Firewall disabled (${engine})"
+        rx_log_file "success" "Firewall disabled (nftables)"
         ;;
 
     --restart)
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_restart ;;
-            ufw) _ufw_restart ;;
-            firewalld) _fwd_restart ;;
-            iptables) _ipt_restart ;;
-        esac
-
+        _nft_restart
         ok=false
-        case "$engine" in
-            nftables) systemctl is-active nftables &>/dev/null && ok=true ;;
-            ufw) ufw status 2>/dev/null | head -1 | grep -qi "active" && ok=true ;;
-            firewalld) firewall-cmd --state 2>/dev/null | grep -qi "running" && ok=true ;;
-            iptables) $SUDO_CMD iptables -L -n &>/dev/null && ok=true ;;
-        esac
-
+        systemctl is-active nftables &>/dev/null && ok=true
         if [[ $ok == true ]]; then
             echo "OK|restarted"
-            rx_log_file "success" "Firewall restarted (${engine})"
+            rx_log_file "success" "Firewall restarted (nftables)"
         else
             echo "result=error|reason=restart_failed"
-            rx_log_file "error" "Failed to restart firewall (${engine})"
+            rx_log_file "error" "Failed to restart firewall (nftables)"
             exit 1
         fi
         ;;
 
     --rules)
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "count=0"; exit 0; }
-
-        case "$engine" in
-            nftables) _nft_rules ;;
-            ufw) _ufw_rules ;;
-            firewalld) _fwd_rules ;;
-            iptables) _ipt_rules ;;
-        esac
+        _nft_rules
         ;;
 
     --allow)
         port="$2" proto="${3:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_allow "$port" "$proto" ;;
-            ufw) _ufw_allow "$port" "$proto" ;;
-            firewalld) _fwd_allow "$port" "$proto" ;;
-            iptables) _ipt_allow "$port" "$proto" ;;
-        esac
+        _nft_allow "$port" "$proto"
         echo "OK|allowed|port=${port}|proto=${proto}"
-        rx_log_file "success" "Port allowed: ${port}/${proto} (${engine})"
+        rx_log_file "success" "Port allowed: ${port}/${proto} (nftables)"
         ;;
 
     --allow-ip-port)
         ip="$2" port="$3" proto="${4:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_allow_ip_port "$ip" "$port" "$proto" ;;
-            ufw) _ufw_allow "$port" "$proto" ;;
-            firewalld) _fwd_allow "$port" "$proto" ;;
-            iptables) _ipt_allow "$port" "$proto" ;;
-        esac
+        _nft_allow_ip_port "$ip" "$port" "$proto"
         echo "OK|allowed|ip=${ip}|port=${port}|proto=${proto}"
-        rx_log_file "success" "IP:Port allowed: ${ip}:${port}/${proto} (${engine})"
+        rx_log_file "success" "IP:Port allowed: ${ip}:${port}/${proto} (nftables)"
         ;;
 
     --deny)
         port="$2" proto="${3:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_deny "$port" "$proto" ;;
-            ufw) _ufw_deny "$port" "$proto" ;;
-            firewalld) _fwd_deny "$port" "$proto" ;;
-            iptables) _ipt_deny "$port" "$proto" ;;
-        esac
+        _nft_deny "$port" "$proto"
         echo "OK|denied|port=${port}|proto=${proto}"
-        rx_log_file "success" "Port denied: ${port}/${proto} (${engine})"
+        rx_log_file "success" "Port denied: ${port}/${proto} (nftables)"
         ;;
 
     --deny-ip-port)
         ip="$2" port="$3" proto="${4:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_deny_ip_port "$ip" "$port" "$proto" ;;
-            ufw) _ufw_block "$ip" ;;
-            firewalld) _fwd_block "$ip" ;;
-            iptables) _ipt_block "$ip" ;;
-        esac
+        _nft_deny_ip_port "$ip" "$port" "$proto"
         echo "OK|denied|ip=${ip}|port=${port}|proto=${proto}"
-        rx_log_file "success" "IP:Port denied: ${ip}:${port}/${proto} (${engine})"
+        rx_log_file "success" "IP:Port denied: ${ip}:${port}/${proto} (nftables)"
         ;;
 
     --delete)
         port="$2" proto="${3:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_delete "$port" "$proto" ;;
-            ufw) _ufw_delete "$port" "$proto" ;;
-            firewalld) _fwd_delete "$port" "$proto" ;;
-            iptables) _ipt_delete "$port" "$proto" ;;
-        esac
+        _nft_delete "$port" "$proto"
         echo "OK|deleted|port=${port}|proto=${proto}"
-        rx_log_file "success" "Rule deleted: ${port}/${proto} (${engine})"
+        rx_log_file "success" "Rule deleted: ${port}/${proto} (nftables)"
         ;;
 
     --delete-id)
         id="$2"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $id || ! $id =~ ^[0-9]+(-[0-9]+)?$ ]] && { echo "result=error|reason=invalid_id"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_delete_by_id "$id" || { echo "result=error|reason=not_found"; exit 1; } ;;
-            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
-            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
-            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
-        esac
+        _nft_delete_by_id "$id" || { echo "result=error|reason=not_found"; exit 1; }
         echo "OK|deleted|id=${id}"
-        if [[ $id == *-* ]]; then
-            rx_log_file "success" "Rules ${id} deleted (${engine})"
-        else
-            rx_log_file "success" "Rule #${id} deleted (${engine})"
-        fi
+        [[ $id == *-* ]] && rx_log_file "success" "Rules ${id} deleted (nftables)" || rx_log_file "success" "Rule #${id} deleted (nftables)"
         ;;
 
     --block)
         ip="$2"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_block "$ip" ;;
-            ufw) _ufw_block "$ip" ;;
-            firewalld) _fwd_block "$ip" ;;
-            iptables) _ipt_block "$ip" ;;
-        esac
+        _nft_block "$ip"
         echo "OK|blocked|ip=${ip}"
-        rx_log_file "success" "IP blocked: ${ip} (${engine})"
+        rx_log_file "success" "IP blocked: ${ip} (nftables)"
         ;;
 
     --add-block)
         ip="$2"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_add_block "$ip" ;;
-            ufw) _ufw_block "$ip" ;;
-            firewalld) _fwd_block "$ip" ;;
-            iptables) _ipt_block "$ip" ;;
-        esac
+        _nft_add_block "$ip"
         echo "OK|blocked|ip=${ip}|mode=add"
-        rx_log_file "success" "IP blocked (add): ${ip} (${engine})"
+        rx_log_file "success" "IP blocked (add): ${ip} (nftables)"
         ;;
 
     --add-deny-ip-port)
         ip="$2" port="$3" proto="${4:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_add_deny_ip_port "$ip" "$port" "$proto" ;;
-            ufw) _ufw_block "$ip" ;;
-            firewalld) _fwd_block "$ip" ;;
-            iptables) _ipt_block "$ip" ;;
-        esac
+        _nft_add_deny_ip_port "$ip" "$port" "$proto"
         echo "OK|denied|ip=${ip}|port=${port}|proto=${proto}|mode=add"
-        rx_log_file "success" "IP:Port denied (add): ${ip}:${port}/${proto} (${engine})"
+        rx_log_file "success" "IP:Port denied (add): ${ip}:${port}/${proto} (nftables)"
         ;;
 
     --insert-block)
         ip="$2" idx="$3"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
         [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_insert_block "$ip" "$idx" ;;
-            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
-            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
-            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
-        esac
+        _nft_insert_block "$ip" "$idx"
         echo "OK|blocked|ip=${ip}|position=${idx}|mode=insert"
-        rx_log_file "success" "IP blocked (insert): ${ip} at ${idx} (${engine})"
+        rx_log_file "success" "IP blocked (insert): ${ip} at ${idx} (nftables)"
         ;;
 
     --insert-deny)
         port="$2" idx="$3" proto="${4:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
         [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_insert_deny "$port" "$idx" "$proto" ;;
-            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
-            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
-            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
-        esac
+        _nft_insert_deny "$port" "$idx" "$proto"
         echo "OK|denied|port=${port}|proto=${proto}|position=${idx}|mode=insert"
-        rx_log_file "success" "Port denied (insert): ${port}/${proto} at ${idx} (${engine})"
+        rx_log_file "success" "Port denied (insert): ${port}/${proto} at ${idx} (nftables)"
         ;;
 
     --insert-accept)
         port="$2" idx="$3" proto="${4:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
         [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_insert_accept "$port" "$idx" "$proto" ;;
-            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
-            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
-            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
-        esac
+        _nft_insert_accept "$port" "$idx" "$proto"
         echo "OK|allowed|port=${port}|proto=${proto}|position=${idx}|mode=insert"
-        rx_log_file "success" "Port allowed (insert): ${port}/${proto} at ${idx} (${engine})"
+        rx_log_file "success" "Port allowed (insert): ${port}/${proto} at ${idx} (nftables)"
         ;;
 
     --insert-deny-ip-port)
         ip="$2" port="$3" idx="$4" proto="${5:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
         [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_insert_deny_ip_port "$ip" "$port" "$idx" "$proto" ;;
-            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
-            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
-            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
-        esac
+        _nft_insert_deny_ip_port "$ip" "$port" "$idx" "$proto"
         echo "OK|denied|ip=${ip}|port=${port}|proto=${proto}|position=${idx}|mode=insert"
-        rx_log_file "success" "IP:Port denied (insert): ${ip}:${port}/${proto} at ${idx} (${engine})"
+        rx_log_file "success" "IP:Port denied (insert): ${ip}:${port}/${proto} at ${idx} (nftables)"
         ;;
 
     --insert-accept-ip-port)
         ip="$2" port="$3" idx="$4" proto="${5:-tcp}"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $ip ]] && { echo "result=error|reason=no_ip"; exit 1; }
         [[ -z $port ]] && { echo "result=error|reason=no_port"; exit 1; }
         [[ -z $idx || ! $idx =~ ^[0-9]+$ ]] && { echo "result=error|reason=invalid_idx"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_insert_accept_ip_port "$ip" "$port" "$idx" "$proto" ;;
-            ufw) echo "result=error|reason=unsupported"; exit 1 ;;
-            firewalld) echo "result=error|reason=unsupported"; exit 1 ;;
-            iptables) echo "result=error|reason=unsupported"; exit 1 ;;
-        esac
+        _nft_insert_accept_ip_port "$ip" "$port" "$idx" "$proto"
         echo "OK|allowed|ip=${ip}|port=${port}|proto=${proto}|position=${idx}|mode=insert"
-        rx_log_file "success" "IP:Port allowed (insert): ${ip}:${port}/${proto} at ${idx} (${engine})"
+        rx_log_file "success" "IP:Port allowed (insert): ${ip}:${port}/${proto} at ${idx} (nftables)"
         ;;
 
     --default)
         policy="$2"
-        engine=$(_engine_get)
-        [[ $engine == "none" ]] && { echo "result=error|reason=no_engine"; exit 1; }
         [[ -z $policy ]] && { echo "result=error|reason=no_policy"; exit 1; }
-
-        case "$engine" in
-            nftables) _nft_default "$policy" ;;
-            ufw) _ufw_default "$policy" ;;
-            firewalld) _fwd_default "$policy" ;;
-            iptables) _ipt_default "$policy" ;;
-        esac
+        _nft_default "$policy"
         echo "OK|default|policy=${policy}"
-        rx_log_file "success" "Default policy set: ${policy} (${engine})"
+        rx_log_file "success" "Default policy set: ${policy} (nftables)"
         ;;
 
     --kill-ssh)
@@ -1130,7 +611,7 @@ case "$1" in
 
     --logs)
         lines="${2:-50}"
-        $SUDO_CMD journalctl -u nftables -u ufw -u firewalld -u iptables --no-pager -n "$lines" 2>/dev/null || echo "No logs available"
+        $SUDO_CMD journalctl -u nftables --no-pager -n "$lines" 2>/dev/null || echo "No logs available"
         ;;
 
     *)

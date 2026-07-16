@@ -58,7 +58,7 @@ cmd_firewall() {
 
         "setup")
             rx_setup_parse "$@"
-            rx_setup_validate "engine,default" "engine:in=nftables,ufw,firewalld,iptables|default:in=drop,accept" || return 1
+            rx_setup_validate "default,ports" "default:in=drop,accept" || return 1
 
             local config_data
             config_data=$(bash "$core" --setup-get 2>/dev/null)
@@ -71,7 +71,7 @@ cmd_firewall() {
                 esac
             done <<<"$config_data"
 
-            : "${current_engine:=none}"
+            : "${current_engine:=nftables}"
             : "${current_status:=inactive}"
 
             local config_exists=false
@@ -79,36 +79,20 @@ cmd_firewall() {
 
             rx_setup_check_needed "$config_exists" && return 0
 
-            local engine_input=""
             local -a port_inputs=()
-
             local default_input="drop"
+
             if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
-                engine_input=$(rx_setup_get_opt "engine" "$current_engine")
                 default_input=$(rx_setup_get_opt "default" "drop")
             else
-                local available
-                available=$(bash "$core" --list-engines 2>/dev/null)
-                local -a engines=($available)
-
-                if [[ ${#engines[@]} -eq 0 ]]; then
-                    rx_log "error" "No firewall engines found. Install one: ${PINK}nftables, ufw, firewalld, iptables${RESET}"
-                    return 1
-                fi
-
                 if [[ $config_exists == true ]]; then
                     rx_setup_prompt_reconfigure "󰦝" "Current Firewall Configuration" \
-                        "Engine" "${current_engine^}" \
+                        "Engine" "nftables" \
                         "Status" "${current_status^}" \
                         "Default Policy" "${current_policy^}" || return 0
                 fi
 
-                if [[ ${#engines[@]} -eq 1 ]]; then
-                    engine_input="${engines[0]}"
-                    rx_log "info" "Using only available engine: ${PINK}${engine_input^}${RESET}"
-                else
-                    engine_input=$(rx_menu "󰦝" "Select Firewall Engine" "${engines[@]}")
-                fi
+                rx_log "info" "Engine: ${PINK}nftables${RESET} (only supported engine)"
 
                 rx_log "info" "Select ports to open:"
                 rx_confirm "Open SSH (22/tcp)?" "Y" && { port_inputs+=("22" "tcp"); }
@@ -139,7 +123,7 @@ cmd_firewall() {
                 default_input=$(rx_menu "󰦝" "Default Input Policy" "drop" "accept")
 
                 rx_setup_summary "󰦝" "Firewall Setup Summary" \
-                    "Engine" "${engine_input^}" \
+                    "Engine" "nftables" \
                     "Default Policy" "${default_input^}" \
                     "Open Ports" "$ports_preview"
 
@@ -148,7 +132,7 @@ cmd_firewall() {
 
             rx_log "info" "Applying firewall configuration..."
             local result
-            result=$(bash "$core" --setup-apply "$engine_input" "${port_inputs[@]}" 2>/dev/null)
+            result=$(bash "$core" --setup-apply "nftables" "${port_inputs[@]}" 2>/dev/null)
 
             if echo "$result" | grep -q "^OK|"; then
                 if [[ -n $default_input ]]; then
@@ -157,14 +141,7 @@ cmd_firewall() {
 
                 local sudoers_file="/etc/sudoers.d/99-retro-firewall"
                 if [[ ! -f $sudoers_file ]]; then
-                    local engine_bin
-                    case "${engine_input,,}" in
-                        nftables) engine_bin="/usr/bin/nft" ;;
-                        ufw) engine_bin="/usr/bin/ufw" ;;
-                        firewalld) engine_bin="/usr/bin/firewall-cmd" ;;
-                        iptables) engine_bin="/usr/bin/iptables" ;;
-                    esac
-                    local rule="%wheel ALL=(ALL) NOPASSWD: ${engine_bin}, /usr/bin/ss, /usr/bin/kill"
+                    local rule="%wheel ALL=(ALL) NOPASSWD: /usr/bin/nft, /usr/bin/ss, /usr/bin/kill"
                     echo "$rule" | sudo tee "$sudoers_file" >/dev/null 2>&1 && sudo chmod 440 "$sudoers_file" 2>/dev/null || true
                 fi
 
@@ -182,7 +159,7 @@ cmd_firewall() {
                 done <<<"$result_data"
 
                 rx_setup_success "󰦝" "Firewall Configured" \
-                    "Engine" "${res_engine^}" \
+                    "Engine" "nftables" \
                     "Status" "${res_status^}" \
                     "Rules" "${res_rules:-0}" \
                     "Default Policy" "${res_policy^}" \
