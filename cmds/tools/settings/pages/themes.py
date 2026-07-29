@@ -763,7 +763,7 @@ class OverrideDialog(Adw.Window):
         list_box.add_css_class("boxed-list")
         scrolled.set_child(list_box)
 
-        # Track color buttons for live preview
+        # Track color buttons
         self._color_btns: dict[str, Gtk.ColorButton] = {}
 
         for key in COLOR_MAP_KEYS:
@@ -810,7 +810,6 @@ class OverrideDialog(Adw.Window):
         rgba = btn.get_rgba()
         hex_str = f"#{int(rgba.red * 255):02x}{int(rgba.green * 255):02x}{int(rgba.blue * 255):02x}"
         btn.set_tooltip_text(hex_str)
-        # If the color matches the default, remove from overrides
         default_hex = self._defaults.get(key, "")
         if hex_str.lower() == default_hex.lower():
             self._overrides.pop(key, None)

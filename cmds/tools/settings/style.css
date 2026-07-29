@@ -394,3 +394,9 @@ levelbar.level-bar-warning block.filled {
 levelbar.level-bar-critical block.filled {
     background-color: @error_color;
 }
+
+/* Color chooser popover sizing */
+colorchooserwidget {
+    min-width: 480px;
+    min-height: 520px;
+}
