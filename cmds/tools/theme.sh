@@ -521,6 +521,169 @@ cmd_theme() {
             fi
             ;;
 
+        "override")
+            local subcmd="${1,,}"
+            shift 2>/dev/null || true
+            case "$subcmd" in
+                "set")
+                    local slug="$1"
+                    [[ -z $slug ]] && rx_log "error" "Usage: retro theme override set <slug> --key <key> --value <hex>" && return 1
+                    shift
+                    local key=""
+                    local value=""
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --key) key="$2"; shift 2 ;;
+                            --value) value="$2"; shift 2 ;;
+                            *) shift ;;
+                        esac
+                    done
+                    if [[ -z $key || -z $value ]]; then
+                        rx_log "error" "Usage: retro theme override set <slug> --key <key> --value <hex>"
+                        return 1
+                    fi
+                    result=$(_theme_call "--override-set" "$slug" "$key" "$value")
+                    if [[ $result == success* ]]; then
+                        rx_log "success" "Override ${PINK}$key${RESET} set to ${PINK}$value${RESET} for ${PICK}$slug${RESET}"
+                        _theme_call "--apply-colors"
+                    else
+                        rx_log "error" "Failed to set override"
+                    fi
+                    ;;
+                "clear")
+                    local slug="$1"
+                    [[ -z $slug ]] && rx_log "error" "Usage: retro theme override clear <slug>" && return 1
+                    _theme_call "--override-clear" "$slug"
+                    rx_log "success" "Overrides cleared for ${PICK}$slug${RESET}"
+                    _theme_call "--apply-colors"
+                    ;;
+                "show")
+                    local slug="$1"
+                    [[ -z $slug ]] && rx_log "error" "Usage: retro theme override show <slug>" && return 1
+                    local output
+                    output=$(_theme_call "--override-get" "$slug")
+                    if [[ -z $output ]]; then
+                        rx_log "info" "No overrides for ${PICK}$slug${RESET}"
+                    else
+                        echo -e "\n ${PICK}󰏘 Overrides for ${slug}${RESET}"
+                        while IFS='|' read -r ok ov; do
+                            echo "   ${PICK}${ok}${RESET}: ${PINK}${ov}${RESET}"
+                        done <<<"$output"
+                    fi
+                    ;;
+                "list")
+                    local output
+                    output=$(_theme_call "--override-list")
+                    if [[ -z $output ]]; then
+                        rx_log "info" "No overrides configured"
+                    else
+                        rx_table_header "󰆣" "Color Overrides"
+                        while IFS='|' read -r slug count; do
+                            rx_table_list_single "󰆣" "${slug}: ${count}"
+                        done <<<"$output"
+                        rx_table_spacer
+                    fi
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro theme override {set|clear|show|list}"
+                    return 1
+                    ;;
+            esac
+            ;;
+
+        "create")
+            local create_action="${1,,}"
+            shift 2>/dev/null || true
+
+            if [[ $create_action == "--from-image" || $1 == "--from-image" ]]; then
+                [[ -z $2 ]] && rx_log "error" "Usage: retro theme create --from-image <path>" && return 1
+                rx_log "error" "Use the settings GUI for interactive theme creation with matugen import"
+                return 1
+            fi
+
+            # Interactive theme creation
+            local name
+            name=$(rx_input "Theme name" "" '^.+$' "Name is required")
+            [[ -z $name ]] && return 1
+
+            local author
+            author=$(rx_input "Author" "$(whoami)" '^.*$' "Optional author name")
+
+            local description
+            description=$(rx_input "Short description" "" '^.*$' "Optional description")
+
+            local primary
+            primary=$(rx_input "Primary color (hex)" "#b24bf3" '^#[0-9a-fA-F]{6}$' "Must be hex like #b24bf3")
+            [[ -z $primary ]] && return 1
+
+            rx_log "info" "Creating custom theme: ${PINK}$name${RESET}"
+            local json_payload
+            json_payload=$(cat <<EOF
+{
+    "name": "$name",
+    "author": "${author:-$(whoami)}",
+    "description": "${description:-Custom theme created by $author}",
+    "color_map": {
+        "primary": "$primary",
+        "on_primary": "#ffffff",
+        "primary_container": "#12102e",
+        "secondary": "#6b70ff",
+        "tertiary": "#ffcc33",
+        "error": "#ff2a6d",
+        "surface": "#070514",
+        "on_surface": "#e5e9f0",
+        "background": "#070514",
+        "on_background": "#e5e9f0",
+        "outline": "#323c58",
+        "red": "#ff2a6d",
+        "green": "#05ffa1",
+        "yellow": "#ffcc33",
+        "blue": "#6b70ff",
+        "magenta": "#b24bf3",
+        "cyan": "#00d9ff",
+        "white": "#d1d1e0",
+        "black": "#030208"
+    }
+}
+EOF
+)
+            local result
+            result=$(_theme_call "--custom-theme-create" "$json_payload")
+            if [[ $result == success* ]]; then
+                local slug="${result#success|}"
+                rx_log "success" "Custom theme ${PINK}$name${RESET} created as ${PICK}$slug${RESET}"
+                _theme_call "--theme" "$slug"
+            else
+                rx_log "error" "Failed to create theme"
+            fi
+            ;;
+
+        "scheme" | "matugen-scheme")
+            local val="$1"
+            if [[ -z $val ]]; then
+                local current
+                current=$(_theme_call "--scheme-get")
+                rx_log "info" "Current matugen scheme: ${PICK}$current${RESET}"
+            else
+                _theme_call "--scheme-set" "$val"
+                rx_log "success" "Matugen scheme set to ${PICK}$val${RESET}"
+                _theme_call "--apply-colors"
+            fi
+            ;;
+
+        "index" | "matugen-index")
+            local val="$1"
+            if [[ -z $val ]]; then
+                local current
+                current=$(_theme_call "--index-get")
+                rx_log "info" "Current source color index: ${PICK}$current${RESET}"
+            else
+                _theme_call "--index-set" "$val"
+                rx_log "success" "Source color index set to ${PICK}$val${RESET}"
+                _theme_call "--apply-colors"
+            fi
+            ;;
+
         "refresh")
             local mode
             mode=$(get_var "RETRO_THEME_MODE" "dark")
@@ -606,6 +769,10 @@ EOF
             rx_help_cmd "cursor {set|size|list}" "Manage cursor themes (set <name|auto>, size <N>, list)"
             rx_help_cmd "apply-colors" "Regenerate colors from wallpaper"
             rx_help_cmd "browsers" "Deploy colors and website themes to Firefox/Zen profiles"
+            rx_help_cmd "override {set|clear|show|list}" "Override individual colors in a theme (set <slug> --key <key> --value <hex>)"
+            rx_help_cmd "create [--from-image <path>]" "Create a custom theme (interactive or from image)"
+            rx_help_cmd "scheme <type>" "Set matugen scheme type (e.g. scheme-tonal-spot, scheme-vibrant)"
+            rx_help_cmd "index <n>" "Set matugen source color index (0-10)"
             rx_help_cmd "refresh" "Live-reload GTK3/GTK4 theme into running apps"
             rx_help_examples
             rx_help_example "retro theme status" "Show current configuration"

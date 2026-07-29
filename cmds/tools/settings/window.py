@@ -894,6 +894,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             counts["window_rules"] += self._window_rules_page.pending_change_count()
         if self._layer_rules_page and self._layer_rules_page.is_dirty():
             counts["layer_rules"] += self._layer_rules_page.pending_change_count()
+        if self._themes_page is not None and self._themes_page.is_dirty():
+            counts["themes"] = 1
         if self._wallpapers_page is not None and self._wallpapers_page.needs_optimization():
             counts["wallpapers"] = 1
         if self._apps_page is not None and self._apps_page.is_dirty():
@@ -1150,6 +1152,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ThemesPage:
+            page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is DiskPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
@@ -1377,6 +1380,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             return True
         if any(s.is_dirty() for s in self._section_pages):
             return True
+        if self._themes_page is not None and self._themes_page.is_dirty():
+            return True
         if self._wallpapers_page is not None and self._wallpapers_page.is_dirty():
             return True
         if self._apps_page is not None and self._apps_page.is_dirty():
@@ -1543,6 +1548,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self.hypr.clear_pending()
         for section in self._section_pages:
             section.mark_saved()
+        if self._themes_page is not None:
+            self._themes_page.flush_pending()
         if self._wallpapers_page is not None:
             self._wallpapers_page.flush_pending()
         if self._apps_page is not None:
