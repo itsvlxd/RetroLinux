@@ -7,23 +7,31 @@ source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "theme"
 
 THEMES_DIR="$RETRO_DIR/themes"
+USER_THEMES_DIR="${RETRO_CONFIG:-$HOME/.config/retro}/themes"
+OVERRIDE_DIR="${USER_THEMES_DIR}/overrides"
+
+_resolve_theme_file() {
+    local name="$1"
+    local file="$THEMES_DIR/${name}.json"
+    [[ -f $file ]] && echo "$file" && return
+    local normalized=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
+    file="$THEMES_DIR/${normalized}.json"
+    [[ -f $file ]] && echo "$file" && return
+    file="$USER_THEMES_DIR/${name}.json"
+    [[ -f $file ]] && echo "$file" && return
+    file="$USER_THEMES_DIR/${normalized}.json"
+    [[ -f $file ]] && echo "$file" && return
+    for f in "$THEMES_DIR"/*.json "$USER_THEMES_DIR"/*.json; do
+        [[ $(jq -r '.name // empty' "$f" 2>/dev/null) == "$name" ]] && echo "$f" && return
+    done
+    return 1
+}
 
 _load_theme_def() {
     local name="$1"
-    local file="$THEMES_DIR/${name}.json"
-    local resolved="$name"
-    if [[ ! -f $file ]]; then
-        local normalized
-        normalized=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
-        file="$THEMES_DIR/${normalized}.json"
-        [[ -f $file ]] && resolved="$normalized"
-    fi
-    if [[ ! -f $file ]]; then
-        for f in "$THEMES_DIR"/*.json; do
-            [[ $(jq -r '.name // empty' "$f" 2>/dev/null) == "$name" ]] && file="$f" && resolved=$(basename "$f" .json) && break
-        done
-        [[ ! -f $file ]] && return 1
-    fi
+    local file=$(_resolve_theme_file "$name")
+    [[ -z $file ]] && return 1
+    local resolved=$(basename "$file" .json)
     local palette_path
     palette_path=$(jq -r '.palette // empty' "$file" 2>/dev/null)
     local display_name
@@ -36,27 +44,32 @@ _load_theme_def() {
 }
 
 _list_themes() {
-    local files=("$THEMES_DIR"/*.json)
-    if [[ ! -e ${files[0]} ]]; then
-        return
-    fi
-    for f in "${files[@]}"; do
-        local base
-        base=$(basename "$f" .json)
-        local display
-        display=$(jq -r '.name // empty' "$f" 2>/dev/null)
-        local description
-        description=$(jq -r '.description // empty' "$f" 2>/dev/null)
-        echo "${display:-$base}|$base|$description"
+    local dirs=("$THEMES_DIR" "$USER_THEMES_DIR")
+    for dir in "${dirs[@]}"; do
+        [[ ! -d $dir ]] && continue
+        for f in "$dir"/*.json; do
+            [[ ! -f $f ]] && continue
+            local base
+            base=$(basename "$f" .json)
+            local display
+            display=$(jq -r '.name // empty' "$f" 2>/dev/null)
+            local description
+            description=$(jq -r '.description // empty' "$f" 2>/dev/null)
+            echo "${display:-$base}|$base|$description"
+        done
     done
 }
 
 _list_displays() {
-    local files=("$THEMES_DIR"/*.json)
-    if [[ ! -e ${files[0]} ]]; then
-        return
-    fi
-    for f in "${files[@]}"; do
+    local all_files=()
+    for dir in "$THEMES_DIR" "$USER_THEMES_DIR"; do
+        [[ ! -d $dir ]] && continue
+        for f in "$dir"/*.json; do
+            [[ -f $f ]] && all_files+=("$f")
+        done
+    done
+    [[ ${#all_files[@]} -eq 0 ]] && return
+    for f in "${all_files[@]}"; do
         local base display author primary
         local red green yellow blue magenta cyan white black
         base=$(basename "$f" .json)
@@ -538,6 +551,9 @@ rx_theme_apply_colors() {
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
 
+    local matugen_scheme=$(get_var "THEME_SCHEME" "scheme-tonal-spot")
+    local matugen_index=$(get_var "THEME_SOURCE_INDEX" "0")
+
     if [[ $scheme == "wallpaper" ]]; then
         local wallpaper
         wallpaper=$(get_var "WALL_CURRENT" "")
@@ -561,39 +577,16 @@ rx_theme_apply_colors() {
         fi
         rx_log_file "debug" "rx_theme_apply_colors: static_source=$static_source"
 
-        local scheme_type
-        local color_cache="$HOME/.config/retro/wallpaper_frames/$(basename "$wallpaper").colors"
-        if [[ -f $color_cache ]]; then
-            scheme_type="scheme-$(cat "$color_cache")"
-        else
-            local saturation
-            saturation=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info: 2>/dev/null)
-            if [[ -n $saturation ]] && [ "$(echo "$saturation < 1.0" | bc)" -eq 1 ]; then
-                scheme_type="scheme-monochrome"
-                echo "monochrome" >"$color_cache"
-            else
-                scheme_type="scheme-vibrant"
-                echo "vibrant" >"$color_cache"
-            fi
+        rx_log_file "debug" "rx_theme_apply_colors: matugen scheme=$matugen_scheme, index=$matugen_index, mode=$mode"
+        local fallback_args=()
+        [[ $matugen_scheme == "scheme-monochrome" ]] && fallback_args=(--fallback-color '#ffffff')
+        rx_log_file "info" "rx_theme_apply_colors: running matugen on $static_source"
+        matugen image -b wal --mode "$mode" "$static_source" -t "$matugen_scheme" --source-color-index "$matugen_index" "${fallback_args[@]}" >/dev/null 2>&1
+        if [[ $? -ne 0 ]]; then
+            rx_log_file "error" "rx_theme_apply_colors: matugen failed on $static_source"
+            return 1
         fi
-
-        rx_log_file "debug" "rx_theme_apply_colors: scheme_type=$scheme_type, mode=$mode"
-        if [[ $scheme_type == "scheme-monochrome" ]]; then
-            rx_log_file "info" "rx_theme_apply_colors: running matugen (monochrome) on $static_source"
-            matugen image -b wal --mode "$mode" "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1
-            if [[ $? -ne 0 ]]; then
-                rx_log_file "error" "rx_theme_apply_colors: matugen monochrome failed on $static_source"
-                return 1
-            fi
-            rx_grayscale_output
-        else
-            rx_log_file "info" "rx_theme_apply_colors: running matugen (vibrant) on $static_source"
-            matugen image -b wal --mode "$mode" "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1
-            if [[ $? -ne 0 ]]; then
-                rx_log_file "error" "rx_theme_apply_colors: matugen vibrant failed on $static_source"
-                return 1
-            fi
-        fi
+        [[ $matugen_scheme == "scheme-monochrome" ]] && rx_grayscale_output
     else
         local theme_file="$THEMES_DIR/${scheme}.json"
         rx_log_file "debug" "rx_theme_apply_colors: theme scheme=$scheme, file=$theme_file"
@@ -602,13 +595,13 @@ rx_theme_apply_colors() {
 
         if [[ -n $palette_path && -f "$THEMES_DIR/$palette_path" ]]; then
             rx_log_file "info" "rx_theme_apply_colors: using palette PNG for $scheme"
-            rx_generate_colors "$THEMES_DIR/$palette_path" "$mode" "scheme-tonal-spot" "0" "saturation" || return 1
+            rx_generate_colors "$THEMES_DIR/$palette_path" "$mode" "$matugen_scheme" "$matugen_index" "saturation" || return 1
         else
             local source_color
             source_color=$(jq -r '.source_color // .color_map.primary // ""' "$theme_file" 2>/dev/null)
             if [[ -n $source_color ]]; then
                 rx_log_file "info" "rx_theme_apply_colors: using source_color=$source_color for $scheme"
-                rx_generate_colors "" "$mode" "scheme-tonal-spot" "0" "" "$source_color" || return 1
+                rx_generate_colors "" "$mode" "$matugen_scheme" "$matugen_index" "" "$source_color" || return 1
             else
                 rx_log_file "error" "rx_theme_apply_colors: no palette or source_color for $scheme"
                 return 1
@@ -1218,6 +1211,87 @@ SDDMEOF
     rx_log_file "info" "SDDM theme refreshed (wallpaper + colors deployed)"
 }
 
+_override_set() {
+    local slug="$1" key="$2" value="$3"
+    [[ -z $slug || -z $key || -z $value ]] && { echo "error|missing_args"; return 1; }
+    mkdir -p "$OVERRIDE_DIR"
+    local file="$OVERRIDE_DIR/${slug}.json"
+    if [[ -f $file ]]; then
+        local tmp=$(mktemp)
+        jq --arg k "$key" --arg v "$value" '.color_map[$k] = $v' "$file" > "$tmp" && mv "$tmp" "$file"
+    else
+        echo "{\"color_map\": {\"$key\": \"$value\"}}" > "$file"
+    fi
+    echo "success|${slug}|${key}|${value}"
+}
+
+_override_get() {
+    local slug="$1"
+    [[ -z $slug ]] && { echo "error|missing_slug"; return 1; }
+    local file="$OVERRIDE_DIR/${slug}.json"
+    if [[ -f $file ]]; then
+        jq -r '.color_map // empty | to_entries[] | "\(.key)|\(.value)"' "$file" 2>/dev/null
+    fi
+}
+
+_override_clear() {
+    local slug="$1"
+    [[ -z $slug ]] && { echo "error|missing_slug"; return 1; }
+    local file="$OVERRIDE_DIR/${slug}.json"
+    if [[ -f $file ]]; then
+        rm -f "$file"
+        echo "success|cleared|${slug}"
+    else
+        echo "success|no_overrides|${slug}"
+    fi
+}
+
+_override_list() {
+    if [[ ! -d $OVERRIDE_DIR ]]; then
+        return
+    fi
+    for f in "$OVERRIDE_DIR"/*.json; do
+        [[ ! -f $f ]] && continue
+        local slug=$(basename "$f" .json)
+        local count=$(jq -r '.color_map | length' "$f" 2>/dev/null || echo 0)
+        echo "${slug}|${count} overrides"
+    done
+}
+
+_custom_theme_create() {
+    local json_payload="$1"
+    [[ -z $json_payload ]] && { echo "error|missing_json"; return 1; }
+    local slug=$(echo "$json_payload" | jq -r '.name // empty' 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
+    [[ -z $slug ]] && { echo "error|invalid_name"; return 1; }
+    mkdir -p "$USER_THEMES_DIR"
+    echo "$json_payload" > "$USER_THEMES_DIR/${slug}.json"
+    echo "success|${slug}"
+}
+
+_custom_theme_delete() {
+    local slug="$1"
+    [[ -z $slug ]] && { echo "error|missing_slug"; return 1; }
+    local file="$USER_THEMES_DIR/${slug}.json"
+    if [[ -f $file ]]; then
+        rm -f "$file"
+        echo "success|deleted|${slug}"
+    else
+        echo "error|not_found|${slug}"
+    fi
+}
+
+_custom_theme_list() {
+    if [[ ! -d $USER_THEMES_DIR ]]; then
+        return
+    fi
+    for f in "$USER_THEMES_DIR"/*.json; do
+        [[ ! -f $f ]] && continue
+        local slug=$(basename "$f" .json)
+        local display=$(jq -r '.name // empty' "$f" 2>/dev/null)
+        echo "${slug}|${display:-$slug}"
+    done
+}
+
 case "$1" in
     "--set")
         rx_theme_set "$2" "$3"
@@ -1325,5 +1399,40 @@ EOF
         ;;
     "--sddm-refresh")
         rx_sddm_refresh
+        ;;
+    "--override-set")
+        _override_set "$2" "$3" "$4"
+        ;;
+    "--override-get")
+        _override_get "$2"
+        ;;
+    "--override-clear")
+        _override_clear "$2"
+        ;;
+    "--override-list")
+        _override_list
+        ;;
+    "--custom-theme-create")
+        _custom_theme_create "$2"
+        ;;
+    "--custom-theme-delete")
+        _custom_theme_delete "$2"
+        ;;
+    "--custom-theme-list")
+        _custom_theme_list
+        ;;
+    "--scheme-get")
+        get_var "THEME_SCHEME" "scheme-tonal-spot"
+        ;;
+    "--scheme-set")
+        set_var "THEME_SCHEME" "$2"
+        rx_theme_refresh_apps
+        ;;
+    "--index-get")
+        get_var "THEME_SOURCE_INDEX" "0"
+        ;;
+    "--index-set")
+        set_var "THEME_SOURCE_INDEX" "$2"
+        rx_theme_refresh_apps
         ;;
 esac

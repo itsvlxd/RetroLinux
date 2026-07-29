@@ -1,18 +1,64 @@
 """Theme selection page — browse and apply color schemes."""
 
+import getpass
 import json
 import os
 import re
+import shutil
 import subprocess
+import threading
 from pathlib import Path
 
-from gi.repository import Adw, Gtk, GLib, Gdk, Pango
+from gi.repository import Adw, Gtk, GLib, Gdk, Pango, GObject
 
-from lib.python import get_var, set_var
+from lib.python.variable import get_var, get_module_default, set_var
 from settings.ui import make_page_layout
+from settings.ui.row_actions import RowActions
 
 THEMES_DIR = Path(os.environ.get("RETRO_DIR", "")) / "themes"
 THEME_CORE = Path(os.environ.get("RETRO_DIR", "")) / "scripts" / "theme_core.sh"
+RETRO_CONFIG = Path(os.environ.get("RETRO_CONFIG", Path.home() / ".config/retro"))
+USER_THEMES_DIR = RETRO_CONFIG / "themes"
+OVERRIDE_DIR = USER_THEMES_DIR / "overrides"
+
+COLOR_MAP_KEYS = [
+    "primary", "on_primary", "primary_container",
+    "secondary", "on_secondary", "secondary_container",
+    "tertiary", "on_tertiary", "tertiary_container",
+    "error", "on_error", "error_container",
+    "surface", "on_surface", "surface_variant",
+    "on_surface_variant", "background", "on_background",
+    "outline", "outline_variant", "shadow",
+    "red", "green", "yellow", "blue", "magenta", "cyan", "white", "black",
+    "bright_red", "bright_green", "bright_yellow", "bright_blue",
+    "bright_magenta", "bright_cyan", "bright_white", "bright_black",
+]
+
+MATUGEN_SCHEMES = [
+    "scheme-tonal-spot", "scheme-vibrant", "scheme-monochrome",
+    "scheme-content", "scheme-expressive", "scheme-fidelity",
+    "scheme-neutral", "scheme-fruit-salad", "scheme-rainbow",
+]
+
+SCHEME_DISPLAY_NAMES = [
+    "Tonal Spot", "Vibrant", "Monochrome",
+    "Content", "Expressive", "Fidelity",
+    "Neutral", "Fruit Salad", "Rainbow",
+]
+
+def _scheme_to_display(raw: str) -> str:
+    try:
+        idx = MATUGEN_SCHEMES.index(raw)
+        return SCHEME_DISPLAY_NAMES[idx]
+    except ValueError:
+        return raw
+
+def _display_to_scheme(display: str) -> str:
+    try:
+        idx = SCHEME_DISPLAY_NAMES.index(display)
+        return MATUGEN_SCHEMES[idx]
+    except ValueError:
+        return display
 
 
 def _extract_palette_colors(palette_rel: str) -> dict[str, str]:
@@ -46,28 +92,32 @@ def _extract_palette_colors(palette_rel: str) -> dict[str, str]:
 
 def _load_themes() -> list[dict]:
     themes = []
-    if not THEMES_DIR.is_dir():
-        return themes
-    paths = sorted(THEMES_DIR.glob("*.json"))
-    for path in paths:
-        slug = path.stem
-        try:
-            data = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        color_map = data.get("color_map", {})
-        if not color_map:
-            palette = data.get("palette", "")
-            if palette:
-                color_map = _extract_palette_colors(palette)
-        themes.append({
-            "slug": slug,
-            "name": data.get("name", slug),
-            "author": data.get("author", ""),
-            "description": data.get("description", ""),
-            "link": data.get("link", ""),
-            "color_map": color_map,
-        })
+    scan_dirs = [d for d in [THEMES_DIR, USER_THEMES_DIR] if d.is_dir()]
+    seen_slugs: set[str] = set()
+    for scan_dir in scan_dirs:
+        for path in sorted(scan_dir.glob("*.json")):
+            slug = path.stem
+            if slug in seen_slugs:
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            color_map = data.get("color_map", {})
+            if not color_map:
+                palette = data.get("palette", "")
+                if palette:
+                    color_map = _extract_palette_colors(palette)
+            themes.append({
+                "slug": slug,
+                "name": data.get("name", slug),
+                "author": data.get("author", ""),
+                "description": data.get("description", ""),
+                "link": data.get("link", ""),
+                "color_map": color_map,
+                "is_custom": scan_dir == USER_THEMES_DIR,
+            })
+            seen_slugs.add(slug)
     return themes
 
 
@@ -155,12 +205,25 @@ class ThemesPage:
         self._content_box: Gtk.Box | None = None
         self._flow_box: Gtk.FlowBox | None = None
         self._search_entry: Gtk.SearchEntry | None = None
+        self._scheme_actions: RowActions | None = None
+        self._index_actions: RowActions | None = None
+        self._setting_value = False
+        self._pending_scheme: str | None = None
+        self._pending_index: str | None = None
+        self._dirty = False
+        self._notify_dirty = lambda: None
 
     def build(self, header: Adw.HeaderBar | None = None) -> Gtk.Widget:
         toolbar, _page_box, content_box, _scrolled = make_page_layout(header=header)
         self._content_box = content_box
 
         if header:
+            create_btn = Gtk.Button(icon_name="list-add-symbolic")
+            create_btn.set_tooltip_text("Create custom theme")
+            create_btn.add_css_class("flat")
+            create_btn.connect("clicked", lambda *_: self._open_theme_creator())
+            header.pack_start(create_btn)
+
             current_mode = get_var("RETRO_THEME_MODE", "dark")
             icon = "weather-clear-night-symbolic" if current_mode == "dark" else "weather-clear-symbolic"
             tip = "Switch to Light Mode" if current_mode == "dark" else "Switch to Dark Mode"
@@ -169,6 +232,46 @@ class ThemesPage:
             mode_btn.add_css_class("flat")
             mode_btn.connect("clicked", self._on_mode_toggle)
             header.pack_start(mode_btn)
+
+        theme_config_group = Adw.PreferencesGroup(title="Theme Configuration")
+        content_box.append(theme_config_group)
+
+        self._scheme_row = Adw.ComboRow(title="Scheme Type")
+        self._scheme_row.set_subtitle("Controls how colors are generated from the image — tonal spot is well-balanced, vibrant boosts saturation, monochrome uses a single hue.")
+        self._scheme_row.set_model(Gtk.StringList.new(SCHEME_DISPLAY_NAMES))
+        current_scheme = get_var("THEME_SCHEME", "scheme-tonal-spot")
+        current_display = _scheme_to_display(current_scheme)
+        if current_display in SCHEME_DISPLAY_NAMES:
+            self._scheme_row.set_selected(SCHEME_DISPLAY_NAMES.index(current_display))
+        else:
+            self._scheme_row.set_selected(0)
+        self._scheme_row.connect("notify::selected", self._on_scheme_changed)
+        self._scheme_actions = RowActions(
+            self._scheme_row,
+            on_discard=lambda: self._discard_var("THEME_SCHEME"),
+            on_reset=lambda: self._reset_var("THEME_SCHEME"),
+        )
+        self._scheme_row.add_suffix(self._scheme_actions.box)
+        self._scheme_actions.reorder_first()
+        theme_config_group.add(self._scheme_row)
+
+        index_row = Adw.ActionRow(title="Source Color Index")
+        index_row.set_subtitle("Picks which color from the source image is used to seed the palette — 0 is the most dominant color, higher values sample less prominent tones.")
+        self._index_spin = Gtk.SpinButton(adjustment=Gtk.Adjustment(
+            lower=0, upper=4, step_increment=1
+        ))
+        self._index_spin.set_value(int(get_var("THEME_SOURCE_INDEX", "0")))
+        self._index_spin.set_valign(Gtk.Align.CENTER)
+        self._index_spin.connect("notify::value", self._on_index_changed)
+        index_row.add_suffix(self._index_spin)
+        self._index_actions = RowActions(
+            index_row,
+            on_discard=lambda: self._discard_var("THEME_SOURCE_INDEX"),
+            on_reset=lambda: self._reset_var("THEME_SOURCE_INDEX"),
+        )
+        index_row.add_suffix(self._index_actions.box)
+        self._index_actions.reorder_first()
+        theme_config_group.add(index_row)
 
         self._search_entry = Gtk.SearchEntry()
         self._search_entry.set_placeholder_text("Search themes\u2026")
@@ -180,11 +283,38 @@ class ThemesPage:
         content_box.append(flow)
         self._flow_box = flow
 
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_margin_top(48)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(32, 32)
+        spinner.start()
+        spinner_box.append(spinner)
+        lbl = Gtk.Label(label="Loading themes\u2026")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+        self._spinner_box = spinner_box
+        content_box.append(spinner_box)
+
         self._active_scheme = get_var("RETRO_THEME_SCHEME", "wallpaper")
-        self._themes = _load_themes()
-        self._rebuild()
+        self._load_themes_async()
 
         return toolbar
+
+    def _load_themes_async(self) -> None:
+        def worker():
+            themes = _load_themes()
+            GLib.idle_add(self._on_themes_loaded, themes)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_themes_loaded(self, themes: list[dict]) -> None:
+        self._themes = themes
+        if self._spinner_box is not None and self._content_box is not None:
+            self._content_box.remove(self._spinner_box)
+            self._spinner_box = None
+        self._rebuild()
+        self._refresh_managed()
 
     def _make_flowbox(self) -> Gtk.FlowBox:
         flow = Gtk.FlowBox()
@@ -333,6 +463,13 @@ class ThemesPage:
         name_label.set_ellipsize(Pango.EllipsizeMode.END)
         name_box.append(name_label)
 
+        settings_btn = Gtk.Button(icon_name="emblem-system-symbolic")
+        settings_btn.add_css_class("flat")
+        settings_btn.set_valign(Gtk.Align.CENTER)
+        settings_btn.set_tooltip_text("Customize colors")
+        settings_btn.connect("clicked", lambda *_: self._open_override_dialog(theme))
+        name_box.append(settings_btn)
+
         if is_active:
             active_badge = Gtk.Label(label="Active")
             active_badge.add_css_class("badge")
@@ -397,6 +534,129 @@ class ThemesPage:
     def _on_search(self, _entry: Gtk.SearchEntry) -> None:
         self._rebuild()
 
+    def _on_scheme_changed(self, row: Adw.ComboRow, _pspec) -> None:
+        if self._setting_value:
+            return
+        display = SCHEME_DISPLAY_NAMES[row.get_selected()]
+        self._pending_scheme = _display_to_scheme(display)
+        self._dirty = True
+        self._notify_dirty()
+        self._refresh_managed()
+
+    def _on_index_changed(self, spin: Gtk.SpinButton, _pspec) -> None:
+        if self._setting_value:
+            return
+        self._pending_index = str(int(spin.get_value()))
+        self._dirty = True
+        self._notify_dirty()
+        self._refresh_managed()
+
+    def _refresh_managed(self) -> None:
+        for row_actions, var, default in (
+            (self._scheme_actions, "THEME_SCHEME", "scheme-tonal-spot"),
+            (self._index_actions, "THEME_SOURCE_INDEX", "0"),
+        ):
+            if row_actions is None:
+                continue
+            live = get_var(var, "")
+            pending = self._pending_for(var)
+            effective = pending if pending is not None else live
+            is_managed = effective != default
+            is_dirty_val = self._has_pending(var)
+            is_saved = live != default
+            row_actions.update(is_managed=is_managed, is_dirty=is_dirty_val, is_saved=is_saved)
+
+    def _pending_for(self, var_name: str) -> str | None:
+        if var_name == "THEME_SCHEME":
+            return self._pending_scheme
+        if var_name == "THEME_SOURCE_INDEX":
+            return self._pending_index
+        return None
+
+    def _get_pending(self, var_name: str) -> str | None:
+        if var_name == "THEME_SCHEME":
+            return self._pending_scheme
+        if var_name == "THEME_SOURCE_INDEX":
+            return self._pending_index
+        return None
+
+    def _set_pending(self, var_name: str, value: str) -> None:
+        if var_name == "THEME_SCHEME":
+            self._pending_scheme = value
+        elif var_name == "THEME_SOURCE_INDEX":
+            self._pending_index = value
+
+    def _clear_pending(self, var_name: str) -> None:
+        if var_name == "THEME_SCHEME":
+            self._pending_scheme = None
+        elif var_name == "THEME_SOURCE_INDEX":
+            self._pending_index = None
+
+    def _has_pending(self, var_name: str) -> bool:
+        if var_name == "THEME_SCHEME":
+            return self._pending_scheme is not None
+        if var_name == "THEME_SOURCE_INDEX":
+            return self._pending_index is not None
+        return False
+
+    def _check_dirty(self) -> None:
+        any_dirty = self._has_pending("THEME_SCHEME") or self._has_pending("THEME_SOURCE_INDEX")
+        if any_dirty != self._dirty:
+            self._dirty = any_dirty
+            self._notify_dirty()
+
+    def _discard_var(self, var_name: str) -> None:
+        live = get_var(var_name, get_module_default(var_name))
+        self._set_widget_value(var_name, live)
+        self._clear_pending(var_name)
+        self._check_dirty()
+        self._refresh_managed()
+
+    def _reset_var(self, var_name: str) -> None:
+        default = get_module_default(var_name)
+        self._set_widget_value(var_name, default)
+        self._set_pending(var_name, default)
+        self._dirty = True
+        self._notify_dirty()
+        self._refresh_managed()
+
+    def _set_widget_value(self, var_name: str, value: str) -> None:
+        self._setting_value = True
+        if var_name == "THEME_SCHEME":
+            display = _scheme_to_display(value)
+            if display in SCHEME_DISPLAY_NAMES:
+                self._scheme_row.set_selected(SCHEME_DISPLAY_NAMES.index(display))
+        elif var_name == "THEME_SOURCE_INDEX":
+            if value.isdigit():
+                self._index_spin.set_value(float(value))
+        self._setting_value = False
+
+    def is_dirty(self) -> bool:
+        return self._dirty
+
+    def mark_saved(self) -> None:
+        self._dirty = False
+        self._pending_scheme = None
+        self._pending_index = None
+        self._refresh_managed()
+
+    def flush_pending(self) -> None:
+        if self._pending_scheme is not None:
+            from lib.python.variable import set_var as set_py_var
+            set_py_var("THEME_SCHEME", self._pending_scheme)
+            subprocess.Popen(
+                ["retro", "theme", "apply-colors"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        if self._pending_index is not None:
+            from lib.python.variable import set_var as set_py_var
+            set_py_var("THEME_SOURCE_INDEX", self._pending_index)
+            subprocess.Popen(
+                ["retro", "theme", "apply-colors"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        self.mark_saved()
+
     def _on_mode_toggle(self, btn: Gtk.Button) -> None:
         current = get_var("RETRO_THEME_MODE", "dark")
         new_mode = "light" if current == "dark" else "dark"
@@ -410,6 +670,18 @@ class ThemesPage:
             _btn.set_icon_name("weather-clear-night-symbolic" if _m == "dark" else "weather-clear-symbolic"),
             _btn.set_tooltip_text("Switch to Light Mode" if _m == "dark" else "Switch to Dark Mode"),
             self._window.show_toast(f"Theme mode set to {_m.title()}"),
+        ))
+
+    def _open_override_dialog(self, theme: dict) -> None:
+        dialog = OverrideDialog(self._window, theme)
+        dialog.present()
+
+    def _open_theme_creator(self) -> None:
+        dialog = ThemeCreatorDialog(self._window)
+        dialog.present()
+        dialog.connect("theme-created", lambda _dl, slug: (
+            set_var("RETRO_THEME_SCHEME", slug),
+            self._rebuild(),
         ))
 
     def get_search_entries(self) -> list[dict]:
@@ -432,3 +704,335 @@ class ThemesPage:
                 "_section_label": "",
             })
         return entries
+
+
+class OverrideDialog(Adw.Window):
+    """Dialog for customizing individual color values in a theme."""
+
+    def __init__(self, parent: Adw.ApplicationWindow, theme: dict):
+        super().__init__(
+            transient_for=parent,
+            modal=True,
+            title=f"Customize {theme['name']}",
+            default_width=500,
+            default_height=600,
+        )
+        self._theme = theme
+        self._overrides: dict[str, str] = {}
+        self._defaults: dict[str, str] = theme.get("color_map", {})
+
+        # Load existing overrides
+        override_file = OVERRIDE_DIR / f"{theme['slug']}.json"
+        if override_file.is_file():
+            try:
+                data = json.loads(override_file.read_text())
+                self._overrides = data.get("color_map", {})
+            except (json.JSONDecodeError, OSError):
+                self._overrides = {}
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        header = Adw.HeaderBar()
+        content.append(header)
+
+        save_btn = Gtk.Button(label="Save")
+        save_btn.add_css_class("suggested-action")
+        save_btn.connect("clicked", self._on_save)
+        header.pack_end(save_btn)
+
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda *_: self.close())
+        header.pack_end(cancel_btn)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        content.append(scrolled)
+
+        list_box = Gtk.ListBox()
+        list_box.add_css_class("boxed-list")
+        scrolled.set_child(list_box)
+
+        # Track color buttons for live preview
+        self._color_btns: dict[str, Gtk.ColorButton] = {}
+
+        for key in COLOR_MAP_KEYS:
+            if key not in self._defaults:
+                continue
+            default_hex = self._defaults[key]
+            current_hex = self._overrides.get(key, default_hex)
+
+            row = Adw.ActionRow()
+            row.set_title(key.replace("_", " ").title())
+            row.set_subtitle(f"Default: {default_hex}")
+
+            btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+
+            color_btn = Gtk.ColorButton()
+            rgba = Gdk.RGBA()
+            rgba.parse(f"#{current_hex.lstrip('#')}")
+            color_btn.set_rgba(rgba)
+            color_btn.set_tooltip_text(current_hex)
+            color_btn.set_valign(Gtk.Align.CENTER)
+            color_btn.connect("notify::rgba", self._on_color_changed, key)
+            btn_box.append(color_btn)
+            self._color_btns[key] = color_btn
+
+            reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+            reset_btn.add_css_class("flat")
+            reset_btn.set_valign(Gtk.Align.CENTER)
+            reset_btn.set_tooltip_text("Reset to default")
+            reset_btn.connect("clicked", self._on_reset, key, default_hex)
+            btn_box.append(reset_btn)
+
+            if key in self._overrides:
+                badge = Gtk.Label(label="Custom")
+                badge.add_css_class("badge")
+                badge.set_valign(Gtk.Align.CENTER)
+                btn_box.append(badge)
+
+            row.add_suffix(btn_box)
+            list_box.append(row)
+
+        self.set_content(content)
+
+    def _on_color_changed(self, btn: Gtk.ColorButton, _pspec, key: str) -> None:
+        rgba = btn.get_rgba()
+        hex_str = f"#{int(rgba.red * 255):02x}{int(rgba.green * 255):02x}{int(rgba.blue * 255):02x}"
+        btn.set_tooltip_text(hex_str)
+        # If the color matches the default, remove from overrides
+        default_hex = self._defaults.get(key, "")
+        if hex_str.lower() == default_hex.lower():
+            self._overrides.pop(key, None)
+        else:
+            self._overrides[key] = hex_str
+
+    def _on_reset(self, _btn, key: str, default_hex: str) -> None:
+        self._overrides.pop(key, None)
+        color_btn = self._color_btns[key]
+        rgba = Gdk.RGBA()
+        rgba.parse(f"#{default_hex.lstrip('#')}")
+        color_btn.set_rgba(rgba)
+        color_btn.set_tooltip_text(default_hex)
+
+    def _on_save(self, _btn) -> None:
+        slug = self._theme["slug"]
+        if not self._overrides:
+            # Clear overrides file
+            override_file = OVERRIDE_DIR / f"{slug}.json"
+            if override_file.is_file():
+                override_file.unlink()
+        else:
+            OVERRIDE_DIR.mkdir(parents=True, exist_ok=True)
+            (OVERRIDE_DIR / f"{slug}.json").write_text(
+                json.dumps({"color_map": self._overrides}, indent=4)
+            )
+        # Re-apply theme colors with overrides
+        proc = subprocess.Popen(
+            ["bash", str(THEME_CORE), "--theme", slug],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        GLib.child_watch_add(proc.pid, lambda _p, _s: (
+            self.get_transient_for().show_toast(f"Colors updated for {self._theme['name']}"),
+            self.close(),
+        ))
+
+
+class ThemeCreatorDialog(Adw.Window):
+    """Dialog for creating custom themes."""
+
+    __gsignals__ = {
+        "theme-created": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+    }
+
+    def __init__(self, parent: Adw.ApplicationWindow):
+        super().__init__(
+            transient_for=parent,
+            modal=True,
+            title="Create Custom Theme",
+            default_width=550,
+            default_height=700,
+        )
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        header = Adw.HeaderBar()
+        content.append(header)
+
+        save_btn = Gtk.Button(label="Save Theme")
+        save_btn.add_css_class("suggested-action")
+        save_btn.connect("clicked", self._on_save)
+        header.pack_end(save_btn)
+
+        import_btn = Gtk.Button(label="Import from Image")
+        import_btn.add_css_class("flat")
+        import_btn.connect("clicked", self._on_import)
+        header.pack_start(import_btn)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        content.append(scrolled)
+
+        clamp = Adw.Clamp()
+        scrolled.set_child(clamp)
+
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        main_box.set_margin_top(12)
+        main_box.set_margin_bottom(12)
+        main_box.set_margin_start(12)
+        main_box.set_margin_end(12)
+        clamp.set_child(main_box)
+
+        # Theme info fields
+        info_group = Adw.PreferencesGroup(title="Theme Info")
+        main_box.append(info_group)
+
+        self._name_entry = Adw.EntryRow(title="Name")
+        self._name_entry.connect("changed", lambda *_: None)
+        info_group.add(self._name_entry)
+
+        self._author_entry = Adw.EntryRow(title="Author")
+        self._author_entry.set_text(getpass.getuser())
+        info_group.add(self._author_entry)
+
+        self._desc_entry = Adw.EntryRow(title="Description")
+        info_group.add(self._desc_entry)
+
+        # Color fields group
+        colors_group = Adw.PreferencesGroup(title="Colors")
+        main_box.append(colors_group)
+
+        self._color_rows: dict[str, Adw.ActionRow] = {}
+        self._color_btns: dict[str, Gtk.ColorButton] = {}
+
+        for key in COLOR_MAP_KEYS:
+            default_for_key = {
+                "primary": "#b24bf3", "on_primary": "#ffffff",
+                "primary_container": "#12102e", "secondary": "#6b70ff",
+                "tertiary": "#ffcc33", "error": "#ff2a6d",
+                "surface": "#070514", "on_surface": "#e5e9f0",
+                "background": "#070514", "on_background": "#e5e9f0",
+                "outline": "#323c58", "red": "#ff2a6d",
+                "green": "#05ffa1", "yellow": "#ffcc33",
+                "blue": "#6b70ff", "magenta": "#b24bf3",
+                "cyan": "#00d9ff", "white": "#d1d1e0",
+                "black": "#030208",
+            }
+            default = default_for_key.get(key, "#000000")
+
+            row = Adw.ActionRow()
+            row.set_title(key.replace("_", " ").title())
+            colors_group.add(row)
+
+            color_btn = Gtk.ColorButton()
+            rgba = Gdk.RGBA()
+            rgba.parse(default.lstrip("#"))
+            color_btn.set_rgba(rgba)
+            color_btn.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(color_btn)
+
+            self._color_btns[key] = color_btn
+            self._color_rows[key] = row
+
+        self.set_content(content)
+
+    def _on_save(self, _btn) -> None:
+        name = self._name_entry.get_text().strip()
+        if not name:
+            self.get_transient_for().show_toast("Theme name is required")
+            return
+
+        author = self._author_entry.get_text().strip() or getpass.getuser()
+        description = self._desc_entry.get_text().strip() or f"Custom theme by {author}"
+
+        color_map = {}
+        for key, btn in self._color_btns.items():
+            rgba = btn.get_rgba()
+            hex_str = f"#{int(rgba.red * 255):02x}{int(rgba.green * 255):02x}{int(rgba.blue * 255):02x}"
+            color_map[key] = hex_str
+
+        json_payload = json.dumps({
+            "name": name,
+            "author": author,
+            "description": description,
+            "color_map": color_map,
+        }, indent=4)
+
+        proc = subprocess.Popen(
+            ["bash", str(THEME_CORE), "--custom-theme-create", json_payload],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        stdout, _ = proc.communicate()
+        if proc.returncode == 0 and stdout.startswith("success|"):
+            slug = stdout.strip().split("|", 1)[1]
+            self.emit("theme-created", slug)
+            self.close()
+        else:
+            error = stdout.strip() if stdout else "Unknown error"
+            self.get_transient_for().show_toast(f"Failed to create theme: {error}")
+
+    def _on_import(self, _btn) -> None:
+        if not shutil.which("matugen"):
+            self.get_transient_for().show_toast("matugen is not installed")
+            return
+        file_chooser = Gtk.FileChooserNative(
+            title="Select image for color extraction",
+            transient_for=self,
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        filt = Gtk.FileFilter()
+        filt.set_name("Images")
+        filt.add_mime_type("image/png")
+        filt.add_mime_type("image/jpeg")
+        filt.add_mime_type("image/webp")
+        file_chooser.add_filter(filt)
+        file_chooser.connect("response", self._on_import_response)
+        file_chooser.show()
+
+    def _on_import_response(self, dialog, response):
+        if response != Gtk.ResponseType.ACCEPT:
+            return
+        path = dialog.get_file().get_path()
+        if not path:
+            return
+        mode = get_var("RETRO_THEME_MODE", "dark")
+        scheme = get_var("THEME_SCHEME", "scheme-tonal-spot")
+        index = int(get_var("THEME_SOURCE_INDEX", "0"))
+        self.get_transient_for().show_toast("Extracting colors from image...")
+        proc = subprocess.run(
+            ["matugen", "image", path, "--dry-run", "--json", "hex",
+             "--source-color-index", str(index), "--variant", scheme],
+            capture_output=True, text=True, timeout=15,
+        )
+        if proc.returncode != 0:
+            self.get_transient_for().show_toast("matugen failed")
+            return
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            self.get_transient_for().show_toast("Failed to parse matugen output")
+            return
+        MATUGEN_MAP = {
+            "primary": "primary", "on_primary": "on_primary",
+            "primary_container": "primary_container",
+            "secondary": "secondary", "tertiary": "tertiary",
+            "error": "error", "surface": "surface",
+            "on_surface": "on_surface", "background": "background",
+            "on_background": "on_background", "outline": "outline",
+            "surface_variant": "surface_variant",
+            "red": "error", "green": "tertiary",
+            "yellow": "primary_container", "blue": "primary",
+            "magenta": "secondary", "cyan": "tertiary_container",
+            "white": "on_surface", "black": "surface",
+        }
+        colors_data = data.get("colors", {})
+        filled = 0
+        for key, material_key in MATUGEN_MAP.items():
+            hex_val = colors_data.get(material_key, {}).get(mode, {}).get("color", "")
+            if hex_val and key in self._color_btns:
+                rgba = Gdk.RGBA()
+                rgba.parse(hex_val.lstrip("#"))
+                self._color_btns[key].set_rgba(rgba)
+                filled += 1
+        self.get_transient_for().show_toast(f"Colors imported from image ({filled} values filled)")

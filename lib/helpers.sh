@@ -216,6 +216,20 @@ rx_apply_color_map() {
     keys=$(jq -r --arg cm "$cm_key" '.[$cm] | if has("highlight") then .highlight = .primary else . end | if has("cursor") then .cursor = .primary else . end | to_entries[] | "\(.key)|\(.value)"' "$theme_file" 2>/dev/null)
     [[ -z $keys ]] && return 0
 
+    local override_file="${output_dir}/overrides/$(basename "$theme_file" .json).json"
+    local override_keys=""
+    if [[ -f $override_file ]]; then
+        local override_cm="$cm_key"
+        if [[ ! $(jq -r ".${cm_key} | type" "$override_file" 2>/dev/null) == "object" ]]; then
+            override_cm="color_map"
+        fi
+        [[ $(jq -r ".${override_cm} | type" "$override_file" 2>/dev/null) == "object" ]] && \
+            override_keys=$(jq -r --arg cm "$override_cm" '.[$cm] | to_entries[] | "\(.key)|\(.value)"' "$override_file" 2>/dev/null)
+    fi
+    if [[ -n $override_keys ]]; then
+        keys=$(printf "%s\n%s" "$override_keys" "$keys" | awk -F'|' '!seen[$1]++')
+    fi
+
     declare -A slot_map
     slot_map["black"]="color0"
     slot_map["red"]="color1"
@@ -300,6 +314,58 @@ rx_apply_color_map() {
             file="$output_dir/hyprland-colors.conf"
             if [[ -f $file ]]; then
                 sed -i "s/^\$${key} = .*$/\$${key} = #${hex}/" "$file"
+            fi
+        fi
+
+        file="$output_dir/shell-colors.json"
+        if [[ -f $file ]]; then
+            local shell_key=""
+            case "$key" in
+                primary)               shell_key="primary" ;;
+                on_primary)            shell_key="overPrimary" ;;
+                primary_container)     shell_key="primaryContainer" ;;
+                on_primary_container)  shell_key="overPrimaryContainer" ;;
+                on_primary_fixed)      shell_key="overPrimaryFixed" ;;
+                on_primary_fixed_variant) shell_key="overPrimaryFixedVariant" ;;
+                secondary)             shell_key="secondary" ;;
+                on_secondary)          shell_key="overSecondary" ;;
+                secondary_container)   shell_key="secondaryContainer" ;;
+                on_secondary_container) shell_key="overSecondaryContainer" ;;
+                on_secondary_fixed)    shell_key="overSecondaryFixed" ;;
+                on_secondary_fixed_variant) shell_key="overSecondaryFixedVariant" ;;
+                tertiary)              shell_key="tertiary" ;;
+                on_tertiary)           shell_key="overTertiary" ;;
+                tertiary_container)    shell_key="tertiaryContainer" ;;
+                on_tertiary_container) shell_key="overTertiaryContainer" ;;
+                on_tertiary_fixed)     shell_key="overTertiaryFixed" ;;
+                on_tertiary_fixed_variant) shell_key="overTertiaryFixedVariant" ;;
+                error)                 shell_key="error" ;;
+                on_error)              shell_key="overError" ;;
+                error_container)       shell_key="errorContainer" ;;
+                on_error_container)    shell_key="overErrorContainer" ;;
+                surface)               shell_key="surface" ;;
+                on_surface)            shell_key="overSurface" ;;
+                surface_variant)       shell_key="surfaceVariant" ;;
+                on_surface_variant)    shell_key="overSurfaceVariant" ;;
+                surface_bright)        shell_key="surfaceBright" ;;
+                surface_container)     shell_key="surfaceContainer" ;;
+                surface_container_high) shell_key="surfaceContainerHigh" ;;
+                surface_container_highest) shell_key="surfaceContainerHighest" ;;
+                surface_container_low) shell_key="surfaceContainerLow" ;;
+                surface_container_lowest) shell_key="surfaceContainerLowest" ;;
+                surface_dim)           shell_key="surfaceDim" ;;
+                background)            shell_key="background" ;;
+                on_background)         shell_key="overBackground" ;;
+                outline)               shell_key="outline" ;;
+                outline_variant)       shell_key="outlineVariant" ;;
+                inverse_primary)       shell_key="inversePrimary" ;;
+                inverse_surface)       shell_key="inverseSurface" ;;
+                inverse_on_surface)    shell_key="inverseOnSurface" ;;
+                shadow)                shell_key="shadow" ;;
+                scrim)                 shell_key="scrim" ;;
+            esac
+            if [[ -n $shell_key ]]; then
+                sed -i "s/\"${shell_key}\": *\"#[0-9a-f]*\"/\"${shell_key}\": \"#${hex}\"/" "$file"
             fi
         fi
 
