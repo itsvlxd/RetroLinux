@@ -53,6 +53,16 @@ def _scheme_to_display(raw: str) -> str:
     except ValueError:
         return raw
 
+def _lighten_color(hex_str: str, amount: float = 0.15) -> str:
+    h = hex_str.lstrip("#")
+    r = int(h[0:2], 16)
+    g = int(h[2:4], 16)
+    b = int(h[4:6], 16)
+    r = min(255, int(r + (255 - r) * amount))
+    g = min(255, int(g + (255 - g) * amount))
+    b = min(255, int(b + (255 - b) * amount))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
 def _display_to_scheme(display: str) -> str:
     try:
         idx = SCHEME_DISPLAY_NAMES.index(display)
@@ -927,7 +937,7 @@ class ThemeCreatorDialog(Adw.Window):
 
             color_btn = Gtk.ColorButton()
             rgba = Gdk.RGBA()
-            rgba.parse(default.lstrip("#"))
+            rgba.parse(default)
             color_btn.set_rgba(rgba)
             color_btn.set_valign(Gtk.Align.CENTER)
             row.add_suffix(color_btn)
@@ -1000,19 +1010,27 @@ class ThemeCreatorDialog(Adw.Window):
         scheme = get_var("THEME_SCHEME", "scheme-tonal-spot")
         index = int(get_var("THEME_SOURCE_INDEX", "0"))
         self.get_transient_for().show_toast("Extracting colors from image...")
+        print(f"[DEBUG] matugen import: path={path} mode={mode} scheme={scheme} index={index}", file=__import__('sys').stderr)
         proc = subprocess.run(
             ["matugen", "image", path, "--dry-run", "--json", "hex",
-             "--source-color-index", str(index), "--variant", scheme],
+             "--source-color-index", str(index), "-t", scheme],
             capture_output=True, text=True, timeout=15,
         )
         if proc.returncode != 0:
-            self.get_transient_for().show_toast("matugen failed")
+            error_msg = proc.stderr.strip()[:200] if proc.stderr.strip() else "unknown error"
+            print(f"[DEBUG] matugen failed (rc={proc.returncode}): {error_msg}", file=__import__('sys').stderr)
+            print(f"[DEBUG] matugen stderr: {proc.stderr[:500]}", file=__import__('sys').stderr)
+            self.get_transient_for().show_toast(f"matugen failed: {error_msg}")
             return
+        print(f"[DEBUG] matugen stdout (first 500 chars): {proc.stdout[:500]}", file=__import__('sys').stderr)
         try:
             data = json.loads(proc.stdout)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"[DEBUG] JSON parse error: {e}", file=__import__('sys').stderr)
             self.get_transient_for().show_toast("Failed to parse matugen output")
             return
+        colors_data = data.get("colors", {})
+        print(f"[DEBUG] colors_data keys: {list(colors_data.keys())[:15]}...", file=__import__('sys').stderr)
         MATUGEN_MAP = {
             "primary": "primary", "on_primary": "on_primary",
             "primary_container": "primary_container",
@@ -1026,13 +1044,32 @@ class ThemeCreatorDialog(Adw.Window):
             "magenta": "secondary", "cyan": "tertiary_container",
             "white": "on_surface", "black": "surface",
         }
-        colors_data = data.get("colors", {})
+        imported_hexes: dict[str, str] = {}
         filled = 0
         for key, material_key in MATUGEN_MAP.items():
-            hex_val = colors_data.get(material_key, {}).get(mode, {}).get("color", "")
+            color_entry = colors_data.get(material_key, {})
+            mode_entry = color_entry.get(mode, {})
+            hex_val = mode_entry.get("color", "")
+            print(f"[DEBUG]   {key} -> colors.{material_key}.{mode}.color = {hex_val!r}", file=__import__('sys').stderr)
             if hex_val and key in self._color_btns:
+                imported_hexes[key] = hex_val
                 rgba = Gdk.RGBA()
-                rgba.parse(hex_val.lstrip("#"))
+                rgba.parse(hex_val)
                 self._color_btns[key].set_rgba(rgba)
                 filled += 1
+        BRIGHT_MAP = {
+            "bright_red": "red", "bright_green": "green", "bright_yellow": "yellow",
+            "bright_blue": "blue", "bright_magenta": "magenta", "bright_cyan": "cyan",
+            "bright_white": "white", "bright_black": "black",
+        }
+        for bright_key, base_key in BRIGHT_MAP.items():
+            base_hex = imported_hexes.get(base_key)
+            if base_hex and bright_key in self._color_btns:
+                lightened = _lighten_color(base_hex, 0.15)
+                rgba = Gdk.RGBA()
+                rgba.parse(lightened)
+                self._color_btns[bright_key].set_rgba(rgba)
+                filled += 1
+
+        print(f"[DEBUG] filled {filled} color values", file=__import__('sys').stderr)
         self.get_transient_for().show_toast(f"Colors imported from image ({filled} values filled)")
