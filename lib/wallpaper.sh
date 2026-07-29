@@ -168,44 +168,17 @@ rx_wallpaper_apply_colors() {
 
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
-    # Fallback: read file directly in case cache is stale
-    if [[ $scheme == "wallpaper" ]]; then
-        local file_scheme
-        file_scheme=$(grep "^export RETRO_THEME_SCHEME=" "$RETRO_CONFIG/variables.sh" 2>/dev/null | head -1 | cut -d'"' -f2)
-        [[ -n $file_scheme ]] && scheme="$file_scheme"
-    fi
-    [[ $scheme != "wallpaper" ]] && return 0
-    [[ $is_same_wall == "true" ]] && return 0
+    [[ $scheme != "wallpaper" ]] && { echo "$(date) skip: scheme=$scheme" >> /tmp/retro_wallpaper_colors.log; return 0; }
 
-    local mode
-    mode=$(get_var "RETRO_THEME_MODE" "dark")
+    echo "$(date) applying colors for $filename, scheme=$scheme" >> /tmp/retro_wallpaper_colors.log
+    env RETRO_CONFIG="${RETRO_CONFIG:-$HOME/.config/retro}" HOME="$HOME" RETRO_DIR="$RETRO_DIR" \
+        bash "$RETRO_DIR/scripts/theme_core.sh" --apply-colors >> /tmp/retro_wallpaper_colors.log 2>&1 || \
+        { echo "$(date) FAILED with code $?" >> /tmp/retro_wallpaper_colors.log; return 1; }
 
-    local color_cache="$FRAME_CACHE/${filename}.colors"
-    local scheme_type=""
-
-    if [[ -f $color_cache ]]; then
-        scheme_type=$(cat "$color_cache")
-    else
-        local color=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info:)
-        if [ "$(echo "$color < 1.0" | bc)" -eq 1 ]; then
-            scheme_type="monochrome"
-        else
-            scheme_type="vibrant"
-        fi
-        echo "$scheme_type" >"$color_cache"
-    fi
-
-    if [[ $scheme_type == "monochrome" ]]; then
-        matugen image -b wal --mode "$mode" "$static_source" -t scheme-monochrome --fallback-color "#ffffff" --source-color-index 0 >/dev/null 2>&1 || return 1
-        rx_grayscale_output
-    else
-        matugen image -b wal --mode "$mode" "$static_source" -t scheme-vibrant --source-color-index 0 >/dev/null 2>&1 || return 1
-    fi
-
+    echo "$(date) done, refreshing hyprctl" >> /tmp/retro_wallpaper_colors.log
     hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
-
-    "$RETRO_DIR/retro.sh" app all refresh
-    bash "$RETRO_DIR/scripts/theme_core.sh" "--sddm-refresh" >/dev/null 2>&1
+    "$RETRO_DIR/retro.sh" app all refresh >/dev/null 2>&1
+    bash "$RETRO_DIR/scripts/theme_core.sh" --sddm-refresh >/dev/null 2>&1
     rx_set_papirus_folder_color
 }
 
@@ -327,6 +300,8 @@ rx_wallpaper_start() {
     fi
 
     rx_wallpaper_set_image "$static_source" "$quick" "$is_first_load" "$monitor"
+
+    echo "$(date) needs_colors=$needs_colors scheme=$scheme is_video=$is_video wall=$wall_path is_same=$is_same_wall RETRO_CONFIG=${RETRO_CONFIG:-$HOME/.config/retro}" >> /tmp/retro_wallpaper_colors.log
 
     if [[ $needs_colors == "true" || $is_video == "true" ]]; then
         (

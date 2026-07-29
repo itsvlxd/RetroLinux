@@ -577,6 +577,15 @@ rx_theme_apply_colors() {
         fi
         rx_log_file "debug" "rx_theme_apply_colors: static_source=$static_source"
 
+        # Auto-detect desaturated wallpapers → use monochrome scheme
+        if command -v magick &>/dev/null && [[ -f $static_source ]]; then
+            local sat=$(magick "$static_source" -colorspace HSL -format "%[fx:100*s]" info: 2>/dev/null)
+            if [[ -n $sat ]] && [ "$(echo "$sat < 1.0" | bc 2>/dev/null || echo 0)" -eq 1 ]; then
+                matugen_scheme="scheme-monochrome"
+                rx_log_file "debug" "rx_theme_apply_colors: low saturation ($sat%), forcing monochrome with white fallback"
+            fi
+        fi
+
         rx_log_file "debug" "rx_theme_apply_colors: matugen scheme=$matugen_scheme, index=$matugen_index, mode=$mode"
         local fallback_args=()
         [[ $matugen_scheme == "scheme-monochrome" ]] && fallback_args=(--fallback-color '#ffffff')
@@ -615,6 +624,17 @@ rx_theme_apply_colors() {
             [[ $has_cm == "object" ]] && rx_apply_color_map "$theme_file"
         fi
     fi
+
+    # GTK / Qt hot-reload: toggle color-scheme to force apps to pick up new colors
+    local adw_scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)
+    if [[ $adw_scheme == "'prefer-dark'" ]]; then
+        gsettings set org.gnome.desktop.interface color-scheme prefer-light 2>/dev/null
+        gsettings set org.gnome.desktop.interface color-scheme prefer-dark 2>/dev/null
+    elif [[ $adw_scheme == "'prefer-light'" ]]; then
+        gsettings set org.gnome.desktop.interface color-scheme prefer-dark 2>/dev/null
+        gsettings set org.gnome.desktop.interface color-scheme prefer-light 2>/dev/null
+    fi
+    touch "$HOME/.config/qt6ct/qt6ct.conf" 2>/dev/null || true
 
     rx_theme_refresh_apps
     rx_theme_apply_gtk_font
