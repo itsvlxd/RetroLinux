@@ -213,6 +213,7 @@ _cmd_set_brightness() {
         return 1
     fi
     rx_log_file "info" "Set brightness for $name to $value"
+    bash "$RETRO_DIR/scripts/shell_core.sh" --run "brightness_ping" 2>/dev/null &
 }
 
 _cmd_get_brightness() {
