@@ -224,6 +224,8 @@ class BatteryPage:
             "critical": get_var("BAT_NOTIFY_CRITICAL_THRESHOLD") or "15",
             "notify": get_var("BAT_NOTIFY_THRESHOLD") or "30",
             "on_pwr_dis": get_var("BAT_SAVER_ON_PWR_DIS") or "true",
+            "dim_enabled": get_var("BAT_SAVER_BRIGHTNESS_DIM") or "true",
+            "dim_val": get_var("BAT_SAVER_BRIGHTNESS") or "30",
         }
 
     def _rebuild_refreshable(self) -> None:
@@ -370,6 +372,35 @@ class BatteryPage:
         sa.reorder_first()
         self._config_rows.append(("BAT_SAVER_ON_PWR_DIS", "on_pwr_dis", sr, sa))
 
+        # Brightness dimming on saver
+        dim_row = Adw.SwitchRow(
+            title="Dim screen brightness on saver",
+            subtitle="Reduce brightness when battery saver is active",
+        )
+        dim_row.set_active(self._orig.get("dim_enabled") == "true")
+        dim_row.connect("notify::active", self._on_dim_enabled_changed)
+        cg.add(dim_row)
+        self._switch_dim_enabled = dim_row
+        dim_actions = RowActions(dim_row, on_discard=lambda: self._discard_row("BAT_SAVER_BRIGHTNESS_DIM", "dim_enabled"),
+                                 on_reset=lambda: self._reset_row("BAT_SAVER_BRIGHTNESS_DIM", "dim_enabled"))
+        dim_row.add_suffix(dim_actions.box)
+        dim_actions.reorder_first()
+        self._config_rows.append(("BAT_SAVER_BRIGHTNESS_DIM", "dim_enabled", dim_row, dim_actions))
+
+        adj = Gtk.Adjustment(value=float(self._orig["dim_val"]), lower=1, upper=100, step_increment=1, page_increment=5)
+        dim_spin = Gtk.SpinButton(adjustment=adj, digits=0)
+        dim_spin.set_valign(Gtk.Align.CENTER)
+        dim_spin.connect("notify::value", self._on_spin_changed, "dim_val")
+        dim_pct = Gtk.Label(label="%"); dim_pct.set_valign(Gtk.Align.CENTER); dim_pct.set_opacity(0.7); dim_pct.set_margin_start(4)
+        dim_val_row = Adw.ActionRow(title="Brightness level when dimmed", subtitle="Screen brightness percentage on battery saver")
+        dim_val_row.add_suffix(dim_pct); dim_val_row.add_suffix(dim_spin); cg.add(dim_val_row)
+        self._spin_dim_val = dim_spin
+        dim_val_actions = RowActions(dim_val_row, on_discard=lambda: self._discard_row("BAT_SAVER_BRIGHTNESS", "dim_val"),
+                                     on_reset=lambda: self._reset_row("BAT_SAVER_BRIGHTNESS", "dim_val"))
+        dim_val_row.add_suffix(dim_val_actions.box)
+        dim_val_actions.reorder_first()
+        self._config_rows.append(("BAT_SAVER_BRIGHTNESS", "dim_val", dim_spin, dim_val_actions))
+
         self._refreshable_box.append(cg)
         GLib.idle_add(self._refresh_managed)
 
@@ -378,7 +409,10 @@ class BatteryPage:
     def _get_val(self, var: str, key: str) -> str:
         if key == "on_pwr_dis":
             return "true" if self._switch_on_pwr_dis.get_active() else "false"
-        return str(int(getattr(self, f"_spin_{key}").get_value()))
+        if key == "dim_enabled":
+            return "true" if self._switch_dim_enabled.get_active() else "false"
+        if key in ("dim_val", "threshold", "critical", "notify"):
+            return str(int(getattr(self, f"_spin_{key}").get_value()))
 
     def _refresh_managed(self) -> None:
         from lib.python.variable import get_var as _g
@@ -415,6 +449,8 @@ class BatteryPage:
         self._setting_value = True
         if key == "on_pwr_dis":
             self._switch_on_pwr_dis.set_active(val == "true")
+        elif key == "dim_enabled":
+            self._switch_dim_enabled.set_active(val == "true")
         else:
             try:
                 getattr(self, f"_spin_{key}").set_value(float(val))
@@ -427,8 +463,16 @@ class BatteryPage:
     def _on_spin_changed(self, spin: Gtk.SpinButton, _pspec, key: str) -> None:
         if self._setting_value:
             return
-        var_map = {"notify": "BAT_NOTIFY_THRESHOLD", "critical": "BAT_NOTIFY_CRITICAL_THRESHOLD", "threshold": "BAT_SAVER_THRESHOLD"}
+        var_map = {"notify": "BAT_NOTIFY_THRESHOLD", "critical": "BAT_NOTIFY_CRITICAL_THRESHOLD", "threshold": "BAT_SAVER_THRESHOLD",
+                   "dim_val": "BAT_SAVER_BRIGHTNESS"}
         self._pending[var_map.get(key, key)] = str(int(spin.get_value()))
+        GLib.idle_add(self._check_dirty)
+        GLib.idle_add(self._refresh_managed)
+
+    def _on_dim_enabled_changed(self, sw: Adw.SwitchRow, _pspec) -> None:
+        if self._setting_value:
+            return
+        self._pending["BAT_SAVER_BRIGHTNESS_DIM"] = "true" if sw.get_active() else "false"
         GLib.idle_add(self._check_dirty)
         GLib.idle_add(self._refresh_managed)
 
@@ -443,10 +487,12 @@ class BatteryPage:
         was = self._dirty
         self._dirty = any(
             str(int(getattr(self, f"_spin_{key}").get_value())) != self._orig.get(key, "")
-            for key in ("threshold", "critical", "notify")
+            for key in ("threshold", "critical", "notify", "dim_val")
             if hasattr(self, f"_spin_{key}")
         )
         if (self._switch_on_pwr_dis.get_active() == True) != (self._orig.get("on_pwr_dis") == "true"):
+            self._dirty = True
+        if (self._switch_dim_enabled.get_active() == True) != (self._orig.get("dim_enabled") == "true"):
             self._dirty = True
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
@@ -468,15 +514,18 @@ class BatteryPage:
             "critical": str(int(self._spin_critical.get_value())),
             "notify": str(int(self._spin_notify.get_value())),
             "on_pwr_dis": "true" if self._switch_on_pwr_dis.get_active() else "false",
+            "dim_enabled": "true" if self._switch_dim_enabled.get_active() else "false",
+            "dim_val": str(int(self._spin_dim_val.get_value())),
         }
         self._dirty = False
         self._refresh_managed()
 
     def discard(self) -> None:
-        for key in ("threshold", "critical", "notify"):
+        for key in ("threshold", "critical", "notify", "dim_val"):
             if hasattr(self, f"_spin_{key}"):
                 getattr(self, f"_spin_{key}").set_value(float(self._orig.get(key, "50")))
         self._switch_on_pwr_dis.set_active(self._orig.get("on_pwr_dis") == "true")
+        self._switch_dim_enabled.set_active(self._orig.get("dim_enabled") == "true")
         self._dirty = False
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:
