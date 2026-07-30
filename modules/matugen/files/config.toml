@@ -64,3 +64,7 @@ output_path = '~/.config/cava/themes/retro'
 pre_hook = 'mkdir -p ~/.config/retro/themes'
 input_path = '~/.config/matugen/templates/sddm.conf'
 output_path = '~/.config/retro/themes/sddm.conf'
+
+[templates.shell-colors]
+input_path = '~/.config/matugen/templates/shell-colors.json'
+output_path = '~/.config/retro/themes/shell-colors.json'
