@@ -459,6 +459,7 @@ class MonitorsPage(SectionPage):
         if self._applying:
             return
         if all(getattr(mon, k) == v for k, v in new_vals.items()):
+            print(f"[MONITOR] _apply_change skipped (unchanged) for {mon.name}: {new_vals}", file=__import__('sys').stderr)
             return
 
         # Validate mirror target before applying
@@ -638,9 +639,11 @@ class MonitorsPage(SectionPage):
                 if not hw_mon:
                     continue
 
+                saved_transform = mon.transform
                 # MonitorState and Monitor share the geometry fields used here;
                 # update_geometry_from_ipc declares Monitor but tolerates either.
                 mon.update_geometry_from_ipc(hw_mon)  # type: ignore[arg-type]
+                mon.transform = saved_transform
                 vs = compute_valid_scales(mon.width, mon.height)
                 if vs:
                     si = nearest_scale_index(vs, hw_mon.scale)

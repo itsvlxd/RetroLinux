@@ -28,7 +28,8 @@ class RetroSettingsApp(Adw.Application):
     def do_activate(self):
         win = self.props.active_window
         if not isinstance(win, RetroSettingsWindow):
-            win = RetroSettingsWindow(application=self)
+            target = getattr(self, "_target_page", None)
+            win = RetroSettingsWindow(application=self, target_page=target)
         win.present()
 
 
@@ -37,7 +38,13 @@ def main():
     if debug:
         sys.argv.remove("--debug")
 
+    target_page = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
+    if target_page:
+        sys.argv.pop(1)
+
     app = RetroSettingsApp()
+    app._target_page = target_page
+    app._debug = debug
 
     def _on_signal(*_args) -> bool:
         app.quit()

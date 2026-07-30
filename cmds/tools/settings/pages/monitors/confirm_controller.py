@@ -98,7 +98,7 @@ class ConfirmController:
         if self._seconds_left <= 0:
             self._showing = False
             self._reset_banner()
-            self._on_revert()
+            # Just hide the banner — don't auto-revert
             return GLib.SOURCE_REMOVE
         self._update_title()
         if self._seconds_left <= 5:

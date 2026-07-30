@@ -77,6 +77,7 @@ CSS_PATH = settings_pkg_dir() / "style.css"
 
 class RetroSettingsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
+        self._target_page = kwargs.pop("target_page", None)
         super().__init__(**kwargs)
 
         self.set_title("Retro Settings")
@@ -156,6 +157,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._refresh_all_modified_indicators()
         _t3 = time.monotonic()
         print(f"[TIMING] build_ui={_t1-_t0:.3f}s  register_state={_t2-_t1:.3f}s  refresh={_t3-_t2:.3f}s  total={_t3-_t0:.3f}s", file=__import__('sys').stderr)
+
+        if self._target_page:
+            GLib.idle_add(self.navigate, self._target_page)
 
     @property
     def auto_save(self) -> bool:
