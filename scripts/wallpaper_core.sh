@@ -252,8 +252,12 @@ set_wallpaper() {
 
     mkdir -p "$HOME/.config/retro/wallpaper"
     cp "$input" "$HOME/.config/retro/wallpaper/current.png"
+    rx_wallpaper_generate_cache "$input" >/dev/null
 
     echo "OK|$input"
+
+    # Notify the shell so it keeps currentWallpaper in sync
+    bash "$RETRO_DIR/scripts/shell_core.sh" --run "wallpaper_ping $input" 2>/dev/null &
 }
 
 restore_wallpaper() {
@@ -299,7 +303,11 @@ restore_wallpaper() {
     rx_wallpaper_start "$last_wall" "${1:-false}"
     mkdir -p "$HOME/.config/retro/wallpaper"
     cp "$last_wall" "$HOME/.config/retro/wallpaper/current.png"
+    rx_wallpaper_generate_cache "$last_wall" >/dev/null
+
     echo "OK|$last_wall"
+
+    bash "$RETRO_DIR/scripts/shell_core.sh" --run "wallpaper_ping $last_wall" 2>/dev/null &
 }
 
 static_wallpaper() {
