@@ -93,21 +93,21 @@ sync_hyprland_power() {
     local state="$1"
 
     local mon_name=$(get_internal_monitor)
-    if [[ -z $mon_name ]]; then
-        return 0
+    if [[ -n $mon_name ]]; then
+        read -r w h x y scale <<< $(hyprctl monitors -j | jq -r --arg n "$mon_name" \
+            '.[] | select(.name==$n) | "\(.width) \(.height) \(.x) \(.y) \(.scale)"')
     fi
 
-    read -r w h x y scale <<< $(hyprctl monitors -j | jq -r --arg n "$mon_name" \
-        '.[] | select(.name==$n) | "\(.width) \(.height) \(.x) \(.y) \(.scale)"')
-
     if [[ $state == "true" ]]; then
-        hyprctl keyword monitor "$mon_name, ${w}x${h}@60, ${x}x${y}, $scale" >/dev/null
+        [[ -n $mon_name ]] && hyprctl keyword monitor "$mon_name, ${w}x${h}@60, ${x}x${y}, $scale" >/dev/null
 
-        if command -v brightnessctl >/dev/null 2>&1; then
-            brightnessctl set 30% >/dev/null 2>&1
+        local dim_enabled=$(get_var "BAT_SAVER_BRIGHTNESS_DIM" "true")
+        if [[ $dim_enabled == "true" ]]; then
+            local dim_val=$(get_var "BAT_SAVER_BRIGHTNESS" "30")
+            bash "$RETRO_DIR/scripts/display_core.sh" --set-brightness default "$dim_val" >/dev/null 2>&1
         fi
     else
-        hyprctl keyword monitor "$mon_name, highres, ${x}x${y}, $scale" >/dev/null
+        [[ -n $mon_name ]] && hyprctl keyword monitor "$mon_name, highres, ${x}x${y}, $scale" >/dev/null
 
         local blur_state=$(get_var "RETRO_BLUR" "true")
         local shadow_state=$(get_var "RETRO_SHADOW" "true")
