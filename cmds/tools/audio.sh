@@ -262,11 +262,11 @@ cmd_audio() {
             ;;
 
         "eq")
-            local eq_action="$val1"
+            local eq_action="$2"
             shift 2
             local eq_val="$*"
 
-            case "$eq_action" in
+            case "${eq_action,,}" in
                 "list" | "download" | "delete" | "delete-all" | "list-remote" | "remote" | "open")
                     ;;
                 "")
@@ -290,6 +290,7 @@ cmd_audio() {
                     ;;
                 *)
                     eq_val="$eq_action $eq_val"
+                    eq_val="${eq_val% }"
                     eq_action="apply"
                     ;;
             esac

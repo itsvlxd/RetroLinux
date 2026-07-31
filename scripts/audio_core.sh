@@ -510,12 +510,18 @@ apply_audio_primary() {
 list_eq_profiles() {
     local eq_dir="$HOME/.local/share/easyeffects/output"
     [[ ! -d $eq_dir ]] && echo "No EQ profiles found" && return
-    find "$eq_dir" -name "*.json" -o -name "*.presets" 2>/dev/null | while read -r f; do
-        basename "$f"
+    find "$eq_dir" -maxdepth 1 -name "*.json" 2>/dev/null | while read -r f; do
+        basename "$f" .json
     done
 }
 
 get_current_eq_profile() {
+    local retro_eq=$(get_var "AUDIO_EQ_PRESET" "")
+    if [[ -n $retro_eq ]]; then
+        echo "$retro_eq"
+        return
+    fi
+
     local eq_config="$HOME/.config/easyeffects/db/equalizerrc"
     if [[ -f $eq_config ]]; then
         local preset=$(grep "^preset=" "$eq_config" 2>/dev/null | cut -d'=' -f2-)
@@ -556,6 +562,11 @@ apply_eq_profile() {
     fi
 
     if [[ -f $profile_path ]]; then
+        local preset_name=$(basename "$profile_path" .json)
+        if command -v easyeffects >/dev/null 2>&1 && pgrep -x easyeffects >/dev/null 2>&1; then
+            easyeffects -l "$profile_path" >/dev/null 2>/dev/null
+        fi
+        set_var "AUDIO_EQ_PRESET" "$preset_name"
         echo "$profile_path"
     else
         echo "Profile not found: $profile"
