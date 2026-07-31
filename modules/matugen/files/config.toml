@@ -68,3 +68,8 @@ output_path = '~/.config/retro/themes/sddm.conf'
 [templates.shell-colors]
 input_path = '~/.config/matugen/templates/shell-colors.json'
 output_path = '~/.config/retro/themes/shell-colors.json'
+
+[templates.spotify]
+input_path = '~/.config/matugen/templates/spicetify.ini'
+output_path = '~/.config/spicetify/Themes/Sleek/color.ini'
+post_hook = 'pgrep -x spicetify > /dev/null || spicetify apply -n'
