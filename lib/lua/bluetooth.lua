@@ -20,7 +20,9 @@ function Bluetooth.get_connected_devices()
     local result = run_cmd("bluetoothctl devices Connected 2>/dev/null | awk '{print $2}'")
     local macs = {}
     for mac in result:gmatch("[^%s]+") do
-        table.insert(macs, mac)
+        if mac:match("^[%x][%x]:[%x][%x]:[%x][%x]:[%x][%x]:[%x][%x]:[%x][%x]$") then
+            table.insert(macs, mac)
+        end
     end
     return macs
 end
