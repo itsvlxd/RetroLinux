@@ -1,0 +1,2 @@
+spotify
+spicetify-cli

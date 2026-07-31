@@ -1,0 +1,11 @@
+{
+  "title": "Spotify",
+  "description": "Spotify client with Spicetify customizer for themes, extensions, and ad-blocking",
+  "type": "extra",
+  "access": "user",
+  "defaults": true,
+  "mode": "mirror",
+  "config": "./files",
+  "install": "~/.config/spicetify",
+  "overwrite": false
+}
