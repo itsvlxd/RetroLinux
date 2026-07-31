@@ -505,6 +505,10 @@ case "$1" in
         rx_log_file "success" "Fan setup applied: engine=${engine} profile=${profile} fans=${fan_count}"
         ;;
 
+    "--cpu-temp")
+        _get_coretemp
+        ;;
+
     *)
         echo "Usage: $0 --{detect|status|list-fans|list-temps|set-speed|set-curve|reset|profile|scan-engines|setup-get|setup-apply} [args]"
         exit 1
