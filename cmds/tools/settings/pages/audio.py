@@ -51,8 +51,8 @@ def _make_device_factory() -> Gtk.SignalListItemFactory:
     factory = Gtk.SignalListItemFactory()
 
     def setup(_f, item):
-        label = Gtk.Label(xalign=1.0)
-        label.set_ellipsize(Pango.EllipsizeMode.START)
+        label = Gtk.Label(xalign=0.0)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
         label.set_max_width_chars(30)
         item.set_child(label)
 
@@ -203,7 +203,7 @@ class AudioPage:
                     continue
                 try:
                     name = subprocess.run(
-                        ["bash", _AUDIO_CORE, "--get-sink-name", sid],
+                        ["bash", _AUDIO_CORE, "--get-sink-short-name", sid],
                         capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
                     ).stdout.strip()
                     pname = subprocess.run(
@@ -229,7 +229,7 @@ class AudioPage:
                     continue
                 try:
                     name = subprocess.run(
-                        ["bash", _AUDIO_CORE, "--get-source-name", sid],
+                        ["bash", _AUDIO_CORE, "--get-source-short-name", sid],
                         capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
                     ).stdout.strip()
                     pname = subprocess.run(
