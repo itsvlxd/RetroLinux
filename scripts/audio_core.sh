@@ -451,6 +451,11 @@ apply_audio_fallback() {
     local type="$1"
     [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
 
+    if [[ $(get_var "AUDIO_PRIORITY_ENABLED" "true") != "true" ]]; then
+        echo "OK|priority_disabled"
+        return 0
+    fi
+
     local current_id
     if [[ $type == "sink" ]]; then
         current_id=$(get_default_sink)
@@ -515,6 +520,11 @@ apply_audio_fallback() {
 apply_audio_primary() {
     local type="$1"
     [[ -z $type ]] && echo "ERR_MISSING_ARGS" && return 1
+
+    if [[ $(get_var "AUDIO_PRIORITY_ENABLED" "true") != "true" ]]; then
+        echo "OK|priority_disabled"
+        return 0
+    fi
 
     local primary_name
     if [[ $type == "sink" ]]; then

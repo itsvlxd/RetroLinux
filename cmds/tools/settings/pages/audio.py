@@ -27,6 +27,10 @@ _CRASH_DEFAULTS = {
     "AUDIO_RESTART_ON_CRASH_NOTIFY": "true",
 }
 
+_PRIORITY_DEFAULTS = {
+    "AUDIO_PRIORITY_ENABLED": "true",
+}
+
 
 def _find_mic_source() -> str:
     """Find the first hardware mic PulseAudio source name, skipping EasyEffects and monitors."""
@@ -244,6 +248,7 @@ class AudioPage:
 
         # Priority from variables
         self._orig = {
+            "priority_enabled": _g("AUDIO_PRIORITY_ENABLED", _PRIORITY_DEFAULTS["AUDIO_PRIORITY_ENABLED"]),
             "primary_sink": _g("AUDIO_PRIMARY_SINK", ""),
             "fallback_sink": _g("AUDIO_FALLBACK_SINK", ""),
             "primary_source": _g("AUDIO_PRIMARY_SOURCE", ""),
@@ -303,6 +308,8 @@ class AudioPage:
         self._rebuild_eq_list()
         self._rebuild_volume_models()
         self._refresh_managed()
+        if hasattr(self, "_priority_master_row"):
+            self._set_priority_rows_sensitive(self._priority_master_row.get_active())
 
     # ── Volume controls (immediate) ──
 
@@ -526,6 +533,24 @@ class AudioPage:
     def _build_priority_section(self, group: Adw.PreferencesGroup) -> None:
         self._priority_rows = []
 
+        master = Adw.SwitchRow(
+            title="Device Priority",
+            subtitle="Automatically switch between primary and fallback audio devices",
+        )
+        master.set_active(self._orig.get("priority_enabled", "true") == "true")
+        master.connect("notify::active", self._on_priority_enabled_switch)
+        group.add(master)
+        self._priority_master_row = master
+        ma = RowActions(
+            master,
+            on_discard=lambda: self._discard_priority_enabled(),
+            on_reset=lambda: self._reset_priority_enabled(),
+        )
+        master.add_suffix(ma.box)
+        ma.reorder_first()
+        self._priority_master_actions = ma
+        self._priority_master_rows = [("AUDIO_PRIORITY_ENABLED", "priority_enabled", master, ma)]
+
         for var, key, label, subtitle, dev_list in [
             ("AUDIO_PRIMARY_SINK", "primary_sink", "Primary Output",
              "Preferred output device (restored when available)", self._sinks),
@@ -571,6 +596,8 @@ class AudioPage:
 
             self._priority_rows.append((var, key, row, actions, dev_list, is_fallback))
 
+        self._set_priority_rows_sensitive(master.get_active())
+
     def _on_priority_changed(self, combo: Adw.ComboRow, _pspec, var: str, key: str, dev_list: list[dict], is_fallback: bool) -> None:
         if self._setting_value:
             return
@@ -586,6 +613,46 @@ class AudioPage:
         if self._on_dirty_changed:
             self._on_dirty_changed()
         GLib.idle_add(self._refresh_managed)
+
+    def _on_priority_enabled_switch(self, sw: Adw.SwitchRow, _pspec) -> None:
+        if self._setting_value:
+            return
+        self._pending["AUDIO_PRIORITY_ENABLED"] = "true" if sw.get_active() else "false"
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        GLib.idle_add(self._refresh_managed)
+        self._set_priority_rows_sensitive(sw.get_active())
+
+    def _set_priority_rows_sensitive(self, enabled: bool) -> None:
+        for _var, _key, row, _actions, _dl, _fb in self._priority_rows:
+            row.set_sensitive(enabled)
+
+    def _discard_priority_enabled(self) -> None:
+        from lib.python.variable import get_var as _g
+        live = _g("AUDIO_PRIORITY_ENABLED", "true")
+        self._set_priority_master_widget(live)
+        self._pending.pop("AUDIO_PRIORITY_ENABLED", None)
+        self._check_dirty()
+        self._refresh_managed()
+
+    def _reset_priority_enabled(self) -> None:
+        default = _PRIORITY_DEFAULTS.get("AUDIO_PRIORITY_ENABLED", "true")
+        self._set_priority_master_widget(default)
+        self._pending["AUDIO_PRIORITY_ENABLED"] = default
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        self._refresh_managed()
+
+    def _set_priority_master_widget(self, val: str) -> None:
+        self._setting_value = True
+        self._priority_master_row.set_active(val == "true")
+        self._setting_value = False
+        self._set_priority_rows_sensitive(val == "true")
+
+    def _get_priority_enabled_cur(self) -> str:
+        return "true" if self._priority_master_row.get_active() else "false"
 
     def _discard_priority(self, var: str, key: str) -> None:
         from lib.python.variable import get_var as _g
@@ -653,6 +720,14 @@ class AudioPage:
     def _refresh_managed(self) -> None:
         from lib.python.variable import get_var as _g
         from lib.python.variable import get_module_default as _md
+        for var, key, _widget, actions in self._priority_master_rows:
+            cur = self._pending.get(var, self._orig.get(key, "true"))
+            live = _g(var, _PRIORITY_DEFAULTS.get(var, "true"))
+            default = _md(var) or _PRIORITY_DEFAULTS.get(var, "true")
+            is_managed = cur != default
+            is_dirty = cur != live
+            is_saved = live != default
+            actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
         for var, key, _row, actions, _dl, _fb in self._priority_rows:
             cur = self._pending.get(var, self._orig.get(key, ""))
             live = _g(var, "")
@@ -674,10 +749,15 @@ class AudioPage:
         was = self._dirty
         self._dirty = bool(self._pending)
         if not self._dirty:
-            for var, key, _widget, _actions in self._crash_rows:
-                if self._get_crash_cur(key) != self._orig.get(key, ""):
+            for var, key, _widget, _actions in self._priority_master_rows:
+                if self._get_priority_enabled_cur() != self._orig.get(key, "true"):
                     self._dirty = True
                     break
+            if not self._dirty:
+                for var, key, _widget, _actions in self._crash_rows:
+                    if self._get_crash_cur(key) != self._orig.get(key, ""):
+                        self._dirty = True
+                        break
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
 
@@ -1198,6 +1278,7 @@ class AudioPage:
 
         self._pending.clear()
         self._orig = {
+            "priority_enabled": self._get_priority_enabled_cur(),
             "primary_sink": ps,
             "fallback_sink": fs,
             "primary_source": pp,
@@ -1211,6 +1292,8 @@ class AudioPage:
         self._refresh_managed()
 
     def discard(self) -> None:
+        for var, key, _widget, _actions in self._priority_master_rows:
+            self._set_priority_master_widget(self._orig.get(key, "true"))
         for var, key, _row, _actions, _dl, _fb in self._priority_rows:
             self._set_priority_widget(key, self._orig.get(key, ""))
         for var, key, _widget, _actions in self._crash_rows:
@@ -1239,6 +1322,9 @@ class AudioPage:
              "_group_id": "audio", "_group_label": "Audio", "_section_label": "Volume & Devices"},
             {"key": "audio:priority", "label": "Device Priority",
              "description": "Primary and fallback output/input devices",
+             "_group_id": "audio", "_group_label": "Audio", "_section_label": "Device Priority"},
+            {"key": "audio:priority_enabled", "label": "Device Priority Toggle",
+             "description": "Enable or disable automatic switching between primary and fallback devices",
              "_group_id": "audio", "_group_label": "Audio", "_section_label": "Device Priority"},
             {"key": "audio:eq", "label": "EQ Profiles",
              "description": "Apply, delete, and download equalizer presets",
