@@ -1,11 +1,11 @@
-hyprland-git
-hyprutils-git
-hyprland-protocols-git
-hyprwayland-scanner-git
+hyprland
+hyprutils
+hyprland-protocols
+hyprwayland-scanner
 
-hyprshot
 hypridle
 hyprlock
+hyprshutdown
 
 cliphist
 wl-clipboard

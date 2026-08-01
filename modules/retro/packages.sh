@@ -40,7 +40,7 @@ xdg-dbus-proxy
 xdg-terminal-exec
 xdg-desktop-portal
 xdg-desktop-portal-gtk
-xdg-desktop-portal-hyprland-git
+xdg-desktop-portal-hyprland
 
 # Icons
 papirus-folders
