@@ -119,6 +119,74 @@ get_source_id_by_persistent() {
     done
 }
 
+get_sink_short_name() {
+    local id="$1"
+    [[ -z $id ]] && return
+    local nick=$(wpctl inspect "$id" 2>/dev/null | grep "node.nick" | head -1 | sed 's/.*= *//' | tr -d '"')
+    if [[ -n $nick ]]; then
+        echo "$nick"
+        return
+    fi
+    get_sink_name "$id"
+}
+
+get_source_short_name() {
+    local id="$1"
+    [[ -z $id ]] && return
+    local nick=$(wpctl inspect "$id" 2>/dev/null | grep "node.nick" | head -1 | sed 's/.*= *//' | tr -d '"')
+    if [[ -n $nick ]]; then
+        echo "$nick"
+        return
+    fi
+    get_source_name "$id"
+}
+
+# Resolve a sink identifier (numeric ID, nick, description or node.name) to a numeric ID
+resolve_sink_id() {
+    local val="$1"
+    [[ -z $val ]] && return 1
+    if [[ $val =~ ^[0-9]+$ ]]; then
+        echo "$val"
+        return 0
+    fi
+    local dev_id
+    while read -r dev_id; do
+        [[ -z $dev_id ]] && continue
+        local info=$(wpctl inspect "$dev_id" 2>/dev/null)
+        local nick=$(printf '%s' "$info" | grep "node.nick" | head -1 | sed 's/.*= *//' | tr -d '"')
+        local desc=$(printf '%s' "$info" | grep "node.description" | head -1 | sed 's/.*= *//' | tr -d '"')
+        local pname=$(printf '%s' "$info" | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
+        if [[ $val == "$nick" || $val == "$desc" || $val == "$pname" ]]; then
+            echo "$dev_id"
+            return 0
+        fi
+    done < <(get_sinks 2>/dev/null)
+    return 1
+}
+
+# Resolve a source identifier (numeric ID, nick, description or node.name) to a numeric ID
+resolve_source_id() {
+    local val="$1"
+    [[ -z $val ]] && return 1
+    if [[ $val =~ ^[0-9]+$ ]]; then
+        echo "$val"
+        return 0
+    fi
+    local dev_id
+    while read -r dev_id; do
+        [[ -z $dev_id ]] && continue
+        local info=$(wpctl inspect "$dev_id" 2>/dev/null)
+        local nick=$(printf '%s' "$info" | grep "node.nick" | head -1 | sed 's/.*= *//' | tr -d '"')
+        local desc=$(printf '%s' "$info" | grep "node.description" | head -1 | sed 's/.*= *//' | tr -d '"')
+        local pname=$(printf '%s' "$info" | grep "node.name" | head -1 | awk '{print $NF}' | tr -d '"')
+        if [[ $val == "$nick" || $val == "$desc" || $val == "$pname" ]]; then
+            echo "$dev_id"
+            return 0
+        fi
+    done < <(get_sources 2>/dev/null)
+    return 1
+}
+
 get_pipewire_version() {
     local ver=$(pipewire --version 2>/dev/null | grep "Linked with" | awk '{print $NF}' | tr -d ')')
     [[ -z $ver ]] && echo "N/A" || echo "$ver"
@@ -206,16 +274,18 @@ set_mic_mute() {
 }
 
 set_sink() {
-    local sink_id="$1"
+    local sink_val="$1"
+    [[ -z $sink_val ]] && return 1
+    local sink_id=$(resolve_sink_id "$sink_val")
     [[ -z $sink_id ]] && return 1
-    local sink_name=$(get_sink_name "$sink_id")
     wpctl set-default "$sink_id" 2>/dev/null
 }
 
 set_source() {
-    local source_id="$1"
+    local source_val="$1"
+    [[ -z $source_val ]] && return 1
+    local source_id=$(resolve_source_id "$source_val")
     [[ -z $source_id ]] && return 1
-    local source_name=$(get_source_name "$source_id")
     wpctl set-default "$source_id" 2>/dev/null
 }
 
@@ -515,6 +585,29 @@ list_eq_profiles() {
     done
 }
 
+list_sinks_named() {
+    local ids
+    ids=$(get_sinks 2>/dev/null)
+    while IFS= read -r id; do
+        [[ -z $id ]] && continue
+        local name
+        name=$(get_sink_short_name "$id" 2>/dev/null || echo "$id")
+        echo "${id}→${name}"
+    done <<< "$ids"
+}
+
+list_sources_named() {
+    local ids
+    ids=$(get_sources 2>/dev/null)
+    while IFS= read -r id; do
+        [[ -z $id ]] && continue
+        local name
+        name=$(get_source_short_name "$id" 2>/dev/null || echo "$id")
+        [[ $name == *.monitor ]] && continue
+        echo "${id}→${name}"
+    done <<< "$ids"
+}
+
 get_current_eq_profile() {
     local retro_eq=$(get_var "AUDIO_EQ_PRESET" "")
     if [[ -n $retro_eq ]]; then
@@ -786,6 +879,8 @@ case "$1" in
     "--get-sources") get_sources ;;
     "--get-sink-name") get_sink_name "$2" ;;
     "--get-source-name") get_source_name "$2" ;;
+    "--get-sink-short-name") get_sink_short_name "$2" ;;
+    "--get-source-short-name") get_source_short_name "$2" ;;
     "--get-sink-persistent-name") get_sink_persistent_name "$2" ;;
     "--get-source-persistent-name") get_source_persistent_name "$2" ;;
     "--get-sink-id-by-name") get_sink_id_by_persistent "$2" ;;
@@ -796,6 +891,8 @@ case "$1" in
     "--set-source-volume") set_source_volume "$2" ;;
     "--eq-list") list_eq_profiles ;;
     "--eq-current") get_current_eq_profile ;;
+    "--list-sinks-named") list_sinks_named ;;
+    "--list-sources-named") list_sources_named ;;
     "--eq-apply") apply_eq_profile "$2" ;;
     "--eq-download") download_eq_preset "$2" ;;
     "--eq-list-remote") get_remote_eq_repos ;;
