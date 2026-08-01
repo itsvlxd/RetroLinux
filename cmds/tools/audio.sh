@@ -54,8 +54,8 @@ cmd_audio() {
                 ee_color="$SUCCESS"
             fi
 
-            local sink_name=$(bash "$audio_core" --get-sink-name "$sink" 2>/dev/null || echo "$sink")
-            local source_name=$(bash "$audio_core" --get-source-name "$source" 2>/dev/null || echo "$source")
+            local sink_name=$(bash "$audio_core" --get-sink-short-name "$sink" 2>/dev/null || echo "$sink")
+            local source_name=$(bash "$audio_core" --get-source-short-name "$source" 2>/dev/null || echo "$source")
 
             local sink_pri=$(bash "$audio_core" --audio-priority-get "sink")
             local source_pri=$(bash "$audio_core" --audio-priority-get "source")
@@ -194,7 +194,7 @@ cmd_audio() {
 
             local idx=0
             for s in "${sinks[@]}"; do
-                local s_name=$(bash "$audio_core" --get-sink-name "$s" 2>/dev/null || echo "$s")
+                local s_name=$(bash "$audio_core" --get-sink-short-name "$s" 2>/dev/null || echo "$s")
                 local marker="  "
                 if [[ $s == "$current_sink" ]]; then
                     marker="${PINK}󰤨${RESET}"
@@ -211,7 +211,7 @@ cmd_audio() {
             if [[ $choice =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#sinks[@]})); then
                 local selected="${sinks[$((choice - 1))]}"
                 bash "$audio_core" --set-sink "$selected" >/dev/null
-                local s_name=$(bash "$audio_core" --get-sink-name "$selected" 2>/dev/null || echo "$selected")
+                local s_name=$(bash "$audio_core" --get-sink-short-name "$selected" 2>/dev/null || echo "$selected")
                 rx_log "success" "Output set to ${PINK}${s_name}${RESET}"
             else
                 rx_log "info" "No changes made"
@@ -241,7 +241,7 @@ cmd_audio() {
 
             while IFS= read -r s; do
                 [[ -n $s ]] || continue
-                local s_name=$(bash "$audio_core" --get-sink-name "$s" 2>/dev/null || echo "$s")
+                local s_name=$(bash "$audio_core" --get-sink-short-name "$s" 2>/dev/null || echo "$s")
                 local marker="   "
                 [[ $s == "$current_sink" ]] && marker="${PINK}󰤨${RESET}"
                 printf " ${marker} %s\n" "${s_name:0:45}"
@@ -251,7 +251,8 @@ cmd_audio() {
 
             while IFS= read -r s; do
                 [[ -n $s ]] || continue
-                local s_name=$(bash "$audio_core" --get-source-name "$s" 2>/dev/null || echo "$s")
+                local s_name=$(bash "$audio_core" --get-source-short-name "$s" 2>/dev/null || echo "$s")
+
                 local marker="   "
                 [[ $s == "$current_source" ]] && marker="${PINK}󰤨${RESET}"
                 printf " ${marker} %s\n" "${s_name:0:45}"
@@ -511,7 +512,7 @@ cmd_audio() {
 
             while IFS= read -r s; do
                 [[ -n $s ]] || continue
-                local s_name=$(bash "$audio_core" --get-source-name "$s" 2>/dev/null || echo "$s")
+                local s_name=$(bash "$audio_core" --get-source-short-name "$s" 2>/dev/null || echo "$s")
                 local marker="   "
                 [[ $s == "$current_source" ]] && marker="${PINK}󰤨${RESET}"
                 printf " ${marker} %s\n" "${s_name:0:45}"
@@ -531,7 +532,7 @@ cmd_audio() {
 
             while IFS= read -r s; do
                 [[ -n $s ]] || continue
-                local s_name=$(bash "$audio_core" --get-sink-name "$s" 2>/dev/null || echo "$s")
+                local s_name=$(bash "$audio_core" --get-sink-short-name "$s" 2>/dev/null || echo "$s")
                 local s_pw=$(bash "$audio_core" --get-sink-persistent-name "$s" 2>/dev/null)
                 local marker="   "
                 [[ $s == "$current_sink" ]] && marker="${PINK}󰤨${RESET}"
@@ -546,7 +547,7 @@ cmd_audio() {
 
             while IFS= read -r s; do
                 [[ -n $s ]] || continue
-                local s_name=$(bash "$audio_core" --get-source-name "$s" 2>/dev/null || echo "$s")
+                local s_name=$(bash "$audio_core" --get-source-short-name "$s" 2>/dev/null || echo "$s")
                 local s_pw=$(bash "$audio_core" --get-source-persistent-name "$s" 2>/dev/null)
                 local marker="   "
                 [[ $s == "$current_source" ]] && marker="${PINK}󰤨${RESET}"
