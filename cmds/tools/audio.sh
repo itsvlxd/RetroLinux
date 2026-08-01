@@ -86,6 +86,15 @@ cmd_audio() {
             fi
             rx_table_row "$eq_icon" "EQ:" "$current_eq" "$eq_color" "16"
 
+            local priority_enabled=$(get_var "AUDIO_PRIORITY_ENABLED" "true")
+            local pri_status="Enabled"
+            local pri_color="$SUCCESS"
+            if [[ $priority_enabled != "true" ]]; then
+                pri_status="Disabled"
+                pri_color="$GRAY"
+            fi
+            rx_table_row "󰱓" "Device Priority:" "$pri_status" "$pri_color" "16"
+
             rx_table_separator
             if [[ -n $sink_p && $sink_p != "none" ]]; then
                 local sink_p_id=$(bash "$audio_core" --get-sink-id-by-name "$sink_p" 2>/dev/null)
@@ -562,6 +571,33 @@ cmd_audio() {
             rx_table_spacer
             ;;
 
+        "priority")
+            local mode="$val1"
+            if [[ -z $mode ]]; then
+                local current_pri=$(get_var "AUDIO_PRIORITY_ENABLED" "true")
+                if [[ $current_pri == "true" ]]; then
+                    rx_log "success" "Device priority is ${SUCCESS}ENABLED${RESET}"
+                else
+                    rx_log "info" "Device priority is ${GRAY}DISABLED${RESET}"
+                fi
+                return 0
+            fi
+
+            local new_val="true"
+            case "${mode,,}" in
+                on | true | enable) new_val="true" ;;
+                off | false | disable) new_val="false" ;;
+                *) rx_log "error" "Invalid mode. Use: on, off, true, false, enable, disable" && return 1 ;;
+            esac
+
+            set_var "AUDIO_PRIORITY_ENABLED" "$new_val"
+            if [[ $new_val == "true" ]]; then
+                rx_log "success" "Device priority ENABLED — devices will be switched automatically"
+            else
+                rx_log "info" "Device priority DISABLED — devices will not be switched automatically"
+            fi
+            ;;
+
         "set")
             local set_action="${val1,,}"
             case "$set_action" in
@@ -798,6 +834,7 @@ cmd_audio() {
             rx_help_cmd "easyeffects [cmd]" "Control EasyEffects"
             rx_help_cmd "fix-stutter" "Fix audio crackling"
             rx_help_cmd "set <sink|source|clear>" "Set device priority"
+            rx_help_cmd "priority <on|off>" "Enable/disable automatic device switching"
             rx_help_cmd "setup [-o options]" "Interactive or scripted priority setup"
             rx_help_examples
             rx_help_example "retro audio volume 50" "Set volume to 50%"
@@ -806,6 +843,7 @@ cmd_audio() {
             rx_help_example "retro audio eq list" "List EQ profiles"
             rx_help_example "retro audio eq Boosted" "Apply Boosted profile"
             rx_help_example "retro audio setup" "Interactive setup wizard"
+            rx_help_example "retro audio priority on" "Enable automatic device switching"
             rx_help_example "retro audio setup -o sink_primary=bluez_output.xxx,sink_fallback=none" "Non-interactive setup"
             rx_help_spacer
             ;;
