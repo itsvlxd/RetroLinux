@@ -261,3 +261,33 @@ def load_theme() -> dict:
 
 def save_theme(data: dict) -> None:
     save_shell_json("theme", data)
+
+
+# ── ai.json ──────────────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/ai.js`` and the
+# JsonAdapter defaults in ``Config.qml`` (lines ~1174-1181). The Sidebar
+# settings page only edits the ``sidebar*`` keys, but the full schema is
+# kept here so a load-then-save round trip preserves the unrelated keys
+# (systemPrompt, tool, extraModels, defaultModel).
+AI_DEFAULTS: dict = {
+    "systemPrompt": "You are a helpful assistant running on a Linux system. You have access to some tools to control the system.",
+    "tool": "none",
+    "extraModels": [],
+    "defaultModel": "gemini-2.0-flash",
+    "sidebarWidth": 400,
+    "sidebarPosition": "right",
+    "sidebarPinnedOnStartup": False,
+}
+
+
+def ai_path() -> Path:
+    return shell_config_dir() / "ai.json"
+
+
+def load_ai() -> dict:
+    return load_shell_json("ai", AI_DEFAULTS)
+
+
+def save_ai(data: dict) -> None:
+    save_shell_json("ai", data)
