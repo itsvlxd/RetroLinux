@@ -10,6 +10,7 @@ from settings.ui.icons import (
     APPS_ICON,
     AUDIO_ICON,
     AUTOSTART_ICON,
+    BAR_ICON,
     BATTERY_ICON,
     BINDS_ICON,
     BLUETOOTH_ICON,
@@ -27,6 +28,7 @@ from settings.ui.icons import (
     NETWORK_ICON,
     POWER_ICON,
     SETTINGS_ICON,
+    SHELL_THEME_ICON,
     SLEEP_ICON,
     THEMES_ICON,
     WALLPAPERS_ICON,
@@ -197,6 +199,10 @@ class Sidebar:
             if group is None:
                 return
             add_row(listbox, group_id, group["label"], group.get("icon"))
+
+        shell = new_category("Shell")
+        add_row(shell, "shell_bar", "Bar", BAR_ICON)
+        add_row(shell, "shell_theme", "Theme", SHELL_THEME_ICON)
 
         look_and_feel = new_category("Style")
         add_schema_row(look_and_feel, "appearance")

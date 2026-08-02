@@ -22,6 +22,8 @@ LAYOUTS_ICON = "view-grid-symbolic"
 ANIMATIONS_ICON = "bounce-symbolic"
 CURSOR_ICON = "settings-cursor-symbolic"
 THEMES_ICON = "preferences-color-symbolic"
+BAR_ICON = "focus-top-bar-symbolic"
+SHELL_THEME_ICON = "applications-graphics-symbolic"
 
 PENDING_ICON = "view-list-symbolic"
 PROFILES_ICON = "user-bookmarks-symbolic"
