@@ -111,15 +111,19 @@ def _draw_linear(cr, w, h, stops, angle: float, opacity: float):
 
 
 def _draw_radial(cr, w, h, stops, center_x: float, center_y: float, opacity: float):
-    """Draw a radial gradient mirroring radial_gradient.frag."""
+    """Draw a radial gradient mirroring radial_gradient.frag.
+
+    The shader works in normalized [0,1] UV space with Euclidean distance
+    from a configurable centre; we match that by scaling the Cairo context
+    so the unit square fills the canvas exactly.
+    """
     if not stops:
         return
-    # The shader works in normalized [0,1] UV space; scale the context so the
-    # gradient stops align the same way regardless of the chip's aspect ratio.
     cr.save()
     cr.scale(w, h)
-    grad = cairo.RadialGradient(center_x, center_y, 0.0, center_x, center_y, 1.0)
-    for i, stop in enumerate(stops):
+    grad = cairo.RadialGradient(
+        center_x, center_y, 0.0, center_x, center_y, 1.0)
+    for i in range(len(stops)):
         pos = _stop_pos(stops, i, 0.0 if i == 0 else 1.0)
         rgba = _rgba(_stop_color(stops, i, "surface"))
         grad.add_color_stop_rgba(pos, rgba.red, rgba.green, rgba.blue, rgba.alpha * opacity)
@@ -129,7 +133,12 @@ def _draw_radial(cr, w, h, stops, center_x: float, center_y: float, opacity: flo
 
 
 def _draw_halftone(cr, w, h, vdata, opacity: float):
-    """Draw the halftone dot pattern mirroring halftone.frag."""
+    """Draw the halftone dot pattern mirroring halftone.frag.
+
+    The shader rotates the pixel grid so the gradient runs along the
+    rotated Y axis; each cell's dot radius is determined by that
+    projection, producing a dissolve-like sweep of shrinking dots.
+    """
     dot_rgba = _rgba(vdata.get("halftoneDotColor", "surface"))
     bg_rgba = _rgba(vdata.get("halftoneBackgroundColor", "background"))
     try:
@@ -141,59 +150,61 @@ def _draw_halftone(cr, w, h, vdata, opacity: float):
     except (TypeError, ValueError):
         return
 
+    cell_size = dot_max * 2.0
+    if cell_size <= 0.0:
+        return
+
     # Background fill
     _set_source_rgba(cr, bg_rgba, opacity)
     cr.paint()
 
-    cell = max(dot_max * 2.0, 1.0)
     rad = math.radians(angle)
-    dir_x, dir_y = math.sin(rad), math.cos(rad)
+    cos_a = math.cos(rad)
+    sin_a = math.sin(rad)
+    cx, cy = w / 2.0, h / 2.0
 
-    center_x, center_y = w / 2.0, h / 2.0
-    corners = [
-        (0 - center_x, 0 - center_y),
-        (w - center_x, 0 - center_y),
-        (0 - center_x, h - center_y),
-        (w - center_x, h - center_y),
-    ]
-    projs = [x * dir_x + y * dir_y for x, y in corners]
+    # Projection range – Y of the four corners after rotating about centre.
+    corners = [(0, 0), (w, 0), (w, h), (0, h)]
+    projs = [(x - cx) * sin_a + (y - cy) * cos_a for x, y in corners]
     min_p, max_p = min(projs), max(projs)
     total = max(max_p - min_p, 0.001)
-    active_start = min_p + start * total
-    active_end = min_p + end * total
-    active_range = max(active_end - active_start, 0.001)
+    a_start = min_p + start * total
+    a_end = min_p + end * total
+    a_range = max(a_end - a_start, 0.001)
+
+    # Bounding-box of rotated corners → cell-index sweep.
+    rot_xs = [(x - cx) * cos_a - (y - cy) * sin_a for x, y in corners]
+    rot_ys = projs  # same as above
+    i0 = int(math.floor(min(rot_xs) / cell_size))
+    i1 = int(math.ceil(max(rot_xs) / cell_size))
+    j0 = int(math.floor(min(rot_ys) / cell_size))
+    j1 = int(math.ceil(max(rot_ys) / cell_size))
 
     _set_source_rgba(cr, dot_rgba, opacity)
-    step = max(cell, 0.5)
-    y = 0.0
-    while y < h:
-        x = 0.0
-        while x < w:
-            rel_x = x - center_x
-            rel_y = y - center_y
-            rx = rel_x * math.cos(rad) - rel_y * math.sin(rad)
-            ry = rel_x * math.sin(rad) + rel_y * math.cos(rad)
-            cell_x = math.floor(rx / step + 0.5)
-            cell_y = math.floor(ry / step + 0.5)
-            c_cx = cell_x * step
-            c_cy = cell_y * step
-            dist = math.hypot(rx - c_cx, ry - c_cy)
 
-            proj = rel_x * dir_x + rel_y * dir_y
-            if proj < active_start:
-                growth = (active_start - proj) / active_range
+    for i in range(i0, i1 + 1):
+        rcx = i * cell_size
+        for j in range(j0, j1 + 1):
+            rcy = j * cell_size
+            proj = rcy
+
+            if proj < a_start:
+                growth = (a_start - proj) / a_range
                 radius = dot_max * (1.0 + growth)
-            elif proj > active_end:
+            elif proj > a_end:
                 radius = 0.0
             else:
-                gp = (proj - active_start) / active_range
+                gp = (proj - a_start) / a_range
                 radius = dot_max + (dot_min - dot_max) * gp
 
             if radius > 0.0:
-                cr.arc(x, y, radius, 0, 2 * math.pi)
-                cr.fill()
-            x += step
-        y += step
+                # Inverse-rotate cell centre back to device coordinates.
+                ox = cx + rcx * cos_a + rcy * sin_a
+                oy = cy - rcx * sin_a + rcy * cos_a
+                if -radius <= ox <= w + radius and -radius <= oy <= h + radius:
+                    cr.new_sub_path()
+                    cr.arc(ox, oy, radius, 0.0, 2.0 * math.pi)
+                    cr.fill()
 
 
 def _draw_variant_surface(cr, w, h, vdata: dict, roundness: int):
@@ -359,7 +370,14 @@ def _preview_subtitle(vdata: dict) -> str:
     gradient_type = vdata.get("gradientType", "linear")
     stops = vdata.get("gradient") or []
     parts = [str(gradient_type).capitalize()]
-    if gradient_type in ("linear", "radial") and stops:
+    if gradient_type == "halftone":
+        try:
+            dmin = float(vdata.get("halftoneDotMin", 0))
+            dmax = float(vdata.get("halftoneDotMax", 2))
+        except (TypeError, ValueError):
+            dmin, dmax = 0, 2
+        parts.append(f"dots {dmin:.0f}–{dmax:.0f}")
+    elif gradient_type in ("linear", "radial") and stops:
         count = len(stops)
         parts.append(f"{count} stop{'s' if count != 1 else ''}")
     return " · ".join(parts)
