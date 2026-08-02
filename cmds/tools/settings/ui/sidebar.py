@@ -29,6 +29,7 @@ from settings.ui.icons import (
     POWER_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
+    SIDEBAR_ICON,
     SLEEP_ICON,
     THEMES_ICON,
     WALLPAPERS_ICON,
@@ -200,18 +201,21 @@ class Sidebar:
                 return
             add_row(listbox, group_id, group["label"], group.get("icon"))
 
-        shell = new_category("Shell")
-        add_row(shell, "shell_bar", "Bar", BAR_ICON)
-        add_row(shell, "shell_theme", "Theme", SHELL_THEME_ICON)
+        
 
         look_and_feel = new_category("Style")
         add_schema_row(look_and_feel, "appearance")
         add_schema_row(look_and_feel, "decoration")
         add_schema_row(look_and_feel, "animations")
         add_row(look_and_feel, "fonts", "Fonts", FONTS_ICON)
+        add_row(look_and_feel, "shell_theme", "Shell", SHELL_THEME_ICON)
         add_schema_row(look_and_feel, "cursor")
         add_row(look_and_feel, "themes", "Themes", THEMES_ICON)
         add_row(look_and_feel, "apps", "Applications", APPS_ICON)
+    
+        shell = new_category("Shell")
+        add_row(shell, "shell_bar", "Bar", BAR_ICON)
+        add_row(shell, "shell_sidebar", "Sidebar", SIDEBAR_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
