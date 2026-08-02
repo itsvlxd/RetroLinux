@@ -3,16 +3,20 @@
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/help.sh"
 
-# TODO: Add also boot time metric and change from list to status
-
 cmd_load() {
     local action="$1"
 
-    local startup_tasks=(
+    local setup_mode=false
+    [[ -f $HOME/.retro_install ]] && setup_mode=true
+
+    if $setup_mode; then
+        startup_tasks+=("retro --setup|Running first boot system setup")
+    else
+        startup_tasks+=("retro shell start|Initializing RetroLinux quick shell")
+    fi
+
+    startup_tasks+=(
         "retro xdg portal inject|Injecting session env into XDG portal daemon"
-
-        "retro --setup|Initializing first boot system setup"
-
         "retro firewall on|Enabling nftables firewall"
 
         "retro bluetooth restore|Initializing bluetooth radio cards"
@@ -80,6 +84,51 @@ cmd_load() {
             done
             ;;
 
+        "status")
+            rx_table_header "󱗼" "Startup Status"
+
+            local boot_time=$(uptime -s 2>/dev/null)
+            local uptime_secs=$(awk '{print int($1)}' /proc/uptime 2>/dev/null)
+            local uptime_disp="Just now"
+            [[ -n $uptime_secs ]] && uptime_disp=$(rx_format_uptime "$uptime_secs")
+            local an_total=""
+            if command -v systemd-analyze >/dev/null 2>&1; then
+                an_total=$(systemd-analyze 2>/dev/null | head -1)
+            fi
+
+            rx_table_row "󰧠" "Boot time:" "$boot_time" "$GRAY" "20"
+            rx_table_row "󰕭" "Uptime:" "$uptime_disp" "$GRAY" "20"
+            [[ -n $an_total ]] && rx_table_row "󰦐" "Startup:" "${an_total:0:60}" "$PINK" "20"
+
+            rx_table_separator
+            for task in "${final_tasks[@]}"; do
+                IFS='|' read -r cmd desc <<<"$task"
+
+                local bin_name=$(echo "$cmd" | awk '{print $1}')
+                local running=false
+                if [[ $bin_name == "retro" ]]; then
+                    local sub_arg=$(echo "$cmd" | awk '{print $2}')
+                    if pgrep -f "retro $sub_arg" >/dev/null 2>&1; then
+                        running=true
+                    fi
+                else
+                    if pgrep -f "^$cmd" >/dev/null 2>&1; then
+                        running=true
+                    fi
+                fi
+
+                if $running; then
+                    rx_table_simple "󰄴" "$cmd" "$SUCCESS"
+                else
+                    rx_table_simple "󰄾" "$cmd" "$MUTE"
+                fi
+                rx_help_wrap "$desc" 50
+            done
+
+            rx_table_separator
+            rx_table_spacer
+            ;;
+
         "all" | "")
             rx_log "info" "Syncing startup state..."
 
@@ -117,14 +166,13 @@ cmd_load() {
             rx_log "success" "Startup sequence synchronized."
             ;;
         *)
-            rx_log "info" "Usage: retro --load [all|list]"
+            rx_log "info" "Usage: retro --load [all|list|status]"
             ;;
     esac
 }
 
 register_command "SYSTEM" "-l|--load" "Execute or list the system startup sequence" "cmd_load"
 
-# Allow direct execution (used by the settings page to read tasks)
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ ${BASH_SOURCE[0]} == "${0}" ]]; then
     cmd_load "$@"
 fi
