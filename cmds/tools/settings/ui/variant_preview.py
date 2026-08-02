@@ -11,6 +11,7 @@ shows what each option actually looks like. Color names resolve through
 gradient math mirrors ``modules/retroshell/files/modules/components/*.frag``.
 """
 
+import json
 import math
 
 import cairo
@@ -175,12 +176,23 @@ def _draw_halftone(cr, w, h, vdata, opacity: float):
     # Bounding-box of rotated corners → cell-index sweep.
     rot_xs = [(x - cx) * cos_a - (y - cy) * sin_a for x, y in corners]
     rot_ys = projs  # same as above
+    span_x = max(rot_xs) - min(rot_xs)
+    span_y = max(rot_ys) - min(rot_ys)
+
+    # Cap the cell count so tiny dots don't grind the preview: coarsen the
+    # grid just enough to stay under ~16k cells (imperceptible at small sizes).
+    max_cells = 16000
+    est = (span_x / cell_size) * (span_y / cell_size)
+    if est > max_cells:
+        cell_size *= math.sqrt(est / max_cells)
+
     i0 = int(math.floor(min(rot_xs) / cell_size))
     i1 = int(math.ceil(max(rot_xs) / cell_size))
     j0 = int(math.floor(min(rot_ys) / cell_size))
     j1 = int(math.ceil(max(rot_ys) / cell_size))
 
     _set_source_rgba(cr, dot_rgba, opacity)
+    cr.new_path()
 
     for i in range(i0, i1 + 1):
         rcx = i * cell_size
@@ -204,7 +216,8 @@ def _draw_halftone(cr, w, h, vdata, opacity: float):
                 if -radius <= ox <= w + radius and -radius <= oy <= h + radius:
                     cr.new_sub_path()
                     cr.arc(ox, oy, radius, 0.0, 2.0 * math.pi)
-                    cr.fill()
+
+    cr.fill()
 
 
 def _draw_variant_surface(cr, w, h, vdata: dict, roundness: int):
@@ -348,22 +361,45 @@ def make_variant_preview(page, vk: str, height: int = 140) -> Gtk.DrawingArea:
 
     Redrawn on every change to ``page._data[vk]`` — the Theme page calls
     ``queue_draw()`` on the returned widget from its dirty-change plumbing.
+    The rendered frame is cached offscreen so expose/scroll redraws are a
+    cheap blit instead of re-running the (potentially heavy) halftone/radial
+    rasterizer; only a real data change re-renders.
     """
     preview = Gtk.DrawingArea()
     preview.set_size_request(-1, height)
     preview.set_hexpand(True)
-    preview.set_draw_func(lambda w, cr, ww, hh: _draw_variant_preview(cr, ww, hh, page, vk))
+    cache: dict = {"sig": None, "surf": None}
+    setattr(preview, "_rl_preview_cache", cache)
+
+    def _on_draw(w, cr, ww, hh):
+        _draw_variant_preview(w, cr, ww, hh, page, vk, cache)
+
+    preview.set_draw_func(_on_draw)
     return preview
 
 
-def _draw_variant_preview(cr, w, h, page, vk: str):
+def _draw_variant_preview(_widget, cr, pw, ph, page, vk: str, cache: dict):
     vdata = page._data.get(vk, {}) or {}
     roundness = int(page._data.get("roundness", 16) or 16)
-    _draw_variant_surface(cr, w, h, vdata, roundness)
 
+    sig = (pw, ph, roundness, json.dumps(vdata, sort_keys=True))
+    if cache.get("sig") == sig and cache.get("surf") is not None:
+        cr.set_source_surface(cache["surf"], 0, 0)
+        cr.paint()
+        return
+
+    w_i, h_i = max(1, int(pw)), max(1, int(ph))
+    surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w_i, h_i)
+    c2 = cairo.Context(surf)
+    _draw_variant_surface(c2, pw, ph, vdata, roundness)
     label = vdata.get("label", vk)
     item_color = vdata.get("itemColor", "overBackground")
-    _draw_preview_label(cr, w, h, label, _preview_subtitle(vdata), item_color)
+    _draw_preview_label(c2, pw, ph, label, _preview_subtitle(vdata), item_color)
+
+    cache["sig"] = sig
+    cache["surf"] = surf
+    cr.set_source_surface(surf, 0, 0)
+    cr.paint()
 
 
 def _preview_subtitle(vdata: dict) -> str:
@@ -379,7 +415,7 @@ def _preview_subtitle(vdata: dict) -> str:
         parts.append(f"dots {dmin:.0f}–{dmax:.0f}")
     elif gradient_type in ("linear", "radial") and stops:
         count = len(stops)
-        parts.append(f"{count} stop{'s' if count != 1 else ''}")
+        parts.append(f"{count} color{'s' if count != 1 else ''}")
     return " · ".join(parts)
 
 

@@ -941,11 +941,15 @@ class ShellThemePage:
 
     def discard(self) -> None:
         self._data = deepcopy(self._saved)
-        for mrow in self._rows.values():
+        # Snapshot the row collections: discarding the Gradient Type row
+        # rebuilds the variant editor (clearing/recreating these dicts), so
+        # iterating them in place raises "dictionary changed size during
+        # iteration".
+        for mrow in list(self._rows.values()):
             mrow.discard()
-        for mrow in self._editor_rows.values():
+        for mrow in list(self._editor_rows.values()):
             mrow.discard()
-        for _vk, _f, _i, mrow in self._stops_rows:
+        for _vk, _f, _i, mrow in list(self._stops_rows):
             mrow.discard()
         self._rebuild_variant_editor()
 
