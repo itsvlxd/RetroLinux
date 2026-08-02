@@ -41,6 +41,8 @@ if TYPE_CHECKING:
     from settings.pages.pending import PendingChangesPage
     from settings.pages.power import PowerPage
     from settings.pages.settings import SettingsPage
+    from settings.pages.shell_bar import ShellBarPage
+    from settings.pages.shell_theme import ShellThemePage
     from settings.pages.themes import ThemesPage
     from settings.pages.wallpapers import WallpapersPage
     from settings.pages.window_rules import WindowRulesPage
@@ -438,6 +440,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
         from settings.pages.settings import SettingsPage
+        from settings.pages.shell_bar import ShellBarPage
+        from settings.pages.shell_theme import ShellThemePage
         from settings.pages.themes import ThemesPage
         from settings.pages.wallpapers import WallpapersPage
         from settings.pages.window_rules import WindowRulesPage
@@ -517,6 +521,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PowerPage, "_power_page", "power", "Power"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
+            (ShellBarPage, "_shell_bar_page", "shell_bar", "Bar"),
+            (ShellThemePage, "_shell_theme_page", "shell_theme", "Theme"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
@@ -907,6 +913,12 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         audio_page = getattr(self, "_audio_page", None)
         if audio_page is not None and audio_page.is_dirty():
             counts["audio"] = 1
+        shell_bar_page = getattr(self, "_shell_bar_page", None)
+        if shell_bar_page is not None and shell_bar_page.is_dirty():
+            counts["shell_bar"] = 1
+        shell_theme_page = getattr(self, "_shell_theme_page", None)
+        if shell_theme_page is not None and shell_theme_page.is_dirty():
+            counts["shell_theme"] = 1
         driver_page = getattr(self, "_driver_page", None)
         if driver_page is not None and driver_page.missing_count() > 0:
             counts["driver"] = driver_page.missing_count()
@@ -1139,6 +1151,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
+        from settings.pages.shell_bar import ShellBarPage
+        from settings.pages.shell_theme import ShellThemePage
         from settings.pages.themes import ThemesPage
         from settings.pages.wallpapers import WallpapersPage
         cls, attr, title = self._lazy_standalone_specs.pop(slug)
@@ -1204,6 +1218,14 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is HypridlePage:
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ShellBarPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ShellThemePage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
 
