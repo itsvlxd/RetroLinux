@@ -98,6 +98,10 @@ BAR_DEFAULTS: dict = {
     "containBar": False,
     "keepBarShadow": False,
     "keepBarBorder": False,
+    "showLayoutChanger": True,
+    "showPresetsButton": True,
+    "showWeatherTemp": False,
+    "showDayOfWeek": False,
 }
 
 
