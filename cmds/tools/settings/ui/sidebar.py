@@ -28,6 +28,8 @@ from settings.ui.icons import (
     LOGS_ICON,
     MONITORS_ICON,
     NETWORK_ICON,
+    NOTCH_ICON,
+    OVERVIEW_ICON,
     POWER_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
@@ -221,6 +223,7 @@ class Sidebar:
         add_row(shell, "shell_sidebar", "Sidebar", SIDEBAR_ICON)
         add_row(shell, "shell_frame", "Frame", FRAME_ICON)
         add_row(shell, "shell_workspaces", "Workspaces", WORKSPACES_ICON)
+        add_row(shell, "shell_overview", "Overview", OVERVIEW_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
