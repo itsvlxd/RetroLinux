@@ -15,6 +15,7 @@ from settings.ui.icons import (
     BINDS_ICON,
     BLUETOOTH_ICON,
     DAEMON_ICON,
+    DESKTOP_ICON,
     DISKS_ICON,
     DOCK_ICON,
     DRIVER_ICON,
@@ -27,6 +28,7 @@ from settings.ui.icons import (
     LAYER_RULES_ICON,
     LAYOUTS_ICON,
     LOGS_ICON,
+    MISC_ICON,
     MONITORS_ICON,
     NETWORK_ICON,
     NOTCH_ICON,
@@ -226,6 +228,8 @@ class Sidebar:
         add_row(shell, "shell_workspaces", "Workspaces", WORKSPACES_ICON)
         add_row(shell, "shell_overview", "Overview", OVERVIEW_ICON)
         add_row(shell, "shell_dock", "Dock", DOCK_ICON)
+        add_row(shell, "shell_desktop", "Desktop", DESKTOP_ICON)
+        add_row(shell, "shell_misc", "Miscellaneous", MISC_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
