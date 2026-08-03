@@ -28,6 +28,7 @@ SIDEBAR_ICON = "sidebar-show-symbolic"
 FRAME_ICON = "window-maximize-symbolic"
 NOTCH_ICON = "camera-web-symbolic"
 OVERVIEW_ICON = "view-fullscreen-symbolic"
+DOCK_ICON = "focus-windows-symbolic"
 
 PENDING_ICON = "view-list-symbolic"
 PROFILES_ICON = "user-bookmarks-symbolic"

@@ -16,6 +16,7 @@ from settings.ui.icons import (
     BLUETOOTH_ICON,
     DAEMON_ICON,
     DISKS_ICON,
+    DOCK_ICON,
     DRIVER_ICON,
     ENV_VARS_ICON,
     FONTS_ICON,
@@ -224,6 +225,7 @@ class Sidebar:
         add_row(shell, "shell_frame", "Frame", FRAME_ICON)
         add_row(shell, "shell_workspaces", "Workspaces", WORKSPACES_ICON)
         add_row(shell, "shell_overview", "Overview", OVERVIEW_ICON)
+        add_row(shell, "shell_dock", "Dock", DOCK_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
