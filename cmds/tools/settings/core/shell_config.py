@@ -291,3 +291,55 @@ def load_ai() -> dict:
 
 def save_ai(data: dict) -> None:
     save_shell_json("ai", data)
+
+
+# ── notch.json ──────────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/notch.js`` and the
+# JsonAdapter defaults in ``Config.qml`` (lines ~672-680).
+NOTCH_DEFAULTS: dict = {
+    "position": "top",
+    "theme": "default",
+    "hoverRegionHeight": 8,
+    "keepHidden": False,
+    "disableHoverExpansion": True,
+    "noMediaDisplay": "userHost",
+    "customText": "RetroLinux",
+}
+
+
+def notch_path() -> Path:
+    return shell_config_dir() / "notch.json"
+
+
+def load_notch() -> dict:
+    return load_shell_json("notch", NOTCH_DEFAULTS)
+
+
+def save_notch(data: dict) -> None:
+    save_shell_json("notch", data)
+
+
+# ── workspaces.json ─────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/workspaces.js`` and the
+# JsonAdapter defaults in ``Config.qml`` (lines ~587-593).
+WORKSPACES_DEFAULTS: dict = {
+    "shown": 10,
+    "showAppIcons": True,
+    "alwaysShowNumbers": False,
+    "showNumbers": False,
+    "dynamic": False,
+}
+
+
+def workspaces_path() -> Path:
+    return shell_config_dir() / "workspaces.json"
+
+
+def load_workspaces() -> dict:
+    return load_shell_json("workspaces", WORKSPACES_DEFAULTS)
+
+
+def save_workspaces(data: dict) -> None:
+    save_shell_json("workspaces", data)
