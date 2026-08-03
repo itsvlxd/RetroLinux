@@ -343,3 +343,26 @@ def load_workspaces() -> dict:
 
 def save_workspaces(data: dict) -> None:
     save_shell_json("workspaces", data)
+
+
+# ── overview.json ───────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/overview.js``.
+OVERVIEW_DEFAULTS: dict = {
+    "rows": 2,
+    "columns": 5,
+    "scale": 0.15,
+    "workspaceSpacing": 8,
+}
+
+
+def overview_path() -> Path:
+    return shell_config_dir() / "overview.json"
+
+
+def load_overview() -> dict:
+    return load_shell_json("overview", OVERVIEW_DEFAULTS)
+
+
+def save_overview(data: dict) -> None:
+    save_shell_json("overview", data)

@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from settings.pages.shell_bar import ShellBarPage
     from settings.pages.shell_frame import ShellFramePage
     from settings.pages.shell_notch import ShellNotchPage
+    from settings.pages.shell_overview import ShellOverviewPage
     from settings.pages.shell_sidebar import ShellSidebarPage
     from settings.pages.shell_theme import ShellThemePage
     from settings.pages.shell_workspaces import ShellWorkspacesPage
@@ -447,6 +448,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_bar import ShellBarPage
         from settings.pages.shell_frame import ShellFramePage
         from settings.pages.shell_notch import ShellNotchPage
+        from settings.pages.shell_overview import ShellOverviewPage
         from settings.pages.shell_sidebar import ShellSidebarPage
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.shell_workspaces import ShellWorkspacesPage
@@ -535,6 +537,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (ShellSidebarPage, "_shell_sidebar_page", "shell_sidebar", "Sidebar"),
             (ShellFramePage, "_shell_frame_page", "shell_frame", "Frame"),
             (ShellWorkspacesPage, "_shell_workspaces_page", "shell_workspaces", "Workspaces"),
+            (ShellOverviewPage, "_shell_overview_page", "shell_overview", "Overview"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
@@ -943,6 +946,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         shell_workspaces_page = getattr(self, "_shell_workspaces_page", None)
         if shell_workspaces_page is not None and shell_workspaces_page.is_dirty():
             counts["shell_workspaces"] = 1
+        shell_overview_page = getattr(self, "_shell_overview_page", None)
+        if shell_overview_page is not None and shell_overview_page.is_dirty():
+            counts["shell_overview"] = 1
         driver_page = getattr(self, "_driver_page", None)
         if driver_page is not None and driver_page.missing_count() > 0:
             counts["driver"] = driver_page.missing_count()
@@ -1178,6 +1184,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_bar import ShellBarPage
         from settings.pages.shell_frame import ShellFramePage
         from settings.pages.shell_notch import ShellNotchPage
+        from settings.pages.shell_overview import ShellOverviewPage
         from settings.pages.shell_sidebar import ShellSidebarPage
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.shell_workspaces import ShellWorkspacesPage
@@ -1269,6 +1276,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ShellWorkspacesPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ShellOverviewPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
