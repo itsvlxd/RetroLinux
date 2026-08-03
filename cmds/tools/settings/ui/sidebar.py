@@ -31,7 +31,6 @@ from settings.ui.icons import (
     MISC_ICON,
     MONITORS_ICON,
     NETWORK_ICON,
-    NOTCH_ICON,
     OVERVIEW_ICON,
     POWER_ICON,
     SETTINGS_ICON,

@@ -104,6 +104,10 @@ class ShellBarPage:
         for key, label, sub in (
             ("use12hFormat", "Use 12h Format", "Show the clock in 12-hour format"),
             ("enableFirefoxPlayer", "Enable Firefox Player", "Show Firefox media controls in the bar"),
+            ("showWeatherTemp", "Show Weather Temperature", "Display temperature in Celsius next to the weather icon"),
+            ("showDayOfWeek", "Show Day of Week", "Show the day abbreviation (Mon, Tue...) beside the clock"),
+            ("showLayoutChanger", "Show Layout Changer", "Display the dwindle/master/scrolling layout selector in the bar"),
+            ("showPresetsButton", "Show Presets Button", "Display the presets manager button in the bar"),
         ):
             self._add_switch(group, key, label, subtitle=sub)
 
@@ -318,6 +322,7 @@ class ShellBarPage:
                     "position": "Position",
                     "launcherIcon": "Launcher Icon",
                     "pillStyle": "Pill Style",
+                    "showLayoutChanger": "Layout Changer",
                 }.get(key, "Bar setting")
                 changed.append(label)
         if changed:
