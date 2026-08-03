@@ -21,6 +21,7 @@ from settings.ui.icons import (
     FONTS_ICON,
     FRAME_ICON,
     GRUB_ICON,
+    NOTCH_ICON,
     KEYRING_ICON,
     LAYER_RULES_ICON,
     LAYOUTS_ICON,
@@ -216,8 +217,10 @@ class Sidebar:
     
         shell = new_category("Shell")
         add_row(shell, "shell_bar", "Bar", BAR_ICON)
+        add_row(shell, "shell_notch", "Notch", NOTCH_ICON)
         add_row(shell, "shell_sidebar", "Sidebar", SIDEBAR_ICON)
         add_row(shell, "shell_frame", "Frame", FRAME_ICON)
+        add_row(shell, "shell_workspaces", "Workspaces", WORKSPACES_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
