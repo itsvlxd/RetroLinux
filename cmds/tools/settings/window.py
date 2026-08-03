@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from settings.pages.power import PowerPage
     from settings.pages.settings import SettingsPage
     from settings.pages.shell_bar import ShellBarPage
+    from settings.pages.shell_frame import ShellFramePage
     from settings.pages.shell_sidebar import ShellSidebarPage
     from settings.pages.shell_theme import ShellThemePage
     from settings.pages.themes import ThemesPage
@@ -442,6 +443,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.power import PowerPage
         from settings.pages.settings import SettingsPage
         from settings.pages.shell_bar import ShellBarPage
+        from settings.pages.shell_frame import ShellFramePage
         from settings.pages.shell_sidebar import ShellSidebarPage
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.themes import ThemesPage
@@ -526,6 +528,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (ShellBarPage, "_shell_bar_page", "shell_bar", "Bar"),
             (ShellThemePage, "_shell_theme_page", "shell_theme", "Theme"),
             (ShellSidebarPage, "_shell_sidebar_page", "shell_sidebar", "Sidebar"),
+            (ShellFramePage, "_shell_frame_page", "shell_frame", "Frame"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
@@ -925,6 +928,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         shell_sidebar_page = getattr(self, "_shell_sidebar_page", None)
         if shell_sidebar_page is not None and shell_sidebar_page.is_dirty():
             counts["shell_sidebar"] = 1
+        shell_frame_page = getattr(self, "_shell_frame_page", None)
+        if shell_frame_page is not None and shell_frame_page.is_dirty():
+            counts["shell_frame"] = 1
         driver_page = getattr(self, "_driver_page", None)
         if driver_page is not None and driver_page.missing_count() > 0:
             counts["driver"] = driver_page.missing_count()
@@ -1158,6 +1164,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
         from settings.pages.shell_bar import ShellBarPage
+        from settings.pages.shell_frame import ShellFramePage
         from settings.pages.shell_sidebar import ShellSidebarPage
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.themes import ThemesPage
@@ -1236,6 +1243,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ShellSidebarPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ShellFramePage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

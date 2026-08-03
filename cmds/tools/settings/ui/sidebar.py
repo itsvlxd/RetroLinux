@@ -19,6 +19,7 @@ from settings.ui.icons import (
     DRIVER_ICON,
     ENV_VARS_ICON,
     FONTS_ICON,
+    FRAME_ICON,
     GRUB_ICON,
     KEYRING_ICON,
     LAYER_RULES_ICON,
@@ -216,6 +217,7 @@ class Sidebar:
         shell = new_category("Shell")
         add_row(shell, "shell_bar", "Bar", BAR_ICON)
         add_row(shell, "shell_sidebar", "Sidebar", SIDEBAR_ICON)
+        add_row(shell, "shell_frame", "Frame", FRAME_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
