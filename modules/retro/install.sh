@@ -129,7 +129,7 @@ sync_missing_variables
 
 HYPRIDLE_SRC="$RETRO_DIR/modules/hyprland/files/hypridle.conf"
 HYPRIDLE_DST="$RETRO_CONFIG/hypridle.conf"
-if [[ ! -f "$HYPRIDLE_DST" ]] || cmp -s "$HYPRIDLE_SRC" "$HYPRIDLE_DST"; then
+if [[ ! -f $HYPRIDLE_DST ]] || cmp -s "$HYPRIDLE_SRC" "$HYPRIDLE_DST"; then
     cp "$HYPRIDLE_SRC" "$HYPRIDLE_DST"
     rx_log "success" "Copied default hypridle.conf"
 fi
@@ -192,5 +192,4 @@ fi
 if [[ ! -f /swapfile ]]; then
     rx_log "info" "Setting up swap + hibernation (auto-calculated from RAM)..."
     bash "$SYSTEM_SCRIPT" --apply
-    rx_log "success" "System defaults applied — reboot to activate hibernation"
 fi
