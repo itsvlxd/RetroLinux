@@ -1,9 +1,10 @@
 """Shell Bar page — configure the Retro Shell top bar (``bar.json``).
 
-Mirrors the Bar and Frame sections of the in-shell ``ShellPanel.qml``.
-Values are written to ``~/.config/retro/shell/bar.json``; the shell's
-``FileView`` watches that file with ``watchChanges`` and reloads on
-external writes, so changes apply live without a shell restart.
+Mirrors the Bar and Auto-hide sections of the in-shell ``ShellPanel.qml``
+(its Frame section lives in the separate ``shell_frame`` page). Values are
+written to ``~/.config/retro/shell/bar.json``; the shell's ``FileView``
+watches that file with ``watchChanges`` and reloads on external writes, so
+changes apply live without a shell restart.
 
 Writes are gated by the settings window's save/discard lifecycle: edits
 are staged in memory (``_data`` vs the ``_saved`` snapshot) and only
@@ -34,10 +35,6 @@ _SWITCH_KEYS = (
     ("hoverToReveal", "Hover to Reveal"),
     ("showPinButton", "Show Pin Button"),
     ("availableOnFullscreen", "Available on Fullscreen"),
-    ("frameEnabled", "Enabled"),
-    ("containBar", "Contain Bar"),
-    ("keepBarShadow", "Keep Bar Shadow"),
-    ("keepBarBorder", "Keep Bar Border"),
 )
 
 _POSITION_OPTIONS = [
@@ -63,7 +60,6 @@ class ShellBarPage:
         self._data = load_bar()
         self._saved = dict(self._data)
         self._rows: dict[str, ManagedRow] = {}
-        self._frame_rows: list[tuple[str, ManagedRow]] = []
 
     # ── Build ──
 
@@ -84,13 +80,6 @@ class ShellBarPage:
         )
         self._build_autohide_group(autohide_group)
         content_box.append(autohide_group)
-
-        frame_group = Adw.PreferencesGroup(
-            title="Frame",
-            description="Frame around the bar and whether it contains its own chrome.",
-        )
-        self._build_frame_group(frame_group)
-        content_box.append(frame_group)
 
         return toolbar
 
@@ -130,28 +119,6 @@ class ShellBarPage:
                          subtitle="Show a button to pin the bar")
         self._add_switch(group, "availableOnFullscreen", "Available on Fullscreen",
                          subtitle="Keep the bar visible over fullscreen apps")
-
-    def _build_frame_group(self, group: Adw.PreferencesGroup) -> None:
-        self._add_switch(group, "frameEnabled", "Enabled",
-                         subtitle="Draw a frame around the bar")
-        self._add_spin(group, "frameThickness", "Thickness",
-                       lower=0, upper=40, suffix="px",
-                       subtitle="Frame thickness in pixels")
-        self._add_switch(group, "containBar", "Contain Bar",
-                         subtitle="Clip the bar to its frame bounds")
-        for key, label, sub in (
-            ("keepBarShadow", "Keep Bar Shadow", "Keep the bar's shadow when contained"),
-            ("keepBarBorder", "Keep Bar Border", "Keep the bar's border when contained"),
-        ):
-            mrow = self._add_switch(group, key, label, subtitle=sub)
-            self._frame_rows.append((key, mrow))
-        self._refresh_frame_visibility()
-
-    def _refresh_frame_visibility(self) -> None:
-        """Keep Bar Shadow / Border only apply when the bar is contained."""
-        contained = bool(self._data.get("containBar", False))
-        for _key, mrow in self._frame_rows:
-            mrow.row.set_visible(contained)
 
     # ── Row builders ──
 
@@ -315,8 +282,6 @@ class ShellBarPage:
 
     def _on_change(self, key: str, value) -> None:
         self._data[key] = value
-        if key == "containBar":
-            self._refresh_frame_visibility()
         self._notify_dirty()
 
     def _notify_dirty(self) -> None:
@@ -338,7 +303,6 @@ class ShellBarPage:
 
     def discard(self) -> None:
         self._data = dict(self._saved)
-        self._refresh_frame_visibility()
         for mrow in self._rows.values():
             mrow.discard()
 
@@ -377,9 +341,6 @@ class ShellBarPage:
             {"key": "shell_bar:autohide", "label": "Bar Auto-hide",
              "description": "Pin, hover-to-reveal, fullscreen behaviour",
              "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Auto-hide"},
-            {"key": "shell_bar:frame", "label": "Bar Frame",
-             "description": "Frame thickness and contain-bar chrome",
-             "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Frame"},
         ]
 
 

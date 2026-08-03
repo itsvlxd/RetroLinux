@@ -25,6 +25,7 @@ THEMES_ICON = "preferences-color-symbolic"
 BAR_ICON = "focus-top-bar-symbolic"
 SHELL_THEME_ICON = "preferences-desktop-display-symbolic"
 SIDEBAR_ICON = "sidebar-show-symbolic"
+FRAME_ICON = "window-maximize-symbolic"
 
 PENDING_ICON = "view-list-symbolic"
 PROFILES_ICON = "user-bookmarks-symbolic"
