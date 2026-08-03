@@ -366,3 +366,40 @@ def load_overview() -> dict:
 
 def save_overview(data: dict) -> None:
     save_shell_json("overview", data)
+
+
+# ── dock.json ───────────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/dock.js``.
+# Only settings exposed in ShellPanel.qml's Dock section are included;
+# ``ignoredAppRegexes`` and ``screenList`` are complex list types the shell
+# panel itself exposes via custom widgets — they are left to the QML side.
+DOCK_DEFAULTS: dict = {
+    "enabled": True,
+    "position": "bottom",
+    "theme": "default",
+    "height": 48,
+    "iconSize": 24,
+    "spacing": 4,
+    "margin": 4,
+    "hoverToReveal": True,
+    "hoverRegionHeight": 16,
+    "pinnedOnStartup": False,
+    "showPinButton": True,
+    "availableOnFullscreen": False,
+    "keepHidden": False,
+    "showRunningIndicators": True,
+    "showOverviewButton": True,
+}
+
+
+def dock_path() -> Path:
+    return shell_config_dir() / "dock.json"
+
+
+def load_dock() -> dict:
+    return load_shell_json("dock", DOCK_DEFAULTS)
+
+
+def save_dock(data: dict) -> None:
+    save_shell_json("dock", data)
