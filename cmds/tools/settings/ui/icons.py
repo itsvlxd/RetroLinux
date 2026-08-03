@@ -29,6 +29,8 @@ FRAME_ICON = "window-maximize-symbolic"
 NOTCH_ICON = "camera-web-symbolic"
 OVERVIEW_ICON = "view-fullscreen-symbolic"
 DOCK_ICON = "focus-windows-symbolic"
+DESKTOP_ICON = "user-desktop-symbolic"
+MISC_ICON = "preferences-other-symbolic"
 
 PENDING_ICON = "view-list-symbolic"
 PROFILES_ICON = "user-bookmarks-symbolic"

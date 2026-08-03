@@ -42,8 +42,10 @@ if TYPE_CHECKING:
     from settings.pages.power import PowerPage
     from settings.pages.settings import SettingsPage
     from settings.pages.shell_bar import ShellBarPage
+    from settings.pages.shell_desktop import ShellDesktopPage
     from settings.pages.shell_dock import ShellDockPage
     from settings.pages.shell_frame import ShellFramePage
+    from settings.pages.shell_misc import ShellMiscPage
     from settings.pages.shell_notch import ShellNotchPage
     from settings.pages.shell_overview import ShellOverviewPage
     from settings.pages.shell_sidebar import ShellSidebarPage
@@ -447,8 +449,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.power import PowerPage
         from settings.pages.settings import SettingsPage
         from settings.pages.shell_bar import ShellBarPage
+        from settings.pages.shell_desktop import ShellDesktopPage
         from settings.pages.shell_dock import ShellDockPage
         from settings.pages.shell_frame import ShellFramePage
+        from settings.pages.shell_misc import ShellMiscPage
         from settings.pages.shell_notch import ShellNotchPage
         from settings.pages.shell_overview import ShellOverviewPage
         from settings.pages.shell_sidebar import ShellSidebarPage
@@ -534,6 +538,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (PowerPage, "_power_page", "power", "Power"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ShellBarPage, "_shell_bar_page", "shell_bar", "Bar"),
+            (ShellDesktopPage, "_shell_desktop_page", "shell_desktop", "Desktop"),
             (ShellDockPage, "_shell_dock_page", "shell_dock", "Dock"),
             (ShellThemePage, "_shell_theme_page", "shell_theme", "Theme"),
             (ShellNotchPage, "_shell_notch_page", "shell_notch", "Notch"),
@@ -541,6 +546,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (ShellFramePage, "_shell_frame_page", "shell_frame", "Frame"),
             (ShellWorkspacesPage, "_shell_workspaces_page", "shell_workspaces", "Workspaces"),
             (ShellOverviewPage, "_shell_overview_page", "shell_overview", "Overview"),
+            (ShellMiscPage, "_shell_misc_page", "shell_misc", "Miscellaneous"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
@@ -934,6 +940,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         shell_bar_page = getattr(self, "_shell_bar_page", None)
         if shell_bar_page is not None and shell_bar_page.is_dirty():
             counts["shell_bar"] = 1
+        shell_desktop_page = getattr(self, "_shell_desktop_page", None)
+        if shell_desktop_page is not None and shell_desktop_page.is_dirty():
+            counts["shell_desktop"] = 1
         shell_dock_page = getattr(self, "_shell_dock_page", None)
         if shell_dock_page is not None and shell_dock_page.is_dirty():
             counts["shell_dock"] = 1
@@ -955,6 +964,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         shell_overview_page = getattr(self, "_shell_overview_page", None)
         if shell_overview_page is not None and shell_overview_page.is_dirty():
             counts["shell_overview"] = 1
+        shell_misc_page = getattr(self, "_shell_misc_page", None)
+        if shell_misc_page is not None and shell_misc_page.is_dirty():
+            counts["shell_misc"] = 1
         driver_page = getattr(self, "_driver_page", None)
         if driver_page is not None and driver_page.missing_count() > 0:
             counts["driver"] = driver_page.missing_count()
@@ -1188,8 +1200,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
         from settings.pages.shell_bar import ShellBarPage
+        from settings.pages.shell_desktop import ShellDesktopPage
         from settings.pages.shell_dock import ShellDockPage
         from settings.pages.shell_frame import ShellFramePage
+        from settings.pages.shell_misc import ShellMiscPage
         from settings.pages.shell_notch import ShellNotchPage
         from settings.pages.shell_overview import ShellOverviewPage
         from settings.pages.shell_sidebar import ShellSidebarPage
@@ -1266,6 +1280,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ShellDesktopPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ShellDockPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
@@ -1291,6 +1309,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ShellOverviewPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is ShellMiscPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

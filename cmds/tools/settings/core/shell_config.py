@@ -403,3 +403,120 @@ def load_dock() -> dict:
 
 def save_dock(data: dict) -> None:
     save_shell_json("dock", data)
+
+
+# ── desktop.json ────────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/desktop.js``.
+DESKTOP_DEFAULTS: dict = {
+    "enabled": False,
+    "iconSize": 40,
+    "spacingVertical": 16,
+    "textColor": "overBackground",
+}
+
+
+def desktop_path() -> Path:
+    return shell_config_dir() / "desktop.json"
+
+
+def load_desktop() -> dict:
+    return load_shell_json("desktop", DESKTOP_DEFAULTS)
+
+
+def save_desktop(data: dict) -> None:
+    save_shell_json("desktop", data)
+
+
+# ── system.json (Misc/OCR) ──────────────────────────────────────────────
+
+# OCR defaults from ``modules/retroshell/files/config/defaults/system.js``.
+# Only the ``ocr`` sub-object is managed by the Misc page; the rest of
+# system.json (idle, pomodoro, disks, …) is preserved untouched via deep
+# merge on load and partial update on save.
+SYSTEM_OCR_DEFAULTS: dict = {
+    "eng": True,
+    "spa": True,
+    "lat": False,
+    "jpn": False,
+    "chi_sim": False,
+    "chi_tra": False,
+    "kor": False,
+}
+
+
+def system_path() -> Path:
+    return shell_config_dir() / "system.json"
+
+
+def load_system() -> dict:
+    """Return the full system.json merged over partial defaults.
+
+    Returns the entire document so callers can reach nested keys like
+    ``ocr``, ``idle``, ``pomodoro`` and ``disks``. The ``ocr`` sub-object
+    always resolves because ``SYSTEM_OCR_DEFAULTS`` provides it.
+    """
+    return load_shell_json("system", {"ocr": SYSTEM_OCR_DEFAULTS})
+
+
+def save_system(data: dict) -> None:
+    """Write *data* back to system.json, preserving unknown top-level keys.
+
+    Merges *data* on top of the on-disk file so nested objects the Misc
+    page doesn't touch (idle, pomodoro, disks, …) survive the round-trip.
+    """
+    path = shell_config_dir() / "system.json"
+    existing: dict = {}
+    try:
+        existing = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        pass
+    if not isinstance(existing, dict):
+        existing = {}
+    save_shell_json("system", _deep_merge(existing, data))
+
+
+# ── weather.json ────────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/weather.js``.
+WEATHER_DEFAULTS: dict = {
+    "location": "",
+    "unit": "C",
+}
+
+
+def weather_path() -> Path:
+    return shell_config_dir() / "weather.json"
+
+
+def load_weather() -> dict:
+    return load_shell_json("weather", WEATHER_DEFAULTS)
+
+
+def save_weather(data: dict) -> None:
+    save_shell_json("weather", data)
+
+
+# ── performance.json ───────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/performance.js``.
+PERFORMANCE_DEFAULTS: dict = {
+    "blurTransition": True,
+    "windowPreview": True,
+    "wavyLine": True,
+    "rotateCoverArt": True,
+    "dashboardPersistTabs": True,
+    "dashboardMaxPersistentTabs": 2,
+}
+
+
+def performance_path() -> Path:
+    return shell_config_dir() / "performance.json"
+
+
+def load_performance() -> dict:
+    return load_shell_json("performance", PERFORMANCE_DEFAULTS)
+
+
+def save_performance(data: dict) -> None:
+    save_shell_json("performance", data)
