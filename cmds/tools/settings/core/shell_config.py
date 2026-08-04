@@ -18,6 +18,7 @@ Writes are atomic (temp file + ``os.replace``) to match the shell's
 
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -524,3 +525,194 @@ def load_performance() -> dict:
 
 def save_performance(data: dict) -> None:
     save_shell_json("performance", data)
+
+
+# ── presets ─────────────────────────────────────────────────────────────
+
+# Mirrors ``PresetsService.qml`` preset file handling.
+# Bundled presets ship at ``modules/retroshell/files/assets/presets/``;
+# user presets live under the shell config dir at ``presets/``.
+_PRESET_FILES = (
+    "bar.json",
+    "desktop.json",
+    "dock.json",
+    "compositor.json",
+    "lockscreen.json",
+    "notch.json",
+    "overview.json",
+    "performance.json",
+    "theme.json",
+    "workspaces.json",
+)
+
+_BUNDLED_PRESETS_DIR = Path("/opt/retrolinux/modules/retroshell/files/assets/presets")
+
+
+def _resolve_retro_dir() -> Path:
+    """Best-effort resolution of the RetroLinux install root."""
+    candidate = os.environ.get("RETRO_DIR", "/opt/retrolinux")
+    return Path(candidate)
+
+
+def user_presets_dir() -> Path:
+    return shell_config_dir() / "presets"
+
+
+def active_preset_file() -> Path:
+    return user_presets_dir() / "active_preset"
+
+
+def read_active_preset() -> str:
+    """Return the currently active preset name, or empty string."""
+    path = active_preset_file()
+    try:
+        return path.read_text().strip()
+    except OSError:
+        return ""
+
+
+def _read_info(preset_dir: Path) -> dict:
+    info = preset_dir / "info.json"
+    try:
+        data = json.loads(info.read_text())
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _has_config_files(preset_dir: Path) -> bool:
+    return any((preset_dir / f).exists() for f in _PRESET_FILES)
+
+
+def scan_presets() -> list[dict]:
+    """Return sorted list of ``{name, path, is_official, info}`` dicts."""
+    presets: list[dict] = []
+    seen: set[str] = set()
+
+    # Bundled (official) presets
+    bundled = _BUNDLED_PRESETS_DIR
+    if bundled.is_dir():
+        for d in sorted(bundled.iterdir()):
+            if d.is_dir() and _has_config_files(d):
+                seen.add(d.name)
+                presets.append({
+                    "name": d.name,
+                    "path": str(d),
+                    "is_official": True,
+                    "info": _read_info(d),
+                })
+
+    # User presets
+    user = user_presets_dir()
+    if user.is_dir():
+        for d in sorted(user.iterdir()):
+            if d.is_dir() and _has_config_files(d) and d.name not in seen:
+                presets.append({
+                    "name": d.name,
+                    "path": str(d),
+                    "is_official": False,
+                    "info": _read_info(d),
+                })
+
+    return presets
+
+
+def apply_preset(preset: dict) -> None:
+    """Copy all config files from *preset*'s dir into the shell config dir."""
+    src = Path(preset["path"])
+    dst = shell_config_dir()
+    for f in _PRESET_FILES:
+        s = src / f
+        if s.exists():
+            shutil.copy2(s, dst / f)
+    # Mark as active
+    af = active_preset_file()
+    af.parent.mkdir(parents=True, exist_ok=True)
+    af.write_text(preset["name"] + "\n")
+
+
+def save_preset(name: str) -> None:
+    """Create a new user preset from the current shell config."""
+    dst_dir = user_presets_dir() / name
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    src_dir = shell_config_dir()
+    for f in _PRESET_FILES:
+        s = src_dir / f
+        if s.exists():
+            shutil.copy2(s, dst_dir / f)
+    info = dst_dir / "info.json"
+    info.write_text(json.dumps({"author": "User", "authorUrl": ""}, indent=2) + "\n")
+
+
+def delete_preset(name: str) -> None:
+    """Delete a user preset directory."""
+    d = user_presets_dir() / name
+    if d.is_dir():
+        shutil.rmtree(d)
+    # Clear active if it was the deleted one
+    if read_active_preset() == name:
+        af = active_preset_file()
+        try:
+            af.unlink()
+        except OSError:
+            pass
+
+
+def rename_preset(old_name: str, new_name: str) -> None:
+    """Rename a user preset directory."""
+    old = user_presets_dir() / old_name
+    new = user_presets_dir() / new_name
+    if old.is_dir():
+        old.rename(new)
+    if read_active_preset() == old_name:
+        af = active_preset_file()
+        af.write_text(new_name + "\n")
+
+
+def update_preset(preset: dict) -> None:
+    """Overwrite a user preset's files with current shell config."""
+    dst = Path(preset["path"])
+    src = shell_config_dir()
+    for f in _PRESET_FILES:
+        s = src / f
+        if s.exists() and (dst / f).exists():
+            shutil.copy2(s, dst / f)
+
+
+def clone_official_preset(name: str) -> None:
+    """Copy an official preset into user presets (allows updates)."""
+    bundled = _BUNDLED_PRESETS_DIR / name
+    dst = user_presets_dir() / name
+    # Block re-cloning if it already exists as user preset
+    if not dst.exists():
+        shutil.copytree(str(bundled), str(dst))
+
+
+# ── lockscreen.json ─────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/lockscreen.js``.
+LOCK_DEFAULTS: dict = {
+    "clockFontSize": 240,
+    "clockColor": "primaryFixed",
+    "clockMinutesColor": "primaryFixedDim",
+    "clockDateFontSize": 14,
+    "clockDateColor": "primaryFixedDim",
+    "clockPosition": "center",
+    "clockStyle": "split",
+    "passwordPosition": "bottom",
+    "musicPosition": "bottom-left",
+    "weatherPosition": "bottom-left",
+    "powerPosition": "bottom-right",
+}
+
+
+def lockscreen_path() -> Path:
+    return shell_config_dir() / "lockscreen.json"
+
+
+def load_lockscreen() -> dict:
+    return load_shell_json("lockscreen", LOCK_DEFAULTS)
+
+
+def save_lockscreen(data: dict) -> None:
+    save_shell_json("lockscreen", data)

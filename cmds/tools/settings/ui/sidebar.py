@@ -27,12 +27,14 @@ from settings.ui.icons import (
     KEYRING_ICON,
     LAYER_RULES_ICON,
     LAYOUTS_ICON,
+    LOCK_ICON,
     LOGS_ICON,
     MISC_ICON,
     MONITORS_ICON,
     NETWORK_ICON,
     OVERVIEW_ICON,
     POWER_ICON,
+    PRESETS_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -229,6 +231,8 @@ class Sidebar:
         add_row(shell, "shell_dock", "Dock", DOCK_ICON)
         add_row(shell, "shell_desktop", "Desktop", DESKTOP_ICON)
         add_row(shell, "shell_misc", "Miscellaneous", MISC_ICON)
+        add_row(shell, "shell_presets", "Presets", PRESETS_ICON)
+        add_row(shell, "shell_lock", "Lockscreen", LOCK_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
