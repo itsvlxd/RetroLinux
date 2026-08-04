@@ -155,7 +155,8 @@ cmd_audio() {
             if ! [[ $step =~ ^[0-9]+$ ]]; then
                 rx_log "error" "Step must be a number" && return 1
             fi
-            local new_vol=$(bash "$audio_core" --volume-up "$step")
+            wpctl set-volume @DEFAULT_AUDIO_SINK@ "${step}%+" 2>/dev/null
+            local new_vol=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2 * 100)}')
             rx_log "success" "Volume increased to ${PINK}${new_vol}%%${RESET}"
             ;;
 
@@ -164,7 +165,8 @@ cmd_audio() {
             if ! [[ $step =~ ^[0-9]+$ ]]; then
                 rx_log "error" "Step must be a number" && return 1
             fi
-            local new_vol=$(bash "$audio_core" --volume-down "$step")
+            wpctl set-volume @DEFAULT_AUDIO_SINK@ "${step}%-" 2>/dev/null
+            local new_vol=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2 * 100)}')
             rx_log "success" "Volume decreased to ${PINK}${new_vol}%%${RESET}"
             ;;
 
