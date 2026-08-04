@@ -5,13 +5,15 @@ Values are written to ``~/.config/retro/shell/lockscreen.json``; the shell's
 writes, so changes apply live without a shell restart.
 """
 
+import os
+import subprocess
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from gi.repository import Adw, Gtk
 
 from settings.core.pending import PendingChange
-from settings.core.shell_config import LOCK_DEFAULTS, load_lockscreen, save_lockscreen
+from settings.core.shell_config import LOCK_DEFAULTS, load_lockscreen, save_lockscreen, load_weather
 from settings.ui import make_page_layout
 from settings.ui.color_combo import COLOR_NAMES, _draw_swatch_hex, color_map
 from settings.ui.icons import LOCK_ICON
@@ -20,11 +22,26 @@ from settings.ui.managed_row import ManagedRow, make_combo_row, make_spin_int_ro
 if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
 
+_RETRO_DIR = os.environ.get("RETRO_DIR", "/opt/retrolinux")
+_FONT_CORE = os.path.join(_RETRO_DIR, "scripts", "font_core.sh")
+
+def _installed_fonts() -> list[str]:
+    try:
+        result = subprocess.run(
+            ["bash", _FONT_CORE, "--list-installed"],
+            capture_output=True, text=True, timeout=15,
+            stdin=subprocess.DEVNULL,
+        )
+        return sorted(l.strip() for l in result.stdout.strip().splitlines() if l.strip())
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return []
+
 _ALL_POSITIONS = [
     ("top-left", "Top Left"),
     ("top", "Top Center"),
     ("top-right", "Top Right"),
     ("left", "Left Center"),
+    ("center", "Center"),
     ("right", "Right Center"),
     ("bottom-left", "Bottom Left"),
     ("bottom", "Bottom Center"),
@@ -36,7 +53,6 @@ _CLOCK_STYLES = [
     ("split", "Split (HH MM offset)"),
     ("inline", "Inline (HH:MM)"),
     ("stacked", "Stacked (HH / MM)"),
-    ("minimal", "Minimal (HH:MM + date)"),
 ]
 
 
@@ -103,8 +119,10 @@ class ShellLockPage:
 
         clock_group = Adw.PreferencesGroup(
             title="Clock",
-            description="Font size and colors for the lockscreen clock.",
+            description="Font, size, style and colors for the lockscreen clock.",
         )
+        self._add_font_combo(clock_group, "clockFont", "Font",
+                             subtitle="Font family used for the clock digits")
         self._add_spin(clock_group, "clockFontSize", "Font Size", lower=80, upper=400, suffix="px",
                        subtitle="Size of the clock digits in pixels")
         self._add_combo(clock_group, "clockStyle", "Style", _CLOCK_STYLES,
@@ -115,10 +133,6 @@ class ShellLockPage:
                               subtitle="Color used for the hours digits")
         self._add_color_combo(clock_group, "clockMinutesColor", "Minutes Color",
                               subtitle="Color used for the minutes digits")
-        self._add_spin(clock_group, "clockDateFontSize", "Date Font Size", lower=8, upper=48, suffix="px",
-                       subtitle="Size of the date text in minimal style")
-        self._add_color_combo(clock_group, "clockDateColor", "Date Color",
-                              subtitle="Color used for the date text in minimal style")
         content_box.append(clock_group)
 
         password_group = Adw.PreferencesGroup(
@@ -135,8 +149,14 @@ class ShellLockPage:
         )
         self._add_combo(widgets_group, "musicPosition", "Music Player", _ALL_POSITIONS,
                         subtitle="Corner for the currently playing track")
-        self._add_combo(widgets_group, "weatherPosition", "Weather", _ALL_POSITIONS,
-                        subtitle="Corner for the weather and forecast")
+
+        weather_config = load_weather()
+        has_city = bool(weather_config.get("location", ""))
+        weather_row = self._add_combo(widgets_group, "weatherPosition", "Weather", _ALL_POSITIONS,
+                        subtitle="Corner for the weather and forecast" if has_city else "No city configured — set up in Shell → Miscellaneous")
+        if not has_city:
+            weather_row.row.set_sensitive(False)
+
         self._add_combo(widgets_group, "powerPosition", "Power Menu", _ALL_POSITIONS,
                         subtitle="Corner for the power buttons")
         content_box.append(widgets_group)
@@ -160,6 +180,37 @@ class ShellLockPage:
         def set_silent(value):
             try: row.set_selected(ids.index(value))
             except ValueError: row.set_selected(0)
+
+        mrow = ManagedRow(row, default=LOCK_DEFAULTS[key],
+                          baseline=self._saved.get(key, LOCK_DEFAULTS[key]),
+                          get_value=get_value, set_value_silent=set_silent,
+                          on_value_set=lambda v, k=key: self._on_change(k, v))
+        self._rows[key] = mrow
+        row.connect("notify::selected", lambda *a, k=key, m=mrow: (setattr(self, '_data', {**self._data, k: m.value}), m.refresh(), self._notify_dirty()))
+        return mrow
+
+    def _add_font_combo(self, group: Adw.PreferencesGroup, key: str, label: str,
+                        subtitle: str = "") -> ManagedRow:
+        fonts = _installed_fonts()
+        current = str(self._data.get(key, LOCK_DEFAULTS[key]))
+        if current and fonts:
+            if not any(f.lower() == current.lower() for f in fonts):
+                fonts = [current] + fonts
+        model = Gtk.StringList.new(fonts) if fonts else Gtk.StringList.new([])
+        selected = 0
+        if current and fonts:
+            for i, f in enumerate(fonts):
+                if f.lower() == current.lower():
+                    selected = i; break
+        row = make_combo_row(label, model=model, selected=selected, subtitle=subtitle)
+        group.add(row)
+
+        def get_value():
+            idx = row.get_selected()
+            return fonts[idx] if 0 <= idx < len(fonts) else (current if current else (fonts[0] if fonts else ""))
+        def set_silent(value):
+            try: row.set_selected(next(i for i, f in enumerate(fonts) if f.lower() == str(value).lower()))
+            except StopIteration: row.set_selected(0)
 
         mrow = ManagedRow(row, default=LOCK_DEFAULTS[key],
                           baseline=self._saved.get(key, LOCK_DEFAULTS[key]),

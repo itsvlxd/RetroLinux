@@ -692,9 +692,10 @@ def clone_official_preset(name: str) -> None:
 
 # Mirrors ``modules/retroshell/files/config/defaults/lockscreen.js``.
 LOCK_DEFAULTS: dict = {
+    "clockFont": "League Gothic",
     "clockFontSize": 240,
     "clockColor": "primaryFixed",
-    "clockMinutesColor": "primaryFixedDim",
+    "clockMinutesColor": "outline",
     "clockDateFontSize": 14,
     "clockDateColor": "primaryFixedDim",
     "clockPosition": "center",
