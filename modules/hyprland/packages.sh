@@ -4,6 +4,7 @@ hyprland-protocols
 hyprwayland-scanner
 
 hypridle
+hyprpicker
 hyprshutdown
 
 cliphist
