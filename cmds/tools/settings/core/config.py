@@ -67,6 +67,97 @@ RETRO_ACTIONS: dict = {
         "label": "Toggle Fullscreen",
         "standard": ("fullscreen", "0"),
     },
+    # --- retro shell run actions ---
+    "retro_open_launcher": {
+        "lua_fn": "Retro.open_launcher",
+        "label": "Open Launcher",
+        "standard": ("exec", "retro shell run launcher"),
+    },
+    "retro_open_clipboard": {
+        "lua_fn": "Retro.open_clipboard",
+        "label": "Open Clipboard",
+        "standard": ("exec", "retro shell run clipboard"),
+    },
+    "retro_open_emoji": {
+        "lua_fn": "Retro.open_emoji",
+        "label": "Open Emoji",
+        "standard": ("exec", "retro shell run emoji"),
+    },
+    "retro_open_tmux": {
+        "lua_fn": "Retro.open_tmux",
+        "label": "Open Tmux",
+        "standard": ("exec", "retro shell run tmux"),
+    },
+    "retro_open_notes": {
+        "lua_fn": "Retro.open_notes",
+        "label": "Open Notes",
+        "standard": ("exec", "retro shell run notes"),
+    },
+    "retro_open_wallpapers": {
+        "lua_fn": "Retro.open_wallpapers",
+        "label": "Open Wallpapers",
+        "standard": ("exec", "retro shell run wallpapers"),
+    },
+    "retro_open_screenshot": {
+        "lua_fn": "Retro.open_screenshot",
+        "label": "Open Screenshot",
+        "standard": ("exec", "retro shell run screenshot"),
+    },
+    "retro_open_screenrecord": {
+        "lua_fn": "Retro.open_screenrecord",
+        "label": "Open Screen Recorder",
+        "standard": ("exec", "retro shell run screenrecord"),
+    },
+    "retro_open_lockscreen": {
+        "lua_fn": "Retro.open_lockscreen",
+        "label": "Open Lockscreen",
+        "standard": ("exec", "retro shell run lockscreen"),
+    },
+    "retro_open_overview": {
+        "lua_fn": "Retro.open_overview",
+        "label": "Open Overview",
+        "standard": ("exec", "retro shell run overview"),
+    },
+    "retro_open_powermenu": {
+        "lua_fn": "Retro.open_powermenu",
+        "label": "Open Power Menu",
+        "standard": ("exec", "retro shell run powermenu"),
+    },
+    "retro_open_tools": {
+        "lua_fn": "Retro.open_tools",
+        "label": "Open Tools",
+        "standard": ("exec", "retro shell run tools"),
+    },
+    "retro_open_assistant": {
+        "lua_fn": "Retro.open_assistant",
+        "label": "Open Assistant",
+        "standard": ("exec", "retro shell run assistant"),
+    },
+    "retro_open_config": {
+        "lua_fn": "Retro.open_config",
+        "label": "Open Config",
+        "standard": ("exec", "retro shell run config"),
+    },
+    "retro_open_dashboard": {
+        "lua_fn": "Retro.open_dashboard",
+        "label": "Open Dashboard",
+        "standard": ("exec", "retro shell run dashboard"),
+    },
+    "retro_media_play_pause": {
+        "lua_fn": "Retro.media_play_pause",
+        "label": "Media Play / Pause",
+        "standard": ("exec", "retro shell run media-play-pause"),
+    },
+    "retro_media_next": {
+        "lua_fn": "Retro.media_next",
+        "label": "Media Next",
+        "standard": ("exec", "retro shell run media-next"),
+    },
+    "retro_media_prev": {
+        "lua_fn": "Retro.media_prev",
+        "label": "Media Previous",
+        "standard": ("exec", "retro shell run media-prev"),
+    },
 }
 
 # --- Derived maps (do not edit manually) ---
