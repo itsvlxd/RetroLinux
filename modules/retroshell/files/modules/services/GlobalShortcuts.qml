@@ -86,9 +86,19 @@ QtObject {
             case "media-seek-forward": seekActivePlayer(mediaSeekStepMs); break;
             case "media-play-pause": 
                 if (MprisController.canTogglePlaying) MprisController.togglePlaying();
+                GlobalStates.mediaOsdAction = "play-pause";
+                GlobalStates.mediaOsdVisible = true;
                 break;
-            case "media-next": MprisController.next(); break;
-            case "media-prev": MprisController.previous(); break;
+            case "media-next":
+                MprisController.next();
+                GlobalStates.mediaOsdAction = "next";
+                GlobalStates.mediaOsdVisible = true;
+                break;
+            case "media-prev":
+                MprisController.previous();
+                GlobalStates.mediaOsdAction = "prev";
+                GlobalStates.mediaOsdVisible = true;
+                break;
                 
             default: console.warn("Unknown IPC command:", command);
         }

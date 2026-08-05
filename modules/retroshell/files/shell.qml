@@ -246,12 +246,24 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
 
-        Loader {
-            id: osdLoader
-            active: SuspendManager.wakeReady
+        Item {
+            id: osdContainer
             required property ShellScreen modelData
-            sourceComponent: OSD {
-                targetScreen: osdLoader.modelData
+
+            Loader {
+                id: osdLoader
+                active: SuspendManager.wakeReady
+                sourceComponent: OSD {
+                    targetScreen: osdContainer.modelData
+                }
+            }
+
+            Loader {
+                id: mediaOsdLoader
+                active: SuspendManager.wakeReady
+                sourceComponent: MediaOSD {
+                    targetScreen: osdContainer.modelData
+                }
             }
         }
     }
