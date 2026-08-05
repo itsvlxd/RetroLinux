@@ -289,17 +289,6 @@ rx_apply_color_map() {
             sed -i "s/^\([[:space:]]*--${ff_key}_rgb: *\)[0-9][0-9]* [0-9][0-9]* [0-9][0-9]*/\1${r} ${g} ${b}/" "$file"
         fi
 
-        file="$output_dir/rofi-colors.rasi"
-        if [[ -f $file ]]; then
-            local rofi_key="${key//_/-}"
-            sed -i "s/^\(    ${rofi_key}: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
-
-            if [[ $key == "primary" ]]; then
-                sed -i "s/^\(    selected: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
-                sed -i "s/^\(    highlight: *\)#[0-9a-f]*FF/\1#${hex}FF/" "$file"
-            fi
-        fi
-
         if [[ -z $slot ]]; then
             file="$output_dir/hyprland-colors.lua"
             if [[ -f $file ]]; then
