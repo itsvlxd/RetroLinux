@@ -9,7 +9,24 @@ Singleton {
 
     property alias inhibit: idleInhibitor.enabled
     property int timedMinutes: 0
+    property int initialMinutes: 0
     property var _endTime: 0
+    property int _tick: 0
+
+    readonly property int totalSecondsRemaining: {
+        var tick = _tick;
+        if (_endTime <= 0) return 0;
+        return Math.max(0, Math.ceil((_endTime - Date.now()) / 1000));
+    }
+
+    readonly property string timeRemaining: {
+        var tick = _tick;
+        var total = totalSecondsRemaining;
+        if (total <= 0) return "0:00";
+        var min = Math.floor(total / 60);
+        var sec = total % 60;
+        return min + ":" + (sec < 10 ? "0" : "") + sec;
+    }
 
     function toggleInhibit() {
         if (inhibit) {
@@ -27,6 +44,7 @@ Singleton {
         if (minutes > 0) {
             _endTime = Date.now() + minutes * 60000;
             timedMinutes = minutes;
+            initialMinutes = minutes;
             _persistUntil();
             timedTimer.restart();
         } else {
@@ -42,6 +60,7 @@ Singleton {
 
     function _cancelTimed() {
         timedMinutes = 0;
+        initialMinutes = 0;
         _endTime = 0;
         timedTimer.stop();
         _persistUntil();
@@ -49,18 +68,19 @@ Singleton {
 
     function _persistUntil() {
         timedVarProcess.command = ["bash", "-c",
-            'source "$RETRO_DIR/lib/variable.sh" && set_var CAFFEINE_UNTIL "' + _endTime + '"'];
+            'source "$RETRO_DIR/lib/variable.sh" && set_var CAFFEINE_UNTIL "' + _endTime + '" ' +
+            '&& set_var CAFFEINE_INITIAL "' + initialMinutes + '"'];
         timedVarProcess.running = true;
     }
 
     function _readUntil() {
         readUntilProcess.command = ["bash", "-c",
-            'source "$RETRO_DIR/lib/variable.sh" && get_var CAFFEINE_UNTIL "0"'];
+            'source "$RETRO_DIR/lib/variable.sh" && echo "$(get_var CAFFEINE_UNTIL 0)|$(get_var CAFFEINE_INITIAL 0)"'];
         readUntilProcess.running = true;
     }
 
     function _notify(msg) {
-        notifyProcess.command = ["notify-send", "-a", "retro", "-i", "caffeine", "Caffeine", msg];
+        notifyProcess.command = ["notify-send", "-a", "RetroLinux", "Caffeine", msg];
         notifyProcess.running = true;
     }
 
@@ -100,12 +120,15 @@ Singleton {
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
-                var end = parseInt(text.trim());
+                var parts = text.trim().split("|");
+                var end = parseInt(parts[0]);
                 if (isNaN(end) || end <= 0)
                     return;
                 if (end > Date.now()) {
                     root._endTime = end;
                     root.timedMinutes = Math.max(1, Math.ceil((end - Date.now()) / 60000));
+                    var init = parseInt(parts[1]);
+                    root.initialMinutes = isNaN(init) ? Math.max(1, Math.ceil((end - Date.now()) / 60000)) : Math.max(1, init);
                     if (!root.inhibit) {
                         root.inhibit = true;
                     }
@@ -126,10 +149,15 @@ Singleton {
         repeat: true
         running: false
         onTriggered: {
+            root._tick++;
             if (root._endTime > 0 && Date.now() >= root._endTime) {
                 root._cancelTimed();
                 root.inhibit = false;
                 root._notify("Caffeine expired — idle resumed");
+                return;
+            }
+            if (root._endTime > 0) {
+                root.timedMinutes = Math.max(1, Math.ceil((root._endTime - Date.now()) / 60000));
             }
         }
     }

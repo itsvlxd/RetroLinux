@@ -45,6 +45,7 @@ Item {
                 text: {
                     if (root.urgency == NotificationUrgency.Critical) return Icons.alert;
                     if (root.appName === "Pomodoro") return Icons.timer;
+                    if (root.appName === "RetroLinux") return Icons.caffeine;
                     return Icons.bell;
                 }
                 font.family: Icons.font
