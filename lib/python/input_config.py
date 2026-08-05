@@ -22,7 +22,6 @@ _INPUT_OPTION_KEYS = [
     ("INPUT_MOUSE_SENSITIVITY", "input:sensitivity", "0"),
     ("INPUT_MOUSE_ACCEL_PROFILE", "input:accel_profile", "flat"),
     ("INPUT_TOUCHPAD_NATURAL_SCROLL", "input:touchpad:natural_scroll", "true"),
-    ("INPUT_TOUCHPAD_TAP_TO_CLICK", "input:touchpad:tap-to-click", "true"),
 ]
 
 
@@ -86,9 +85,7 @@ def apply():
     opts, sections, rules = config.read_all_sections()
 
     for var, key, default in _INPUT_OPTION_KEYS:
-        val = get_var(var, default)
-        if val:
-            opts[key] = val
+        opts[key] = get_var(var, default)
 
     cs = _to_configsections(sections, rules)
     text = config.to_managed_text(opts, cs)
