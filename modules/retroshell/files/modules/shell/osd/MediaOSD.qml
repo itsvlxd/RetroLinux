@@ -20,6 +20,8 @@ PanelWindow {
     property real radius: Styling.radius(16)
     property real artRadius: Styling.radius(6)
 
+    readonly property int borderWidth: Config.theme && Config.theme.srPopup && Config.theme.srPopup.border ? Config.theme.srPopup.border[1] : 2
+
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "retroshell:mediaosd"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
@@ -40,12 +42,13 @@ PanelWindow {
     readonly property string artUrl: (player?.trackArtUrl ?? "") || ""
     readonly property bool hasArtwork: artUrl !== ""
 
-    readonly property string actionIcon: {
-        if (GlobalStates.mediaOsdAction === "next")
-            return Icons.next;
-        if (GlobalStates.mediaOsdAction === "prev")
-            return Icons.previous;
-        return MprisController.isPlaying ? Icons.pause : Icons.play;
+    readonly property string headerText: {
+        const action = GlobalStates.mediaOsdAction;
+        if (action === "next")
+            return "Next";
+        if (action === "prev")
+            return "Previous";
+        return MprisController.isPlaying ? "Now playing" : "Paused";
     }
 
     Item {
@@ -56,14 +59,16 @@ PanelWindow {
             variant: "popup"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            implicitWidth: 284
-            implicitHeight: 76
+            implicitWidth: 220
+            implicitHeight: 52
             radius: root.radius
             clip: true
+            enableBorder: false
 
             Image {
                 id: artBgImage
                 anchors.fill: parent
+                anchors.margins: root.borderWidth
                 source: root.artUrl
                 sourceSize: Qt.size(64, 64)
                 fillMode: Image.PreserveAspectCrop
@@ -73,6 +78,7 @@ PanelWindow {
 
             MultiEffect {
                 anchors.fill: parent
+                anchors.margins: root.borderWidth
                 source: artBgImage
                 blurEnabled: true
                 blurMax: 32
@@ -91,23 +97,24 @@ PanelWindow {
 
             Rectangle {
                 anchors.fill: parent
+                anchors.margins: root.borderWidth
                 color: "black"
-                opacity: 0.42
+                opacity: 0.50
             }
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 18
-                anchors.rightMargin: 18
-                anchors.topMargin: 12
-                anchors.bottomMargin: 12
-                spacing: 12
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: 6
+                anchors.bottomMargin: 6
+                spacing: 8
 
                 ClippingRectangle {
                     id: artClip
                     Layout.alignment: Qt.AlignVCenter
-                    width: 48
-                    height: 48
+                    width: 40
+                    height: 40
                     radius: root.artRadius
                     color: Colors.surface
 
@@ -136,7 +143,7 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Now playing"
+                        text: root.headerText
                         font.family: Config.theme.font
                         font.pixelSize: Styling.fontSize(-1)
                         font.bold: true
@@ -164,26 +171,14 @@ PanelWindow {
                         maximumLineCount: 1
                     }
                 }
+            }
 
-                Item {
-                    Layout.alignment: Qt.AlignVCenter
-                    width: 44
-                    height: 44
-
-                    StyledRect {
-                        anchors.fill: parent
-                        variant: "primary"
-                        radius: height / 2
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: root.actionIcon
-                            font.family: Icons.font
-                            font.pixelSize: 22
-                            color: parent.item
-                        }
-                    }
-                }
+            ClippingRectangle {
+                anchors.fill: parent
+                radius: root.radius
+                color: "transparent"
+                border.color: Colors.surfaceBright
+                border.width: 2
             }
         }
     }
@@ -199,7 +194,7 @@ PanelWindow {
 
     Timer {
         id: hideTimer
-        interval: 2500
+        interval: 4000
         onTriggered: GlobalStates.mediaOsdVisible = false
     }
 
