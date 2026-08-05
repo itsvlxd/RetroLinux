@@ -326,6 +326,15 @@ get_paired_detailed() {
     done
 }
 
+get_device_battery() {
+    local mac="$1"
+    [[ -z $mac ]] && echo "" && return
+    bluetoothctl info "$mac" 2>/dev/null \
+        | grep "Battery Percentage:" \
+        | grep -o '([0-9]*)' \
+        | tr -d '()'
+}
+
 get_audio_card_for_mac() {
     local mac="$1"
     [[ -z $mac ]] && return
@@ -1257,6 +1266,7 @@ case "$1" in
     "--nearby") get_nearby ;;
     "--nearby-detailed") get_nearby_detailed ;;
     "--paired-detailed") get_paired_detailed ;;
+    "--battery") get_device_battery "$2" ;;
     "--device-type")
         get_device_category "$2"
         ;;
