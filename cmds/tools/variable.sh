@@ -186,8 +186,8 @@ cmd_var() {
             local added_vars=()
             local skip_patterns="^(KITTY_(WINDOW_ID|PID|INSTALLATION_DIR|LISTEN_ON|PUBLIC_KEY)|NOTIFY_SOCKET|BAT_PATH)"
 
-            for default_var in "${!RETRO_@}" "${!KITTY_@}" "${!ROFI_@}" "${!BAT_@}" "${!PWR_@}" "${!WALL_@}" "${!CLIP_@}" "${!NOTIFY_@}"; do
-                [[ $default_var != RETRO_* && $default_var != KITTY_* && $default_var != ROFI_* && $default_var != BAT_* && $default_var != PWR_* && $default_var != WALL_* && $default_var != CLIP_* && $default_var != NOTIFY_* ]] && continue
+            for default_var in "${!RETRO_@}" "${!KITTY_@}" "${!ROFI_@}" "${!BAT_@}" "${!PWR_@}" "${!WALL_@}" "${!CLIP_@}" "${!NOTIFY_@}" "${!CAFFEINE_@}"; do
+                [[ $default_var != RETRO_* && $default_var != KITTY_* && $default_var != ROFI_* && $default_var != BAT_* && $default_var != PWR_* && $default_var != WALL_* && $default_var != CLIP_* && $default_var != NOTIFY_* && $default_var != CAFFEINE_* ]] && continue
 
                 [[ $default_var == RETRO_DIR || $default_var == RETRO_CONFIG || $default_var == RETRO_CACHE || $default_var == RETRO_STATE ]] && continue
 
@@ -219,8 +219,8 @@ cmd_var() {
             source "$defaults_file"
 
             local default_keys=()
-            for default_var in "${!RETRO_@}" "${!KITTY_@}" "${!ROFI_@}" "${!BAT_@}" "${!PWR_@}" "${!WALL_@}" "${!CLIP_@}" "${!NOTIFY_@}"; do
-                [[ $default_var != RETRO_* && $default_var != KITTY_* && $default_var != ROFI_* && $default_var != BAT_* && $default_var != PWR_* && $default_var != WALL_* && $default_var != CLIP_* && $default_var != NOTIFY_* ]] && continue
+            for default_var in "${!RETRO_@}" "${!KITTY_@}" "${!ROFI_@}" "${!BAT_@}" "${!PWR_@}" "${!WALL_@}" "${!CLIP_@}" "${!NOTIFY_@}" "${!CAFFEINE_@}"; do
+                [[ $default_var != RETRO_* && $default_var != KITTY_* && $default_var != ROFI_* && $default_var != BAT_* && $default_var != PWR_* && $default_var != WALL_* && $default_var != CLIP_* && $default_var != NOTIFY_* && $default_var != CAFFEINE_* ]] && continue
 
                 [[ $default_var == RETRO_DIR || $default_var == RETRO_CONFIG || $default_var == RETRO_CACHE || $default_var == RETRO_STATE ]] && continue
 

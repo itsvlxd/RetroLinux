@@ -32,11 +32,11 @@ Singleton {
         if (inhibit) {
             _cancelTimed();
             inhibit = false;
-            _notify("Caffeine disabled — idle resumed");
+            _notify("Caffeine is off, your screen can now sleep");
         } else {
             _cancelTimed();
             inhibit = true;
-            _notify("Caffeine enabled — system will not idle");
+            _notify("Caffeine is on, your screen will stay awake");
         }
     }
 
@@ -54,8 +54,8 @@ Singleton {
             inhibit = true;
         }
         _notify(minutes > 0
-            ? "Caffeine enabled for " + minutes + " minute" + (minutes === 1 ? "" : "s")
-            : "Caffeine enabled — system will not idle");
+            ? "Caffeine will keep your screen awake for " + minutes + " minute" + (minutes === 1 ? "" : "s")
+            : "Caffeine is on, your screen will stay awake");
     }
 
     function _cancelTimed() {
@@ -153,7 +153,7 @@ Singleton {
             if (root._endTime > 0 && Date.now() >= root._endTime) {
                 root._cancelTimed();
                 root.inhibit = false;
-                root._notify("Caffeine expired — idle resumed");
+                root._notify("Caffeine session ended, your screen can now sleep");
                 return;
             }
             if (root._endTime > 0) {
