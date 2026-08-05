@@ -367,7 +367,7 @@ Item {
         Text {
             id: batteryIcon
             anchors.centerIn: parent
-            text: Battery.available ? Battery.getBatteryIcon() : Icons.plug
+            text: Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug
             font.family: Icons.font
             font.pixelSize: Battery.available ? 14 : 18
             color: root.popupOpen ? buttonBg.item : Colors.overBackground
@@ -382,13 +382,13 @@ Item {
             Connections {
                 target: Battery
                 function onIsPluggedInChanged() {
-                    batteryIcon.text = Battery.available ? Battery.getBatteryIcon() : Icons.plug;
+                    batteryIcon.text = Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug;
                 }
                 function onPercentageChanged() {
-                    batteryIcon.text = Battery.available ? Battery.getBatteryIcon() : Icons.plug;
+                    batteryIcon.text = Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug;
                 }
                 function onAvailableChanged() {
-                    batteryIcon.text = Battery.available ? Battery.getBatteryIcon() : Icons.plug;
+                    batteryIcon.text = Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug;
                 }
             }
         }
@@ -494,7 +494,7 @@ Item {
 
                     Text {
                         Layout.alignment: Qt.AlignVCenter
-                        text: Battery.getBatteryIcon()
+                        text: Battery.getBatteryIcon(false)
                         font.family: Icons.font
                         font.pixelSize: 24
                         color: root.getBatteryColor()
