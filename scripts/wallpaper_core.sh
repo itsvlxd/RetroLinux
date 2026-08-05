@@ -350,61 +350,6 @@ should_pause() {
     rx_wallpaper_should_pause
 }
 
-launch_picker() {
-    local theme_conf="$HOME/.config/rofi/themes/gallery.rasi"
-    local list=""
-    local target_dir=$(rx_wallpaper_get_theme_dir)
-    local collection
-    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
-
-    declare -A wall_map
-
-    while IFS= read -r f; do
-        [[ -z $f ]] && continue
-
-        local filename=$(basename "$f")
-
-        if [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]]; then
-            continue
-        fi
-
-        local display=$(rx_format_string "$filename")
-        local thumb=$(rx_wallpaper_generate_cache "$f")
-
-        wall_map["$display"]="$f"
-        list+="${display}\0icon\x1f${thumb}\n"
-    done < <(rx_wallpaper_list_files)
-
-    if [[ -z $list ]]; then
-        echo "result=error|reason=no_files_found|path=$target_dir"
-        return 1
-    fi
-
-    local alpha=$(get_opacity_hex "0.9")
-    local alpha_alt=$(get_opacity_hex "0.6")
-    local base_bg=$(grep "background:" ~/.config/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
-    local base_bg_alt=$(grep "background-alt:" ~/.config/retro/themes/rofi-colors.rasi 2>/dev/null | awk '{print $2}' | sed 's/[#;FF]//g')
-
-    : ${base_bg:="1A1B26"}
-    : ${base_bg_alt:="24283B"}
-
-    local folder_name="${target_dir##*/}"
-
-    local choice=$(printf "%b" "$list" | rofi -dmenu -i -p "󰸉 Wallpapers (${collection^})" -theme "$theme_conf" -theme-str "
-                window { background-color: #${base_bg}${alpha}; } 
-                inputbar { background-color: #${base_bg}${alpha}; }  
-                element selected.normal { background-color: #${base_bg_alt}${alpha_alt}; }
-            ")
-
-    if [[ -n $choice ]]; then
-        local actual_file="${wall_map[$choice]}"
-
-        if [[ -n $actual_file ]]; then
-            set_wallpaper "$actual_file"
-        fi
-    fi
-}
-
 resolve_name() {
     local display_name="$1"
     [[ -z $display_name ]] && return 1
@@ -647,7 +592,6 @@ case "$1" in
         restore_wallpaper >/dev/null 2>&1
         echo "collection=$new_collection"
         ;;
-    "--picker") launch_picker ;;
     "--setup-get")
         theme=$(get_var "RETRO_THEME" "retro")
         current=$(get_var "WALL_CURRENT" "")
