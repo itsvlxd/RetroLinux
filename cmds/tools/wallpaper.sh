@@ -238,10 +238,6 @@ cmd_wallpaper() {
             esac
             ;;
 
-        "picker")
-            bash "$wall_script" --picker
-            ;;
-
         "collection")
             local col_value="$value"
             if [[ -z $col_value ]]; then
@@ -467,7 +463,6 @@ cmd_wallpaper() {
             rx_help_cmd "static [mode]" "Toggle static wallpaper mode"
             rx_help_cmd "list" "List all wallpapers with resolution info"
             rx_help_cmd "sync" "Sync wallpapers from repository and optimize"
-            rx_help_cmd "picker" "Launch interactive wallpaper picker"
             rx_help_cmd "collection [name|list]" "View or switch wallpaper collection"
             rx_help_cmd "cache [value]" "Build animated wallpaper cache"
             rx_help_cmd "restore" "Restore previous wallpaper"
