@@ -194,6 +194,27 @@ print(f'{int(rr*255):02x}{int(gg*255):02x}{int(bb*255):02x}')
 }
 
 
+rx_hex_mix() {
+    python3 -c "
+import sys
+c = sys.argv[1]; t = sys.argv[2]; r = float(sys.argv[3])
+cc = [int(c[i:i+2], 16) for i in (0, 2, 4)]
+tt = [int(t[i:i+2], 16) for i in (0, 2, 4)]
+out = [round(cc[i] * (1 - r) + tt[i] * r) for i in range(3)]
+print('%02x%02x%02x' % tuple(out))
+" "$1" "$2" "$3"
+}
+
+rx_hex_contrast() {
+    python3 -c "
+import sys
+c = sys.argv[1]
+cc = [int(c[i:i+2], 16) for i in (0, 2, 4)]
+lum = 0.2126 * cc[0] + 0.7152 * cc[1] + 0.0722 * cc[2]
+print('e8e8e8' if lum < 150 else '0a0a0a')
+" "$1"
+}
+
 rx_apply_color_map() {
     local theme_file="$1"
     local output_dir="${RETRO_CONFIG:-$HOME/.config/retro}/themes"
@@ -358,6 +379,29 @@ rx_apply_color_map() {
             fi
         fi
 
+        case "$key" in
+            red|green|yellow|blue|magenta|cyan|white|black)
+                local cap="${key^}"
+                local container
+                container=$(rx_hex_mix "$hex" "0d0d0d" "0.35")
+                local over
+                over=$(rx_hex_contrast "$hex")
+                local over_container
+                over_container=$(rx_hex_contrast "$container")
+                local bright
+                bright=$(jq -r --arg k "bright_${key}" '.color_map[$k] // empty' "$theme_file" 2>/dev/null | sed 's/^#//')
+                [[ -z $bright ]] && bright="$hex"
+
+                sed -i "s/\"${key}\": *\"#[0-9a-f]*\"/\"${key}\": \"#${hex}\"/" "$file"
+                sed -i "s/\"${key}Container\": *\"#[0-9a-f]*\"/\"${key}Container\": \"#${container}\"/" "$file"
+                sed -i "s/\"over${cap}\": *\"#[0-9a-f]*\"/\"over${cap}\": \"#${over}\"/" "$file"
+                sed -i "s/\"over${cap}Container\": *\"#[0-9a-f]*\"/\"over${cap}Container\": \"#${over_container}\"/" "$file"
+                sed -i "s/\"light${cap}\": *\"#[0-9a-f]*\"/\"light${cap}\": \"#${bright}\"/" "$file"
+                sed -i "s/\"${key}Source\": *\"#[0-9a-f]*\"/\"${key}Source\": \"#${hex}\"/" "$file"
+                sed -i "s/\"${key}Value\": *\"#[0-9a-f]*\"/\"${key}Value\": \"#${hex}\"/" "$file"
+                ;;
+        esac
+
         for gtk_file in "$HOME/.config/gtk-3.0/gtk.css" "$HOME/.config/gtk-4.0/gtk.css"; do
             [[ -f $gtk_file ]] || continue
             case "$key" in
@@ -484,16 +528,9 @@ rx_grayscale_output() {
 
 rx_set_papirus_folder_color() {
     local hex="$1"
-    local scheme
-    scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
 
     if [[ -z $hex ]]; then
-        if [[ $scheme == "wallpaper" ]]; then
-            hex=$(grep -oP 'source_color = "0x[0-9a-f]{2}\K[0-9a-f]{6}' "$HOME/.config/retro/themes/hyprland-colors.lua" 2>/dev/null | head -1)
-        else
-            local theme_file="$RETRO_DIR/themes/${scheme}.json"
-            [[ -f $theme_file ]] && hex=$(jq -r '.color_map.primary // empty' "$theme_file" 2>/dev/null | sed 's/^#//')
-        fi
+        hex=$(grep -oP '^\s*primary = "0x[0-9a-f]{2}\K[0-9a-f]{6}' "$HOME/.config/retro/themes/hyprland-colors.lua" 2>/dev/null | head -1)
     fi
     [[ -z $hex ]] && return 0
 
@@ -513,40 +550,48 @@ rx_set_papirus_folder_color() {
             else
                 color="nordic"
             fi
-        elif (($(echo "$hue < 15" | bc -l))); then
-            color="red"
-        elif (($(echo "$hue < 30" | bc -l))); then
-            color="carmine"
-        elif (($(echo "$hue < 45" | bc -l))); then
-            color="deeporange"
-        elif (($(echo "$hue < 55" | bc -l))); then
-            color="orange"
-        elif (($(echo "$hue < 70" | bc -l))); then
-            color="paleorange"
-        elif (($(echo "$hue < 100" | bc -l))); then
-            color="yellow"
-        elif (($(echo "$hue < 150" | bc -l))); then
-            color="green"
-        elif (($(echo "$hue < 180" | bc -l))); then
-            color="teal"
-        elif (($(echo "$hue < 200" | bc -l))); then
-            color="cyan"
-        elif (($(echo "$hue < 215" | bc -l))); then
-            color="darkcyan"
-        elif (($(echo "$hue < 245" | bc -l))); then
-            color="blue"
-        elif (($(echo "$hue < 265" | bc -l))); then
-            color="indigo"
-        elif (($(echo "$hue < 290" | bc -l))); then
-            color="violet"
-        elif (($(echo "$hue < 320" | bc -l))); then
-            color="magenta"
-        elif (($(echo "$hue < 335" | bc -l))); then
-            color="pink"
         else
-            color="red"
+            color=$(rx_papirus_nearest_color "$hue")
         fi
     fi
 
     command -v papirus-folders >/dev/null 2>&1 && sudo -n papirus-folders -C "$color" --theme Papirus-Dark >/dev/null 2>&1
+}
+
+rx_papirus_nearest_color() {
+    local hue="$1"
+    local best="red" bestdist=999
+
+    while IFS='|' read -r c h; do
+        [[ -z $c ]] && continue
+        local d
+        d=$(awk -v a="$hue" -v b="$h" 'BEGIN{d=a-b; if(d<0)d=-d; if(d>180)d=360-d; print d}')
+        if (($(echo "$d < $bestdist" | bc -l))); then
+            bestdist=$d
+            best=$c
+        fi
+    done <<EOF
+red|0
+carmine|359
+pink|340
+magenta|289
+violet|262
+indigo|231
+blue|212
+nordic|210
+adwaita|209
+breeze|201
+bluegrey|200
+cyan|187
+darkcyan|195
+teal|168
+green|88
+yellow|42
+paleorange|37
+brown|31
+orange|29
+deeporange|16
+EOF
+
+    echo "$best"
 }
