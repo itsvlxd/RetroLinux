@@ -21,6 +21,12 @@ Item {
     // "arch" = progress ring around the icon, "bar" = small bar beneath it
     readonly property string batteryStyle: Config.bar?.batteryStyle ?? "arch"
 
+    property color batteryColor: Colors.overBackground
+
+    function refreshBatteryColor() {
+        root.batteryColor = getBatteryColor();
+    }
+
     // TEMPORARY: set to false to preview desktop mode (no battery)
 
     property real radius: 0
@@ -186,6 +192,7 @@ Item {
     Component.onCompleted: {
         var rd = Quickshell.env("RETRO_DIR");
         var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        root.refreshBatteryColor();
         wattageProc.command = ["bash", rd + "/scripts/power_core.sh", "--list"];
         wattageProc.running = true;
         sourceProc.command = ["bash", rd + "/scripts/power_core.sh", "--source"];
@@ -351,7 +358,7 @@ Item {
                 anchors.bottom: parent.bottom
                 width: parent.width * (Battery.percentage / 100)
                 radius: height / 2
-                color: root.getBatteryColor()
+                color: root.batteryColor
 
                 Behavior on width {
                     enabled: Config.animDuration > 0
@@ -383,12 +390,40 @@ Item {
                 target: Battery
                 function onIsPluggedInChanged() {
                     batteryIcon.text = Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug;
+                    root.refreshBatteryColor();
                 }
                 function onPercentageChanged() {
                     batteryIcon.text = Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug;
+                    root.refreshBatteryColor();
+                    canvas.requestPaint();
                 }
                 function onAvailableChanged() {
                     batteryIcon.text = Battery.available ? Battery.getBatteryIcon(Config.bar?.batteryStyle === "bar") : Icons.plug;
+                    root.refreshBatteryColor();
+                }
+            }
+
+            Connections {
+                target: Colors
+                function onFileChanged() {
+                    Qt.callLater(() => {
+                        root.refreshBatteryColor();
+                        canvas.requestPaint();
+                    });
+                }
+                function onRedChanged() {
+                    root.refreshBatteryColor();
+                    canvas.requestPaint();
+                }
+                function onGreenChanged() {
+                    root.refreshBatteryColor();
+                    canvas.requestPaint();
+                }
+                function onOutlineVariantChanged() {
+                    canvas.requestPaint();
+                }
+                function onOverBackgroundChanged() {
+                    root.refreshBatteryColor();
                 }
             }
         }
@@ -497,7 +532,7 @@ Item {
                         text: Battery.getBatteryIcon(false)
                         font.family: Icons.font
                         font.pixelSize: 24
-                        color: root.getBatteryColor()
+                        color: root.batteryColor
 
                         MouseArea {
                             anchors.fill: parent
@@ -543,7 +578,7 @@ Item {
                         font.family: Styling.defaultFont
                         font.pixelSize: Styling.fontSize(2)
                         font.bold: true
-                        color: root.getBatteryColor()
+                        color: root.batteryColor
                         opacity: 0.8
                     }
                 }
@@ -785,10 +820,10 @@ Item {
                         variant: isSelected ? "primary" : (buttonHovered ? "focus" : "common")
                         enableShadow: false
 
-                        topLeftRadius: isSelected ? (isFirst ? defaultRadius : selectedRadius) : defaultRadius
-                        bottomLeftRadius: isSelected ? (isFirst ? defaultRadius : selectedRadius) : defaultRadius
-                        topRightRadius: isSelected ? (isLast ? defaultRadius : selectedRadius) : defaultRadius
-                        bottomRightRadius: isSelected ? (isLast ? defaultRadius : selectedRadius) : defaultRadius
+                        topLeftRadius: isFirst ? defaultRadius : selectedRadius
+                        bottomLeftRadius: isFirst ? defaultRadius : selectedRadius
+                        topRightRadius: isLast ? defaultRadius : selectedRadius
+                        bottomRightRadius: isLast ? defaultRadius : selectedRadius
 
                         Text {
                             anchors.centerIn: parent
