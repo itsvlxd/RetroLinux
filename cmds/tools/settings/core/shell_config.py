@@ -103,6 +103,7 @@ BAR_DEFAULTS: dict = {
     "showPresetsButton": True,
     "showWeatherTemp": False,
     "showDayOfWeek": False,
+    "batteryStyle": "arch",
 }
 
 
@@ -735,6 +736,7 @@ TOOLS_DEFAULTS: dict = {
     "recordingResolution": "auto",
     "recordingFps": 60,
     "recordingPortalEnabled": False,
+    "emojiShowRecent": True,
 }
 
 
