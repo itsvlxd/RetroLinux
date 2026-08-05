@@ -200,7 +200,6 @@ cmd_theme() {
             local new_shadow new_shadow_range new_shadow_power
             local new_blur new_blur_size new_blur_passes new_blur_vibrancy
             local new_kitty_font new_kitty_font_size new_kitty_padding
-            local new_rofi_font new_rofi_font_size new_rofi_border new_rofi_rounding new_rofi_padding
             local new_gtk_font new_gtk_font_size
             local new_browser_theme
 
@@ -270,13 +269,6 @@ cmd_theme() {
                 '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 9.5)")
             new_kitty_padding=$(rx_input_numeric "Kitty padding (px)" "$(get_var KITTY_PADDING 5)" 0 50)
 
-            new_rofi_font=$(_pick_font "Select Rofi font" "$(get_var ROFI_FONT "JetBrainsMono Nerd Font")")
-            new_rofi_font_size=$(rx_input "Rofi font size" "$(get_var ROFI_FONT_SIZE 9.5)" \
-                '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 9.5)")
-            new_rofi_border=$(rx_input_numeric "Rofi border (px)" "$(get_var ROFI_BORDER_SIZE 2)" 0 20)
-            new_rofi_rounding=$(rx_input_numeric "Rofi rounding (px)" "$(get_var ROFI_ROUNDING 10)" 0 50)
-            new_rofi_padding=$(rx_input_numeric "Rofi padding (px)" "$(get_var ROFI_PADDING 5)" 0 50)
-
             new_gtk_font=$(_pick_font "Select GTK font" "$(get_var GTK_FONT "Inter")")
             new_gtk_font_size=$(rx_input "GTK font size" "$(get_var GTK_FONT_SIZE 10)" \
                 '^[0-9]+(\.[0-9]+)?$' "Must be a number (e.g. 10)")
@@ -296,7 +288,6 @@ cmd_theme() {
                 "Shadow" "$new_shadow" \
                 "Blur" "$new_blur" \
                 "Kitty Font" "$new_kitty_font" \
-                "Rofi Font" "$new_rofi_font" \
                 "GTK Font" "$new_gtk_font" \
                 "GTK Font Size" "$new_gtk_font_size" \
                 "Browser Theme" "$new_browser_theme"
@@ -323,11 +314,6 @@ cmd_theme() {
             _theme_call "--set" "kitty_font" "$new_kitty_font"
             _theme_call "--set" "kitty_font_size" "$new_kitty_font_size"
             _theme_call "--set" "kitty_padding" "$new_kitty_padding"
-            _theme_call "--set" "rofi_font" "$new_rofi_font"
-            _theme_call "--set" "rofi_font_size" "$new_rofi_font_size"
-            _theme_call "--set" "rofi_border" "$new_rofi_border"
-            _theme_call "--set" "rofi_rounding" "$new_rofi_rounding"
-            _theme_call "--set" "rofi_padding" "$new_rofi_padding"
             _theme_call "--set" "gtk_font" "$new_gtk_font"
             _theme_call "--set" "gtk_font_size" "$new_gtk_font_size"
 
@@ -359,7 +345,7 @@ cmd_theme() {
                 fi
             else
                 case "$key" in
-                    opacity | blur | blur_size | blur_passes | blur_vibrancy | kitty_font | kitty_font_size | kitty_padding | kitty_shrink_padding | rofi_font | rofi_font_size | rofi_border | rofi_rounding | rofi_padding | gtk_font | gtk_font_size | scheme)
+                    opacity | blur | blur_size | blur_passes | blur_vibrancy | kitty_font | kitty_font_size | kitty_padding | kitty_shrink_padding | gtk_font | gtk_font_size | scheme)
                         _theme_set "$key" "$value"
                         ;;
                     *)
@@ -468,7 +454,7 @@ cmd_theme() {
 
             case "$font_action" in
                 "set")
-                    local apps=("kitty" "rofi")
+                    local apps=("kitty")
                     local app
                     app=$(rx_menu "󰄾" "Select target app:" "${apps[@]}")
                     [[ -z $app ]] && return 1
@@ -482,7 +468,7 @@ cmd_theme() {
                     fi
                     ;;
                 "size")
-                    local apps=("system" "kitty" "rofi")
+                    local apps=("system" "kitty")
                     local app
                     app=$(rx_menu "󰄾" "Select target app:" "${apps[@]}")
                     [[ -z $app ]] && return 1
@@ -498,11 +484,6 @@ cmd_theme() {
                             ;;
                         "kitty")
                             if _theme_call "--set" "kitty_font_size" "$size"; then
-                                rx_log "success" "${PINK}$app${RESET} font size set to ${PINK}$size${RESET}"
-                            fi
-                            ;;
-                        "rofi")
-                            if _theme_call "--set" "rofi_font_size" "$size"; then
                                 rx_log "success" "${PINK}$app${RESET} font size set to ${PINK}$size${RESET}"
                             fi
                             ;;
