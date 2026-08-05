@@ -761,10 +761,6 @@ class OverrideDialog(Adw.Window):
         save_btn.connect("clicked", self._on_save)
         header.pack_end(save_btn)
 
-        cancel_btn = Gtk.Button(label="Cancel")
-        cancel_btn.connect("clicked", lambda *_: self.close())
-        header.pack_end(cancel_btn)
-
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_vexpand(True)
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -852,6 +848,7 @@ class OverrideDialog(Adw.Window):
         color_btn.set_tooltip_text(default_hex or "not set")
 
     def _on_save(self, _btn) -> None:
+        parent = self.get_transient_for()
         slug = self._theme["slug"]
         subprocess.run(
             ["bash", str(THEME_CORE), "--override-clear", slug],
@@ -868,9 +865,9 @@ class OverrideDialog(Adw.Window):
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         GLib.child_watch_add(proc.pid, lambda _p, _s: (
-            self.get_transient_for().show_toast(f"Colors updated for {self._theme['name']}"),
-            self.close(),
+            parent.show_toast(f"Colors updated for {self._theme['name']}"),
         ))
+        self.close()
 
 
 class ThemeCreatorDialog(Adw.Window):
