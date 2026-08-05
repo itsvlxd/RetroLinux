@@ -1,0 +1,48 @@
+.pragma library
+
+var data = {
+    "disks": ["/"],
+    "updateServiceEnabled": true,
+    "idle": {
+        "general": {
+            "lock_cmd": "retro shell lock",
+            "before_sleep_cmd": "loginctl lock-session",
+            "after_sleep_cmd": "retro shell screen on"
+        },
+        "listeners": [
+            {
+                "timeout": 150,
+                "onTimeout": "retroshell brightness 10 -s",
+                "onResume": "retroshell brightness -r"
+            },
+            {
+                "timeout": 300,
+                "onTimeout": "loginctl lock-session"
+            },
+            {
+                "timeout": 330,
+                "onTimeout": "retroshell screen off",
+                "onResume": "retroshell screen on"
+            },
+            {
+                "timeout": 1800,
+                "onTimeout": "retroshell suspend"
+            }
+        ]
+    },
+    "ocr": {
+        "eng": true,
+        "spa": true,
+        "lat": false,
+        "jpn": false,
+        "chi_sim": false,
+        "chi_tra": false,
+        "kor": false
+    },
+    "pomodoro": {
+        "workTime": 1500,
+        "restTime": 300,
+        "autoStart": false,
+        "syncSpotify": false
+    }
+}
