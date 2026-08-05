@@ -447,6 +447,11 @@ SYSTEM_OCR_DEFAULTS: dict = {
     "chi_sim": False,
     "chi_tra": False,
     "kor": False,
+    "deu": False,
+    "fra": False,
+    "pol": False,
+    "ron": False,
+    "swe": False,
 }
 
 
@@ -717,3 +722,28 @@ def load_lockscreen() -> dict:
 
 def save_lockscreen(data: dict) -> None:
     save_shell_json("lockscreen", data)
+
+
+# ── tools.json ────────────────────────────────────────────────────────────
+
+TOOLS_DEFAULTS: dict = {
+    "screenshotCountdown": 5,
+    "previewCountdown": True,
+    "screenshotTimerEnabled": False,
+    "screenshotsDir": "",
+    "recordingsDir": "",
+    "recordingResolution": "auto",
+    "recordingFps": 60,
+}
+
+
+def tools_path() -> Path:
+    return shell_config_dir() / "tools.json"
+
+
+def load_tools() -> dict:
+    return load_shell_json("tools", TOOLS_DEFAULTS)
+
+
+def save_tools(data: dict) -> None:
+    save_shell_json("tools", data)

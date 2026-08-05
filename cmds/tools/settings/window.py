@@ -1705,9 +1705,18 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
         if variable_values:
             from lib.python.variable import set_var as _set_var
+            changed = False
+            for key, val in all_values.items():
+                option = self._options_flat.get(key)
+                if option and option.get("variable"):
+                    state = self.app_state.get(key)
+                    if state and str(state.live_value) != str(state.saved_value):
+                        changed = True
+                        break
             for var_name, val in variable_values.items():
                 _set_var(var_name, val)
-            subprocess.run(["retro", "app", "all", "refresh"], check=False)
+            if changed:
+                subprocess.run(["retro", "app", "all", "refresh"], check=False)
 
     def save(self, *, update_active_profile: bool = True):
         """Public save API — performs save and shows banner animation."""
