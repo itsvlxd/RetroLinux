@@ -155,13 +155,8 @@ cmd_audio() {
             if ! [[ $step =~ ^[0-9]+$ ]]; then
                 rx_log "error" "Step must be a number" && return 1
             fi
-            local current=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2 * 100)}')
-            local new=$((current + step))
-            if [[ $(get_var "AUDIO_UNCAP_LIMIT" "false") != "true" ]]; then
-                [[ $new -gt 100 ]] && new=100
-            fi
-            wpctl set-volume @DEFAULT_AUDIO_SINK@ "${new}%" 2>/dev/null
-            rx_log "success" "Volume increased to ${PINK}${new}%%${RESET}"
+            wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ "${step}%+" 2>/dev/null
+            rx_log "success" "Volume increased by ${PINK}${step}%%${RESET}"
             ;;
 
         "down")
@@ -169,11 +164,8 @@ cmd_audio() {
             if ! [[ $step =~ ^[0-9]+$ ]]; then
                 rx_log "error" "Step must be a number" && return 1
             fi
-            local current=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2 * 100)}')
-            local new=$((current - step))
-            [[ $new -lt 0 ]] && new=0
-            wpctl set-volume @DEFAULT_AUDIO_SINK@ "${new}%" 2>/dev/null
-            rx_log "success" "Volume decreased to ${PINK}${new}%%${RESET}"
+            wpctl set-volume @DEFAULT_AUDIO_SOURCE@ "${step}%-" 2>/dev/null
+            rx_log "success" "Volume decreased by ${PINK}${step}%%${RESET}"
             ;;
 
         "mute")
