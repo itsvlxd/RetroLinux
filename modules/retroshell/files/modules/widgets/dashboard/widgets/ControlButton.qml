@@ -15,12 +15,14 @@ StyledRect {
     signal longPressed
 
     property bool isHovered: mouseArea.containsMouse
+    property string activeVariant: "primary"
+    property string activeHoverVariant: "primaryfocus"
 
     variant: {
         if (isActive && isHovered)
-            return "primaryfocus";
+            return activeHoverVariant;
         if (isActive)
-            return "primary";
+            return activeVariant;
         if (isHovered)
             return "focus";
         return "pane";

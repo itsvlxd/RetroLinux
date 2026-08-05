@@ -11,14 +11,6 @@ Item {
     property int maxContentWidth: 480
     signal requestClose()
 
-    readonly property string statusText: {
-        if (!CaffeineService.inhibit)
-            return "Off";
-        if (CaffeineService.timedMinutes > 0)
-            return CaffeineService.timedMinutes + "m remaining";
-        return "On (until turned off)";
-    }
-
     function choose(minutes) {
         CaffeineService.startTimed(minutes);
         requestClose();
@@ -46,7 +38,7 @@ Item {
             }
 
             Text {
-                text: "· " + root.statusText
+                text: CaffeineService.inhibit ? (CaffeineService.timedMinutes > 0 ? CaffeineService.timeRemaining : "On") : "Off"
                 font.family: Config.theme.font
                 font.pixelSize: Config.theme.fontSize
                 color: CaffeineService.inhibit ? Styling.srItem("overprimary") : Colors.outline
@@ -54,6 +46,36 @@ Item {
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: CaffeineService.timedMinutes > 0 ? 10 : 0
+            visible: CaffeineService.timedMinutes > 0
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 6
+                radius: 3
+                color: Colors.outlineVariant
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: parent.width * (CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60))
+                    radius: 3
+                    color: Styling.srItem("overprimary")
+
+                    Behavior on width {
+                        enabled: Config.animDuration > 0
+                        NumberAnimation {
+                            duration: 1000
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
             }
         }
 
@@ -150,30 +172,6 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.choose(120)
-                }
-            }
-
-            StyledRect {
-                Layout.preferredWidth: 84
-                Layout.preferredHeight: 32
-                radius: Styling.radius(-2)
-                variant: unlimitedMouse.containsMouse ? "primaryfocus" : "primary"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "Unlimited"
-                    font.family: Config.theme.font
-                    font.pixelSize: Config.theme.fontSize
-                    font.bold: true
-                    color: Styling.srItem("primary")
-                }
-
-                MouseArea {
-                    id: unlimitedMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.choose(0)
                 }
             }
         }

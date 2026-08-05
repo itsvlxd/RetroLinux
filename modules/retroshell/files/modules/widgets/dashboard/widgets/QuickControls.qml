@@ -131,10 +131,52 @@ StyledRect {
                     Layout.preferredHeight: 48
                     iconName: Icons.caffeine
                     isActive: CaffeineService.inhibit
+                    activeVariant: CaffeineService.timedMinutes > 0 ? "bg" : "primary"
+                    activeHoverVariant: CaffeineService.timedMinutes > 0 ? "focus" : "primaryfocus"
                     tooltipText: CaffeineService.inhibit ? "Caffeine: On" : "Caffeine: Off"
                     onClicked: CaffeineService.toggleInhibit()
                     onRightClicked: root.togglePanel(2)
                     onLongPressed: root.togglePanel(2)
+
+                    Item {
+                        anchors.fill: parent
+                        clip: true
+                        z: -1
+                        visible: CaffeineService.inhibit && CaffeineService.timedMinutes > 0
+
+                        Rectangle {
+                            id: caffeineFill
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: parent.height * (CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60))
+                            color: Styling.srItem("overprimary")
+                            opacity: 0.35
+
+                            Behavior on height {
+                                enabled: Config.animDuration > 0
+                                NumberAnimation {
+                                    duration: 1000
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+                        }
+
+                        WavyLine {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            y: {
+                                var ratio = CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60);
+                                return parent.height * (1 - ratio) - height / 2;
+                            }
+                            height: 10
+                            color: Styling.srItem("overprimary")
+                            lineWidth: 2
+                            amplitudeMultiplier: 0.5
+                            frequency: 3
+                            running: CaffeineService.timedMinutes > 0
+                        }
+                    }
                 }
 
                 ControlButton {
@@ -161,7 +203,7 @@ StyledRect {
             Layout.fillWidth: true
             Layout.preferredHeight: {
                 if (root.expandedPanel === -1) return 0;
-                if (root.expandedPanel === 2) return 104;
+                if (root.expandedPanel === 2) return 120;
                 return root.width - 8;
             }
             clip: true
