@@ -31,6 +31,10 @@ _PRIORITY_DEFAULTS = {
     "AUDIO_PRIORITY_ENABLED": "true",
 }
 
+_UNCAP_DEFAULTS = {
+    "AUDIO_UNCAP_LIMIT": "false",
+}
+
 
 def _find_mic_source() -> str:
     """Find the first hardware mic PulseAudio source name, skipping EasyEffects and monitors."""
@@ -257,6 +261,7 @@ class AudioPage:
             "crash_restart": _g("AUDIO_RESTART_ON_CRASH", _CRASH_DEFAULTS["AUDIO_RESTART_ON_CRASH"]),
             "crash_threshold": _g("AUDIO_RESTART_ON_CRASH_THRESHOLD", _CRASH_DEFAULTS["AUDIO_RESTART_ON_CRASH_THRESHOLD"]),
             "crash_notify": _g("AUDIO_RESTART_ON_CRASH_NOTIFY", _CRASH_DEFAULTS["AUDIO_RESTART_ON_CRASH_NOTIFY"]),
+            "uncap_limit": _g("AUDIO_UNCAP_LIMIT", _UNCAP_DEFAULTS["AUDIO_UNCAP_LIMIT"]),
         }
         self._status["eq_preset"] = self._orig["eq_preset"]
 
@@ -371,6 +376,30 @@ class AudioPage:
         group.add(mic_row)
         self._mic_mute_switch = mic_row
 
+        # Experimental note
+        note_lbl = Gtk.Label(label="Experimental: volume is capped at 100% unless the uncapped limit is enabled.")
+        note_lbl.set_xalign(0)
+        note_lbl.set_margin_start(4)
+        note_lbl.set_margin_top(12)
+        note_lbl.add_css_class("dim-label")
+        group.add(note_lbl)
+
+        # Uncapped audio limit toggle
+        uncap = Adw.SwitchRow(
+            title="Uncapped audio limit",
+            subtitle="Allow volume above 100% (experimental)",
+        )
+        uncap.set_active(self._orig.get("uncap_limit", "false") == "true")
+        uncap.connect("notify::active", self._on_uncap_switch)
+        group.add(uncap)
+        ua = RowActions(uncap,
+                        on_discard=lambda: self._discard_uncap(),
+                        on_reset=lambda: self._reset_uncap())
+        uncap.add_suffix(ua.box)
+        ua.reorder_first()
+        self._uncap_row = uncap
+        self._uncap_actions = ua
+
         self._rebuild_volume_models(group)
 
     def _rebuild_volume_models(self, group: Adw.PreferencesGroup | None = None) -> None:
@@ -409,7 +438,7 @@ class AudioPage:
     def _on_volume_spin(self, spin: Gtk.SpinButton, _pspec) -> None:
         if self._setting_value:
             return
-        val = int(spin.get_value())
+        val = max(0, min(100, int(spin.get_value())))
         subprocess.run(
             ["bash", _AUDIO_CORE, "--set-volume", str(val)],
             capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
@@ -418,7 +447,7 @@ class AudioPage:
     def _on_mic_volume_spin(self, spin: Gtk.SpinButton, _pspec) -> None:
         if self._setting_value:
             return
-        val = int(spin.get_value())
+        val = max(0, min(100, int(spin.get_value())))
         subprocess.run(
             ["bash", _AUDIO_CORE, "--set-source-volume", str(val)],
             capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
@@ -744,6 +773,13 @@ class AudioPage:
             is_dirty = cur != live
             is_saved = live != default
             actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
+        cur = self._pending.get("AUDIO_UNCAP_LIMIT", self._orig.get("uncap_limit", "false"))
+        live = _g("AUDIO_UNCAP_LIMIT", _UNCAP_DEFAULTS["AUDIO_UNCAP_LIMIT"])
+        default = _UNCAP_DEFAULTS["AUDIO_UNCAP_LIMIT"]
+        is_managed = cur != default
+        is_dirty = cur != live
+        is_saved = live != default
+        self._uncap_actions.update(is_managed=is_managed, is_dirty=is_dirty, is_saved=is_saved)
 
     def _check_dirty(self) -> None:
         was = self._dirty
@@ -1151,6 +1187,42 @@ class AudioPage:
                 return "true" if widget.get_active() else "false"
         return ""
 
+    # ── Uncapped audio limit ──
+
+    def _on_uncap_switch(self, sw: Adw.SwitchRow, _pspec) -> None:
+        if self._setting_value:
+            return
+        self._pending["AUDIO_UNCAP_LIMIT"] = "true" if sw.get_active() else "false"
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        GLib.idle_add(self._refresh_managed)
+
+    def _discard_uncap(self) -> None:
+        from lib.python.variable import get_var as _g
+        live = _g("AUDIO_UNCAP_LIMIT", "false")
+        self._set_uncap_widget(live)
+        self._pending.pop("AUDIO_UNCAP_LIMIT", None)
+        self._check_dirty()
+        self._refresh_managed()
+
+    def _reset_uncap(self) -> None:
+        default = _UNCAP_DEFAULTS["AUDIO_UNCAP_LIMIT"]
+        self._set_uncap_widget(default)
+        self._pending["AUDIO_UNCAP_LIMIT"] = default
+        self._dirty = True
+        if self._on_dirty_changed:
+            self._on_dirty_changed()
+        self._refresh_managed()
+
+    def _set_uncap_widget(self, val: str) -> None:
+        self._setting_value = True
+        self._uncap_row.set_active(val == "true")
+        self._setting_value = False
+
+    def _get_uncap_cur(self) -> str:
+        return "true" if self._uncap_row.get_active() else "false"
+
     def _build_advanced_section(self, group: Adw.PreferencesGroup) -> None:
         fix_btn = Gtk.Button(label="Fix Audio Stutter")
         fix_btn.add_css_class("destructive-action")
@@ -1165,21 +1237,11 @@ class AudioPage:
         group.add(row)
 
     def _fix_stutter(self) -> None:
-        self._launch_kitty(
-            f"bash {_AUDIO_CORE} --fix-stutter && "
-            f"echo; echo 'Audio services have been restarted with P-core affinity.'; "
-            f"echo Press Enter to close.; read"
-        )
-        self._window.show_toast("Fixing audio stutter in terminal\u2026", timeout=3)
-
-    @staticmethod
-    def _launch_kitty(command: str) -> None:
-        cmd = f"kitty -- bash -c '{command}'"
-        lua = f'hl.dsp.exec_cmd("{cmd}", {{ float = true, size = {{ 800, 500 }}, center = true }})'
         subprocess.Popen(
-            ["hyprctl", "dispatch", lua],
+            ["bash", _AUDIO_CORE, "--fix-stutter"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        self._window.show_toast("Fixing audio stutter\u2026", timeout=3)
 
     # ── Periodic tick ──
 
@@ -1287,6 +1349,7 @@ class AudioPage:
             "crash_restart": self._get_crash_cur("crash_restart"),
             "crash_threshold": self._get_crash_cur("crash_threshold"),
             "crash_notify": self._get_crash_cur("crash_notify"),
+            "uncap_limit": self._get_uncap_cur(),
         }
         self._dirty = False
         self._refresh_managed()
@@ -1298,6 +1361,7 @@ class AudioPage:
             self._set_priority_widget(key, self._orig.get(key, ""))
         for var, key, _widget, _actions in self._crash_rows:
             self._set_crash_widget(key, self._orig.get(key, ""))
+        self._set_uncap_widget(self._orig.get("uncap_limit", "false"))
         self._pending.clear()
         self._dirty = False
 

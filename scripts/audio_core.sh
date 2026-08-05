@@ -40,7 +40,12 @@ set_source_volume() {
     local source=$(get_default_source)
     [[ -z $source ]] && return 1
     local source_name=$(get_source_name "$source")
-    wpctl set-volume "$source" "${volume}%" 2>/dev/null
+    if [[ $(get_var "AUDIO_UNCAP_LIMIT" "false") == "true" ]]; then
+        wpctl set-volume "$source" "${volume}%" 2>/dev/null
+    else
+        [[ $volume -gt 100 ]] && volume=100
+        wpctl set-volume "$source" "${volume}%" 2>/dev/null
+    fi
 }
 
 get_sinks() {
@@ -206,14 +211,21 @@ set_volume() {
     local sink=$(get_default_sink)
     [[ -z $sink ]] && return 1
     local sink_name=$(get_sink_name "$sink")
-    wpctl set-volume "$sink" "${volume}%" 2>/dev/null
+    if [[ $(get_var "AUDIO_UNCAP_LIMIT" "false") == "true" ]]; then
+        wpctl set-volume "$sink" "${volume}%" 2>/dev/null
+    else
+        [[ $volume -gt 100 ]] && volume=100
+        wpctl set-volume "$sink" "${volume}%" 2>/dev/null
+    fi
 }
 
 volume_up() {
     local step="${1:-5}"
     local current=$(get_sink_volume)
     local new=$((current + step))
-    [[ $new -gt 100 ]] && new=100
+    if [[ $(get_var "AUDIO_UNCAP_LIMIT" "false") != "true" ]]; then
+        [[ $new -gt 100 ]] && new=100
+    fi
     local sink=$(get_default_sink)
     local sink_name=$(get_sink_name "$sink")
     set_volume "$new"
