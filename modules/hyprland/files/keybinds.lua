@@ -4,7 +4,6 @@
 --
 -- See https://wiki.hypr.land/Configuring/Keywords/
 
-local prog = require("programs")
 local Retro = require("lib.retro")
 
 local mainMod = "SUPER" -- Sets "Windows" key as main modifier
@@ -12,25 +11,27 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 -- Example binds, see https://wiki.hypr.land/Configuring/Binds/ for more
 hl.bind(mainMod .. " + Q", Retro.open_terminal)
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
-hl.bind(
-	mainMod .. " + M",
-	hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch exit")
-)
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprctl dispatch exec hyprlock"))
-hl.bind(mainMod .. " + E", Retro.open_filemanager)
+hl.bind(mainMod .. " + M", Retro.open_powermenu)
+hl.bind(mainMod .. " + L", Retro.lock_screen)
+hl.bind(mainMod .. " + E", Retro.open_emoji)
+hl.bind(mainMod .. " + SHIFT + E", Retro.open_filemanager)
 hl.bind(mainMod .. " + F", Retro.fullscreen)
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + V", Retro.open_clipboard)
-hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("retro wallpaper picker"))
-hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("retro clipboard screenshots"))
-hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("hyprshot -m output -o ~/Pictures/Screenshots"))
-hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a -n"))
-hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(prog.menu))
+hl.bind(mainMod .. " + T", Retro.open_tmux)
+hl.bind(mainMod .. " + R", Retro.open_screenrecord)
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo()) -- dwindle
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit")) -- dwindle
 
-hl.bind("F12", hl.dsp.exec_cmd("retro settings"))
-hl.bind("XF86Launch2", hl.dsp.exec_cmd("retro settings"))
+hl.bind(mainMod .. " + space", Retro.open_launcher)
+hl.bind(mainMod .. " + X", Retro.open_tools)
+hl.bind(mainMod .. " + Tab", Retro.open_dashboard)
+hl.bind(mainMod .. " + N", Retro.open_notes)
+hl.bind(mainMod .. " + SHIFT + A", Retro.open_assistant)
+hl.bind("ALT + Tab", Retro.open_overview)
+
+hl.bind("F12", Retro.open_settings)
+hl.bind("XF86Launch2", Retro.open_settings)
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "l" }))
@@ -45,9 +46,7 @@ for i = 1, 10 do
 	hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
--- Example special workspace (scratchpad)
--- hl.bind(mainMod .. " + S", hl.dsp.workspace.toggle_special("magic"))
--- hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
+hl.bind(mainMod .. " + S", Retro.open_screenshot)
 
 -- Scroll through existing workspaces with mainMod + scroll
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
@@ -58,26 +57,14 @@ hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Laptop multimedia keys for volume and LCD brightness
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("retro audio up"), { locked = true, repeating = true })
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("retro audio down"), { locked = true, repeating = true })
-hl.bind(
-	"XF86AudioMute",
-	hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),
-	{ locked = true, repeating = true }
-)
-hl.bind(
-	"XF86AudioMicMute",
-	hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
-	{ locked = true, repeating = true }
-)
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("retro display brightness all +5"), { locked = true, repeating = true })
-hl.bind(
-	"XF86MonBrightnessDown",
-	hl.dsp.exec_cmd("retro display brightness all -5"),
-	{ locked = true, repeating = true }
-)
+hl.bind("XF86AudioRaiseVolume", Retro.audio_up, { locked = true, repeating = true })
+hl.bind("XF86AudioLowerVolume", Retro.audio_down, { locked = true, repeating = true })
+hl.bind("XF86AudioMute", Retro.audio_mute, { locked = true, repeating = true })
+hl.bind("XF86AudioMicMute", Retro.audio_mic_mute, { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessUp", Retro.brightness_up, { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", Retro.brightness_down, { locked = true, repeating = true })
 
-hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
+hl.bind("XF86AudioNext", Retro.media_next, { locked = true })
 hl.bind("XF86AudioPause", Retro.media_play_pause, { locked = true })
 hl.bind("XF86AudioPlay", Retro.media_play_pause, { locked = true })
-hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
+hl.bind("XF86AudioPrev", Retro.media_prev, { locked = true })
