@@ -21,17 +21,3 @@ hl.config({
         },
     },
 })
-
--- See https://wiki.hypr.land/Configuring/Gestures
-hl.gesture({
-    fingers = 3,
-    direction = "horizontal",
-    action = "workspace",
-})
-
--- Example per-device config
--- See https://wiki.hypr.land/Configuring/Keywords/#per-device-input-configs for more
-hl.device({
-    name = "epic-mouse-v1",
-    sensitivity = -0.5,
-})
