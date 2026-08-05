@@ -1,3 +1,0 @@
-rbw
-rofi
-rofi-rbw
