@@ -28,6 +28,7 @@ hl.bind(mainMod .. " + X", Retro.open_tools)
 hl.bind(mainMod .. " + Tab", Retro.open_dashboard)
 hl.bind(mainMod .. " + N", Retro.open_notes)
 hl.bind(mainMod .. " + SHIFT + A", Retro.open_assistant)
+hl.bind(mainMod .. " + comma", Retro.open_wallpapers)
 hl.bind("ALT + Tab", Retro.open_overview)
 
 hl.bind("F12", Retro.open_settings)
