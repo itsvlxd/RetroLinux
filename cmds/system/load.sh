@@ -40,7 +40,7 @@ cmd_load() {
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
     )
 
-    [[ $(get_var "HYPRIDLE_ENABLE" "true") == "true" ]] && startup_tasks+=("hypridle -c ${XDG_CONFIG_HOME}/retro/hypridle.conf|Starting Hyprland idle daemon")
+    [[ $(get_var "HYPRIDLE_ENABLE" "true") == "true" ]] && startup_tasks+=("retro shell idle|Starting Hyprland idle daemon")
 
     local custom_tasks=()
     local custom_raw=$(get_var "RETRO_CUSTOM_LOAD")
