@@ -5,7 +5,7 @@ function Notify.send(summary, body, opts)
 	local urgency = opts.urgency or "normal"
 	local icon = opts.icon or ""
 	local timeout = opts.timeout or "5000"
-	local app_name = opts.app_name or "retro"
+	local app_name = opts.app_name or "RetroLinux"
 
 	local function build_base_cmd(with_wait)
 		local base = string.format("notify-send -a '%s' -u %s", app_name, urgency)
@@ -75,34 +75,34 @@ end
 function Notify.power_disconnect(cap)
 	Notify.send("Power Disconnected", "Now on battery power (" .. cap .. "%)", {
 		icon = "battery-caution",
-		app_name = "retro",
+		app_name = "RetroLinux",
 	})
 end
 
 function Notify.power_connect(cap)
 	local icon = cap == "100" and "battery-full-charging" or "battery-charging"
 	local msg = cap == "100" and "Running on AC (Battery bypassed)" or "Charging up (" .. cap .. "%)"
-	Notify.send("Power Connected", msg, { icon = icon, app_name = "retro" })
+	Notify.send("Power Connected", msg, { icon = icon, app_name = "RetroLinux" })
 end
 
 function Notify.battery_saver_enabled()
 	Notify.send("Battery Saver", "Power draw capped to extend runtime", {
 		icon = "power-profile-saver",
-		app_name = "retro",
+		app_name = "RetroLinux",
 	})
 end
 
 function Notify.battery_saver_disabled()
 	Notify.send("Battery Saver", "Standard power limits restored", {
 		icon = "power-profile-balanced",
-		app_name = "retro",
+		app_name = "RetroLinux",
 	})
 end
 
 function Notify.battery_low(cap)
 	Notify.send("Battery Low", cap .. "% remaining — find a plug soon", {
 		icon = "battery-low",
-		app_name = "retro",
+		app_name = "RetroLinux",
 	})
 end
 
@@ -110,7 +110,7 @@ function Notify.battery_critical(cap)
 	Notify.send("Battery Critical", "Only " .. cap .. "% left. Connect power now.", {
 		icon = "battery-empty",
 		urgency = "critical",
-		app_name = "retro",
+		app_name = "RetroLinux",
 	})
 end
 
@@ -130,7 +130,7 @@ function Notify.battery_usage_high(app, watts, cpu, pid)
 			icon = "dialog-warning-symbolic",
 			urgency = "normal",
 			timeout = "15000",
-			app_name = "retro_battery_usage_" .. app,
+			app_name = "RetroLinux",
 			wait = true,
 			actions = {
 				{ key = "terminate", label = "Terminate Process" },
@@ -148,7 +148,7 @@ function Notify.usb_connected(label, mount_path, fm_name)
 			icon = "drive-removable-media-symbolic",
 			urgency = "normal",
 			timeout = "10000",
-			app_name = "retro_usb_con_" .. label,
+			app_name = "RetroLinux",
 			wait = true,
 			actions = {
 				{ key = "open", label = "Open in " .. fm_display },
@@ -162,7 +162,7 @@ function Notify.usb_disconnected(dev_name, label)
 	Notify.send(
 		"USB Drive Removed",
 		"Drive <b>" .. label .. "</b> (" .. dev_name .. ") has been disconnected.",
-		{ icon = "drive-removable-media-symbolic", app_name = "retro_usb_dis_" .. dev_name }
+		{ icon = "drive-removable-media-symbolic", app_name = "RetroLinux" }
 	)
 end
 
@@ -174,7 +174,7 @@ function Notify.bluetooth_connected(name, mac, icon)
 			icon = icon or "bluetooth-active",
 			urgency = "normal",
 			timeout = "10000",
-			app_name = "retro_bluetooth_con_" .. mac,
+			app_name = "RetroLinux",
 			wait = true,
 			actions = {
 				{ key = "disconnect", label = "Disconnect" },
@@ -189,7 +189,7 @@ function Notify.bluetooth_disconnected(name, mac, icon)
 	Notify.send(
 		"Connection Closed",
 		"<b>" .. name .. "</b> (" .. mac .. ") is no longer active.",
-		{ icon = icon or "bluetooth-active", timeout = "5000", app_name = "retro_bluetooth_con_" .. mac }
+		{ icon = icon or "bluetooth-active", timeout = "5000", app_name = "RetroLinux" }
 	)
 end
 
@@ -200,7 +200,7 @@ function Notify.bluetooth_pairing_request(name, mac, icon)
 		{
 			icon = icon or "bluetooth-active",
 			urgency = "critical",
-			app_name = "retro_bluetooth_con_" .. mac,
+			app_name = "RetroLinux",
 			wait = true,
 			actions = {
 				{ key = "pair", label = "Pair" },
