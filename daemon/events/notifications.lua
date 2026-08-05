@@ -160,7 +160,7 @@ function Events.on_ssh_login(username, ip, method)
 			icon = "network-server-symbolic",
 			urgency = "normal",
 			timeout = "10000",
-			app_name = "retro_ssh_login_" .. ip,
+			app_name = "RetroLinux",
 			wait = true,
 			actions = {
 				{ key = "disconnect", label = "Disconnect" },
@@ -176,7 +176,7 @@ function Events.on_ssh_login(username, ip, method)
 		Notify.send(
 			"SSH Disconnected",
 			"SSH sessions from " .. ip .. " have been terminated.",
-			{ icon = "network-offline-symbolic", timeout = "3000", app_name = "retro_ssh" }
+			{ icon = "network-offline-symbolic", timeout = "3000", app_name = "RetroLinux" }
 		)
 	elseif action == "block" then
 		log("Blocking: " .. ip)
@@ -186,7 +186,7 @@ function Events.on_ssh_login(username, ip, method)
 		Notify.send(
 			"IP Blocked",
 			ip .. " has been blocked and its SSH sessions terminated.",
-			{ icon = "security-low-symbolic", timeout = "3000", app_name = "retro_ssh" }
+			{ icon = "security-low-symbolic", timeout = "3000", app_name = "RetroLinux" }
 		)
 	end
 end
@@ -206,7 +206,7 @@ function Events.on_ssh_failed(username, ip)
 				icon = "dialog-warning-symbolic",
 				urgency = "normal",
 				timeout = "15000",
-				app_name = "retro_ssh_brute_" .. ip,
+				app_name = "RetroLinux",
 				wait = true,
 				actions = {
 					{ key = "block", label = "Block IP" },
@@ -222,7 +222,7 @@ function Events.on_ssh_failed(username, ip)
 			Notify.send(
 				"IP Blocked",
 				ip .. " has been blocked for brute force and its sessions terminated.",
-				{ icon = "security-low-symbolic", timeout = "3000", app_name = "retro_ssh" }
+				{ icon = "security-low-symbolic", timeout = "3000", app_name = "RetroLinux" }
 			)
 		end
 	end
@@ -243,7 +243,7 @@ function Events.on_ssh_close(username, ip, reason)
 				icon = "dialog-warning-symbolic",
 				urgency = "critical",
 				timeout = "10000",
-				app_name = "retro_ssh_auth_fail_" .. ip,
+				app_name = "RetroLinux",
 				wait = true,
 				actions = {
 					{ key = "block", label = "Block IP" },
@@ -258,7 +258,7 @@ function Events.on_ssh_close(username, ip, reason)
 			Notify.send(
 				"IP Blocked",
 				ip .. " has been blocked and its SSH sessions terminated.",
-				{ icon = "security-low-symbolic", timeout = "3000", app_name = "retro_ssh" }
+				{ icon = "security-low-symbolic", timeout = "3000", app_name = "RetroLinux" }
 			)
 		end
 	else
@@ -266,7 +266,7 @@ function Events.on_ssh_close(username, ip, reason)
 			icon = "network-offline-symbolic",
 			urgency = "low",
 			timeout = "5000",
-			app_name = "retro_ssh_close",
+			app_name = "RetroLinux",
 		})
 	end
 end
