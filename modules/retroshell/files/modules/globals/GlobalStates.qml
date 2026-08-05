@@ -171,6 +171,10 @@ Singleton {
     property bool osdVisible: false
     property string osdIndicator: "volume" // volume, mic, brightness
 
+    // Media OSD state
+    property bool mediaOsdVisible: false
+    property string mediaOsdAction: "play-pause" // play-pause, next, prev
+
     // Screenshot Tool state
     property bool screenshotToolVisible: false
     // property string screenshotToolMode: "normal" // DEPRECATED
