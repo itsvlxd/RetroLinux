@@ -155,4 +155,31 @@ function Retro.media_prev()
 	Retro.shell_run("media-prev")
 end
 
+function Retro.lock_screen()
+	os.execute("setsid retro shell lock >/dev/null 2>&1 &")
+end
+
+function Retro.audio_up()
+	os.execute("retro audio up 5 >/dev/null 2>&1 &")
+end
+function Retro.audio_down()
+	os.execute("retro audio down 5 >/dev/null 2>&1 &")
+end
+function Retro.audio_mute()
+	os.execute("retro audio mute >/dev/null 2>&1 &")
+end
+function Retro.audio_mic_mute()
+	os.execute("retro audio mic-mute >/dev/null 2>&1 &")
+end
+function Retro.brightness_up()
+	os.execute("retro display brightness all +5 >/dev/null 2>&1 &")
+end
+function Retro.brightness_down()
+	os.execute("retro display brightness all -5 >/dev/null 2>&1 &")
+end
+
+function Retro.open_settings()
+	os.execute("setsid retro settings >/dev/null 2>&1 &")
+end
+
 return Retro
