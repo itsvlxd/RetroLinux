@@ -30,10 +30,9 @@ Singleton {
         return m + "m";
     }
 
-    function getBatteryIcon() {
+    function getBatteryIcon(horizontal) {
         if (!available) return Icons.plug;
 
-        const horizontal = Config.bar?.batteryStyle === "bar";
         if (isPluggedIn) return horizontal ? Icons.batteryHCharging : Icons.batteryCharging;
 
         const pct = percentage;
