@@ -74,7 +74,16 @@ case "$1" in
         fi
         ;;
     "--lock")
-        run_cmd "lockscreen"
+        sid="${XDG_SESSION_ID:-}"
+        if [[ -z $sid ]]; then
+            sid=$(loginctl 2>/dev/null | awk 'NR>1 {print $1}' | head -1)
+        fi
+        locked=$(loginctl show-session "$sid" -p LockedHint 2>/dev/null | sed 's/^LockedHint=//')
+        if [[ "$locked" == "yes" ]]; then
+            echo "OK|already_locked"
+        else
+            run_cmd "lockscreen"
+        fi
         ;;
     "--pid")
         cat "$PID_FILE" 2>/dev/null || echo ""
