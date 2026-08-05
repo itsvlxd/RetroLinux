@@ -100,10 +100,11 @@ cmd_list_modules() {
         local icon="󰅟 "
         case "$match" in
             *hypr*) icon=" " ;;
+            *retroshell*) icon="󰣆 " ;;
             *retro*) icon="󰊗 " ;;
             *kitty*) icon="󰄛 " ;;
-            *rofi*) icon="󰣖 " ;;
             *matugen*) icon="󰏘 " ;;
+            *spotify*) icon=" " ;;
         esac
 
         printf " ${PINK}%b${RESET} %b%b%b\n" \
