@@ -8,6 +8,8 @@ unzip curl
 brightnessctl networkmanager
 wl-clipboard slurp hyprpicker upower
 
+go
+
 tesseract tesseract-data-eng tesseract-data-spa
 tesseract-data-deu tesseract-data-fra tesseract-data-pol
 tesseract-data-ron tesseract-data-swe
