@@ -33,9 +33,10 @@ FileView {
         id: generationTimer
         interval: 100
         repeat: false
-        onTriggered: {
-        }
+        onTriggered: colors.colorsChanged()
     }
+
+    signal colorsChanged
 
     adapter: JsonAdapter {
         property color background: "#1a1111"

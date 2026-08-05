@@ -133,6 +133,8 @@ StyledRect {
                     isActive: CaffeineService.inhibit
                     tooltipText: CaffeineService.inhibit ? "Caffeine: On" : "Caffeine: Off"
                     onClicked: CaffeineService.toggleInhibit()
+                    onRightClicked: root.togglePanel(2)
+                    onLongPressed: root.togglePanel(2)
                 }
 
                 ControlButton {
@@ -157,7 +159,11 @@ StyledRect {
         Item {
             id: panelArea
             Layout.fillWidth: true
-            Layout.preferredHeight: root.expandedPanel !== -1 ? root.width - 8 : 0 
+            Layout.preferredHeight: {
+                if (root.expandedPanel === -1) return 0;
+                if (root.expandedPanel === 2) return 104;
+                return root.width - 8;
+            }
             clip: true
             opacity: root.expandedPanel !== -1 ? 1 : 0
             
@@ -216,6 +222,27 @@ StyledRect {
                         onLoaded: {
                             if (item) {
                                 item.maxContentWidth = width;
+                            }
+                        }
+
+                        Behavior on opacity { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                        Behavior on x { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                    }
+
+                    Loader {
+                        id: caffeineLoader
+                        anchors.fill: parent
+                        active: root.expandedPanel === 2
+                        source: "../controls/CaffeinePanel.qml"
+                        asynchronous: true
+
+                        opacity: root.expandedPanel === 2 ? 1 : 0
+                        x: root.expandedPanel === 2 ? 0 : (root.expandedPanel === 0 ? -width : width)
+
+                        onLoaded: {
+                            if (item) {
+                                item.maxContentWidth = width;
+                                item.requestClose.connect(() => { root.expandedPanel = -1; });
                             }
                         }
 
