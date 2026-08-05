@@ -211,6 +211,39 @@ class ShellMiscPage:
             self._notify_dirty()
         res_row.connect("notify::selected", _res_changed)
 
+        # -- Portal Recording --
+        portal_row = Adw.SwitchRow(
+            title="Portal Recording (Experimental)",
+            subtitle="Unstable portal capture. Some apps may not render correctly. Off by default.",
+        )
+        portal_row.set_active(bool(self._tools.get("recordingPortalEnabled", TOOLS_DEFAULTS["recordingPortalEnabled"])))
+        tools_group.add(portal_row)
+        self._portal_row = portal_row
+
+        def _portal_changed(*_args):
+            if portal_row.get_active():
+                from settings.ui import confirm
+                def _enable():
+                    self._tools["recordingPortalEnabled"] = True
+                    self._notify_dirty()
+                def _cancel():
+                    portal_row.set_active(False)
+                confirm(
+                    self._window,
+                    heading="Portal mode is experimental",
+                    body="Portal capture may be unstable with some applications and compositor configurations. Enable anyway?",
+                    label="Enable",
+                    on_confirm=_enable,
+                    appearance=Adw.ResponseAppearance.SUGGESTED,
+                )
+                # After showing dialog, always mark for potential dirty
+                # Only actually set dirty if user confirms (in _enable)
+                self._notify_dirty()
+            else:
+                self._tools["recordingPortalEnabled"] = False
+                self._notify_dirty()
+        portal_row.connect("notify::active", _portal_changed)
+
         # -- Preview countdown --
         preview_row = Adw.SwitchRow(
             title="Preview Countdown",
@@ -496,6 +529,7 @@ class ShellMiscPage:
             spin.set_value(self._tools.get(key, TOOLS_DEFAULTS[key]))
         self._preview_row.set_active(self._tools.get("previewCountdown", TOOLS_DEFAULTS["previewCountdown"]))
         self._timer_enabled_row.set_active(self._tools.get("screenshotTimerEnabled", TOOLS_DEFAULTS["screenshotTimerEnabled"]))
+        self._portal_row.set_active(self._tools.get("recordingPortalEnabled", TOOLS_DEFAULTS["recordingPortalEnabled"]))
         if hasattr(self, "_dir_entries"):
             for key, entry in self._dir_entries.items():
                 entry.set_text(self._tools.get(key, TOOLS_DEFAULTS[key]))

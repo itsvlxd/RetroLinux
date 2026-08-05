@@ -3,7 +3,7 @@
     "description": "QML-based desktop shell with bar, notifications, app launcher, and dynamic island",
     "type": "core",
     "access": "user",
-    "defaults": false,
+    "defaults": true,
     "mode": "mirror",
     "config": "./files",
     "install": "~/.local/share/retroshell",

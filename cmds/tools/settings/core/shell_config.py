@@ -734,6 +734,7 @@ TOOLS_DEFAULTS: dict = {
     "recordingsDir": "",
     "recordingResolution": "auto",
     "recordingFps": 60,
+    "recordingPortalEnabled": False,
 }
 
 

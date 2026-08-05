@@ -96,4 +96,63 @@ function Retro.open_editor()
 	end
 end
 
+function Retro.shell_run(name)
+	os.execute("setsid retro shell run " .. name .. " >/dev/null 2>&1 &")
+end
+
+function Retro.open_launcher()
+	Retro.shell_run("launcher")
+end
+function Retro.open_clipboard()
+	Retro.shell_run("clipboard")
+end
+function Retro.open_emoji()
+	Retro.shell_run("emoji")
+end
+function Retro.open_tmux()
+	Retro.shell_run("tmux")
+end
+function Retro.open_notes()
+	Retro.shell_run("notes")
+end
+function Retro.open_wallpapers()
+	Retro.shell_run("wallpapers")
+end
+function Retro.open_screenshot()
+	Retro.shell_run("screenshot")
+end
+function Retro.open_screenrecord()
+	Retro.shell_run("screenrecord")
+end
+function Retro.open_lockscreen()
+	Retro.shell_run("lockscreen")
+end
+function Retro.open_overview()
+	Retro.shell_run("overview")
+end
+function Retro.open_powermenu()
+	Retro.shell_run("powermenu")
+end
+function Retro.open_tools()
+	Retro.shell_run("tools")
+end
+function Retro.open_assistant()
+	Retro.shell_run("assistant")
+end
+function Retro.open_config()
+	Retro.shell_run("config")
+end
+function Retro.open_dashboard()
+	Retro.shell_run("dashboard")
+end
+function Retro.media_play_pause()
+	Retro.shell_run("media-play-pause")
+end
+function Retro.media_next()
+	Retro.shell_run("media-next")
+end
+function Retro.media_prev()
+	Retro.shell_run("media-prev")
+end
+
 return Retro
