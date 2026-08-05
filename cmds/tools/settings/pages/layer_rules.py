@@ -184,13 +184,13 @@ class LayerRulesPage(SavedListSectionPage[LayerRule]):
         Unlike the window-rules empty state, there's no "Pick from Open
         Window" path — ``hyprland-socket`` doesn't expose a layers query,
         and even if it did, the user-recognisable identity for a layer
-        surface is its namespace (``waybar``, ``rofi``), not a running
+        surface is its namespace (``waybar``), not a running
         window the user can point at.
         """
         return EmptyState(
             title="No Layer Rules",
             description=(
-                "Tweak how shell surfaces (waybar, notifications, rofi, wallpapers) "
+                "Tweak how shell surfaces (waybar, notifications, wallpapers) "
                 "are decorated — backdrop blur, dim-around, animations, render order."
             ),
             icon_name=LAYER_RULES_ICON,

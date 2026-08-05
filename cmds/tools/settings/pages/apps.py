@@ -28,7 +28,7 @@ def _resolve_alias(var_name: str, fallback: str = "") -> str:
 
 
 class AppsPage:
-    _FONT_VARS = ("GTK_FONT", "KITTY_FONT", "ROFI_FONT")
+    _FONT_VARS = ("GTK_FONT", "KITTY_FONT")
 
     def __init__(self, window):
         self._window = window
@@ -43,8 +43,6 @@ class AppsPage:
         self._gtk_font_values: list[str] = []
         self._kitty_font_row: Adw.ComboRow | None = None
         self._kitty_font_values: list[str] = []
-        self._rofi_font_row: Adw.ComboRow | None = None
-        self._rofi_font_values: list[str] = []
 
         self._gtk_font_size_row: Adw.ActionRow | None = None
         self._kitty_font_size_row: Adw.ActionRow | None = None
@@ -60,21 +58,6 @@ class AppsPage:
         self._kitty_tab_edge_values: list[str] = []
         self._kitty_tab_style_row: Adw.ComboRow | None = None
         self._kitty_tab_style_values: list[str] = []
-        self._rofi_font_size_row: Adw.ActionRow | None = None
-        self._clip_padding_row: Adw.ActionRow | None = None
-        self._clip_spacing_row: Adw.ActionRow | None = None
-        self._clip_rounding_row: Adw.ActionRow | None = None
-        self._clip_border_row: Adw.ActionRow | None = None
-        self._clip_input_padding_row: Adw.ActionRow | None = None
-        self._clip_y_offset_row: Adw.ActionRow | None = None
-        self._clip_icon_size_row: Adw.ActionRow | None = None
-        self._clip_radius_tl_row: Adw.ActionRow | None = None
-        self._clip_radius_tr_row: Adw.ActionRow | None = None
-        self._clip_radius_br_row: Adw.ActionRow | None = None
-        self._clip_radius_bl_row: Adw.ActionRow | None = None
-        self._clip_enable_emoji_row: Adw.SwitchRow | None = None
-        self._clip_enable_screenshots_row: Adw.SwitchRow | None = None
-        self._clip_enable_bitwarden_row: Adw.SwitchRow | None = None
 
         self._gtk_font_actions: RowActions | None = None
         self._gtk_font_size_actions: RowActions | None = None
@@ -90,22 +73,6 @@ class AppsPage:
         self._kitty_audio_bell_actions: RowActions | None = None
         self._kitty_tab_edge_actions: RowActions | None = None
         self._kitty_tab_style_actions: RowActions | None = None
-        self._rofi_font_actions: RowActions | None = None
-        self._rofi_font_size_actions: RowActions | None = None
-        self._clip_padding_actions: RowActions | None = None
-        self._clip_spacing_actions: RowActions | None = None
-        self._clip_rounding_actions: RowActions | None = None
-        self._clip_border_actions: RowActions | None = None
-        self._clip_input_padding_actions: RowActions | None = None
-        self._clip_y_offset_actions: RowActions | None = None
-        self._clip_icon_size_actions: RowActions | None = None
-        self._clip_radius_tl_actions: RowActions | None = None
-        self._clip_radius_tr_actions: RowActions | None = None
-        self._clip_radius_br_actions: RowActions | None = None
-        self._clip_radius_bl_actions: RowActions | None = None
-        self._clip_enable_emoji_actions: RowActions | None = None
-        self._clip_enable_screenshots_actions: RowActions | None = None
-        self._clip_enable_bitwarden_actions: RowActions | None = None
 
         self._gtk_font_spin: Gtk.SpinButton | None = None
         self._kitty_font_spin: Gtk.SpinButton | None = None
@@ -114,18 +81,6 @@ class AppsPage:
         self._kitty_scrollback_spin: Gtk.SpinButton | None = None
         self._kitty_padding_spin: Gtk.SpinButton | None = None
         self._kitty_opacity_active_spin: Gtk.SpinButton | None = None
-        self._rofi_font_spin: Gtk.SpinButton | None = None
-        self._clip_padding_spin: Gtk.SpinButton | None = None
-        self._clip_spacing_spin: Gtk.SpinButton | None = None
-        self._clip_rounding_spin: Gtk.SpinButton | None = None
-        self._clip_border_spin: Gtk.SpinButton | None = None
-        self._clip_input_padding_spin: Gtk.SpinButton | None = None
-        self._clip_y_offset_spin: Gtk.SpinButton | None = None
-        self._clip_icon_size_spin: Gtk.SpinButton | None = None
-        self._clip_radius_tl_spin: Gtk.SpinButton | None = None
-        self._clip_radius_tr_spin: Gtk.SpinButton | None = None
-        self._clip_radius_br_spin: Gtk.SpinButton | None = None
-        self._clip_radius_bl_spin: Gtk.SpinButton | None = None
 
         self._setting_value = False
 
@@ -149,22 +104,6 @@ class AppsPage:
         ("KITTY_TAB_EDGE", "_kitty_tab_edge_row", "_kitty_tab_edge_actions"),
         ("KITTY_TAB_STYLE", "_kitty_tab_style_row", "_kitty_tab_style_actions"),
         ("KITTY_SHRINK_PADDING_FULLSCREEN", "_kitty_shrink_row", "_kitty_shrink_actions"),
-        ("ROFI_FONT", "_rofi_font_row", "_rofi_font_actions"),
-        ("ROFI_FONT_SIZE", "_rofi_font_size_row", "_rofi_font_size_actions"),
-        ("CLIP_PADDING", "_clip_padding_row", "_clip_padding_actions"),
-        ("CLIP_SPACING", "_clip_spacing_row", "_clip_spacing_actions"),
-        ("CLIP_ROUNDING", "_clip_rounding_row", "_clip_rounding_actions"),
-        ("CLIP_BORDER_SIZE", "_clip_border_row", "_clip_border_actions"),
-        ("CLIP_INPUT_PADDING", "_clip_input_padding_row", "_clip_input_padding_actions"),
-        ("CLIP_Y_OFFSET", "_clip_y_offset_row", "_clip_y_offset_actions"),
-        ("CLIP_ICON_SIZE", "_clip_icon_size_row", "_clip_icon_size_actions"),
-        ("CLIP_RADIUS_TL", "_clip_radius_tl_row", "_clip_radius_tl_actions"),
-        ("CLIP_RADIUS_TR", "_clip_radius_tr_row", "_clip_radius_tr_actions"),
-        ("CLIP_RADIUS_BR", "_clip_radius_br_row", "_clip_radius_br_actions"),
-        ("CLIP_RADIUS_BL", "_clip_radius_bl_row", "_clip_radius_bl_actions"),
-        ("CLIP_ENABLE_EMOJI", "_clip_enable_emoji_row", "_clip_enable_emoji_actions"),
-        ("CLIP_ENABLE_SCREENSHOTS", "_clip_enable_screenshots_row", "_clip_enable_screenshots_actions"),
-        ("CLIP_ENABLE_BITWARDEN", "_clip_enable_bitwarden_row", "_clip_enable_bitwarden_actions"),
     ]
 
     def _refresh_managed(self) -> None:
@@ -213,8 +152,6 @@ class AppsPage:
             return self._gtk_font_values
         if var == "KITTY_FONT":
             return self._kitty_font_values
-        if var == "ROFI_FONT":
-            return self._rofi_font_values
         return []
 
     def _set_widget_value(self, var: str, value: str):
@@ -265,36 +202,6 @@ class AppsPage:
             except ValueError:
                 idx = 0
             self._kitty_tab_style_row.set_selected(idx)
-        elif var == "ROFI_FONT_SIZE" and self._rofi_font_spin is not None:
-            self._rofi_font_spin.set_value(float(value) if value else 12.0)
-        elif var == "CLIP_PADDING" and self._clip_padding_spin is not None:
-            self._clip_padding_spin.set_value(float(value) if value else 5)
-        elif var == "CLIP_SPACING" and self._clip_spacing_spin is not None:
-            self._clip_spacing_spin.set_value(float(value) if value else 5)
-        elif var == "CLIP_ROUNDING" and self._clip_rounding_spin is not None:
-            self._clip_rounding_spin.set_value(float(value) if value else 10)
-        elif var == "CLIP_BORDER_SIZE" and self._clip_border_spin is not None:
-            self._clip_border_spin.set_value(float(value) if value else 2)
-        elif var == "CLIP_INPUT_PADDING" and self._clip_input_padding_spin is not None:
-            self._clip_input_padding_spin.set_value(float(value) if value else 12)
-        elif var == "CLIP_Y_OFFSET" and self._clip_y_offset_spin is not None:
-            self._clip_y_offset_spin.set_value(float(value) if value else 40)
-        elif var == "CLIP_ICON_SIZE" and self._clip_icon_size_spin is not None:
-            self._clip_icon_size_spin.set_value(float(value) if value else 128)
-        elif var == "CLIP_RADIUS_TL" and self._clip_radius_tl_spin is not None:
-            self._clip_radius_tl_spin.set_value(float(value) if value else 10)
-        elif var == "CLIP_RADIUS_TR" and self._clip_radius_tr_spin is not None:
-            self._clip_radius_tr_spin.set_value(float(value) if value else 10)
-        elif var == "CLIP_RADIUS_BR" and self._clip_radius_br_spin is not None:
-            self._clip_radius_br_spin.set_value(float(value) if value else 10)
-        elif var == "CLIP_RADIUS_BL" and self._clip_radius_bl_spin is not None:
-            self._clip_radius_bl_spin.set_value(float(value) if value else 10)
-        elif var == "CLIP_ENABLE_EMOJI" and self._clip_enable_emoji_row is not None:
-            self._clip_enable_emoji_row.set_active(value == "true")
-        elif var == "CLIP_ENABLE_SCREENSHOTS" and self._clip_enable_screenshots_row is not None:
-            self._clip_enable_screenshots_row.set_active(value == "true")
-        elif var == "CLIP_ENABLE_BITWARDEN" and self._clip_enable_bitwarden_row is not None:
-            self._clip_enable_bitwarden_row.set_active(value == "true")
         self._setting_value = False
 
     # ── Dirty tracking ──────────────────────────────────────────────────
@@ -387,22 +294,6 @@ class AppsPage:
             {"key": "apps:kitty_audio_bell", "label": "Kitty Audio Bell", "description": "Enable terminal bell in Kitty", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
             {"key": "apps:kitty_tab_edge", "label": "Kitty Tab Bar Edge", "description": "Position of the tab bar in Kitty", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
             {"key": "apps:kitty_tab_style", "label": "Kitty Tab Bar Style", "description": "Visual style of the Kitty tab bar", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:rofi_font", "label": "Rofi Font", "description": "Font used by the Rofi application launcher", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:rofi_font_size", "label": "Rofi Font Size", "description": "Font size for Rofi (pt)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_padding", "label": "Clipboard Padding", "description": "Inner padding for the clipboard popup (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_spacing", "label": "Clipboard Spacing", "description": "Spacing between clipboard elements (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_rounding", "label": "Clipboard Element Rounding", "description": "Corner radius for clipboard elements — input bar, rows, buttons (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_border", "label": "Clipboard Border Size", "description": "Border width for the clipboard popup (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_input_padding", "label": "Clipboard Input Padding", "description": "Padding inside the clipboard search bar (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_y_offset", "label": "Clipboard Y Offset", "description": "Vertical offset for clipboard popup position (%)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_icon_size", "label": "Clipboard Icon Size", "description": "Size of screenshot thumbnails in clipboard (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_radius_tl", "label": "Clipboard Corner — Top-Left", "description": "Top-left corner radius for the clipboard popup (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_radius_tr", "label": "Clipboard Corner — Top-Right", "description": "Top-right corner radius for the clipboard popup (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_radius_br", "label": "Clipboard Corner — Bottom-Right", "description": "Bottom-right corner radius for the clipboard popup (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_radius_bl", "label": "Clipboard Corner — Bottom-Left", "description": "Bottom-left corner radius for the clipboard popup (px)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_enable_emoji", "label": "Enable Emoji Picker", "description": "Show the Emoji tab in the clipboard picker", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_enable_screenshots", "label": "Enable Screenshots Browser", "description": "Show the Screenshots tab in the clipboard picker", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
-            {"key": "apps:clip_enable_bitwarden", "label": "Enable Bitwarden Vault", "description": "Show the Bitwarden tab in the clipboard picker (requires rbw)", "_group_id": "apps", "_group_label": "Applications", "_section_label": "Settings"},
         ]
 
     def _make_spin_row(self, title: str, subtitle: str, var: str,
@@ -690,224 +581,6 @@ class AppsPage:
         kitty_group.add(kitty_tab_style_row)
 
         content_box.append(kitty_group)
-
-        # ── Rofi (global) ─────────────────────────────────────────────
-        rofi_group = Adw.PreferencesGroup(title="Rofi")
-        rofi_group.set_description(
-            "Global settings for all Rofi launchers and dialogs — "
-            "font family and size applied to the clipboard picker, "
-            "application launcher, gallery, and any other Rofi-based UIs."
-        )
-
-        rofi_font_row = self._make_font_combo(
-            var="ROFI_FONT",
-            title="Rofi Font",
-            subtitle="Font used by the Rofi application launcher and clipboard",
-            actions_attr="_rofi_font_actions",
-            row_attr="_rofi_font_row",
-            values_attr="_rofi_font_values",
-        )
-        rofi_group.add(rofi_font_row)
-
-        rofi_font_size_row, rofi_font_size_spin = self._make_spin_row(
-            title="Rofi Font Size",
-            subtitle="Font size for Rofi (pt)",
-            var="ROFI_FONT_SIZE",
-            lower=1, upper=200, step=0.5,
-            default_val=12.0,
-            actions_attr="_rofi_font_size_actions",
-            spin_attr="_rofi_font_spin",
-            is_int=False,
-        )
-        rofi_group.add(rofi_font_size_row)
-        self._rofi_font_size_row = rofi_font_size_row
-
-        content_box.append(rofi_group)
-
-        # ── Clipboard ─────────────────────────────────────────────────
-        clip_group = Adw.PreferencesGroup(title="Clipboard")
-        clip_group.set_description(
-            "Styling options for the clipboard popup "
-            "(border, padding, spacing, per-corner radius, and more)."
-        )
-
-        clip_padding_row, clip_padding_spin = self._make_spin_row(
-            title="Padding",
-            subtitle="Inner padding (px)",
-            var="CLIP_PADDING",
-            lower=0, upper=200, step=1,
-            default_val=5,
-            actions_attr="_clip_padding_actions",
-            spin_attr="_clip_padding_spin",
-        )
-        clip_group.add(clip_padding_row)
-        self._clip_padding_row = clip_padding_row
-
-        clip_spacing_row, clip_spacing_spin = self._make_spin_row(
-            title="Spacing",
-            subtitle="Spacing between elements (px)",
-            var="CLIP_SPACING",
-            lower=0, upper=100, step=1,
-            default_val=5,
-            actions_attr="_clip_spacing_actions",
-            spin_attr="_clip_spacing_spin",
-        )
-        clip_group.add(clip_spacing_row)
-        self._clip_spacing_row = clip_spacing_row
-
-        clip_rounding_row, clip_rounding_spin = self._make_spin_row(
-            title="Element Rounding",
-            subtitle="Corner radius for input bar, rows, and buttons (px)",
-            var="CLIP_ROUNDING",
-            lower=0, upper=99, step=1,
-            default_val=10,
-            actions_attr="_clip_rounding_actions",
-            spin_attr="_clip_rounding_spin",
-        )
-        clip_group.add(clip_rounding_row)
-        self._clip_rounding_row = clip_rounding_row
-
-        clip_border_row, clip_border_spin = self._make_spin_row(
-            title="Border Size",
-            subtitle="Border width (px)",
-            var="CLIP_BORDER_SIZE",
-            lower=0, upper=99, step=1,
-            default_val=2,
-            actions_attr="_clip_border_actions",
-            spin_attr="_clip_border_spin",
-        )
-        clip_group.add(clip_border_row)
-        self._clip_border_row = clip_border_row
-
-        clip_input_padding_row, clip_input_padding_spin = self._make_spin_row(
-            title="Input Padding",
-            subtitle="Padding inside the search bar (px)",
-            var="CLIP_INPUT_PADDING",
-            lower=0, upper=100, step=1,
-            default_val=12,
-            actions_attr="_clip_input_padding_actions",
-            spin_attr="_clip_input_padding_spin",
-        )
-        clip_group.add(clip_input_padding_row)
-        self._clip_input_padding_row = clip_input_padding_row
-
-        clip_y_offset_row, clip_y_offset_spin = self._make_spin_row(
-            title="Y Offset",
-            subtitle="Vertical offset from the top of the screen (%)",
-            var="CLIP_Y_OFFSET",
-            lower=0, upper=200, step=1,
-            default_val=40,
-            actions_attr="_clip_y_offset_actions",
-            spin_attr="_clip_y_offset_spin",
-        )
-        clip_group.add(clip_y_offset_row)
-        self._clip_y_offset_row = clip_y_offset_row
-
-        clip_icon_size_row, clip_icon_size_spin = self._make_spin_row(
-            title="Icon Size",
-            subtitle="Size of screenshot thumbnails (px)",
-            var="CLIP_ICON_SIZE",
-            lower=16, upper=512, step=8,
-            default_val=128,
-            actions_attr="_clip_icon_size_actions",
-            spin_attr="_clip_icon_size_spin",
-        )
-        clip_group.add(clip_icon_size_row)
-        self._clip_icon_size_row = clip_icon_size_row
-
-        # ── Clipboard modes toggles ───────────────────────────────────
-        clip_enable_emoji_row = Adw.SwitchRow(title="Enable Emoji Picker")
-        clip_enable_emoji_row.set_subtitle("Show the Emoji tab in the clipboard picker")
-        clip_enable_emoji_row.set_active(get_var("CLIP_ENABLE_EMOJI", "true") == "true")
-        clip_enable_emoji_row.connect("notify::active", self._on_switch_changed, "CLIP_ENABLE_EMOJI")
-        self._clip_enable_emoji_actions = RowActions(
-            clip_enable_emoji_row,
-            on_discard=lambda: self._discard_var("CLIP_ENABLE_EMOJI"),
-            on_reset=lambda: self._reset_var("CLIP_ENABLE_EMOJI"),
-        )
-        clip_enable_emoji_row.add_suffix(self._clip_enable_emoji_actions.box)
-        self._clip_enable_emoji_actions.reorder_first()
-        clip_group.add(clip_enable_emoji_row)
-        self._clip_enable_emoji_row = clip_enable_emoji_row
-
-        clip_enable_screenshots_row = Adw.SwitchRow(title="Enable Screenshots Browser")
-        clip_enable_screenshots_row.set_subtitle("Show the Screenshots tab in the clipboard picker")
-        clip_enable_screenshots_row.set_active(get_var("CLIP_ENABLE_SCREENSHOTS", "true") == "true")
-        clip_enable_screenshots_row.connect("notify::active", self._on_switch_changed, "CLIP_ENABLE_SCREENSHOTS")
-        self._clip_enable_screenshots_actions = RowActions(
-            clip_enable_screenshots_row,
-            on_discard=lambda: self._discard_var("CLIP_ENABLE_SCREENSHOTS"),
-            on_reset=lambda: self._reset_var("CLIP_ENABLE_SCREENSHOTS"),
-        )
-        clip_enable_screenshots_row.add_suffix(self._clip_enable_screenshots_actions.box)
-        self._clip_enable_screenshots_actions.reorder_first()
-        clip_group.add(clip_enable_screenshots_row)
-        self._clip_enable_screenshots_row = clip_enable_screenshots_row
-
-        clip_enable_bitwarden_row = Adw.SwitchRow(title="Enable Bitwarden Vault")
-        clip_enable_bitwarden_row.set_subtitle("Show the Bitwarden tab in the clipboard picker (requires rbw)")
-        clip_enable_bitwarden_row.set_active(get_var("CLIP_ENABLE_BITWARDEN", "false") == "true")
-        clip_enable_bitwarden_row.connect("notify::active", self._on_switch_changed, "CLIP_ENABLE_BITWARDEN")
-        self._clip_enable_bitwarden_actions = RowActions(
-            clip_enable_bitwarden_row,
-            on_discard=lambda: self._discard_var("CLIP_ENABLE_BITWARDEN"),
-            on_reset=lambda: self._reset_var("CLIP_ENABLE_BITWARDEN"),
-        )
-        clip_enable_bitwarden_row.add_suffix(self._clip_enable_bitwarden_actions.box)
-        self._clip_enable_bitwarden_actions.reorder_first()
-        clip_group.add(clip_enable_bitwarden_row)
-        self._clip_enable_bitwarden_row = clip_enable_bitwarden_row
-
-        # ── Window Corners (per-corner, inline) ───────────────────────
-        clip_radius_tl_row, clip_radius_tl_spin = self._make_spin_row(
-            title="Window Corner — Top-Left",
-            subtitle="Top-left window corner radius (px)",
-            var="CLIP_RADIUS_TL",
-            lower=0, upper=99, step=1,
-            default_val=10,
-            actions_attr="_clip_radius_tl_actions",
-            spin_attr="_clip_radius_tl_spin",
-        )
-        clip_group.add(clip_radius_tl_row)
-        self._clip_radius_tl_row = clip_radius_tl_row
-
-        clip_radius_tr_row, clip_radius_tr_spin = self._make_spin_row(
-            title="Window Corner — Top-Right",
-            subtitle="Top-right window corner radius (px)",
-            var="CLIP_RADIUS_TR",
-            lower=0, upper=99, step=1,
-            default_val=10,
-            actions_attr="_clip_radius_tr_actions",
-            spin_attr="_clip_radius_tr_spin",
-        )
-        clip_group.add(clip_radius_tr_row)
-        self._clip_radius_tr_row = clip_radius_tr_row
-
-        clip_radius_br_row, clip_radius_br_spin = self._make_spin_row(
-            title="Window Corner — Bottom-Right",
-            subtitle="Bottom-right window corner radius (px)",
-            var="CLIP_RADIUS_BR",
-            lower=0, upper=99, step=1,
-            default_val=10,
-            actions_attr="_clip_radius_br_actions",
-            spin_attr="_clip_radius_br_spin",
-        )
-        clip_group.add(clip_radius_br_row)
-        self._clip_radius_br_row = clip_radius_br_row
-
-        clip_radius_bl_row, clip_radius_bl_spin = self._make_spin_row(
-            title="Window Corner — Bottom-Left",
-            subtitle="Bottom-left window corner radius (px)",
-            var="CLIP_RADIUS_BL",
-            lower=0, upper=99, step=1,
-            default_val=10,
-            actions_attr="_clip_radius_bl_actions",
-            spin_attr="_clip_radius_bl_spin",
-        )
-        clip_group.add(clip_radius_bl_row)
-        self._clip_radius_bl_row = clip_radius_bl_row
-
-        content_box.append(clip_group)
 
         self._refresh_managed()
         return toolbar
