@@ -158,6 +158,46 @@ RETRO_ACTIONS: dict = {
         "label": "Media Previous",
         "standard": ("exec", "retro shell run media-prev"),
     },
+    "retro_lock_screen": {
+        "lua_fn": "Retro.lock_screen",
+        "label": "Lock Screen",
+        "standard": ("exec", "retro shell lock"),
+    },
+    "retro_audio_up": {
+        "lua_fn": "Retro.audio_up",
+        "label": "Volume Up",
+        "standard": ("exec", "retro audio up 5"),
+    },
+    "retro_audio_down": {
+        "lua_fn": "Retro.audio_down",
+        "label": "Volume Down",
+        "standard": ("exec", "retro audio down 5"),
+    },
+    "retro_audio_mute": {
+        "lua_fn": "Retro.audio_mute",
+        "label": "Toggle Mute",
+        "standard": ("exec", "retro audio mute"),
+    },
+    "retro_audio_mic_mute": {
+        "lua_fn": "Retro.audio_mic_mute",
+        "label": "Toggle Mic Mute",
+        "standard": ("exec", "retro audio mic-mute"),
+    },
+    "retro_brightness_up": {
+        "lua_fn": "Retro.brightness_up",
+        "label": "Brightness Up",
+        "standard": ("exec", "retro display brightness all +5"),
+    },
+    "retro_brightness_down": {
+        "lua_fn": "Retro.brightness_down",
+        "label": "Brightness Down",
+        "standard": ("exec", "retro display brightness all -5"),
+    },
+    "retro_open_settings": {
+        "lua_fn": "Retro.open_settings",
+        "label": "Open Settings",
+        "standard": ("exec", "retro settings"),
+    },
 }
 
 # --- Derived maps (do not edit manually) ---

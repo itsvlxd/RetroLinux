@@ -400,3 +400,17 @@ colorchooserwidget {
     min-width: 480px;
     min-height: 520px;
 }
+
+/* ── Bluetooth device battery ── */
+.battery-full {
+    color: @success_color;
+}
+
+.battery-half {
+    color: @warning_color;
+}
+
+.battery-low {
+    color: @error_color;
+}
+
