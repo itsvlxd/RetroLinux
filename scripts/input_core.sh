@@ -86,7 +86,7 @@ rx_input_set_device() {
 rx_input_apply() {
     local helper="$RETRO_DIR/lib/python/input_config.py"
     if [[ ! -f $helper ]]; then
-        rx_log "error" "Missing input helper: $helper"
+        rx_log_file "error" "Missing input helper: $helper"
         return 1
     fi
     PYTHONPATH="$RETRO_DIR/cmds/tools:$RETRO_DIR/scripts:$RETRO_DIR:$PYTHONPATH" \
