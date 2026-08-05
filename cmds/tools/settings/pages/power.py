@@ -541,6 +541,28 @@ class PowerPage:
         btn_group.add(self._pwr_btn_long_row)
         self._lid_row = _make_logind_combo("lid_close", "Lid Close", "Action when the laptop lid is closed")
         btn_group.add(self._lid_row)
+
+        # Logout command
+        logout_row = Adw.ActionRow(
+            title="Logout Command",
+            subtitle="Custom command executed when you log out from the power menu",
+        )
+        logout_entry = Gtk.Entry(text=self._orig.get("logout_cmd") or "hyprctl dispatch exit")
+        logout_entry.set_width_chars(32)
+        logout_entry.set_valign(Gtk.Align.CENTER)
+        logout_entry.connect("changed", self._on_logout_cmd_changed)
+        logout_row.set_activatable_widget(logout_entry)
+
+        reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        reset_btn.set_valign(Gtk.Align.CENTER)
+        reset_btn.set_tooltip_text("Reset to default")
+        reset_btn.connect("clicked", lambda _b: logout_entry.set_text("hyprctl dispatch exit"))
+
+        logout_row.add_suffix(logout_entry)
+        logout_row.add_suffix(reset_btn)
+        btn_group.add(logout_row)
+        self._logout_entry = logout_entry
+
         self._content_box.append(btn_group)
         return toolbar_view
 
@@ -558,6 +580,7 @@ class PowerPage:
             ("PWR_POWER_BTN", "pwr_btn"),
             ("PWR_POWER_BTN_LONG", "pwr_btn_long"),
             ("PWR_LID_CLOSE", "lid_close"),
+            ("RETRO_LOGOUT_CMD", "logout_cmd"),
         ]:
             self._orig[key] = get_var(var) or ""
 
@@ -616,6 +639,11 @@ class PowerPage:
                 set_var(var_name, val)
             self._check_dirty()
 
+    def _on_logout_cmd_changed(self, entry: Gtk.Entry) -> None:
+        from lib.python.variable import set_var
+        set_var("RETRO_LOGOUT_CMD", entry.get_text().strip())
+        self._check_dirty()
+
     def _run_optimize(self) -> None:
         try:
             opt = subprocess.run(
@@ -670,6 +698,10 @@ class PowerPage:
                 if get_var(var_name, "") != self._orig.get(key, ""):
                     self._dirty = True
                     break
+        if not self._dirty:
+            from lib.python.variable import get_var
+            if get_var("RETRO_LOGOUT_CMD", "") != self._orig.get("logout_cmd", ""):
+                self._dirty = True
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
 
@@ -693,6 +725,7 @@ class PowerPage:
             self._orig[key] = val
         for key, var_name in [("pwr_btn", "PWR_POWER_BTN"), ("pwr_btn_long", "PWR_POWER_BTN_LONG"), ("lid_close", "PWR_LID_CLOSE")]:
             self._orig[key] = get_var(var_name, "suspend")
+        self._orig["logout_cmd"] = get_var("RETRO_LOGOUT_CMD", "")
         self._dirty = False
         _restore()
 
@@ -711,6 +744,8 @@ class PowerPage:
                 except ValueError:
                     idx = 0
                 row.set_selected(idx)
+        if hasattr(self, "_logout_entry"):
+            self._logout_entry.set_text(self._orig.get("logout_cmd") or "hyprctl dispatch exit")
         self._dirty = False
 
     def flush_pending(self) -> None:
@@ -742,5 +777,8 @@ class PowerPage:
         return [
             {"key": "power:config", "label": "Power Configuration",
              "description": "Profile, wattage limits, and auto-optimize",
+             "_group_id": "power", "_group_label": "Power", "_section_label": "Configuration"},
+            {"key": "power:logout", "label": "Logout Command",
+             "description": "Custom command executed when logging out from the power menu",
              "_group_id": "power", "_group_label": "Power", "_section_label": "Configuration"},
         ]
