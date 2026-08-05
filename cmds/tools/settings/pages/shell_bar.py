@@ -115,6 +115,8 @@ class ShellBarPage:
             ("showDayOfWeek", "Show Day of Week", "Show the day abbreviation (Mon, Tue...) beside the clock"),
             ("showLayoutChanger", "Show Layout Changer", "Display the dwindle/master/scrolling layout selector in the bar"),
             ("showPresetsButton", "Show Presets Button", "Display the presets manager button in the bar"),
+            ("showWifiPopup", "Show Wifi Button", "Show a Wi-Fi panel button in the bar"),
+            ("showBluetoothPopup", "Show Bluetooth Button", "Show a Bluetooth panel button in the bar"),
         ):
             self._add_switch(group, key, label, subtitle=sub)
 
@@ -331,6 +333,8 @@ class ShellBarPage:
                     "pillStyle": "Pill Style",
                     "batteryStyle": "Battery Style",
                     "showLayoutChanger": "Layout Changer",
+                    "showWifiPopup": "Show Wifi Button",
+                    "showBluetoothPopup": "Show Bluetooth Button",
                 }.get(key, "Bar setting")
                 changed.append(label)
         if changed:
