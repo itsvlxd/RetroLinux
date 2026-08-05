@@ -238,12 +238,6 @@ set_wallpaper() {
         fi
     fi
 
-    if [[ -n $monitor ]]; then
-        set_var "WALL_MONITOR_$monitor" "$input"
-    else
-        set_var "WALL_CURRENT" "$input"
-    fi
-
     if ! rx_wallpaper_start "$input" "$quick" "$monitor"; then
         rx_log_file "ERROR" "Failed to start wallpaper: $input"
         echo "ERR|wallpaper_start_failed|$input"
