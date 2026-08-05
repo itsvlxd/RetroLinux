@@ -519,10 +519,28 @@ class ThemesPage:
             card.append(desc_label)
 
         click_gesture = Gtk.GestureClick()
-        click_gesture.connect("pressed", lambda *_: self._on_theme_clicked(theme["slug"], theme["name"]))
+
+        def _card_pressed(gest, _n, x, y, _slug=theme["slug"], _name=theme["name"]):
+            if self._click_is_on_button(card, x, y, settings_btn):
+                return
+            self._on_theme_clicked(_slug, _name)
+
+        click_gesture.connect("pressed", _card_pressed)
         card.add_controller(click_gesture)
 
         return card
+
+    @staticmethod
+    def _click_is_on_button(container, x: float, y: float, button: Gtk.Widget) -> bool:
+        try:
+            child = container.pick(x, y, Gtk.PickFlags.DEFAULT)
+        except Exception:
+            return False
+        while child is not None:
+            if child is button:
+                return True
+            child = child.get_parent()
+        return False
 
     def _on_theme_clicked(self, slug: str, name: str) -> None:
         if not THEME_CORE.is_file():
@@ -731,14 +749,7 @@ class OverrideDialog(Adw.Window):
         self._overrides: dict[str, str] = {}
         self._defaults: dict[str, str] = theme.get("color_map", {})
 
-        # Load existing overrides
-        override_file = OVERRIDE_DIR / f"{theme['slug']}.json"
-        if override_file.is_file():
-            try:
-                data = json.loads(override_file.read_text())
-                self._overrides = data.get("color_map", {})
-            except (json.JSONDecodeError, OSError):
-                self._overrides = {}
+        self._overrides = self._load_overrides(theme["slug"])
 
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
@@ -767,22 +778,21 @@ class OverrideDialog(Adw.Window):
         self._color_btns: dict[str, Gtk.ColorButton] = {}
 
         for key in COLOR_MAP_KEYS:
-            if key not in self._defaults:
-                continue
-            default_hex = self._defaults[key]
+            default_hex = self._defaults.get(key, "")
             current_hex = self._overrides.get(key, default_hex)
+            display_hex = current_hex or "#888888"
 
             row = Adw.ActionRow()
             row.set_title(key.replace("_", " ").title())
-            row.set_subtitle(f"Default: {default_hex}")
+            row.set_subtitle(f"Default: {default_hex or 'not set'}")
 
             btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
 
             color_btn = Gtk.ColorButton()
             rgba = Gdk.RGBA()
-            rgba.parse(f"#{current_hex.lstrip('#')}")
+            rgba.parse(display_hex)
             color_btn.set_rgba(rgba)
-            color_btn.set_tooltip_text(current_hex)
+            color_btn.set_tooltip_text(current_hex or "not set")
             color_btn.set_valign(Gtk.Align.CENTER)
             color_btn.connect("notify::rgba", self._on_color_changed, key)
             btn_box.append(color_btn)
@@ -806,12 +816,29 @@ class OverrideDialog(Adw.Window):
 
         self.set_content(content)
 
+    def _load_overrides(self, slug: str) -> dict[str, str]:
+        try:
+            proc = subprocess.run(
+                ["bash", str(THEME_CORE), "--override-get", slug],
+                capture_output=True, text=True, timeout=10,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            return {}
+        overrides: dict[str, str] = {}
+        if proc.returncode == 0:
+            for line in proc.stdout.splitlines():
+                key, _, val = line.partition("|")
+                key = key.strip()
+                if key:
+                    overrides[key] = val.strip()
+        return overrides
+
     def _on_color_changed(self, btn: Gtk.ColorButton, _pspec, key: str) -> None:
         rgba = btn.get_rgba()
         hex_str = f"#{int(rgba.red * 255):02x}{int(rgba.green * 255):02x}{int(rgba.blue * 255):02x}"
         btn.set_tooltip_text(hex_str)
         default_hex = self._defaults.get(key, "")
-        if hex_str.lower() == default_hex.lower():
+        if default_hex and hex_str.lower() == default_hex.lower():
             self._overrides.pop(key, None)
         else:
             self._overrides[key] = hex_str
@@ -820,21 +847,20 @@ class OverrideDialog(Adw.Window):
         self._overrides.pop(key, None)
         color_btn = self._color_btns[key]
         rgba = Gdk.RGBA()
-        rgba.parse(f"#{default_hex.lstrip('#')}")
+        rgba.parse(default_hex or "#888888")
         color_btn.set_rgba(rgba)
-        color_btn.set_tooltip_text(default_hex)
+        color_btn.set_tooltip_text(default_hex or "not set")
 
     def _on_save(self, _btn) -> None:
         slug = self._theme["slug"]
-        if not self._overrides:
-            # Clear overrides file
-            override_file = OVERRIDE_DIR / f"{slug}.json"
-            if override_file.is_file():
-                override_file.unlink()
-        else:
-            OVERRIDE_DIR.mkdir(parents=True, exist_ok=True)
-            (OVERRIDE_DIR / f"{slug}.json").write_text(
-                json.dumps({"color_map": self._overrides}, indent=4)
+        subprocess.run(
+            ["bash", str(THEME_CORE), "--override-clear", slug],
+            capture_output=True, timeout=10,
+        )
+        for key, val in self._overrides.items():
+            subprocess.run(
+                ["bash", str(THEME_CORE), "--override-set", slug, key, val],
+                capture_output=True, timeout=10,
             )
         # Re-apply theme colors with overrides
         proc = subprocess.Popen(
