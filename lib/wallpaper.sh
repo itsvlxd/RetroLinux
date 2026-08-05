@@ -129,11 +129,9 @@ rx_wallpaper_is_static() {
 rx_wallpaper_ensure_awww() {
     if ! pgrep -x "awww-daemon" >/dev/null; then
         nohup awww-daemon >/dev/null 2>&1 &
-        local delay=0.1
-        for i in $(seq 1 30); do
-            sleep "$delay" 2>/dev/null || sleep 1
+        for i in $(seq 1 10); do
+            sleep 0.2
             awww query >/dev/null 2>&1 && break
-            delay=$(awk "BEGIN {printf \"%.2f\", $delay * 1.5}")
         done
         return 0
     fi
@@ -164,22 +162,15 @@ rx_wallpaper_set_image() {
 rx_wallpaper_apply_colors() {
     local static_source="$1"
     local filename="$2"
-    local is_same_wall="$3"
 
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
-    [[ $scheme != "wallpaper" ]] && { echo "$(date) skip: scheme=$scheme" >> /tmp/retro_wallpaper_colors.log; return 0; }
+    [[ $scheme != "wallpaper" ]] && return 0
 
-    echo "$(date) applying colors for $filename, scheme=$scheme" >> /tmp/retro_wallpaper_colors.log
     env RETRO_CONFIG="${RETRO_CONFIG:-$HOME/.config/retro}" HOME="$HOME" RETRO_DIR="$RETRO_DIR" \
-        bash "$RETRO_DIR/scripts/theme_core.sh" --apply-colors >> /tmp/retro_wallpaper_colors.log 2>&1 || \
-        { echo "$(date) FAILED with code $?" >> /tmp/retro_wallpaper_colors.log; return 1; }
+        bash "$RETRO_DIR/scripts/theme_core.sh" --apply-colors >/dev/null 2>&1
 
-    echo "$(date) done, refreshing hyprctl" >> /tmp/retro_wallpaper_colors.log
     hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
-    "$RETRO_DIR/retro.sh" app all refresh >/dev/null 2>&1
-    bash "$RETRO_DIR/scripts/theme_core.sh" --sddm-refresh >/dev/null 2>&1
-    rx_set_papirus_folder_color
 }
 
 rx_wallpaper_get_gpu_env() {
@@ -275,23 +266,19 @@ rx_wallpaper_start() {
     [[ $ext =~ ^(mp4|mkv|webm)$ ]] && is_video=true
 
     local theme_dir=$(rx_wallpaper_get_theme_dir)
+
     local is_first_load=false
     rx_wallpaper_ensure_awww && is_first_load=true
 
     local static_source="$wall_path"
     [[ $is_video == "true" ]] && static_source=$(rx_wallpaper_generate_cache "$wall_path")
 
-    local current_wall=$(get_var "WALL_CURRENT")
-    local is_same_wall=false
-    [[ $current_wall == "$wall_path" ]] && is_same_wall=true
-
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
     local needs_colors=false
     [[ $scheme == "wallpaper" ]] && needs_colors=true
 
-    local gen_timestamp=$(date +%s%N)
-    echo "$gen_timestamp" >/tmp/retro_wallpaper_gen
+    date +%s >/tmp/retro_wallpaper_switch_ts
 
     if [[ -z $monitor ]]; then
         set_var "WALL_CURRENT" "$wall_path"
@@ -301,44 +288,31 @@ rx_wallpaper_start() {
 
     rx_wallpaper_set_image "$static_source" "$quick" "$is_first_load" "$monitor"
 
-    echo "$(date) needs_colors=$needs_colors scheme=$scheme is_video=$is_video wall=$wall_path is_same=$is_same_wall RETRO_CONFIG=${RETRO_CONFIG:-$HOME/.config/retro}" >> /tmp/retro_wallpaper_colors.log
-
-    if [[ $needs_colors == "true" || $is_video == "true" ]]; then
-        (
-            pkill mpvpaper 2>/dev/null
-            sleep 1
-
-            if [[ $needs_colors == "true" ]]; then
-                rx_wallpaper_apply_colors "$static_source" "$filename" "$is_same_wall"
+    if [[ $is_video == "true" ]]; then
+        pkill mpvpaper 2>/dev/null
+        local v_static=$(get_var "WALL_STATIC_FORCED" "false")
+        local v_paused=$(get_var "WALL_PAUSED" "false")
+        if [[ $v_static != "true" && $v_paused != "true" ]]; then
+            local trans_delay=0.4
+            if [[ $is_first_load != "true" && $quick != "true" ]]; then
+                trans_delay=2.6
             fi
-
-            if [[ $is_video == "true" ]]; then
-            local current_gen=$(cat /tmp/retro_wallpaper_gen 2>/dev/null)
-            if [[ $current_gen != "$gen_timestamp" ]]; then
-                return 0
-            fi
-
-            local current_check=$(get_var "WALL_CURRENT")
-            if [[ $current_check != "$wall_path" ]]; then
-                return 0
-            fi
-
-            reload_vars
-
-            local wall_paused=$(get_var "WALL_PAUSED" "false")
-            if [[ $wall_paused == "true" ]]; then
-                return 0
-            fi
-
-            local force_static=$(get_var "WALL_STATIC_FORCED" "false")
-            if [[ $force_static == "true" ]]; then
-                return 0
-            fi
-
-            rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename" "$monitor"
+            (
+                sleep $trans_delay
+                rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename" "$monitor"
+            ) >>/tmp/retro_wallpaper_launch.log 2>&1 &
         fi
-    ) &>/dev/null &
-fi
+    fi
+
+    if [[ $needs_colors == "true" ]]; then
+        (
+            if [[ -z $monitor ]]; then
+                local current_check=$(get_var "WALL_CURRENT")
+                [[ $current_check != "$wall_path" ]] && exit 0
+            fi
+            rx_wallpaper_apply_colors "$static_source" "$filename"
+        ) &>/dev/null &
+    fi
 }
 
 rx_wallpaper_restore() {

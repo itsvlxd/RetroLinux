@@ -540,6 +540,74 @@ rx_theme_browser_status() {
     done <<<"$profiles"
 }
 
+THEME_COLOR_CACHE="${RETRO_CONFIG:-$HOME/.config/retro}/themes/.cache/colors"
+
+rx_matugen_output_paths() {
+    local cfg="${MATUGEN_CONFIG:-$HOME/.config/matugen/config.toml}"
+    grep -oP "^output_path\s*=\s*'[^']*'" "$cfg" 2>/dev/null \
+        | sed "s/^output_path\s*=\s*'//;s/'$//" \
+        | sed "s|^~|$HOME|"
+}
+
+rx_matugen_relpath() {
+    echo "${1#$HOME/}"
+}
+
+rx_snapshot_theme_cache() {
+    local dir="$1"
+    local out rel
+    mkdir -p "$dir"
+    while IFS= read -r out; do
+        [[ -z $out || ! -f $out ]] && continue
+        rel=$(rx_matugen_relpath "$out")
+        mkdir -p "$dir/$(dirname "$rel")"
+        cp "$out" "$dir/$rel"
+    done < <(rx_matugen_output_paths)
+    touch "$dir/done"
+}
+
+rx_restore_theme_cache() {
+    local dir="$1"
+    local out rel
+    [[ -f "$dir/done" ]] || return 1
+    while IFS= read -r out; do
+        [[ -z $out ]] && continue
+        rel=$(rx_matugen_relpath "$out")
+        [[ -f "$dir/$rel" ]] || continue
+        mkdir -p "$(dirname "$out")"
+        cp "$dir/$rel" "$out"
+    done < <(rx_matugen_output_paths)
+    return 0
+}
+
+rx_prefetch_theme_cache() {
+    local source="$1" scheme="$2" index="$3" fp="$4" other_mode="$5"
+    [[ -f $source ]] || return 0
+    [[ -f "$THEME_COLOR_CACHE/$fp/$other_mode/done" ]] && return 0
+
+    local scratch
+    scratch=$(mktemp -d /tmp/retro_theme_cache.XXXXXX)
+    sed '/^pre_hook/d; /^post_hook/d' "${MATUGEN_CONFIG:-$HOME/.config/matugen/config.toml}" > "$scratch/cfg.toml" 2>/dev/null
+
+    matugen image "$source" -m "$other_mode" -t "$scheme" --source-color-index "$index" \
+        -c "$scratch/cfg.toml" -p "$scratch/out" >/dev/null 2>&1
+
+    local sdir="$THEME_COLOR_CACHE/$fp/$other_mode"
+    local out rel
+    mkdir -p "$sdir"
+    while IFS= read -r out; do
+        [[ -z $out ]] && continue
+        rel=$(rx_matugen_relpath "$out")
+        [[ -f "$scratch/out$HOME/$rel" ]] || continue
+        mkdir -p "$sdir/$(dirname "$rel")"
+        cp "$scratch/out$HOME/$rel" "$sdir/$rel"
+    done < <(rx_matugen_output_paths)
+    touch "$sdir/done"
+
+    find "$scratch" -type f -delete 2>/dev/null
+    find "$scratch" -depth -type d -empty -delete 2>/dev/null
+}
+
 rx_theme_apply_colors() {
     local mode
     mode=$(get_var "RETRO_THEME_MODE" "dark")
@@ -584,13 +652,33 @@ rx_theme_apply_colors() {
         rx_log_file "debug" "rx_theme_apply_colors: matugen scheme=$matugen_scheme, index=$matugen_index, mode=$mode"
         local fallback_args=()
         [[ $matugen_scheme == "scheme-monochrome" ]] && fallback_args=(--fallback-color '#ffffff')
-        rx_log_file "info" "rx_theme_apply_colors: running matugen on $static_source"
-        matugen image -b wal --mode "$mode" "$static_source" -t "$matugen_scheme" --source-color-index "$matugen_index" "${fallback_args[@]}" >/dev/null 2>&1
-        if [[ $? -ne 0 ]]; then
-            rx_log_file "error" "rx_theme_apply_colors: matugen failed on $static_source"
-            return 1
+
+        local fp_source
+        fp_source=$(stat -c%Y-%s "$static_source" 2>/dev/null || echo 0)
+        local fp_cfg
+        fp_cfg=$(stat -c%Y "${MATUGEN_CONFIG:-$HOME/.config/matugen/config.toml}" 2>/dev/null || echo 0)
+        local fp
+        fp=$(printf '%s|%s|%s|%s|%s' "$mode" "$matugen_scheme" "$matugen_index" "$fp_source" "$fp_cfg" | md5sum | awk '{print $1}')
+        local mode_dir="$THEME_COLOR_CACHE/$fp/$mode"
+        local other_mode="dark"
+        [[ $mode == "dark" ]] && other_mode="light"
+
+        if rx_restore_theme_cache "$mode_dir"; then
+            rx_log_file "info" "rx_theme_apply_colors: color cache hit ($mode)"
+        else
+            rx_log_file "info" "rx_theme_apply_colors: running matugen on $static_source"
+            matugen image -b wal --mode "$mode" "$static_source" -t "$matugen_scheme" --source-color-index "$matugen_index" "${fallback_args[@]}" >/dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+                rx_log_file "error" "rx_theme_apply_colors: matugen failed on $static_source"
+                return 1
+            fi
+            [[ $matugen_scheme == "scheme-monochrome" ]] && rx_grayscale_output
+            rx_snapshot_theme_cache "$mode_dir"
+
+            (
+                rx_prefetch_theme_cache "$static_source" "$matugen_scheme" "$matugen_index" "$fp" "$other_mode"
+            ) >/dev/null 2>&1 &
         fi
-        [[ $matugen_scheme == "scheme-monochrome" ]] && rx_grayscale_output
     else
         local theme_file="$THEMES_DIR/${scheme}.json"
         rx_log_file "debug" "rx_theme_apply_colors: theme scheme=$scheme, file=$theme_file"
