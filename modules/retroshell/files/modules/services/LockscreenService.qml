@@ -14,7 +14,9 @@ QtObject {
     }
 
     function lock() {
-        GlobalStates.lockscreenVisible = true;
+        if (!GlobalStates.lockscreenVisible) {
+            GlobalStates.lockscreenVisible = true;
+        }
     }
 
     function unlock() {
