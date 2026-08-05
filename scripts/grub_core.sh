@@ -989,20 +989,16 @@ regenerate_grub() {
     setup_hibernation
 
     if ! command -v grub-mkconfig >/dev/null 2>&1; then
-        rx_log "error" "grub-mkconfig not found"
         rx_log_file "error" "grub-mkconfig not found"
         return 1
     fi
 
-    rx_log "info" "Generating fresh GRUB config..."
     rx_log_file "info" "Running grub-mkconfig -o /boot/grub/grub.cfg"
     if ! $SUDO_CMD grub-mkconfig -o /boot/grub/grub.cfg >/dev/null; then
-        rx_log "error" "GRUB regeneration failed — check permissions"
         rx_log_file "error" "GRUB regeneration failed"
         return 1
     fi
 
-    rx_log "success" "GRUB config regenerated"
     rx_log_file "success" "GRUB config regenerated"
 
     local target_kernel=$(get_var "GRUB_KERNEL" "linux")
@@ -1054,7 +1050,6 @@ regenerate_grub() {
 
     sudo sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/ { /"$/! s/$/"/ }' /etc/default/grub 2>/dev/null || true
 
-    rx_log "success" "GRUB configuration patched"
     rx_log_file "success" "GRUB configuration regenerated and patched"
 }
 
