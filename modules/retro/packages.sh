@@ -52,6 +52,7 @@ seahorse
 libsecret
 polkit-gnome
 gnome-keyring
+rbw
 
 # Disk
 smartmontools
