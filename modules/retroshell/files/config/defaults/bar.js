@@ -25,5 +25,7 @@ var data = {
     "showPresetsButton": true,
     "showWeatherTemp": false,
     "showDayOfWeek": false,
-    "batteryStyle": "arch"
+    "batteryStyle": "arch",
+    "showWifiPopup": false,
+    "showBluetoothPopup": false
 }

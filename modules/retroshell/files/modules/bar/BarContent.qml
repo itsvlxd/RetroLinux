@@ -522,6 +522,30 @@ Item {
                             endRadius: root.innerRadius
                         }
 
+                        Bar.QuickPopupButton {
+                            iconName: NetworkService.wifiEnabled ? Icons.wifiHigh : Icons.wifiOff
+                            tooltipText: "Wi-Fi"
+                            panelSource: "../widgets/dashboard/controls/WifiPanel.qml"
+                            visible: Config.bar.showWifiPopup
+                            isActive: NetworkService.wifiEnabled
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Bar.QuickPopupButton {
+                            iconName: BluetoothService.enabled ? Icons.bluetooth : Icons.bluetoothOff
+                            tooltipText: "Bluetooth"
+                            panelSource: "../widgets/dashboard/controls/BluetoothPanel.qml"
+                            visible: Config.bar.showBluetoothPopup
+                            isActive: BluetoothService.enabled
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
                         ControlsButton {
                             id: controlsButton
                             bar: root
@@ -729,6 +753,32 @@ Item {
                                 startRadius: root.innerRadius
                                 endRadius: root.outerRadius
                             }
+                        }
+
+                        Bar.QuickPopupButton {
+                            iconName: NetworkService.wifiEnabled ? Icons.wifiHigh : Icons.wifiOff
+                            tooltipText: "Wi-Fi"
+                            panelSource: "../widgets/dashboard/controls/WifiPanel.qml"
+                            visible: Config.bar.showWifiPopup
+                            isActive: NetworkService.wifiEnabled
+                            bar: root
+                            vertical: true
+                            layerEnabled: root.shadowsEnabled
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Bar.QuickPopupButton {
+                            iconName: BluetoothService.enabled ? Icons.bluetooth : Icons.bluetoothOff
+                            tooltipText: "Bluetooth"
+                            panelSource: "../widgets/dashboard/controls/BluetoothPanel.qml"
+                            visible: Config.bar.showBluetoothPopup
+                            isActive: BluetoothService.enabled
+                            bar: root
+                            vertical: true
+                            layerEnabled: root.shadowsEnabled
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
                         }
 
                         ControlsButton {
