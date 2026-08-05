@@ -104,6 +104,8 @@ BAR_DEFAULTS: dict = {
     "showWeatherTemp": False,
     "showDayOfWeek": False,
     "batteryStyle": "arch",
+    "showWifiPopup": False,
+    "showBluetoothPopup": False,
 }
 
 
