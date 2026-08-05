@@ -84,88 +84,13 @@ rx_input_set_device() {
 }
 
 rx_input_apply() {
-    local input_file="${RETRO_CONFIG:-$HOME/.config/retro}/input.lua"
-    mkdir -p "$(dirname "$input_file")"
-
-    local kb_layout kb_variant kb_model kb_options kb_rules
-    local repeat_rate repeat_delay
-    local sensitivity accel_profile
-    local natural_scroll tap_to_click
-    local gesture_fingers gesture_direction gesture_action
-    local device_name device_sensitivity device_accel
-
-    kb_layout=$(get_var "INPUT_KB_LAYOUT" "us")
-    kb_variant=$(get_var "INPUT_KB_VARIANT" "")
-    kb_model=$(get_var "INPUT_KB_MODEL" "")
-    kb_options=$(get_var "INPUT_KB_OPTIONS" "")
-    kb_rules=$(get_var "INPUT_KB_RULES" "")
-    repeat_rate=$(get_var "INPUT_REPEAT_RATE" "50")
-    repeat_delay=$(get_var "INPUT_REPEAT_DELAY" "300")
-    sensitivity=$(get_var "INPUT_MOUSE_SENSITIVITY" "0")
-    accel_profile=$(get_var "INPUT_MOUSE_ACCEL_PROFILE" "flat")
-    natural_scroll=$(get_var "INPUT_TOUCHPAD_NATURAL_SCROLL" "true")
-    tap_to_click=$(get_var "INPUT_TOUCHPAD_TAP_TO_CLICK" "true")
-    gesture_fingers=$(get_var "INPUT_GESTURE_FINGERS" "3")
-    gesture_direction=$(get_var "INPUT_GESTURE_DIRECTION" "horizontal")
-    gesture_action=$(get_var "INPUT_GESTURE_ACTION" "workspace")
-    device_name=$(get_var "INPUT_DEVICE_NAME" "")
-    device_sensitivity=$(get_var "INPUT_DEVICE_SENSITIVITY" "0")
-    device_accel=$(get_var "INPUT_DEVICE_ACCEL_PROFILE" "flat")
-
-    cat >"$input_file" <<EOF
--------------
---- INPUT ---
--------------
---
--- Managed by retro input
--- https://wiki.hypr.land/Configuring/Variables/#input
-
-hl.config({
-    input = {
-        kb_layout = "${kb_layout}",
-        kb_variant = "${kb_variant}",
-        kb_model = "${kb_model}",
-        kb_options = "${kb_options}",
-        kb_rules = "${kb_rules}",
-
-        follow_mouse = 1,
-
-        repeat_rate = ${repeat_rate},
-        repeat_delay = ${repeat_delay},
-
-        sensitivity = ${sensitivity},
-
-        accel_profile = "${accel_profile}",
-
-        touchpad = {
-            natural_scroll = ${natural_scroll},
-            tap_to_click = ${tap_to_click},
-        },
-    },
-})
-EOF
-
-    if [[ -n $gesture_fingers ]]; then
-        cat >>"$input_file" <<EOF
-
-hl.gesture({
-    fingers = ${gesture_fingers},
-    direction = "${gesture_direction}",
-    action = "${gesture_action}",
-})
-EOF
+    local helper="$RETRO_DIR/lib/python/input_config.py"
+    if [[ ! -f $helper ]]; then
+        rx_log "error" "Missing input helper: $helper"
+        return 1
     fi
-
-    if [[ -n $device_name ]]; then
-        cat >>"$input_file" <<EOF
-
-hl.device({
-    name = "${device_name}",
-    sensitivity = ${device_sensitivity},
-    accel_profile = "${device_accel}",
-})
-EOF
-    fi
+    PYTHONPATH="$RETRO_DIR/cmds/tools:$RETRO_DIR/scripts:$RETRO_DIR:$PYTHONPATH" \
+        python "$helper" --apply
 }
 
 rx_input_status() {
