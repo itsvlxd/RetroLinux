@@ -137,11 +137,6 @@ rx_theme_set() {
         kitty_font_size) var_name="KITTY_FONT_SIZE" ;;
         kitty_padding) var_name="KITTY_PADDING" ;;
         kitty_shrink_padding) var_name="KITTY_SHRINK_PADDING_FULLSCREEN" ;;
-        rofi_font) var_name="ROFI_FONT" ;;
-        rofi_font_size) var_name="ROFI_FONT_SIZE" ;;
-        rofi_border) var_name="ROFI_BORDER_SIZE" ;;
-        rofi_rounding) var_name="ROFI_ROUNDING" ;;
-        rofi_padding) var_name="ROFI_PADDING" ;;
         gtk_font) var_name="GTK_FONT" ;;
         gtk_font_size) var_name="GTK_FONT_SIZE" ;;
         scheme)
@@ -687,11 +682,6 @@ blur_vibrancy|$(get_var "RETRO_BLUR_VIBRANCY" "0.1696")
 kitty_font|$(get_var "KITTY_FONT" "JetBrainsMono Nerd Font")
 kitty_font_size|$(get_var "KITTY_FONT_SIZE" "9.5")
 kitty_padding|$(get_var "KITTY_PADDING" "5")
-rofi_font|$(get_var "ROFI_FONT" "JetBrainsMono Nerd Font")
-rofi_font_size|$(get_var "ROFI_FONT_SIZE" "9.5")
-rofi_border|$(get_var "ROFI_BORDER_SIZE" "2")
-rofi_rounding|$(get_var "ROFI_ROUNDING" "10")
-rofi_padding|$(get_var "ROFI_PADDING" "5")
 gtk_font|$(get_var "GTK_FONT" "Inter")
 gtk_font_size|$(get_var "GTK_FONT_SIZE" "10")
 EOF
