@@ -2,7 +2,7 @@
 
 Hyprland's ``layerrule = match:namespace REGEX, EFFECT VALUE`` keyword
 controls how layer-shell surfaces — status bars (waybar), notification
-daemons (mako/dunst), launchers (rofi/wofi), wallpapers (swaybg/
+daemons (mako/dunst), launchers (wofi), wallpapers (swaybg/
 hyprpaper), lock screens — are decorated. It's the layer-side cousin of
 ``windowrule``: same rule-resolver concept, same v3 syntax shape.
 
@@ -147,7 +147,7 @@ class LayerRule:
     """A v2 layer rule: namespace match plus one or more effects.
 
     *namespace* is the regex matched against the layer surface's
-    namespace (``waybar``, ``^(rofi|wofi)$``, ``notifications``).
+    namespace (``waybar``, ``^(wofi)$``, ``notifications``).
     Stored verbatim so byte-for-byte round-trips survive even unusual
     escape sequences.
 
@@ -314,7 +314,7 @@ LAYER_ACTION_PRESETS: tuple[LayerActionPreset, ...] = (
     LayerActionPreset(
         id="blur",
         label="Blur background",
-        description="Apply backdrop blur behind this layer surface (e.g. waybar, rofi).",
+        description="Apply backdrop blur behind this layer surface (e.g. waybar).",
     ),
     LayerActionPreset(
         id="blur_popups",
@@ -326,7 +326,7 @@ LAYER_ACTION_PRESETS: tuple[LayerActionPreset, ...] = (
         label="Dim everything else",
         description=(
             "Dim the background while this surface is mapped. "
-            "Typical for app launchers like rofi or wofi."
+            "Typical for app launchers like wofi."
         ),
     ),
     LayerActionPreset(

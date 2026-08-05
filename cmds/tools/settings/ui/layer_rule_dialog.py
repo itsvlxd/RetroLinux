@@ -148,13 +148,13 @@ class LayerRuleEditDialog(SingletonDialogMixin, Adw.Dialog):
         group = Adw.PreferencesGroup(title="Match this layer surface")
         group.set_description(
             "Type the layer namespace as a regex. "
-            "Common namespaces: waybar, notifications, rofi, mako, dunst, wallpaper."
+            "Common namespaces: waybar, notifications, mako, dunst, wallpaper."
         )
 
         self._namespace_entry = Adw.EntryRow(title="Namespace regex")
         self._namespace_entry.set_tooltip_text(
             "Regex matching the layer surface namespace. "
-            "Examples: 'waybar', '^(rofi|wofi)$', 'notifications'."
+            "Examples: 'waybar', '^(wofi)$', 'notifications'."
         )
         self._namespace_entry.connect("changed", lambda *_: self._refresh())
         group.add(self._namespace_entry)
