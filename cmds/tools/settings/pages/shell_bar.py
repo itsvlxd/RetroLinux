@@ -49,6 +49,11 @@ _PILL_OPTIONS = [
     ("squished", "Squished"),
 ]
 
+_BATTERY_STYLE_OPTIONS = [
+    ("arch", "Arch"),
+    ("bar", "Bar"),
+]
+
 
 class ShellBarPage:
     """Shell bar configuration — writes ``bar.json`` on save."""
@@ -101,6 +106,8 @@ class ShellBarPage:
                        subtitle="Size of the launcher icon")
         self._add_combo(group, "pillStyle", "Pill Style", _PILL_OPTIONS,
                         subtitle="Shape of the launcher pill")
+        self._add_combo(group, "batteryStyle", "Battery Style", _BATTERY_STYLE_OPTIONS,
+                        subtitle="Progress ring around the icon, or a small bar beneath it")
         for key, label, sub in (
             ("use12hFormat", "Use 12h Format", "Show the clock in 12-hour format"),
             ("enableFirefoxPlayer", "Enable Firefox Player", "Show Firefox media controls in the bar"),
@@ -322,6 +329,7 @@ class ShellBarPage:
                     "position": "Position",
                     "launcherIcon": "Launcher Icon",
                     "pillStyle": "Pill Style",
+                    "batteryStyle": "Battery Style",
                     "showLayoutChanger": "Layout Changer",
                 }.get(key, "Bar setting")
                 changed.append(label)

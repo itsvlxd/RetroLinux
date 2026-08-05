@@ -260,6 +260,27 @@ class ShellMiscPage:
 
         content_box.append(tools_group)
 
+        # ── Emoji ──
+        emoji_group = Adw.PreferencesGroup(
+            title="Emoji",
+            description="Clipboard emoji picker settings.",
+        )
+
+        skin_tone_row = Adw.SwitchRow(
+            title="Show Recent Emojis",
+            subtitle="Display recently used emojis at the top of the clipboard emoji list",
+        )
+        skin_tone_row.set_active(bool(self._tools.get("emojiShowRecent", TOOLS_DEFAULTS["emojiShowRecent"])))
+        emoji_group.add(skin_tone_row)
+        self._skin_tone_row = skin_tone_row
+
+        def _skin_tone_changed(*_args):
+            self._tools["emojiShowRecent"] = skin_tone_row.get_active()
+            self._notify_dirty()
+        skin_tone_row.connect("notify::active", _skin_tone_changed)
+
+        content_box.append(emoji_group)
+
         return toolbar
 
     # ══ OCR builders ══
@@ -530,6 +551,7 @@ class ShellMiscPage:
         self._preview_row.set_active(self._tools.get("previewCountdown", TOOLS_DEFAULTS["previewCountdown"]))
         self._timer_enabled_row.set_active(self._tools.get("screenshotTimerEnabled", TOOLS_DEFAULTS["screenshotTimerEnabled"]))
         self._portal_row.set_active(self._tools.get("recordingPortalEnabled", TOOLS_DEFAULTS["recordingPortalEnabled"]))
+        self._skin_tone_row.set_active(self._tools.get("emojiShowRecent", TOOLS_DEFAULTS["emojiShowRecent"]))
         if hasattr(self, "_dir_entries"):
             for key, entry in self._dir_entries.items():
                 entry.set_text(self._tools.get(key, TOOLS_DEFAULTS[key]))
