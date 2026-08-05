@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/colors.sh"
+source "$RETRO_DIR/lib/variable.sh"
 
 cmd_shell() {
     local action="${1,,}"
@@ -68,6 +69,33 @@ cmd_shell() {
                 rx_table_row "󰒓" "Status:" "○ Not running" "$MUTE" "14"
             fi
             ;;
+        idle)
+            local enable
+            enable=$(get_var "HYPRIDLE_ENABLE" "true")
+            if [[ "$enable" != "true" ]]; then
+                rx_log "error" "Hypridle is disabled (HYPRIDLE_ENABLE=$enable)"
+                return 1
+            fi
+
+            local idle_config="${XDG_CONFIG_HOME:-$HOME/.config}/retro/hypridle.conf"
+            if [[ ! -f $idle_config ]]; then
+                rx_log "error" "Hypridle config not found: $idle_config"
+                return 1
+            fi
+
+            if pgrep -x hyprland >/dev/null 2>&1; then
+                rx_log "info" "Hyprland is running — not starting hypridle manually"
+                return 0
+            fi
+
+            if pgrep -x hypridle >/dev/null 2>&1; then
+                rx_log "info" "Hypridle is already running"
+                return 0
+            fi
+
+            nohup hypridle -c "$idle_config" >/dev/null 2>&1 &
+            rx_log "success" "Hypridle started (config: $idle_config)"
+            ;;
         "")
             ;&
         help)
@@ -78,6 +106,7 @@ cmd_shell() {
             rx_help_cmd "restart" "Restart RetroShell" 20
             rx_help_cmd "status" "Check if running" 20
             rx_help_cmd "lock" "Activate lockscreen" 20
+            rx_help_cmd "idle" "Start hypridle idle daemon (custom config)" 20
             rx_help_cmd "run <cmd>" "Send IPC command" 20
             rx_help_spacer
             ;;
