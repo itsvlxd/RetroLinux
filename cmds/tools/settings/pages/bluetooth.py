@@ -58,7 +58,7 @@ class _DeviceRow(Gtk.ListBoxRow):
                  can_send: bool = False,
                  on_connect=None, on_disconnect=None, on_forget=None,
                  on_send=None, on_trust=None, on_pair=None,
-                 radio_on: bool = True):
+                 radio_on: bool = True, battery: int | None = None):
         super().__init__()
         self.mac = mac
         self.name = name
@@ -93,6 +93,13 @@ class _DeviceRow(Gtk.ListBoxRow):
             trust_lbl.add_css_class("badge")
             trust_lbl.set_opacity(0.8)
             name_box.append(trust_lbl)
+
+        battery_img = Gtk.Image.new_from_icon_name("battery-full-symbolic")
+        battery_img.set_pixel_size(16)
+        battery_img.set_valign(Gtk.Align.CENTER)
+        battery_img.set_visible(False)
+        name_box.append(battery_img)
+        self._battery_img = battery_img
 
         text_box.append(name_box)
 
@@ -154,6 +161,27 @@ class _DeviceRow(Gtk.ListBoxRow):
 
         box.append(btn_box)
         self.set_child(box)
+
+        self.set_battery(battery)
+
+    def set_battery(self, battery: int | None) -> None:
+        if battery is None:
+            self._battery_img.set_visible(False)
+            self._battery_img.set_tooltip_text(None)
+            return
+        self._battery_img.set_visible(True)
+        self._battery_img.set_tooltip_text(f"Battery: {battery}%")
+        for cls in ("battery-full", "battery-half", "battery-low"):
+            self._battery_img.remove_css_class(cls)
+        if battery > 60:
+            self._battery_img.set_from_icon_name("battery-full-symbolic")
+            self._battery_img.add_css_class("battery-full")
+        elif battery >= 30:
+            self._battery_img.set_from_icon_name("battery-caution-symbolic")
+            self._battery_img.add_css_class("battery-half")
+        else:
+            self._battery_img.set_from_icon_name("battery-empty-symbolic")
+            self._battery_img.add_css_class("battery-low")
 
     def set_connected(self, connected: bool) -> None:
         self.connected = connected
@@ -232,6 +260,27 @@ class BluetoothPage:
 
         self._tick_source = GLib.timeout_add(5000, self._tick)
 
+    @staticmethod
+    def _parse_paired(raw: str) -> list[dict]:
+        devices: list[dict] = []
+        for line in raw.splitlines():
+            p = line.split("|")
+            if len(p) >= 6:
+                mac = p[3].strip()
+                connected = p[5] == "yes"
+                battery = None
+                if connected:
+                    bat = _run(["--battery", mac]).strip()
+                    battery = int(bat) if bat.isdigit() else None
+                devices.append({
+                    "mac": mac,
+                    "name": p[4].strip(),
+                    "cat": p[2],
+                    "connected": connected,
+                    "battery": battery,
+                })
+        return devices
+
     def _load_data(self) -> None:
         self._status = {}
         raw = _run(["--status"])
@@ -252,16 +301,7 @@ class BluetoothPage:
         self._paired_devices = []
         raw_paired = _run(["--paired-detailed"])
         if raw_paired:
-            for line in raw_paired.splitlines():
-                parts = line.split("|")
-                if len(parts) >= 6:
-                    cat = parts[2]
-                    mac = parts[3].strip()
-                    name = parts[4].strip()
-                    connected = parts[5] == "yes"
-                    self._paired_devices.append({
-                        "mac": mac, "name": name, "cat": cat, "connected": connected,
-                    })
+            self._paired_devices = self._parse_paired(raw_paired)
 
         self._nearby_devices = []
         raw_nearby = _run(["--nearby-detailed"])
@@ -518,6 +558,7 @@ class BluetoothPage:
                 on_forget=self._forget_device,
                 on_send=self._send_file,
                 on_trust=self._toggle_trust,
+                battery=dev.get("battery"),
             )
             self._paired_listbox.append(row)
             self._device_rows[mac] = row
@@ -617,11 +658,12 @@ class BluetoothPage:
                 stdin=subprocess.DEVNULL,
             )
             paired_out = _run(["--paired-detailed"])
-            GLib.idle_add(self._apply_status, r.stdout, paired_out)
+            paired = self._parse_paired(paired_out)
+            GLib.idle_add(self._apply_status, r.stdout, paired)
         except Exception:
             pass
 
-    def _apply_status(self, output: str, paired_out: str) -> None:
+    def _apply_status(self, output: str, paired: list) -> None:
         parts = output.strip().split("|")
         if len(parts) < 7:
             return
@@ -639,16 +681,8 @@ class BluetoothPage:
             self._sidebar_power_switch.set_active(radio_on)
             self._setting_value = False
 
-        # Rebuild paired device list with current connection states
-        self._paired_devices = []
-        if paired_out:
-            for line in paired_out.splitlines():
-                p = line.split("|")
-                if len(p) >= 6:
-                    self._paired_devices.append({
-                        "mac": p[3], "name": p[4],
-                        "cat": p[2], "connected": p[5] == "yes",
-                    })
+        # Rebuild paired device list with current connection states + battery
+        self._paired_devices = paired
         self._rebuild_device_list()
 
     # ── Save lifecycle ──

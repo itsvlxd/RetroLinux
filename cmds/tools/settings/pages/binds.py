@@ -150,7 +150,7 @@ class BindsPage(SectionPage):
         retro_map: dict = {}
         _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
         _EXPR_RETRO = re.compile(
-            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]*?\+\s*(\w+))"\s*,\s*(Retro\.\w+)\)'
+            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]+)"\s*,\s*(Retro\.\w+)\)'
         )
         # Variable → modifier translation from the module's keybinds.lua.
         _KNOWN_MOD_VARS: dict[str, str] = {"mainMod": "SUPER"}
@@ -183,11 +183,17 @@ class BindsPage(SectionPage):
                     retro_map[_combo] = _disp
 
             for _m in _EXPR_RETRO.finditer(_content):
-                _var_name, _suffix, _key, _fn_name = _m.groups()
+                _var_name, _suffix, _fn_name = _m.groups()
                 _mod_str = _KNOWN_MOD_VARS.get(_var_name)
                 if _mod_str:
-                    _mods = tuple(_mod_str.split(" + "))
-                    _combo = (_mods, _key.upper())
+                    _combo_parts = [p.strip().upper() for p in _suffix.strip().split("+")]
+                    _key = _combo_parts[-1] if _combo_parts else ""
+                    _extra_mods = _combo_parts[:-1]
+                    _mods = list(_mod_str.split(" + "))
+                    for _em in _extra_mods:
+                        if _em and _em not in _mods:
+                            _mods.append(_em)
+                    _combo = (tuple(_mods), _key)
                     _disp = config.RETRO_FN_MAP.get(_fn_name)
                     if _disp:
                         retro_map[_combo] = _disp
@@ -204,7 +210,7 @@ class BindsPage(SectionPage):
         self._module_retro_binds.clear()
         _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
         _EXPR_RETRO = re.compile(
-            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]*?\+\s*(\w+))"\s*,\s*(Retro\.\w+)\)'
+            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]+)"\s*,\s*(Retro\.\w+)\)'
         )
         _KNOWN_MOD_VARS: dict[str, str] = {"mainMod": "SUPER"}
 
@@ -235,10 +241,16 @@ class BindsPage(SectionPage):
                 self._module_retro_binds[_bd.combo] = _bd
 
         for _m in _EXPR_RETRO.finditer(_content):
-            _var_name, _suffix, _key, _fn_name = _m.groups()
+            _var_name, _suffix, _fn_name = _m.groups()
             _mod_str = _KNOWN_MOD_VARS.get(_var_name)
             if _mod_str:
+                _combo_parts = [p.strip().upper() for p in _suffix.strip().split("+")]
+                _key = _combo_parts[-1] if _combo_parts else ""
+                _extra_mods = _combo_parts[:-1]
                 _mods = [m.upper() for m in _mod_str.split(" + ")]
+                for _em in _extra_mods:
+                    if _em and _em not in _mods:
+                        _mods.append(_em)
                 _disp = config.RETRO_FN_MAP.get(_fn_name)
                 if _disp:
                     _bd = BindData(
