@@ -555,6 +555,8 @@ Singleton {
             property bool showWeatherTemp: false
             property bool showDayOfWeek: false
             property string batteryStyle: "arch"
+            property bool showWifiPopup: false
+            property bool showBluetoothPopup: false
         }
     }
 
