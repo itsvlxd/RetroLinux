@@ -110,12 +110,12 @@ local _real_require = require
 local mock_modules = {
     ["lib.retro"] = retro_mock,
     ["programs"] = {
-        menu = "rofi -show drun",
+        menu = "hyprlauncher",
         terminal = "kitty",
         filemanager = "nemo",
         browser = "zen-browser",
         editor = "nvim",
-        launcher = "rofi -show drun",
+        launcher = "hyprlauncher",
     },
 }
 
