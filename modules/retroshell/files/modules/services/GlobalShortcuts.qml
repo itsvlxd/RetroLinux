@@ -78,7 +78,7 @@ QtObject {
                 Screenshot.captureMode = "lens";
                 screenshotDelay.start();
                 break;
-            case "lockscreen": GlobalStates.lockscreenVisible = true; break;
+            case "lockscreen": LockscreenService.lock(); break;
             case "brightness_ping": Brightness.refreshAll(); break;
             
             // Media

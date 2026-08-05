@@ -56,6 +56,16 @@ cmd_shell() {
             fi
             ;;
         lock)
+            local sid="${XDG_SESSION_ID:-}"
+            if [[ -z $sid ]]; then
+                sid=$(loginctl 2>/dev/null | awk 'NR>1 {print $1}' | head -1)
+            fi
+            local locked
+            locked=$(loginctl show-session "$sid" -p LockedHint 2>/dev/null | sed 's/^LockedHint=//')
+            if [[ "$locked" == "yes" ]]; then
+                rx_log "info" "Screen is already locked"
+                return 0
+            fi
             bash "$core" --lock
             rx_log "success" "Screen locked"
             ;;
@@ -75,6 +85,13 @@ cmd_shell() {
             if [[ "$enable" != "true" ]]; then
                 rx_log "error" "Hypridle is disabled (HYPRIDLE_ENABLE=$enable)"
                 return 1
+            fi
+
+            local caffeine
+            caffeine=$(get_var "HYPRIDLE_CAFFEINE_ENABLE" "false")
+            if [[ "$caffeine" == "true" ]]; then
+                rx_log "info" "Caffeine is active — not starting hypridle"
+                return 0
             fi
 
             local idle_config="${XDG_CONFIG_HOME:-$HOME/.config}/retro/hypridle.conf"
