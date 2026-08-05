@@ -18,10 +18,6 @@ output_path = '~/.config/retro/themes/hyprland-colors.conf'
 input_path = '~/.config/matugen/templates/kitty.conf'
 output_path = '~/.config/retro/themes/kitty-colors.conf'
 
-[templates.rofi]
-input_path = '~/.config/matugen/templates/rofi.rasm'
-output_path = '~/.config/retro/themes/rofi-colors.rasi'
-
 [templates.colors-css]
 input_path = '~/.config/matugen/templates/colors.css'
 output_path = '~/.config/retro/themes/colors.css'
