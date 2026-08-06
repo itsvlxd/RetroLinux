@@ -1,0 +1,9 @@
+{
+ "position": "top",
+ "theme": "island",
+ "hoverRegionHeight": 16,
+ "keepHidden": false,
+ "disableHoverExpansion": true,
+ "noMediaDisplay": "userHost",
+ "customText": "RetroLinux"
+}

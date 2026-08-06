@@ -1,0 +1,53 @@
+{
+ "disks": [
+  "/"
+ ],
+ "updateServiceEnabled": true,
+ "idle": {
+  "general": {
+   "lock_cmd": "ambxst lock",
+   "before_sleep_cmd": "loginctl lock-session",
+   "after_sleep_cmd": "ambxst screen on"
+  },
+  "listeners": [
+   {
+    "onResume": "ambxst brightness -r",
+    "onTimeout": "ambxst brightness 10 -s",
+    "timeout": 150
+   },
+   {
+    "onTimeout": "loginctl lock-session",
+    "timeout": 300
+   },
+   {
+    "onResume": "ambxst screen on",
+    "onTimeout": "ambxst screen off",
+    "timeout": 330
+   },
+   {
+    "onTimeout": "ambxst suspend",
+    "timeout": 1800
+   }
+  ]
+ },
+ "ocr": {
+  "eng": true,
+  "spa": true,
+  "lat": false,
+  "jpn": false,
+  "chi_sim": false,
+  "chi_tra": false,
+  "kor": false,
+  "deu": true,
+  "fra": false,
+  "pol": false,
+  "ron": true,
+  "swe": false
+ },
+ "pomodoro": {
+  "workTime": 330,
+  "restTime": 60,
+  "autoStart": false,
+  "syncSpotify": true
+ }
+}
