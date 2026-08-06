@@ -1,5 +1,7 @@
 #!/bin/bash
 
+RETRO_DIR="${RETRO_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+
 source "$RETRO_DIR/lib/helpers.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/scripts/log_core.sh"
@@ -139,6 +141,15 @@ case "${1:-}" in
         ;;
     --status | -s)
         print_status
+        ;;
+    --sysinfo)
+        # One passwordless sudo call for all root-only specs. The app splits
+        # the output on these markers and feeds each raw chunk to its own
+        # parser — no second sudo round-trip needed.
+        echo "|MEMINFO|"
+        dmidecode -t 17 2>/dev/null
+        echo "|GPU_TOP|"
+        intel_gpu_top -J -m -s 500 -n 3 2>/dev/null
         ;;
     --set-power)
         write_logind "${2:-suspend}" "$(get_var PWR_POWER_BTN_LONG poweroff)" "$(get_var PWR_LID_CLOSE suspend)"
