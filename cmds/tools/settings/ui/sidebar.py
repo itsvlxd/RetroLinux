@@ -215,10 +215,10 @@ class Sidebar:
         add_schema_row(look_and_feel, "appearance")
         add_schema_row(look_and_feel, "decoration")
         add_schema_row(look_and_feel, "animations")
-        add_row(look_and_feel, "fonts", "Fonts", FONTS_ICON)
-        add_row(look_and_feel, "shell_theme", "Shell", SHELL_THEME_ICON)
         add_schema_row(look_and_feel, "cursor")
+        add_row(look_and_feel, "fonts", "Fonts", FONTS_ICON)
         add_row(look_and_feel, "themes", "Themes", THEMES_ICON)
+        add_row(look_and_feel, "shell_theme", "Shell", SHELL_THEME_ICON)
         add_row(look_and_feel, "apps", "Applications", APPS_ICON)
     
         shell = new_category("Shell")
@@ -230,9 +230,9 @@ class Sidebar:
         add_row(shell, "shell_overview", "Overview", OVERVIEW_ICON)
         add_row(shell, "shell_dock", "Dock", DOCK_ICON)
         add_row(shell, "shell_desktop", "Desktop", DESKTOP_ICON)
-        add_row(shell, "shell_misc", "Miscellaneous", MISC_ICON)
-        add_row(shell, "shell_presets", "Presets", PRESETS_ICON)
         add_row(shell, "shell_lock", "Lockscreen", LOCK_ICON)
+        add_row(shell, "shell_presets", "Presets", PRESETS_ICON)
+        add_row(shell, "shell_misc", "Miscellaneous", MISC_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
@@ -259,24 +259,24 @@ class Sidebar:
         add_row(startup, "env_vars", "Env Variables", ENV_VARS_ICON)
 
         system = new_category("System")
-        add_row(system, "disks", "Disks", DISKS_ICON)
-        add_row(system, "grub", "Bootloader", GRUB_ICON)
-        add_row(system, "power", "Power", POWER_ICON)
-        if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
-            add_row(system, "battery", "Battery", BATTERY_ICON)
-        add_row(system, "hypridle", "Sleep", SLEEP_ICON)
-        add_row(system, "daemon", "Daemon", DAEMON_ICON)
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
         add_row(system, "audio", "Audio", AUDIO_ICON)
+        if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
+            add_row(system, "battery", "Battery", BATTERY_ICON)
+        add_row(system, "power", "Power", POWER_ICON)
+        add_row(system, "hypridle", "Sleep", SLEEP_ICON)
+        add_row(system, "disks", "Disks", DISKS_ICON)
+        add_row(system, "grub", "Bootloader", GRUB_ICON)
         add_row(system, "driver", "Drivers", DRIVER_ICON)
+        add_row(system, "daemon", "Daemon", DAEMON_ICON)
 
         advanced = new_category("Advanced")
         add_row(advanced, "keyring", "Keyring", KEYRING_ICON)
+        add_row(advanced, "logs", "Logs", LOGS_ICON)
         add_schema_row(advanced, "xwayland")
         add_schema_row(advanced, "ecosystem")
         add_schema_row(advanced, "misc")
-        add_row(advanced, "logs", "Logs", LOGS_ICON)
 
         # Pinned list is NOT added to _lists so select_first() ignores it.
 
