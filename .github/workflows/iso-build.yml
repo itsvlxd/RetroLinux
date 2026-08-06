@@ -163,3 +163,84 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  release-stable:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "ci@retrolinux.local"
+          git config --local user.name "RetroLinux CI"
+
+      - name: Download ISO
+        uses: actions/download-artifact@v4
+        with:
+          name: retrolinux-iso
+          path: iso/out/
+
+      - name: Semantic Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Brand stable release body
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          VERSION: ${{ steps.semantic.outputs.new_release_version }}
+          KERNEL_VERSION: ${{ needs.build.outputs.kernel }}
+        run: |
+          notes=$(gh release view "$VERSION" --repo "${{ github.repository }}" --json body -q .body)
+          cat > stable_body.md << ENDOFFILE
+          <p align="center">
+            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/main/assets/logo-main-transparent-bg.png" alt="RetroLinux" width="1200">
+          </p>
+
+          <p align="center">
+            This ISO is a stable release built from the <code>main</code> branch.<br>
+            Recommended for everyday use.
+          </p>
+
+          <p align="center">
+            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-blueviolet?style=for-the-badge&logo=linux">
+            <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=main&label=Tests&style=for-the-badge">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=main&label=Build&style=for-the-badge">
+            <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&color=cyan">
+          </p>
+
+          ### 💻 About
+
+          Stable releases are built from the <code>main</code> branch and contain only tested, production-ready changes. They are recommended for everyday use.
+
+          If you encounter any issues, please report them on the [issue tracker](https://github.com/itsvlxd/RetroLinux/issues). Your feedback helps improve RetroLinux for everyone.
+
+          Want the latest features and fixes? Try the [nightly release](https://github.com/itsvlxd/RetroLinux/releases/tag/nightly).
+
+          [🐛 Report a Bug](https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug) · [✨ Request a Feature](https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement) · [📖 Documentation](https://github.com/itsvlxd/RetroLinux/wiki)
+
+          **Commit:** ${{ github.sha }} · **Built:** ${{ github.event.head_commit.timestamp }}
+
+          ### 📜 Changelog
+
+          $notes
+          ENDOFFILE
+          gh release edit "$VERSION" --repo "${{ github.repository }}" --notes-file stable_body.md
