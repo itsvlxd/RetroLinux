@@ -1,0 +1,12 @@
+[color]
+foreground = '#e2e2e2'
+
+gradient = 1
+gradient_color_1 = '#f8adfc'
+gradient_color_2 = '#6b2d72'
+
+horizontal_gradient = 1
+horizontal_gradient_color_1 = '#f8adfc'
+horizontal_gradient_color_2 = '#d8bfd5'
+
+blend_direction = 'up'
