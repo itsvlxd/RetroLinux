@@ -2,8 +2,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
     <linearGradient id="bg" x1="64" y1="8" x2="64" y2="120" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3584e4"/>
-      <stop offset="1" stop-color="#1a5fb4"/>
+      <stop offset="0" stop-color="#b24bf3"/>
+      <stop offset="1" stop-color="#6b70ff"/>
     </linearGradient>
     <linearGradient id="gloss" x1="64" y1="8" x2="64" y2="72" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
