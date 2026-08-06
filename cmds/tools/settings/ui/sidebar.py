@@ -7,6 +7,7 @@ import os
 from gi.repository import Adw, Gtk
 
 from settings.ui.icons import (
+    ABOUT_ICON,
     APPS_ICON,
     AUDIO_ICON,
     AUTOSTART_ICON,
@@ -151,6 +152,12 @@ class Sidebar:
         self._pinned_list.set_selection_mode(Gtk.SelectionMode.NONE)
         self._pinned_list.add_css_class("navigation-sidebar")
         self._pinned_list.connect("row-activated", self._on_row_activated)
+
+        about_row = SidebarRow(group_id="about", title="About")
+        about_row.set_activatable(True)
+        about_row.add_prefix(Gtk.Image.new_from_icon_name(ABOUT_ICON))
+        self._pinned_list.append(about_row)
+        self._rows_by_id["about"] = about_row
 
         settings_row = SidebarRow(group_id="settings", title="Settings")
         settings_row.set_activatable(True)

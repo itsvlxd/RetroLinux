@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk
 
 from settings.core.pending import PendingChange
+from settings.core.system_info import gpu_memory_label, memory_summary
 from settings.ui import make_page_layout
 
 if TYPE_CHECKING:
@@ -47,6 +48,8 @@ class DriverPage:
         self._temps: dict[str, int] = {}
         self._updates: list[str] = []
         self._current_driver: str = ""
+        self._memory_summary: str = ""
+        self._gpu_mem_label: str = ""
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -83,16 +86,20 @@ class DriverPage:
             temps = _run(["--temps"])
             updates = _run(["--check-updates"])
             current = _run(["--current-driver"])
-            GLib.idle_add(self._on_data_loaded, scan, pkgs, conflicts, specs, env, temps, updates, current)
+            mem = memory_summary()
+            gpu_mem = gpu_memory_label()
+            GLib.idle_add(self._on_data_loaded, scan, pkgs, conflicts, specs, env, temps, updates, current, mem, gpu_mem)
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_data_loaded(self, scan: str, pkgs: str, conflicts: str, specs: str, env: str, temps: str, updates: str, current: str) -> None:
+    def _on_data_loaded(self, scan: str, pkgs: str, conflicts: str, specs: str, env: str, temps: str, updates: str, current: str, mem: str, gpu_mem: str) -> None:
         self._parse_scan(scan)
         self._parse_packages(pkgs)
         self._conflicts = [c for c in conflicts.splitlines() if c.strip()]
         self._parse_specs(specs)
         self._env_status = env.replace("ENV|", "").strip() if "ENV|" in env else ""
         self._parse_temps(temps)
+        self._memory_summary = mem
+        self._gpu_mem_label = gpu_mem
 
         self._updates = []
         if "UPDATES|" in updates:
@@ -403,7 +410,7 @@ class DriverPage:
             "AUDIO": ("Audio", "audio-speakers-symbolic"),
         }
 
-        for typ in ("GPU", "CPU", "NPU", "NET", "AUDIO"):
+        for typ in ("CPU", "GPU", "NPU", "NET", "AUDIO"):
             entries = self._components.get(typ, [])
             if not entries:
                 continue
@@ -411,11 +418,22 @@ class DriverPage:
             for comp in entries:
                 self._build_hw_row(group, label, comp, icon)
                 label = None
+            if typ == "CPU" and self._memory_summary:
+                self._add_memory_row(group)
 
         self._build_packages_expander(group)
 
         if self._components:
             self._content_box.append(group)
+
+    def _add_memory_row(self, group: Adw.PreferencesGroup) -> None:
+        mem_row = Adw.ActionRow(title="Memory", subtitle=self._memory_summary)
+        mem_row.add_prefix(Gtk.Image.new_from_icon_name("memory-symbolic"))
+        check = Gtk.Label(label="\u2713")
+        check.add_css_class("success")
+        check.set_valign(Gtk.Align.CENTER)
+        mem_row.add_suffix(check)
+        group.add(mem_row)
 
     def _build_packages_expander(self, group: Adw.PreferencesGroup) -> None:
         if not self._pkg_data:
@@ -464,6 +482,8 @@ class DriverPage:
             parts.append(comp["model"])
         if comp["driver"]:
             parts.append(comp["driver"])
+        if comp["type"] == "GPU" and self._gpu_mem_label:
+            parts.append(self._gpu_mem_label)
         subtitle = " \u00b7 ".join(parts) if parts else ""
 
         row = Adw.ActionRow(title=title, subtitle=subtitle)

@@ -19,6 +19,7 @@ from settings.core.undo import OptionChange, PairedOptionChange, UndoManager
 from settings.pages.section import SectionPage
 if TYPE_CHECKING:
     from settings.data.bezier_data import get_curve_store as _get_curve_store_type
+    from settings.pages.about import AboutPage
     from settings.pages.animations import AnimationsPage as AnimationsPageType
     from settings.pages.cursor import CursorPage as CursorPageType
     from settings.pages.apps import AppsPage
@@ -345,6 +346,16 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         print(f'[TIMING]   finalize={_bt4-_bt3:.3f}s', file=__import__('sys').stderr)
 
         GLib.timeout_add(100, self._eager_all_sidebars)
+        self._preload_about_info()
+
+    def _preload_about_info(self):
+        """Start collecting About-page specs in the background at startup."""
+        try:
+            from settings.core.system_info import preload_system_info
+            compositor = getattr(self.hypr, "version", None) or "Hyprland"
+            preload_system_info(compositor=compositor)
+        except Exception:
+            pass
 
     def _eager_all_sidebars(self):
         """Load all sidebar badges in one batch to avoid staggered layout shifts."""
@@ -429,6 +440,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
     def _build_pages(self) -> tuple[list[dict], dict[str, dict]]:
         """Build the default schema page eagerly, defer the rest."""
         # Lazy page imports — deferred to avoid pulling in 20+ page modules at startup
+        from settings.pages.about import AboutPage
         from settings.pages.apps import AppsPage
         from settings.pages.audio import AudioPage
         from settings.pages.autostart import AutostartPage
@@ -527,6 +539,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
         # Store standalone page specs for lazy building
         standalone_page_specs: list[tuple[type, str, str, str]] = [
+            (AboutPage, "_about_page", "about", "About"),
             (AppsPage, "_apps_page", "apps", "Applications"),
             (AudioPage, "_audio_page", "audio", "Audio"),
             (BluetoothPage, "_bluetooth_page", "bluetooth", "Bluetooth"),
@@ -1197,6 +1210,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def _build_lazy_standalone_page(self, slug: str):
         """Build a deferred standalone page (layouts, pending, wallpapers, settings)."""
+        from settings.pages.about import AboutPage
         from settings.pages.apps import AppsPage
         from settings.pages.audio import AudioPage
         from settings.pages.battery import BatteryPage
@@ -1335,6 +1349,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is ShellPresetsPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is AboutPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
