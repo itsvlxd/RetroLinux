@@ -1,0 +1,14 @@
+{
+ "clockFont": "League Gothic",
+ "clockFontSize": 240,
+ "clockColor": "secondary",
+ "clockMinutesColor": "primaryContainer",
+ "clockDateFontSize": 14,
+ "clockDateColor": "primaryFixedDim",
+ "clockPosition": "top",
+ "clockStyle": "split",
+ "passwordPosition": "bottom-left",
+ "musicPosition": "bottom-right",
+ "weatherPosition": "hidden",
+ "powerPosition": "bottom-right"
+}

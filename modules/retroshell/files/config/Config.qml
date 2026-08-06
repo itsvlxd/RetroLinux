@@ -37,7 +37,7 @@ Singleton {
 
     property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/retro/shell"
     property string keybindsPath: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/retro/shell/binds.json"
-    property string presetDir: Qt.resolvedUrl("../assets/presets/Ambxst Default").toString().replace("file://", "")
+    property string presetDir: Qt.resolvedUrl("../assets/presets/RetroLinux").toString().replace("file://", "")
 
     property bool pauseAutoSave: false
 
