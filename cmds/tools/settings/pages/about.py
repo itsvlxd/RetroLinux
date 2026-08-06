@@ -8,7 +8,10 @@ logo from ``assets/``.
 Buttons:
 - **Check Updates** — counts available package updates and offers to run
   ``retro --update`` in a terminal when any are found.
-- **Copy Specs** — copies a plain-text spec block to the clipboard.
+- **Copy Specs** — copies a plain-text spec block to the clipboard (wrench
+  icon in the header bar).
+- **Branch Selector** — switches the repository between the rolling
+  ``develop`` and stable ``main`` branches.
 - **View System Logs** — navigates to the existing Logs page.
 - **GitHub Repo** — opens the repo URL in the default browser.
 """
@@ -74,6 +77,8 @@ class AboutPage:
         self._check_btn: Gtk.Button | None = None
         self._version_lbl: Gtk.Label | None = None
         self._badge_lbl: Gtk.Label | None = None
+        self._branch_dd: Gtk.DropDown | None = None
+        self._branch_switching = False
         self._info = None
         self._value_rows: dict[str, Adw.ActionRow] = {}
         self._mem_bar: Gtk.LevelBar | None = None
@@ -86,6 +91,11 @@ class AboutPage:
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar, _page_box, content_box, _scrolled = make_page_layout(header=header)
         self._content_box = content_box
+
+        copy_btn = Gtk.Button(icon_name="lucide-wrench-symbolic")
+        copy_btn.set_tooltip_text("Copy specs")
+        copy_btn.connect("clicked", lambda _b: self._copy_specs())
+        header.pack_start(copy_btn)
 
         content_box.append(self._build_branding())
 
@@ -159,9 +169,8 @@ class AboutPage:
         self._check_btn.connect("clicked", lambda _b: self._check_updates())
         btn_box.append(self._check_btn)
 
-        copy_btn = Gtk.Button(label="Copy Specs")
-        copy_btn.connect("clicked", lambda _b: self._copy_specs())
-        btn_box.append(copy_btn)
+        self._branch_dd = self._build_branch_dropdown()
+        btn_box.append(self._branch_dd)
 
         gh_btn = Gtk.Button(label="GitHub Repo")
         gh_btn.connect("clicked", lambda _b: self._open_repo())
@@ -170,6 +179,13 @@ class AboutPage:
         inner.append(btn_box)
 
         return card
+
+    def _build_branch_dropdown(self) -> Gtk.DropDown:
+        model = Gtk.StringList(strings=["Rolling (develop)", "Stable (main)"])
+        dd = Gtk.DropDown(model=model)
+        dd.set_selected(self._branch_index(self._current_branch()))
+        dd.connect("notify::selected", self._on_branch_selected)
+        return dd
 
     def _add_value_row(self, group: Adw.PreferencesGroup, title: str, icon: str = "") -> Adw.ActionRow:
         row = Adw.ActionRow(title=title, subtitle="—")
@@ -282,6 +298,123 @@ class AboutPage:
         lbl.set_label(text)
 
     # ── Actions ──
+
+    @staticmethod
+    def _current_branch() -> str:
+        try:
+            r = subprocess.run(
+                ["git", "-C", os.environ.get("RETRO_DIR", "/opt/retrolinux"),
+                 "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=5,
+                stdin=subprocess.DEVNULL,
+            )
+            return r.stdout.strip()
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _branch_index(branch: str) -> int:
+        return 1 if branch == "main" else 0
+
+    def _on_branch_selected(self, _dd: Gtk.DropDown, _pspec) -> None:
+        if self._branch_switching:
+            return
+        target = "main" if _dd.get_selected() == 1 else "develop"
+        if target == self._current_branch():
+            return
+        self._confirm_switch_branch(target)
+
+    def _confirm_switch_branch(self, target: str) -> None:
+        current = self._current_branch() or "develop"
+
+        def do_switch():
+            self._branch_switching = True
+            if self._branch_dd is not None:
+                self._branch_dd.set_sensitive(False)
+            threading.Thread(
+                target=self._switch_branch, args=(target,), daemon=True
+            ).start()
+
+        confirm(
+            self._window,
+            heading=f"Switch to {target}?",
+            body=(
+                f"Retro Linux will move from {current} to {target} in "
+                "$RETRO_DIR. Any uncommitted changes there will be discarded, "
+                "and RETRO_BRANCH will be updated."
+            ),
+            label="Switch",
+            on_confirm=do_switch,
+            appearance=Adw.ResponseAppearance.SUGGESTED,
+        )
+
+    def _switch_branch(self, target: str) -> None:
+        ok, msg = self._git_switch(target)
+        GLib.idle_add(self._on_branch_switched, ok, msg)
+
+    def _git_switch(self, target: str) -> tuple[bool, str]:
+        repo = os.environ.get("RETRO_DIR", "/opt/retrolinux")
+
+        def git(*args):
+            return subprocess.run(
+                ["git", "-C", repo, *args],
+                capture_output=True, text=True, timeout=120,
+                stdin=subprocess.DEVNULL,
+            )
+
+        try:
+            if git("status", "--porcelain").stdout.strip():
+                git("reset", "--hard")
+            r = git("fetch", "origin")
+            if r.returncode != 0:
+                return False, r.stderr.strip() or f"Failed to fetch origin"
+            r = git("rev-parse", "--verify", f"origin/{target}")
+            if r.returncode != 0:
+                return False, f"Branch '{target}' does not exist on the remote"
+            r = git("checkout", "-B", target, f"origin/{target}")
+            if r.returncode != 0:
+                return False, r.stderr.strip() or f"Failed to switch to {target}"
+        except Exception as e:
+            return False, str(e)
+
+        try:
+            from lib.python.variable import set_var
+            set_var("RETRO_BRANCH", target)
+        except Exception:
+            pass
+        return True, target
+
+    def _on_branch_switched(self, ok: bool, msg: str) -> None:
+        self._branch_switching = False
+        if self._branch_dd is not None:
+            self._branch_dd.set_sensitive(True)
+        if ok:
+            self._window.show_toast(f"Switched to {msg}")
+            self._refresh_version_display()
+        else:
+            if self._branch_dd is not None:
+                self._branch_dd.set_selected(self._branch_index(self._current_branch()))
+            self._window.show_toast(f"Switch failed: {msg}", timeout=8)
+
+    def _refresh_version_display(self) -> None:
+        branch = self._current_branch() or "develop"
+        tag = ""
+        try:
+            r = subprocess.run(
+                ["git", "-C", os.environ.get("RETRO_DIR", "/opt/retrolinux"),
+                 "describe", "--tags", "--abbrev=0"],
+                capture_output=True, text=True, timeout=5,
+                stdin=subprocess.DEVNULL,
+            )
+            tag = r.stdout.strip()
+        except Exception:
+            pass
+        version = display_version(tag or "rolling-release")
+        if self._version_lbl is not None:
+            self._version_lbl.set_label(f"Version {version} ({branch})")
+        if self._badge_lbl is not None:
+            rolling = branch == "develop" or "nightly" in tag.lower()
+            self._badge_lbl.set_label("Rolling Release" if rolling else "Stable Release")
 
     def _copy_specs(self) -> None:
         if self._info is None:

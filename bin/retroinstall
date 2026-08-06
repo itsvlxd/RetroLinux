@@ -27,6 +27,7 @@ rx_setup_traps
 
 SETUP_SCRIPTS=(
     "install.sh"
+    "branch.sh"
     "ricing.sh"
     "user.sh"
     "root.sh"
@@ -60,6 +61,7 @@ else
     SYS_ENC="UTF-8"
     INSTALL_TYPE="complete"
     RICE_MODE="stable"
+    RETRO_BRANCH="develop"
     USER_NAME=""
     USER_PASSWORD=""
     USER_HOSTNAME=""
@@ -231,6 +233,7 @@ rx_install_system() {
     fi
 
     local table_data="Install Type,${INSTALL_TYPE^}
+Release Branch,${RETRO_BRANCH:-develop}
 Username,${USER_NAME:-unknown}
 User Password,${user_pw_dots}
 Root Password,${root_pw_dots}
