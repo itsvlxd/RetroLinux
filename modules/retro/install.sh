@@ -142,6 +142,28 @@ if command -v glib-compile-schemas >/dev/null 2>&1; then
     fi
 fi
 
+install_settings_desktop() {
+    local svg="$RETRO_DIR/cmds/tools/settings/data/icons/hicolor/scalable/apps/io.github.retrolinux.settings.svg"
+    local desktop="$RETRO_DIR/cmds/tools/settings/data/applications/io.github.retrolinux.settings.desktop"
+
+    [[ -f $svg ]] || return 0
+    [[ -f $desktop ]] || return 0
+
+    sudo mkdir -p /usr/share/applications /usr/share/icons/hicolor/scalable/apps || return 0
+    sudo cp -f "$svg" /usr/share/icons/hicolor/scalable/apps/ || return 0
+    sudo cp -f "$desktop" /usr/share/applications/ || return 0
+
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        sudo gtk-update-icon-cache -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
+    fi
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        sudo update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
+    fi
+
+    rx_log "success" "Retro Settings desktop entry and icon installed"
+}
+install_settings_desktop
+
 setup_theme_sudoers() {
     if command -v papirus-folders >/dev/null 2>&1; then
         sudo rm -f /etc/sudoers.d/papirus-folders
