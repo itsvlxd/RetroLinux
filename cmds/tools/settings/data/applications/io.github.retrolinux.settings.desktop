@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Retro Settings
+GenericName=Settings
+Comment=The global settings app for Retro Linux
+Exec=retro settings
+Icon=io.github.retrolinux.settings
+Terminal=false
+Categories=Settings;DesktopSettings;GTK;
+Keywords=retro;settings;system;style;appearance;configuration;wayland;
+StartupNotify=true
+StartupWMClass=io.github.retrolinux.settings
