@@ -139,6 +139,7 @@ Singleton {
                     }
                     root._cancelTimed();
                 }
+                root._syncHypridle();
             }
         }
     }
@@ -181,6 +182,7 @@ Singleton {
         function onStateLoaded() {
             root.inhibit = StateService.get("caffeine", false);
             root._readUntil();
+            root._syncHypridle();
         }
     }
 
@@ -193,6 +195,7 @@ Singleton {
                 root.inhibit = StateService.get("caffeine", false);
             }
             root._readUntil();
+            root._syncHypridle();
         }
     }
 }
