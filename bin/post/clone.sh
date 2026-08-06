@@ -3,8 +3,7 @@
 source /opt/retrolinux/bin/lib/setup_lib.sh
 
 RETRO_REPO_URL="https://github.com/itsvlxd/RetroLinux.git"
-
-# TODO: when we will release retrolinux add a branch setting
+RETRO_BRANCH="${RETRO_BRANCH:-develop}"
 
 rx_post_clone_repo() {
     rx_clear_logo
@@ -44,14 +43,23 @@ rx_post_clone_repo() {
             return 1
         fi
 
-        if git clone "$RETRO_REPO_URL" "$target_dir"; then
-            find "$target_dir" -type f -name "*.sh" -exec chmod 755 {} \;
-            gum style --foreground 2 "Successfully cloned $RETRO_BRANCH from GitHub"
-            return 0
+        if git ls-remote --exit-code --heads "$RETRO_REPO_URL" "refs/heads/$RETRO_BRANCH" >/dev/null 2>&1; then
+            if git clone --branch "$RETRO_BRANCH" "$RETRO_REPO_URL" "$target_dir"; then
+                find "$target_dir" -type f -name "*.sh" -exec chmod 755 {} \;
+                gum style --foreground 2 "Successfully cloned ${RETRO_BRANCH} from GitHub"
+                return 0
+            fi
         else
-            gum style --foreground 1 "ERROR: Failed to clone repository."
-            return 1
+            gum style --foreground 3 "Branch ${RETRO_BRANCH} not found, cloning default branch..."
+            if git clone "$RETRO_REPO_URL" "$target_dir"; then
+                find "$target_dir" -type f -name "*.sh" -exec chmod 755 {} \;
+                gum style --foreground 2 "Successfully cloned default branch from GitHub"
+                return 0
+            fi
         fi
+
+        gum style --foreground 1 "ERROR: Failed to clone repository."
+        return 1
     fi
 }
 

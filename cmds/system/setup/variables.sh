@@ -9,12 +9,14 @@ setup_variables() {
     local editor_choice="${EDITOR_CHOICE:-nvim}"
     local install_type="${INSTALL_TYPE:-complete}"
     local aur_helper="${AUR_HELPER:-yay}"
+    local retro_branch="${RETRO_BRANCH:-develop}"
 
     local defaults=(
         "PKG_HELPER|$aur_helper"
         "RETRO_FILEMANAGER_CMD|$filemanager_choice"
         "RETRO_EDITOR_CMD|$editor_choice"
         "RETRO_INSTALL|$install_type"
+        "RETRO_BRANCH|$retro_branch"
     )
 
     for entry in "${defaults[@]}"; do

@@ -24,8 +24,11 @@ cmd_update() {
     rx_git_fix_owner
 
     local current_branch=$(rx_git_branch)
-    if [[ $current_branch == "develop" ]]; then
-        rx_log "warn" "On ${PINK}develop${RESET} branch, creating Timeshift backup before update"
+    local desired_branch=$($RETRO_DIR/retro.sh variable get RETRO_BRANCH 2>/dev/null || echo "")
+    [[ $desired_branch == "null" ]] && desired_branch=""
+
+    if [[ $current_branch == "develop" || $desired_branch == "develop" ]]; then
+        rx_log "warn" "On the ${PINK}develop${RESET} branch, creating Timeshift backup before update"
         if command -v timeshift >/dev/null 2>&1; then
             if sudo timeshift --create --comments "Pre-update safety backup (develop)" --tags O >/dev/null 2>&1; then
                 rx_log "success" "Timeshift backup created"
@@ -43,6 +46,20 @@ cmd_update() {
     if [[ -n $has_changes ]]; then
         rx_confirm "Uncommitted changes detected. Reset --hard to discard?" "N" || return 0
         rx_git_reset_hard
+    fi
+
+    if [[ -n $desired_branch && $desired_branch != $current_branch ]]; then
+        rx_log "info" "Switching to configured branch ${PINK}${desired_branch}${RESET}..."
+        if git -C "$RETRO_DIR" fetch origin >/dev/null 2>&1 \
+            && git -C "$RETRO_DIR" rev-parse --verify "origin/$desired_branch" >/dev/null 2>&1; then
+            if git -C "$RETRO_DIR" checkout -B "$desired_branch" "origin/$desired_branch" 2>&1; then
+                rx_log "success" "Now on ${PINK}${desired_branch}${RESET}"
+            else
+                rx_log "warn" "Could not switch to ${PINK}${desired_branch}${RESET}, staying on ${PINK}${current_branch}${RESET}"
+            fi
+        else
+            rx_log "warn" "Branch ${PINK}${desired_branch}${RESET} not found on the remote, staying on ${PINK}${current_branch}${RESET}"
+        fi
     fi
 
     rx_log "info" "Syncing repository with $(rx_git_branch)"

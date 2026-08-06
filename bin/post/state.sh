@@ -17,6 +17,7 @@ rx_post_save_state() {
         arch-chroot /mnt tee "$home_dir/.retro_install" >/dev/null <<EOF
 export INSTALL_TYPE=${INSTALL_TYPE:-complete}
 export RICE_MODE=${RICE_MODE:-stable}
+export RETRO_BRANCH=${RETRO_BRANCH:-develop}
 export FILEMANAGER_CHOICE=${FILEMANAGER_CHOICE:-thunar}
 export EDITOR_CHOICE=${EDITOR_CHOICE:-nvim}
 export BROWSER_CHOICE=${BROWSER_CHOICE:-firefox}
