@@ -10,11 +10,17 @@ rx_log "info" "Waiting for ~/.config/spotify/prefs to appear..."
 
 spotify &
 
-while [[ ! -f "$HOME/.config/spotify/prefs" ]]; do
+local attempts=0
+while [[ ! -f "$HOME/.config/spotify/prefs" && $attempts -lt 30 ]]; do
     sleep 2
+    ((attempts++))
 done
 
-rx_log "success" "Spotify preferences detected"
+if [[ -f "$HOME/.config/spotify/prefs" ]]; then
+    rx_log "success" "Spotify preferences detected"
+else
+    rx_log "warn" "Spotify preferences not detected after $((attempts * 2))s — continuing anyway"
+fi
 
 rx_log "info" "Granting write permissions to Spotify directory..."
 sudo chmod a+wr /opt/spotify

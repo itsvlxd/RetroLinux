@@ -7,5 +7,6 @@
   "mode": "mirror",
   "config": "./files",
   "install": "~/.config/spicetify",
-  "overwrite": false
+  "overwrite": false,
+  "gui": true
 }
