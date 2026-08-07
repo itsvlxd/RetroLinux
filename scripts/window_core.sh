@@ -200,7 +200,6 @@ _remove_rule() {
 
 _apply_rules() {
     if command -v hyprctl >/dev/null 2>&1; then
-        hyprctl eval 'APPLY_RULES_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
         bash "$RETRO_DIR/modules/hyprland/files/scripts/refresh_hyprland.sh" >/dev/null 2>&1 || true
     fi
     echo "APPLIED"

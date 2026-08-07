@@ -169,8 +169,6 @@ rx_wallpaper_apply_colors() {
 
     env RETRO_CONFIG="${RETRO_CONFIG:-$HOME/.config/retro}" HOME="$HOME" RETRO_DIR="$RETRO_DIR" \
         bash "$RETRO_DIR/scripts/theme_core.sh" --apply-colors >/dev/null 2>&1
-
-    hyprctl eval 'APPLY_COLORS_ONLY=true; '"$(cat "$HOME/.config/hypr/hyprland.lua")" >/dev/null 2>&1
 }
 
 rx_wallpaper_get_gpu_env() {
