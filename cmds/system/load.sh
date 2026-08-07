@@ -33,9 +33,7 @@ cmd_load() {
 
         "retro display scale --from-dpi|Applying display scaling to XWayland DPI"
 
-        "wl-paste --type text --watch cliphist store -ignore-secrets|Starting cliphist text store watcher"
-        "wl-paste --type image --watch cliphist store -ignore-secrets|Starting cliphist image store watcher"
-
+        # NOTE: Deprected bitwarden integration
         "rbw config set sync_interval $(get_var 'CLIP_WARDEN_SYNC')|Synchronizing vault refresh interval with global security policy"
         "rbw config set lock_timeout $(get_var 'CLIP_WARDEN_TIMEOUT')|Enforcing automated vault hibernation and session locking"
     )

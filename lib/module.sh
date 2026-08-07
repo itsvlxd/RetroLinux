@@ -79,6 +79,14 @@ get_module_overwrite() {
     rx_get_json "$json_file" "overwrite" "false" 2>/dev/null
 }
 
+get_module_gui() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    rx_get_json "$json_file" "gui" "false" 2>/dev/null
+}
+
 is_core_module() {
     local name="$1"
     local mod_type=$(get_module_type "$name")
@@ -97,6 +105,14 @@ filter_module() {
     if [[ -n $MODULE_ACCESS_FILTER && $MODULE_ACCESS_FILTER != "all" ]]; then
         local mod_access=$(get_module_access "$name")
         [[ $mod_access != "$MODULE_ACCESS_FILTER" ]] && return 1
+    fi
+
+    if [[ ${RETRO_SETUP:-false} == "true" || ${RETRO_CHROOT:-false} == "true" ]]; then
+        local mod_gui=$(get_module_gui "$name")
+        if [[ $mod_gui == "true" ]]; then
+            rx_log "warn" "Skipping $name — requires a working GUI session. Install later with 'retro -i $name'"
+            return 1
+        fi
     fi
 
     return 0
