@@ -11,15 +11,13 @@ setup_drivers() {
     [[ -z $scan_data ]] && return 0
     [[ $scan_data == *"ALL_DRIVERS_INSTALLED"* ]] && return 0
 
-    rx_log "info" "Missing drivers detected on your system, would you like to install them? ${PINK}[y/N]${RESET}: "
-    read -r confirm
-    [[ ! $confirm =~ ^[Yy]$ ]] && return 0
+    rx_log "info" "Installing missing hardware drivers..."
 
     local driver_script="$RETRO_DIR/cmds/tools/driver.sh"
 
     [[ -f $driver_script ]] && source "$driver_script"
 
-    cmd_driver "install"
+    cmd_driver "install" "-y"
 
     rx_log "success" "Hardware drivers installed"
 }
