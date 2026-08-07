@@ -254,8 +254,6 @@ set_wallpaper() {
     echo "OK|$input"
 
     bash "$RETRO_DIR/scripts/shell_core.sh" --run "wallpaper_ping $input" 2>/dev/null &
-
-    hyprctl reload
 }
 
 restore_wallpaper() {
