@@ -8,9 +8,9 @@ setup_ricing_mode() {
 
     if [[ $rice_mode == "advanced" ]]; then
         "$RETRO_DIR/retro.sh" variable set RETRO_RICING "true" 2>/dev/null
-        rx_log "success" "Advanced ricing mode enabled (RETRO_RICING=true)"
+        rx_log "success" "Manual ricing mode enabled (RETRO_RICING=true)"
     else
         "$RETRO_DIR/retro.sh" variable set RETRO_RICING "false" 2>/dev/null
-        rx_log "success" "Stable ricing mode enabled (RETRO_RICING=false)"
+        rx_log "success" "Managed ricing mode enabled (RETRO_RICING=false)"
     fi
 }

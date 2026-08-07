@@ -18,7 +18,7 @@ rx_post_save_state() {
 export INSTALL_TYPE=${INSTALL_TYPE:-complete}
 export RICE_MODE=${RICE_MODE:-stable}
 export RETRO_BRANCH=${RETRO_BRANCH:-develop}
-export FILEMANAGER_CHOICE=${FILEMANAGER_CHOICE:-thunar}
+export FILEMANAGER_CHOICE=${FILEMANAGER_CHOICE:-nemo}
 export EDITOR_CHOICE=${EDITOR_CHOICE:-nvim}
 export BROWSER_CHOICE=${BROWSER_CHOICE:-firefox}
 export AUR_HELPER=${AUR_HELPER:-yay}

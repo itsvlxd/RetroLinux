@@ -214,7 +214,7 @@ end
 function XDG.reset_defaults()
 	init_paths()
 	local editor = Watcher.get_var("RETRO_EDITOR_CMD", "nvim")
-	local fm = Watcher.get_var("RETRO_FILEMANAGER_CMD", "thunar")
+	local fm = Watcher.get_var("RETRO_FILEMANAGER_CMD", "nemo")
 	local terminal = Watcher.get_var("RETRO_TERMINAL_CMD", "kitty")
 
 	local editor_desktop = editor .. ".desktop"
@@ -225,10 +225,10 @@ function XDG.reset_defaults()
 		nautilus = "org.gnome.Nautilus.desktop",
 		yazi = "yazi.desktop",
 	}
-	local fm_desktop = fm_map[fm] or "thunar.desktop"
+	local fm_desktop = fm_map[fm] or "nemo.desktop"
 
 	local browser_desktop = "firefox.desktop"
-	local browsers = { "zen", "firefox", "chromium", "floorp", "thorium", "nyxt", "google-chrome" }
+	local browsers = { "zen", "firefox", "chromium" }
 	for _, b in ipairs(browsers) do
 		if XDG.validate_desktop(b .. ".desktop") then
 			browser_desktop = b .. ".desktop"

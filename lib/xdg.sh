@@ -220,14 +220,14 @@ rx_xdg_list_defaults() {
 
 rx_xdg_reset_defaults() {
     local editor=$(get_var "RETRO_EDITOR_CMD" "nvim")
-    local fm=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
+    local fm=$(get_var "RETRO_FILEMANAGER_CMD" "nemo")
     local terminal=$(get_var "RETRO_TERMINAL_CMD" "kitty")
 
     local editor_desktop=$(rx_xdg_resolve_desktop "$editor")
     local fm_desktop=$(rx_xdg_resolve_desktop "$fm")
 
     local browser_desktop="firefox.desktop"
-    for b in zen firefox chromium floorp thorium nyxt google-chrome; do
+    for b in zen firefox chromium; do
         if rx_xdg_validate_desktop "${b}.desktop"; then
             browser_desktop="${b}.desktop"
             break
@@ -329,19 +329,26 @@ rx_xdg_setup() {
     local video_input="$5"
 
     [[ -z $editor_input ]] && editor_input=$(get_var "RETRO_EDITOR_CMD" "nvim")
-    [[ -z $browser_input ]] && browser_input=$(get_var "BROWSER_CHOICE" "zen")
-    [[ -z $fm_input ]] && fm_input=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
+    [[ -z $browser_input ]] && browser_input=$(get_var "BROWSER_CHOICE" "firefox")
+    [[ -z $fm_input ]] && fm_input=$(get_var "RETRO_FILEMANAGER_CMD" "nemo")
     [[ -z $image_input ]] && image_input="loupe"
     [[ -z $video_input ]] && video_input="mpv"
 
     local editor_desktop=$(rx_xdg_resolve_desktop "$editor_input")
-    local browser_desktop=$(rx_xdg_resolve_desktop "$browser_input")
+    local browser_desktop=""
+    local skip_browser=false
+    if [[ $browser_input == "none" ]]; then
+        browser_desktop="none"
+        skip_browser=true
+    else
+        browser_desktop=$(rx_xdg_resolve_desktop "$browser_input")
+    fi
     local fm_desktop=$(rx_xdg_resolve_desktop "$fm_input")
     local image_desktop=$(rx_xdg_resolve_desktop "$image_input")
     local video_desktop=$(rx_xdg_resolve_desktop "$video_input")
     local terminal_desktop="kitty.desktop"
 
-    [[ $fm_desktop == "thunar.desktop" ]] && ! rx_xdg_validate_desktop "thunar.desktop" && fm_desktop=$(rx_xdg_resolve_desktop "nemo")
+    [[ $fm_desktop == "nemo.desktop" ]] && ! rx_xdg_validate_desktop "nemo.desktop" && fm_desktop=$(rx_xdg_resolve_desktop "thunar")
     [[ $image_desktop == "loupe.desktop" ]] && ! rx_xdg_validate_desktop "loupe.desktop" && image_desktop=$(rx_xdg_resolve_desktop "viewnior")
 
     mkdir -p "$(dirname "$XDG_MIMEAPPS_FILE")"
@@ -355,9 +362,11 @@ EOF
     for mime in "${XDG_FM_MIMES[@]}"; do
         echo "${mime}=${fm_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done
-    for mime in "${XDG_BROWSER_MIMES[@]}"; do
-        echo "${mime}=${browser_desktop}" >>"$XDG_MIMEAPPS_FILE"
-    done
+    if [[ $skip_browser == false ]]; then
+        for mime in "${XDG_BROWSER_MIMES[@]}"; do
+            echo "${mime}=${browser_desktop}" >>"$XDG_MIMEAPPS_FILE"
+        done
+    fi
     for mime in "${XDG_IMAGE_MIMES[@]}"; do
         echo "${mime}=${image_desktop}" >>"$XDG_MIMEAPPS_FILE"
     done

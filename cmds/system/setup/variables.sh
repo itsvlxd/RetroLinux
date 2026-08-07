@@ -5,7 +5,7 @@ source "$RETRO_DIR/lib/colors.sh"
 
 setup_variables() {
     rx_log "info" "Initializing system variables..."
-    local filemanager_choice="${FILEMANAGER_CHOICE:-thunar}"
+    local filemanager_choice="${FILEMANAGER_CHOICE:-nemo}"
     local editor_choice="${EDITOR_CHOICE:-nvim}"
     local install_type="${INSTALL_TYPE:-complete}"
     local aur_helper="${AUR_HELPER:-yay}"
