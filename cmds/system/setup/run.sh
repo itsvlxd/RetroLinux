@@ -14,8 +14,14 @@ register_command() {
 }
 
 run_postinstall() {
+    SETUP_LOG="/var/log/retrolinux-setup.log"
+    exec > >(tee -a "$SETUP_LOG") 2>&1
+
+    export RETRO_SETUP=true
+
     rx_logo
     rx_log "info" "Running post-install setup..."
+    rx_log "info" "Setup log written to: $SETUP_LOG"
     faillock --user $USER --reset
 
     rx_git_fix_owner
@@ -68,6 +74,7 @@ run_postinstall() {
 
     retro wallpaper "static" "false"
 
+    sudo rm -f /etc/sudoers.d/retro-post-install
     rm "$HOME/.retro_install"
 
     rx_log "success" "Post-install complete!"
