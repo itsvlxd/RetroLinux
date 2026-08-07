@@ -68,19 +68,24 @@ run_postinstall() {
 
     retro wallpaper setup --needed -o "theme=retro"
     retro theme setup --needed -y
+    retro theme mode dark
 
     sudo mkdir -p /root/.config
     for _dir in gtk-3.0 gtk-4.0 Kvantum qt5ct qt6ct; do
         sudo ln -snf "$HOME/.config/$_dir" "/root/.config/$_dir"
     done
 
+    retro grub apply -y
+
     retro power setup --needed -o "profile=recommended"
     retro font setup --needed -y
     retro input setup --needed -y
+
     retro audio setup
+
     retro polkit setup --needed -y
-    retro firewall setup --needed -o "engine=${FIREWALL_ENGINE:-nftables},default=drop"
-    retro fans setup --needed -o "engine=lm-sensors,profile=balanced"
+    retro firewall setup --needed -o "default=drop"
+    retro fans setup --needed -y -o "engine=lm-sensors,profile=balanced"
 
     [[ $FINGERPRINT_ENABLED == true ]] && retro fingerprint setup --needed
     [[ $SSH_ENABLED == true ]] && retro ssh setup --needed -o "port=${SSH_PORT:-22},password=${SSH_PASSWORD_LOGIN:-false},pubkey=${SSH_KEY_LOGIN:-true},root=${SSH_ROOT_LOGIN:-false}"
