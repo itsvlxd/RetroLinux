@@ -148,7 +148,7 @@ rx_confirm() {
     local default="${2:-N}"
     local skip="${3:-false}"
 
-    if [[ $skip == "true" || ${RX_SETUP_YES:-false} == "true" ]]; then
+    if [[ $skip == "true" || ${RX_SETUP_YES:-false} == "true" || ${SKIP_PROMPT:-false} == "true" ]]; then
         return 0
     fi
 
@@ -172,7 +172,7 @@ rx_yesno() {
     local message="$1"
     local result
 
-    if [[ $SKIP_PROMPT == "true" ]]; then
+    if [[ ${SKIP_PROMPT:-false} == "true" || ${RX_SETUP_YES:-false} == "true" ]]; then
         return 0
     fi
 
