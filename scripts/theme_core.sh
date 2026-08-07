@@ -864,14 +864,25 @@ rx_cursor_set() {
     fi
 
     mkdir -p "$HOME/.local/share/icons" "$HOME/.icons" "$HOME/.icons/default"
+    local -a installed_themes=()
     for theme_dir in "$RETRO_DIR/themes/cursors"/*/; do
         [[ -d $theme_dir ]] || continue
         local theme_name
         theme_name=$(basename "$theme_dir")
         [[ -n $theme_name ]] || continue
-        ln -snf "$theme_dir" "$HOME/.local/share/icons/$theme_name"
-        ln -snf "$HOME/.local/share/icons/$theme_name" "$HOME/.icons/$theme_name"
+        local icon_target="$HOME/.local/share/icons/$theme_name"
+        local doticons_target="$HOME/.icons/$theme_name"
+        if [[ -e $icon_target && ! -L $icon_target ]]; then
+            rm -rf "$icon_target"
+        fi
+        if [[ -e $doticons_target && ! -L $doticons_target ]]; then
+            rm -rf "$doticons_target"
+        fi
+        ln -snf "$theme_dir" "$icon_target"
+        ln -snf "$icon_target" "$doticons_target"
+        installed_themes+=("$theme_name")
     done
+    rx_log_file "info" "Installed cursor themes: ${installed_themes[*]:-none}"
     cat >"$HOME/.icons/default/index.theme" <<EOF
 [Icon Theme]
 Inherits=$name
@@ -881,6 +892,11 @@ EOF
 [Icon Theme]
 Inherits=$name
 EOF
+
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -t -f "$HOME/.local/share/icons" 2>/dev/null
+        gtk-update-icon-cache -q -t -f "$HOME/.icons" 2>/dev/null
+    fi
 
     local xresources="$HOME/.Xresources"
     if grep -q '^Xcursor\.theme' "$xresources" 2>/dev/null; then
