@@ -311,7 +311,7 @@ cmd_font() {
             local helper=$(get_var "PKG_HELPER")
             [[ -z $helper ]] && helper="sudo pacman"
 
-            if [[ $flag == "--yes" || $flag == "-y" ]]; then
+            if [[ $type == "--yes" || $type == "-y" || $value == "--yes" || $value == "-y" ]]; then
                 export SKIP_PROMPT=true
             fi
 

@@ -152,6 +152,38 @@ rx_theme_set() {
     rx_theme_refresh_apps
 }
 
+rx_theme_persist_defaults() {
+    local key val
+    local defaults=(
+        "RETRO_THEME_MODE|dark"
+        "RETRO_THEME_SCHEME|wallpaper"
+        "RETRO_OPACITY|1.0"
+        "RETRO_INACTIVE_OPACITY|0.8"
+        "RETRO_ROUNDING|10"
+        "RETRO_ROUNDING_POWER|2"
+        "RETRO_BORDER_SIZE|2"
+        "RETRO_GAP_IN|5"
+        "RETRO_GAP_OUT|20"
+        "RETRO_SHADOW|true"
+        "RETRO_SHADOW_RANGE|4"
+        "RETRO_SHADOW_RENDER_POWER|3"
+        "RETRO_BLUR|true"
+        "RETRO_BLUR_SIZE|3"
+        "RETRO_BLUR_PASSES|3"
+        "RETRO_BLUR_VIBRANCY|0.1696"
+        "KITTY_FONT|JetBrainsMono Nerd Font"
+        "KITTY_FONT_SIZE|9.5"
+        "KITTY_PADDING|5"
+        "GTK_FONT|Inter"
+        "GTK_FONT_SIZE|10"
+        "RETRO_BROWSER_THEME|true"
+    )
+    for entry in "${defaults[@]}"; do
+        IFS='|' read -r key val <<<"$entry"
+        set_var "$key" "$(get_var "$key" "$val")"
+    done
+}
+
 rx_theme_refresh_apps() {
     bash "$RETRO_DIR/retro.sh" app all refresh >/dev/null 2>&1
     bash "$RETRO_DIR/retro.sh" theme refresh >/dev/null 2>&1
@@ -260,15 +292,18 @@ EOF
 
     local scheme
     scheme=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
+    local wallpaper_ok=true
     if [[ $scheme == "wallpaper" ]]; then
         local wallpaper
         wallpaper=$(get_var "WALL_CURRENT" "")
         if [[ -z $wallpaper || ! -f $wallpaper ]]; then
-            return 0
+            wallpaper_ok=false
         fi
     fi
-    rx_theme_apply_colors
-    rx_theme_deploy_root_config
+    if [[ $wallpaper_ok == "true" ]]; then
+        rx_theme_apply_colors
+        rx_theme_deploy_root_config
+    fi
     local cursor cursor_size
     cursor=$(get_var "RETRO_CURSOR_THEME" "auto")
     cursor_size=$(get_var "RETRO_CURSOR_SIZE" "24")
@@ -829,8 +864,14 @@ rx_cursor_set() {
     fi
 
     mkdir -p "$HOME/.local/share/icons" "$HOME/.icons" "$HOME/.icons/default"
-    ln -snf "$src_dir" "$HOME/.local/share/icons/$name"
-    ln -snf "$HOME/.local/share/icons/$name" "$HOME/.icons/$name"
+    for theme_dir in "$RETRO_DIR/themes/cursors"/*/; do
+        [[ -d $theme_dir ]] || continue
+        local theme_name
+        theme_name=$(basename "$theme_dir")
+        [[ -n $theme_name ]] || continue
+        ln -snf "$theme_dir" "$HOME/.local/share/icons/$theme_name"
+        ln -snf "$HOME/.local/share/icons/$theme_name" "$HOME/.icons/$theme_name"
+    done
     cat >"$HOME/.icons/default/index.theme" <<EOF
 [Icon Theme]
 Inherits=$name
@@ -1393,6 +1434,9 @@ _custom_theme_list() {
 case "$1" in
     "--set")
         rx_theme_set "$2" "$3"
+        ;;
+    "--setup-defaults")
+        rx_theme_persist_defaults
         ;;
     "--mode")
         rx_theme_apply_mode "$2"
