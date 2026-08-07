@@ -19,8 +19,7 @@ rx_discover_scripts() {
         "network.sh"
         "aur.sh"
         "clone.sh"
-        "state.sh"
-        "modules.sh")
+        "state.sh")
     local sorted_scripts=()
     local remaining_scripts=()
 
@@ -72,8 +71,6 @@ rx_run_post_install() {
     done
 
     gum style --foreground 2 "Post-installation complete!" --padding "1 0 1 $PADDING_LEFT"
-
-    arch-chroot /mnt rm -f /etc/sudoers.d/retro-post-install 2>/dev/null
 
     return 0
 }
