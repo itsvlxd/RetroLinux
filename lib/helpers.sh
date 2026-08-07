@@ -507,8 +507,10 @@ ensure_pkg() {
     if command -v "$cmd" >/dev/null 2>&1; then
         return 0
     fi
-    rx_log "info" "Installing ${PINK}${pkg}${RESET} via yay..."
-    yay -S --needed --noconfirm "$pkg"
+    local helper="${AUR_HELPER:-$(get_var "PKG_HELPER")}"
+    : "${helper:="yay"}"
+    rx_log "info" "Installing ${PINK}${pkg}${RESET} via $helper..."
+    $helper -S --needed --noconfirm "$pkg"
 }
 
 rx_grayscale_output() {
