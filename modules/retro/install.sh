@@ -41,10 +41,16 @@ retro_fix_permissions
 
 if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
     rx_log "info" "Installing ${PINK}${cmd_name}${RESET} to ${bin_dir}..."
-    [[ ! -d $bin_dir ]] && mkdir -p "$bin_dir"
-    ln -sf "$source_bin" "$target"
-    chmod +x "$target"
-    rx_log "success" "The ${PINK}${cmd_name}${RESET} command is now global."
+    [[ ! -d $bin_dir ]] && sudo mkdir -p "$bin_dir"
+
+    if sudo ln -sf "$source_bin" "$target"; then
+        sudo chmod +x "$source_bin"
+        rx_log "success" "The ${PINK}${cmd_name}${RESET} command is now global."
+    else
+        rx_log "error" "Failed to install ${cmd_name} — ${bin_dir} is not writable."
+        return 1
+    fi
+
     git config --global --add safe.directory "$RETRO_DIR"
 fi
 
