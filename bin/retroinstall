@@ -24,6 +24,7 @@ source "$RETRO_INSTALL/lib/debug.sh"
 
 rx_set_retro_colors
 rx_setup_traps
+rx_start_install_log
 
 SETUP_SCRIPTS=(
     "install.sh"
@@ -108,10 +109,21 @@ rx_show_error_and_qr() {
     rx_show_cursor
     gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "RetroLinux installation stopped!"
     gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Error during setup (exit code: $exit_code)"
+
     echo
     rx_generate_error_qr "$exit_code"
     echo
-    gum style "Get help at https://github.com/itsvlxd/RetroLinux/issues"
+    gum style "Scan the QR code above to report this issue"
+
+    if [[ -n ${CURRENT_SCRIPT:-} ]]; then
+        echo
+        gum style "Failed script: $CURRENT_SCRIPT"
+    fi
+
+    echo
+    gum style "Last output from the failing process:"
+    rx_show_log_tail
+
     echo
     gum confirm --affirmative "Retry installation" --negative "Exit" --padding "$GUM_CONFIRM_PADDING" && exec /opt/retrolinux/bin/retroinstall || exit 1
 }
@@ -126,8 +138,10 @@ rx_run_step() {
 
     rx_clear_logo
     rx_load_state
+    CURRENT_SCRIPT="$script"
     /opt/retrolinux/bin/setup/"$script"
     local exit_code=$?
+    CURRENT_SCRIPT=""
     rx_load_state
     if [[ $exit_code -eq 42 ]]; then
         RX_SKIP_STEP=6
@@ -271,22 +285,31 @@ Network,${network_info}"
     gum style --foreground 3 --padding "1 0 1 $PADDING_LEFT" "Installing RetroLinux..."
     echo
 
+    set -o pipefail
     archinstall \
         --config user_configuration.json \
         --creds user_credentials.json \
         --silent \
         --skip-ntp \
         --skip-wkd \
-        --skip-wifi-check
-
-    local arch_exit_code=$?
+        --skip-wifi-check 2>&1 | tee -a "$RETRO_INSTALL_LOG_FILE"
+    local arch_exit_code=${PIPESTATUS[0]}
+    set +o pipefail
 
     if [[ $arch_exit_code -ne 0 ]]; then
         rx_clear_logo
         echo
         gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Installation failed (exit code: $arch_exit_code)"
+
         echo
         rx_generate_error_qr "$arch_exit_code"
+        echo
+        gum style "Scan the QR code above to report this issue"
+
+        echo
+        gum style "Last output from archinstall:"
+        rx_show_log_tail
+
         echo
         gum confirm --affirmative "Retry" --negative "Exit" --padding "$GUM_CONFIRM_PADDING" && exec /opt/retrolinux/bin/retroinstall || exit 1
     fi
