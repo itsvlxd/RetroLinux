@@ -128,6 +128,30 @@ cmd_load() {
             ;;
 
         "all" | "")
+            if $setup_mode; then
+                rx_log "info" "First boot detected — running post-install setup only."
+                if pgrep -f "run_postinstall" >/dev/null 2>&1; then
+                    rx_log "info" "Post-install setup already running, skipping duplicate launch."
+                    return 0
+                fi
+
+                local terminal=""
+                if command -v kitty >/dev/null 2>&1; then
+                    terminal="kitty"
+                elif [[ -n ${TERMINAL:-} ]] && command -v "$TERMINAL" >/dev/null 2>&1; then
+                    terminal="$TERMINAL"
+                fi
+
+                if [[ -n $terminal ]]; then
+                    exec "$terminal" -e bash -c "/opt/retrolinux/retro.sh --setup"
+                else
+                    rx_log "warn" "No graphical terminal found, running setup in the background"
+                    nohup /opt/retrolinux/retro.sh --setup >/dev/null 2>&1 &
+                    disown
+                fi
+                return 0
+            fi
+
             rx_log "info" "Syncing startup state..."
 
             for task in "${final_tasks[@]}"; do
