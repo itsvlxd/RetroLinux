@@ -92,9 +92,8 @@ post/
 ├── packages.sh    # Installs additional packages via pacman
 ├── network.sh     # Configures WiFi/Ethernet in chroot
 ├── aur.sh         # Installs AUR helper (yay/paru)
-├── clone.sh       # Deploys RetroLinux repo (from ISO or GitHub)
-├── state.sh       # Saves installation state to user home dir
-└── modules.sh     # Installs RetroLinux root + user modules
+├── clone.sh       # Deploys RetroLinux repo + bootstraps first-boot autostart
+└── state.sh       # Saves installation state to user home dir
 ```
 
 > [!NOTE]
