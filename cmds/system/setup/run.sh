@@ -15,6 +15,11 @@ register_command() {
 
 run_postinstall() {
     SETUP_LOG="/var/log/retrolinux-setup.log"
+    if ! sudo mkdir -p /var/log 2>/dev/null || ! sudo touch "$SETUP_LOG" 2>/dev/null; then
+        SETUP_LOG="$HOME/.retrolinux-setup.log"
+    else
+        sudo chown "$USER:$USER" "$SETUP_LOG" 2>/dev/null || true
+    fi
     exec > >(tee -a "$SETUP_LOG") 2>&1
 
     export RETRO_SETUP=true
@@ -41,7 +46,7 @@ run_postinstall() {
     source "$RETRO_DIR/cmds/system/setup/drivers.sh" && setup_drivers
 
     retro wallpaper "static" "true"
-    retro wallpaper "set" "Car In Neon Gas Station"
+    retro wallpaper "set" "Retrowave Gtr Wallpaper"
 
     retro keyring setup --needed
 
