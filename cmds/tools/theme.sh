@@ -187,7 +187,8 @@ cmd_theme() {
             local scheme_conf
             scheme_conf=$(get_var "RETRO_THEME_SCHEME" "wallpaper")
 
-            if [[ $RX_SETUP_YES == "true" ]]; then
+            if [[ $RX_SETUP_YES == "true" || $SKIP_PROMPT == "true" || $RX_SETUP_MODE == "non-interactive" ]]; then
+                _theme_call "--setup-defaults"
                 _theme_call "--mode" "$mode_conf"
                 _theme_call "--theme" "$scheme_conf"
                 rx_log "success" "Theme configuration applied with current defaults"

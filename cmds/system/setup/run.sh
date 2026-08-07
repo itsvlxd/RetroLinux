@@ -68,10 +68,12 @@ run_postinstall() {
 
     retro wallpaper setup --needed -o "theme=retro"
     retro theme setup --needed -y
+
     sudo mkdir -p /root/.config
     for _dir in gtk-3.0 gtk-4.0 Kvantum qt5ct qt6ct; do
         sudo ln -snf "$HOME/.config/$_dir" "/root/.config/$_dir"
     done
+
     retro power setup --needed -o "profile=recommended"
     retro font setup --needed -y
     retro input setup --needed -y
@@ -88,7 +90,7 @@ run_postinstall() {
         retro timeshift setup --needed -o "device=${root_device},daily=5,weekly=3,monthly=2,boot=true,filters=optimized" 2>/dev/null || true
     fi
 
-    retro wallpaper "static" "false"
+    retro shell start
 
     sudo rm -f /etc/sudoers.d/retro-post-install
     rm "$HOME/.retro_install"
