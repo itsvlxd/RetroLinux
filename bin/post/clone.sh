@@ -88,12 +88,16 @@ rx_install_retro_bootstrap() {
 exec /opt/retrolinux/retro.sh --load
 EOF
             chmod +x \$autostart_file
-            conf='$home_dir/.config/hypr/hyprland.conf'
-            if [[ -f \$conf ]]; then
-                grep -q 'autostart.sh' \$conf 2>/dev/null || echo 'exec-once = $home_dir/.config/hypr/autostart.sh' >> \$conf
-            else
-                printf 'exec-once = $home_dir/.config/hypr/autostart.sh\n' > \$conf
-            fi
+            lua_file='$home_dir/.config/hypr/hyprland.lua'
+            cat > \$lua_file <<'EOF'
+local autostart = os.getenv('HOME') .. '/.config/hypr/autostart.sh'
+
+hl.on('hyprland.start', function()
+	if io.open(autostart, 'r') then
+		hl.exec_cmd(autostart)
+	end
+end)
+EOF
             chown -R $username: '$home_dir/.config' 2>/dev/null || true
         " 2>/dev/null || true
     else
