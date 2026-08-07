@@ -7,7 +7,7 @@ setup_modules() {
     rx_log "info" "Installing RetroLinux modules..."
 
     local type_flag=""
-    if [[ $install_type == "minimal" ]]; then
+    if [[ ${INSTALL_TYPE:-complete} == "minimal" ]]; then
         type_flag="-t core"
         rx_log "info" "Installing minimal set (core modules only)..."
     else
