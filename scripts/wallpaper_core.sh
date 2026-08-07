@@ -80,10 +80,10 @@ optimize_wallpapers() {
 
     # Build file list, then process with ALL stderr suppressed
     local file_list=$(mktemp /tmp/wallpaper_list.XXXXXX)
-    find "$WALL_DIR" -maxdepth 2 \( -type f -o -type l \) 2>/dev/null \
-        | grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" \
-        | grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" \
-        | sort > "$file_list"
+    find "$WALL_DIR" -maxdepth 2 \( -type f -o -type l \) 2>/dev/null |
+        grep -iE "\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$" |
+        grep -vE "\.[0-9]+x[0-9]+\.(mp4|mkv|webm)$" |
+        sort >"$file_list"
 
     while IFS= read -r f; do
         [[ -z $f ]] && continue
@@ -93,7 +93,10 @@ optimize_wallpapers() {
         local file_res=$(get_image_resolution "$f")
         local file_w="${file_res%x*}"
         local file_h="${file_res#*x}"
-        [[ -z $file_w || -z $file_h ]] && { ((skipped++)); continue; }
+        [[ -z $file_w || -z $file_h ]] && {
+            ((skipped++))
+            continue
+        }
 
         if [[ $file_w -le $target_w && $file_h -le $target_h ]]; then
             ((skipped++))
@@ -106,14 +109,14 @@ optimize_wallpapers() {
             local tmp=$(mktemp --suffix=".$ext")
             ffmpeg -y -i "$f" \
                 -vf "scale='min($target_w,iw)':'min($target_h,ih)':force_original_aspect_ratio=decrease" \
-                -c:v libx264 -preset fast -crf 23 -an "$tmp" -loglevel error \
-            && mv "$tmp" "$f" || rm -f "$tmp"
+                -c:v libx264 -preset fast -crf 23 -an "$tmp" -loglevel error &&
+                mv "$tmp" "$f" || rm -f "$tmp"
         else
             magick "$f" -resize "${target_w}x${target_h}>" "$f"
         fi
         ((optimized++))
         rx_wallpaper_generate_cache "$f" >/dev/null
-    done < "$file_list" 2>/dev/null
+    done <"$file_list" 2>/dev/null
     rm -f "$file_list"
 
     rx_log_file "INFO" "Optimization complete: $optimized optimized, $skipped already at target resolution"
@@ -250,8 +253,9 @@ set_wallpaper() {
 
     echo "OK|$input"
 
-    # Notify the shell so it keeps currentWallpaper in sync
     bash "$RETRO_DIR/scripts/shell_core.sh" --run "wallpaper_ping $input" 2>/dev/null &
+
+    hyprctl reload
 }
 
 restore_wallpaper() {
@@ -356,7 +360,7 @@ resolve_name() {
         [[ $filename =~ \.[0-9]+x[0-9]+\.(mp4|mkv|webm)$ ]] && continue
         local raw="${filename%.*}"
         local raw_lower=$(echo "$raw" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
-        if [[ "$raw_lower" == "$search_pattern" ]]; then
+        if [[ $raw_lower == "$search_pattern" ]]; then
             echo "$f"
             return 0
         fi
@@ -399,7 +403,7 @@ gpu_wallpaper() {
 
             echo "mode=$mode|vendor=$vendor|model=$model|driver=$driver|installed=$installed"
             ;;
-        auto|nvidia|amd|intel|off)
+        auto | nvidia | amd | intel | off)
             set_var "WALL_GPU_OFFLOAD" "$action"
             rx_log_file "INFO" "GPU offload mode set to: $action"
             restore_wallpaper >/dev/null 2>&1
@@ -441,8 +445,8 @@ sync_wallpapers() {
                 local src_w="${src_res%x*}" src_h="${src_res#*x}"
                 local tgt_w="${tgt_res%x*}" tgt_h="${tgt_res#*x}"
 
-                if [[ -n $src_w && -n $src_h && -n $tgt_w && -n $tgt_h
-                      && -n $map_w && -n $map_h ]]; then
+                if [[ -n $src_w && -n $src_h && -n $tgt_w && -n $tgt_h &&
+                    -n $map_w && -n $map_h ]]; then
                     local src_area=$((src_w * src_h))
                     local tgt_area=$((tgt_w * tgt_h))
                     local map_area=$((map_w * map_h))
