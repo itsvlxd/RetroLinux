@@ -58,7 +58,7 @@ rx_generate_error_qr() {
 
     local log_content=""
     if [[ -f $RETRO_INSTALL_LOG_FILE ]]; then
-        log_content=$(tail -c 6000 "$RETRO_INSTALL_LOG_FILE" 2>/dev/null | tr '\n' '.' | sed 's/^\.+//;s/\.\+/ /g')
+        log_content=$(tail -c 2000 "$RETRO_INSTALL_LOG_FILE" 2>/dev/null | tr '\n' '.' | sed 's/^\.+//;s/\.\+/ /g')
     fi
 
     local issue_body="Installer failed during RetroLinux setup.
@@ -70,52 +70,54 @@ $log_content
 
 Please describe what happened below:"
 
-    local encoded_title encoded_body
+    rx_encode_url() {
+        local text="$1"
+        local encoded=""
+        if command -v jq &>/dev/null; then
+            encoded=$(printf '%s' "$text" | jq -Rs '@uri' 2>/dev/null)
+            encoded="${encoded%\"}"
+            encoded="${encoded#\"}"
+        fi
+        if [[ -z $encoded || $encoded == '""' ]]; then
+            encoded="${text}"
+            encoded="${encoded//%/%25}"
+            encoded="${encoded//$'\n'/%0A}"
+            encoded="${encoded// /%20}"
+            encoded="${encoded//!/%21}"
+            encoded="${encoded//#/%23}"
+            encoded="${encoded//\$/%24}"
+            encoded="${encoded//&/%26}"
+            encoded="${encoded//\'/%27}"
+            encoded="${encoded//(/%28}"
+            encoded="${encoded//)/%29}"
+            encoded="${encoded//\*/%2A}"
+            encoded="${encoded//+/%2B}"
+            encoded="${encoded//,/%2C}"
+            encoded="${encoded//\//%2F}"
+            encoded="${encoded//:/%3A}"
+            encoded="${encoded//;/%3B}"
+            encoded="${encoded//=/%3D}"
+            encoded="${encoded//\?/%3F}"
+            encoded="${encoded//@/%40}"
+            encoded="${encoded//\[/%5B}"
+            encoded="${encoded//\]/%5D}"
+        fi
+        echo "$encoded"
+    }
 
-    if command -v jq &>/dev/null; then
-        encoded_title=$(echo "$issue_title" | jq -Rs '@uri' 2>/dev/null)
-        encoded_title="${encoded_title//'%'/%25}"
-        encoded_body=$(printf '%s' "$issue_body" | jq -Rs '@uri' 2>/dev/null)
+    local encoded_title encoded_body full_url
+    encoded_title=$(rx_encode_url "$issue_title")
+
+    local body_max=600
+    encoded_body=$(rx_encode_url "${issue_body:0:body_max}")
+    full_url="https://${repo_url}?title=${encoded_title}&body=${encoded_body}"
+
+    if [[ ${#full_url} -gt 2800 ]]; then
+        encoded_body=$(rx_encode_url "${issue_body:0:400}")
+        full_url="https://${repo_url}?title=${encoded_title}&body=${encoded_body}"
     fi
-
-    if [[ -z $encoded_title ]]; then
-        encoded_title="${issue_title// /+}"
-    fi
-
-    if [[ -z $encoded_body ]]; then
-        encoded_body="${issue_body}"
-        encoded_body="${encoded_body//%/%25}"
-        encoded_body="${encoded_body//$'\n'/%0A}"
-        encoded_body="${encoded_body// /%20}"
-        encoded_body="${encoded_body//!/%21}"
-        encoded_body="${encoded_body//#/%23}"
-        encoded_body="${encoded_body//\$/%24}"
-        encoded_body="${encoded_body//&/%26}"
-        encoded_body="${encoded_body//\'/%27}"
-        encoded_body="${encoded_body//(/%28}"
-        encoded_body="${encoded_body//)/%29}"
-        encoded_body="${encoded_body//*/%2A}"
-        encoded_body="${encoded_body//+/%2B}"
-        encoded_body="${encoded_body//,/%2C}"
-        encoded_body="${encoded_body///%2F}"
-        encoded_body="${encoded_body//:/%3A}"
-        encoded_body="${encoded_body//;/%3B}"
-        encoded_body="${encoded_body//=/%3D}"
-        encoded_body="${encoded_body//\?/%3F}"
-        encoded_body="${encoded_body//@/%40}"
-        encoded_body="${encoded_body//\[/%5B}"
-        encoded_body="${encoded_body//\]/%5D}"
-    fi
-
-    local full_url="https://${repo_url}?title=${encoded_title}&body=${encoded_body}"
 
     if command -v qrencode &>/dev/null; then
-        qrencode -t ANSIUTF8 "$full_url" 2>/dev/null || true
-    else
-        echo
-        gum style --foreground 5 --padding "1 0 1 $PADDING_LEFT" "Scan QR code or visit:"
-        echo
-        gum style --foreground 6 --padding "1 0 1 $PADDING_LEFT" "https://${repo_url}"
-        echo
+        qrencode -t ANSIUTF8 -s 1 -m 1 "$full_url" 2>/dev/null || true
     fi
 }
