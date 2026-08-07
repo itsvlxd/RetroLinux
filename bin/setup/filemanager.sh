@@ -13,14 +13,14 @@ setup_filemanager() {
         return 0
     fi
     
-    local fm_options="thunar
-nemo
+    local fm_options="nemo
+thunar
 nautilus
 yazi"
     
     FILEMANAGER_CHOICE=$(echo "$fm_options" | gum choose --height 4 --header "Select default file manager" --padding "$GUM_CHOOSE_PADDING") || {
         rx_step_error "2" "File manager selection failed"
-        FILEMANAGER_CHOICE="thunar"
+        FILEMANAGER_CHOICE="nemo"
         rx_save_state
         return 0
     }
