@@ -169,7 +169,6 @@ EOF
             app_config: {
                 audio_config: { audio: "pipewire" },
                 bluetooth_config: { enabled: $bluetooth },
-                firewall_config: { firewall: "nftables" },
                 print_service_config: { enabled: $printing }
             },
             "archinstall-language": "English",
