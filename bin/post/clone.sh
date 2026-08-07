@@ -63,6 +63,50 @@ rx_post_clone_repo() {
     fi
 }
 
+rx_install_retro_bootstrap() {
+    rx_clear_logo
+    rx_step "Bootstrapping first-boot setup..."
+
+    if [[ ! -f /mnt/opt/retrolinux/retro.sh ]]; then
+        gum style --foreground 3 "RetroLinux framework not present, skipping first-boot bootstrap"
+        return 0
+    fi
+
+    local username=$(arch-chroot /mnt getent passwd 1000 2>/dev/null | cut -d: -f1)
+    local home_dir=""
+    [[ -n $username ]] && home_dir=$(arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
+
+    if [[ -n $username && -n $home_dir ]]; then
+        gum style --foreground 7 "Creating first-boot autostart script..."
+        arch-chroot /mnt bash -c "
+            mkdir -p '$home_dir/.config/hypr'
+            autostart_file='$home_dir/.config/hypr/autostart.sh'
+            cat > \$autostart_file <<'EOF'
+#!/bin/bash
+# RetroLinux first-boot autostart (written during install)
+[[ -f \"\$HOME/.retro_install\" ]] || exit 0
+exec /opt/retrolinux/retro.sh --load
+EOF
+            chmod +x \$autostart_file
+            conf='$home_dir/.config/hypr/hyprland.conf'
+            if [[ -f \$conf ]]; then
+                grep -q 'autostart.sh' \$conf 2>/dev/null || echo 'exec-once = $home_dir/.config/hypr/autostart.sh' >> \$conf
+            else
+                printf 'exec-once = $home_dir/.config/hypr/autostart.sh\n' > \$conf
+            fi
+            chown -R $username: '$home_dir/.config' 2>/dev/null || true
+        " 2>/dev/null || true
+    else
+        gum style --foreground 3 "Could not determine user home, skipping autostart hook"
+    fi
+
+    gum style --foreground 2 "First-boot bootstrap complete"
+    gum style --foreground 7 "All remaining modules are installed by 'retro --setup' on first boot."
+    echo
+    return 0
+}
+
 if [[ ${BASH_SOURCE[0]} == "${0}" ]]; then
     rx_post_clone_repo "$@"
+    rx_install_retro_bootstrap
 fi
