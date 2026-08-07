@@ -501,6 +501,16 @@ check_dep() {
     return 0
 }
 
+ensure_pkg() {
+    local cmd="$1"
+    local pkg="$2"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        return 0
+    fi
+    rx_log "info" "Installing ${PINK}${pkg}${RESET} via yay..."
+    yay -S --needed --noconfirm "$pkg"
+}
+
 rx_grayscale_output() {
     local output_dir="${RETRO_CONFIG:-$HOME/.config/retro}/themes"
 
