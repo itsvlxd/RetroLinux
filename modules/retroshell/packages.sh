@@ -6,7 +6,7 @@ ttf-phosphor-icons ttf-league-gothic
 
 unzip curl
 brightnessctl networkmanager
-wl-clipboard slurp hyprpicker upower
+wl-clipboard slurp hyprpicker upower gpu-screen-recorder
 
 go
 
