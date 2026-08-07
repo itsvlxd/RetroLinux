@@ -483,10 +483,10 @@ cmd_xdg() {
                 video_input=$(rx_setup_get_opt "video")
             else
                 local cur_editor=$(get_var "RETRO_EDITOR_CMD" "nvim")
-                local cur_fm=$(get_var "RETRO_FILEMANAGER_CMD" "thunar")
+                local cur_fm=$(get_var "RETRO_FILEMANAGER_CMD" "nemo")
 
                 local detected_browser="firefox"
-                for b in zen firefox chromium floorp; do
+                for b in zen firefox chromium; do
                     if rx_xdg_validate_desktop "${b}.desktop"; then
                         detected_browser="$b"
                         break
@@ -521,10 +521,14 @@ cmd_xdg() {
                 fi
 
                 _rx_xdg_desktop_input() {
-                    local icon="$1" label="$2" default="$3"
+                    local icon="$1" label="$2" default="$3" allow_skip="${4:-false}"
                     while true; do
                         local input
                         input=$(rx_input "$label" "$default")
+                        if [[ $allow_skip == true && $input == "none" || $allow_skip == true && $input == "skip" ]]; then
+                            echo "none"
+                            return 0
+                        fi
                         local desktop
                         desktop=$(rx_xdg_resolve_desktop "$input")
                         if [[ -n $desktop ]]; then
@@ -537,17 +541,27 @@ cmd_xdg() {
                 }
 
                 editor_input=$(_rx_xdg_desktop_input "󰓅" "What editor would you like to use?" "$cur_editor")
-                browser_input=$(_rx_xdg_desktop_input "󰤨" "What browser would you like to use?" "$detected_browser")
+                browser_input=$(_rx_xdg_desktop_input "󰤨" "What browser would you like to use? (type 'none' to skip)" "$detected_browser" "true")
                 fm_input=$(_rx_xdg_desktop_input "󰉋" "What file manager would you like to use?" "$cur_fm")
                 image_input=$(_rx_xdg_desktop_input "󰋩" "What image viewer would you like to use?" "$detected_image")
                 video_input=$(_rx_xdg_desktop_input "󰎁" "What video player would you like to use?" "$detected_video")
             fi
 
             local editor_desktop=$(rx_xdg_resolve_desktop "$editor_input")
-            local browser_desktop=$(rx_xdg_resolve_desktop "$browser_input")
+            local browser_desktop=""
+            if [[ $browser_input == "none" ]]; then
+                browser_desktop="none"
+            else
+                browser_desktop=$(rx_xdg_resolve_desktop "$browser_input")
+            fi
             local fm_desktop=$(rx_xdg_resolve_desktop "$fm_input")
             local image_desktop=$(rx_xdg_resolve_desktop "$image_input")
             local video_desktop=$(rx_xdg_resolve_desktop "$video_input")
+
+            local browser_summary_display="$browser_input"
+            [[ $browser_summary_display == "none" ]] && browser_summary_display="None"
+            local browser_success_display="$browser_desktop"
+            [[ $browser_success_display == "none" ]] && browser_success_display="None"
 
             local editor_count=45
             local browser_count=11
@@ -558,7 +572,7 @@ cmd_xdg() {
             if [[ $RX_SETUP_MODE == "interactive" ]]; then
                 rx_setup_summary "󰈔" "Summary" \
                     "Editor" "$editor_input (${editor_count} types)" \
-                    "Browser" "$browser_input (${browser_count} types)" \
+                    "Browser" "$browser_summary_display (${browser_count} types)" \
                     "File Manager" "$fm_input (${fm_count} types)" \
                     "Image Viewer" "$image_input (${image_count} types)" \
                     "Video Player" "$video_input (${video_count} types)" \
@@ -585,7 +599,7 @@ EOF
 
                 rx_setup_success "󱗼" "XDG Defaults Configured" \
                     "Editor" "$editor_desktop (${editor_count} types)" \
-                    "Browser" "$browser_desktop (${browser_count} types)" \
+                    "Browser" "$browser_success_display (${browser_count} types)" \
                     "File Manager" "$fm_desktop (${fm_count} types)" \
                     "Image Viewer" "$image_desktop (${image_count} types)" \
                     "Video Player" "$video_desktop (${video_count} types)" \
@@ -619,7 +633,7 @@ EOF
             rx_help_example "retro xdg query invoice.pdf" "Find what opens PDFs" "38"
             rx_help_example "retro xdg autostart disable discord.desktop" "Disable Discord autostart" "38"
             rx_help_example "retro xdg setup" "Interactive configuration wizard" "38"
-            rx_help_example "retro xdg setup -o editor=nvim,browser=zen,filemanager=thunar,image=loupe,video=mpv" "Non-interactive setup" "38"
+            rx_help_example "retro xdg setup -o editor=nvim,browser=zen,filemanager=nemo,image=loupe,video=mpv" "Non-interactive setup" "38"
             rx_help_spacer
             ;;
     esac

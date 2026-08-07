@@ -219,9 +219,11 @@ rx_install_system() {
 
     local editor_info="${EDITOR_CHOICE:-nano}"
 
-    local filemanager_info="${FILEMANAGER_CHOICE:-thunar}"
+    local filemanager_info="${FILEMANAGER_CHOICE:-nemo}"
 
-    local browser_info="${BROWSER_CHOICE:-zen-browser-bin}"
+    local browser_info="${BROWSER_CHOICE:-firefox}"
+    [[ $browser_info == "zen-browser-bin" ]] && browser_info="Zen"
+    [[ $browser_info == "none" ]] && browser_info="None"
 
     local boot_info="GRUB ${GRUB_THEME_CHOICE:-retropunk} ${BOOT_VIDEO_GRUB:-1920x1080}"
     if [[ $GRUB_OS_PROBER == "true" ]]; then
