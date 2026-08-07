@@ -9,6 +9,7 @@ rx_show_cursor() {
 rx_show_log_tail() {
     if [[ -f $RETRO_INSTALL_LOG_FILE ]]; then
         local log_lines=$((TERM_HEIGHT - LOGO_HEIGHT - 35))
+        (( log_lines < 5 )) && log_lines=5
         local max_line_width=$((LOGO_WIDTH - 4))
 
         tail -n $log_lines "$RETRO_INSTALL_LOG_FILE" | while IFS= read -r line; do
@@ -67,15 +68,20 @@ rx_catch_errors() {
     rx_show_cursor
 
     gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "RetroLinux installation stopped!"
-    rx_show_log_tail
-
-    gum style "This command halted with exit code $exit_code:"
-    rx_show_failed_script_or_command
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Exit code: $exit_code"
 
     echo
     rx_generate_error_qr "$exit_code"
     echo
-    gum style "Get help from the community via QR code or at https://github.com/itsvlxd/RetroLinux/issues"
+    gum style "Scan the QR code above to report this issue"
+
+    echo
+    gum style "This command halted:"
+    rx_show_failed_script_or_command
+
+    echo
+    gum style "Last output from the failing process:"
+    rx_show_log_tail
 
     ERROR_HANDLING=true
     while true; do
@@ -112,8 +118,7 @@ rx_exit_handler() {
     if ((exit_code != 0)) && [[ $ERROR_HANDLING != "true" ]]; then
         rx_catch_errors
     else
-        rx_stop_log_output
-        rx_show_cursor
+        rx_stop_install_log
     fi
 }
 
@@ -141,7 +146,6 @@ rx_setup_traps() {
 }
 
 # Global state - always load on module source
-rx_load_state
 
 rx_save_state() {
     cat <<EOF > "$RETRO_STATE"
@@ -202,6 +206,9 @@ rx_load_state() {
         source "$RETRO_STATE"
     fi
 }
+
+# Global state - always load on module source
+rx_load_state
 
 rx_restore_disk_selection() {
     rx_clear_logo
