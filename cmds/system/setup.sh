@@ -1,10 +1,11 @@
 #!/bin/bash
 
+RETRO_DIR="${RETRO_DIR:-/opt/retrolinux}"
+RETRO_INSTALL="${RETRO_INSTALL:-$HOME/.retro_install}"
+
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/log.sh"
 source "$RETRO_DIR/lib/colors.sh"
-
-RETRO_INSTALL="$HOME/.retro_install"
 
 cmd_setup() {
     [[ ! -f $RETRO_INSTALL ]] && exit 1
