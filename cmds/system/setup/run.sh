@@ -50,17 +50,17 @@ run_postinstall() {
 
     retro keyring setup --needed
 
-    check_dep "${EDITOR_CHOICE:-nvim}" "neovim"
+    ensure_pkg "${EDITOR_CHOICE:-nvim}" "neovim"
     if [[ ${BROWSER_CHOICE:-firefox} != "none" ]]; then
         local browser_pkg="${BROWSER_CHOICE:-firefox}"
         local browser_bin="$browser_pkg"
         [[ $browser_bin == "zen-browser-bin" ]] && browser_bin="zen"
-        check_dep "$browser_bin" "$browser_pkg"
+        ensure_pkg "$browser_bin" "$browser_pkg"
     fi
-    check_dep "${FILEMANAGER_CHOICE:-nemo}" "nemo"
-    check_dep "${FIREWALL_ENGINE:-nftables}" "nftables"
-    check_dep "loupe" "loupe"
-    check_dep "mpv" "mpv"
+    ensure_pkg "${FILEMANAGER_CHOICE:-nemo}" "nemo"
+    ensure_pkg "${FIREWALL_ENGINE:-nftables}" "nftables"
+    ensure_pkg "loupe" "loupe"
+    ensure_pkg "mpv" "mpv"
 
     local xdg_browser="${BROWSER_CHOICE:-firefox}"
     [[ $xdg_browser == "zen-browser-bin" ]] && xdg_browser="zen"
