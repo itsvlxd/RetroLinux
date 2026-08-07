@@ -2,7 +2,7 @@
 
 source "$RETRO_DIR/cmds/tools/power.sh"
 
-RETRO_CONFIG="$HOME/.config/retro"
+: "${RETRO_CONFIG:=$HOME/.config/retro}"
 source_bin="$RETRO_DIR/retro.sh"
 bin_dir="/usr/local/bin"
 cmd_name="retro"
@@ -47,7 +47,7 @@ if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
         sudo chmod +x "$source_bin"
         rx_log "success" "The ${PINK}${cmd_name}${RESET} command is now global."
     else
-        rx_log "error" "Failed to install ${cmd_name} — ${bin_dir} is not writable."
+        rx_log "error" "Failed to install ${cmd_name}. ${bin_dir} is not writable."
         return 1
     fi
 
@@ -111,6 +111,18 @@ sync_missing_variables() {
 
     [[ ! -f $template_vars ]] && return 0
 
+    mkdir -p "$RETRO_CONFIG" || return 0
+
+    if [[ ! -w $RETRO_CONFIG ]] || ([[ -e $user_vars ]] && [[ ! -w $user_vars ]]); then
+        rx_log "warn" "$RETRO_CONFIG is not writable. Attempting to fix ownership..."
+        if sudo -n chown -R "$(id -u):$(id -g)" "$RETRO_CONFIG" 2>/dev/null; then
+            rx_log "success" "Ownership fixed for $RETRO_CONFIG"
+        else
+            rx_log "error" "Cannot write to $RETRO_CONFIG. Variable sync skipped"
+            return 1
+        fi
+    fi
+
     local added=0
     while IFS= read -r line; do
         if [[ $line =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)= ]]; then
@@ -118,7 +130,10 @@ sync_missing_variables() {
             if [[ -f $user_vars ]] && grep -q "^export $key=" "$user_vars" 2>/dev/null; then
                 continue
             fi
-            echo "$line" >>"$user_vars"
+            if ! echo "$line" 2>/dev/null >>"$user_vars"; then
+                rx_log "warn" "Skipped $key. Cannot write to $user_vars"
+                continue
+            fi
             rx_log "success" "Added missing variable: $key"
             added=1
         fi
@@ -204,7 +219,7 @@ setup_smartctl_sudoers() {
         sudo chmod 440 /etc/sudoers.d/99-smartctl
         rx_log "success" "Sudoers rule added for smartctl"
     else
-        rx_log "info" "smartctl not found — install smartmontools for SMART data"
+        rx_log "info" "smartctl not found. Install smartmontools for SMART data"
     fi
 }
 setup_smartctl_sudoers
