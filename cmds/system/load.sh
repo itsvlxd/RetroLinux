@@ -185,6 +185,8 @@ cmd_load() {
                 disown
             done
 
+            faillock --user $USER --reset
+
             rx_log "success" "Startup sequence synchronized."
             ;;
         *)
