@@ -545,7 +545,7 @@ cmd_grub() {
 
         "setup")
             rx_setup_parse "$@"
-            rx_setup_validate "theme,resolution,timeout,os-prober,snapshots,kernel" "theme:in=retropunk,retrolinux|resolution:in=1920x1080,1024x768,auto|timeout:numeric|os-prober:in=true,false|snapshots:in=true,false|kernel:in=linux,linux-zen,linux-lts,linux-hardened" || return 1
+            rx_setup_validate "theme,resolution,timeout,os-prober,snapshots,kernel" "theme:in=retropunk,retrolinux|resolution:pattern=^(auto|[0-9]+x[0-9]+)$|timeout:numeric|os-prober:in=true,false|snapshots:in=true,false|kernel:in=linux,linux-zen,linux-lts,linux-hardened" || return 1
 
             local grub_theme=$(get_var "GRUB_THEME_CHOICE")
             local grub_resolution=$(get_var "BOOT_VIDEO_GRUB")
@@ -553,8 +553,18 @@ cmd_grub() {
             local grub_os_prober=$(get_var "GRUB_OS_PROBER")
             local grub_snapshots=$(get_var "GRUB_SNAPSHOTS_ENABLED")
             local grub_kernel=$(get_var "GRUB_KERNEL")
+            # ``--needed`` must reflect real on-disk GRUB state, not the shell
+            # variables (variables.sh seeds them on every boot). On a fresh
+            # install the bootloader isn't marked as RetroLinux yet, so setup
+            # must run; once applied, /etc/default/grub + grub.cfg carry the
+            # RetroLinux markers and setup can be skipped.
             local config_exists=false
-            [[ -n $grub_theme || -n $grub_resolution || -n $grub_timeout ]] && config_exists=true
+            if [[ -f /etc/default/grub && -f /boot/grub/grub.cfg ]]; then
+                if grep -q 'GRUB_DISTRIBUTOR="RetroLinux"' /etc/default/grub 2>/dev/null \
+                    && grep -q "menuentry.*RetroLinux" /boot/grub/grub.cfg 2>/dev/null; then
+                    config_exists=true
+                fi
+            fi
 
             rx_setup_check_needed "$config_exists" && return 0
 

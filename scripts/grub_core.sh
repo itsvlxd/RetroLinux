@@ -235,6 +235,119 @@ install_grub_themes() {
     rx_log_file "success" "GRUB themes installed to $themes_dir ($theme_count themes)"
 }
 
+install_grub_template() {
+    local module_template="$RETRO_DIR/modules/grub/files/10_linux"
+    local state_dir="/usr/local/share/retrolinux/grub.d"
+    local kernel=$(get_var "GRUB_KERNEL" "linux")
+
+    rx_log_file "info" "Installing GRUB template (kernel=$kernel)"
+
+    if [[ ! -f $module_template ]]; then
+        rx_log_file "error" "GRUB template not found: $module_template"
+        return 1
+    fi
+
+    $SUDO_CMD mkdir -p "$state_dir"
+    $SUDO_CMD sed "s|@RETRO_KERNEL@|$kernel|" "$module_template" | $SUDO_CMD tee "$state_dir/10_linux" >/dev/null
+    $SUDO_CMD install -m 755 "$state_dir/10_linux" /etc/grub.d/10_linux
+    rx_log_file "success" "GRUB template installed to /etc/grub.d/10_linux"
+
+    install_grub_restore_script
+}
+
+install_grub_restore_script() {
+    local state_dir="/usr/local/share/retrolinux"
+    local restore="$state_dir/grub-restore.sh"
+    $SUDO_CMD mkdir -p "$state_dir"
+
+    $SUDO_CMD tee "$restore" >/dev/null <<'RESTORE'
+#!/bin/sh
+set -e
+# Restore the RetroLinux GRUB template after grub package updates so the boot
+# menu is always generated deterministically.
+if [ -f /usr/local/share/retrolinux/grub.d/10_linux ]; then
+    install -m 755 /usr/local/share/retrolinux/grub.d/10_linux /etc/grub.d/10_linux
+fi
+for script in 30_uefi-firmware 41_snapshots-btrfs 60_memtest86+; do
+    chmod -x "/etc/grub.d/$script" 2>/dev/null || true
+done
+exit 0
+RESTORE
+    $SUDO_CMD chmod +x "$restore"
+
+    local hook="/etc/pacman.d/hooks/99-retrolinux-grub.hook"
+    $SUDO_CMD mkdir -p /etc/pacman.d/hooks
+    $SUDO_CMD tee "$hook" >/dev/null <<'HOOK'
+[Trigger]
+Operation = Upgrade
+Operation = Install
+Type = File
+Target = usr/bin/grub-mkconfig
+
+[Action]
+Description = Restoring RetroLinux GRUB template...
+When = PostTransaction
+Exec = /usr/local/share/retrolinux/grub-restore.sh
+HOOK
+    rx_log_file "success" "GRUB restore hook installed"
+}
+
+disable_grub_d_scripts() {
+    # Scripts absorbed into the RetroLinux template are disabled so grub-mkconfig
+    # doesn't emit duplicate entries. 41_snapshots-btrfs still regenerates the
+    # snapshot list via grub-btrfsd; 60_memtest86+ is replaced by the template's
+    # single memtest entry.
+    for script in 30_uefi-firmware 41_snapshots-btrfs 60_memtest86+; do
+        $SUDO_CMD chmod -x "/etc/grub.d/$script" 2>/dev/null || true
+    done
+}
+
+verify_grub_cfg() {
+    local grub_cfg="/boot/grub/grub.cfg"
+    if command -v grub-script-check >/dev/null 2>&1 && [[ -f $grub_cfg ]]; then
+        if grub-script-check "$grub_cfg" 2>/dev/null; then
+            rx_log_file "success" "grub.cfg passed grub-script-check"
+        else
+            rx_log_file "error" "grub.cfg FAILED grub-script-check - the boot menu may be broken!"
+            return 1
+        fi
+    fi
+}
+
+apply_manual_entries() {
+    local store="${RETRO_CONFIG:-$HOME/.config/retro}/grub/manual-entries.cfg"
+    if [[ ! -f $store ]]; then
+        return 0
+    fi
+
+    local grub_cfg="/boot/grub/grub.cfg"
+    local out
+    out=$("$RETRO_DIR/scripts/python/grub_manual_entries.py" --apply "$grub_cfg" "$store") || {
+        rx_log_file "error" "Failed to apply manual GRUB menu entries"
+        return 1
+    }
+
+    rx_log_file "info" "Applying manual GRUB menu entries from $store"
+    printf '%s\n' "$out" | $SUDO_CMD tee "$grub_cfg" >/dev/null
+}
+
+apply_menu_order() {
+    local store="${RETRO_CONFIG:-$HOME/.config/retro}/grub/manual-entries.cfg"
+    if [[ ! -f $store ]]; then
+        return 0
+    fi
+
+    local grub_cfg="/boot/grub/grub.cfg"
+    local out
+    out=$("$RETRO_DIR/scripts/python/grub_manual_entries.py" --reorder "$grub_cfg" "$store") || {
+        rx_log_file "error" "Failed to reorder GRUB menu entries"
+        return 1
+    }
+
+    rx_log_file "info" "Applying GRUB menu entry order from $store"
+    printf '%s\n' "$out" | $SUDO_CMD tee "$grub_cfg" >/dev/null
+}
+
 get_grub_cmdline() {
     local base_params="quiet splash loglevel=3 net.ifnames=0"
     local hw_cmdline=$(RETRO_CONFIG="$RETRO_CONFIG" bash "$RETRO_DIR/scripts/driver_core.sh" --hw-cmdline 2>/dev/null)
@@ -276,14 +389,36 @@ update_grub_config() {
         fi
     fi
 
+    # Make sure the selected theme is on disk before we reference it in
+    # GRUB_THEME; otherwise GRUB falls back to the default theme silently.
+    install_grub_themes
+
     local gfxmode=$(get_var "BOOT_VIDEO_GRUB" "1920x1080")
     local theme_choice=$(get_var "GRUB_THEME_CHOICE" "retropunk")
     local os_prober=$(get_var "GRUB_OS_PROBER" "false")
     local timeout_val=$(get_var "GRUB_TIMEOUT" "10")
     local cmdline=$(get_grub_cmdline)
 
+    local driver_params=$(get_var "DRIVER_KERNEL_PARAMS" "")
+    [[ -n $driver_params ]] && cmdline="$cmdline $driver_params"
+
+    local resume_params=$(_compute_resume_params)
+    if [[ -n $resume_params ]]; then
+        IFS='|' read -r resume_dev resume_offset <<<"$resume_params"
+        if [[ -n $resume_dev && -n $resume_offset ]]; then
+            cmdline="$cmdline resume=$resume_dev resume_offset=$resume_offset"
+        fi
+    fi
+    cmdline=$(echo "$cmdline" | tr ' ' '\n' | awk '!seen[$0]++' | tr '\n' ' ' | xargs)
+
     local snapshots=$(get_var "GRUB_SNAPSHOTS_ENABLED" "true")
     rx_log_file "info" "Updating GRUB config (theme=$theme_choice, timeout=${timeout_val}s, gfxmode=$gfxmode, os_prober=$os_prober, snapshots=$snapshots)"
+
+    if [[ $snapshots == "true" ]]; then
+        $SUDO_CMD systemctl enable --now grub-btrfsd 2>/dev/null || true
+    else
+        $SUDO_CMD systemctl disable --now grub-btrfsd 2>/dev/null || true
+    fi
 
     if [[ -f $grub_defaults ]]; then
         rx_log_file "info" "Writing GRUB configuration..."
@@ -298,6 +433,24 @@ update_grub_config() {
             $SUDO_CMD sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=$timeout_val|" "$grub_defaults"
         else
             echo "GRUB_TIMEOUT=$timeout_val" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
+        fi
+
+        if grep -q "^GRUB_DEFAULT=" "$grub_defaults"; then
+            $SUDO_CMD sed -i 's|^GRUB_DEFAULT=.*|GRUB_DEFAULT=0|' "$grub_defaults"
+        else
+            echo "GRUB_DEFAULT=0" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
+        fi
+
+        if grep -q "^GRUB_DISABLE_RECOVERY=" "$grub_defaults"; then
+            $SUDO_CMD sed -i 's|^GRUB_DISABLE_RECOVERY=.*|GRUB_DISABLE_RECOVERY=true|' "$grub_defaults"
+        else
+            echo "GRUB_DISABLE_RECOVERY=true" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
+        fi
+
+        if grep -q "^GRUB_PRELOAD_MODULES=" "$grub_defaults"; then
+            $SUDO_CMD sed -i 's|^GRUB_PRELOAD_MODULES=.*|GRUB_PRELOAD_MODULES="part_gpt part_msdos"|' "$grub_defaults"
+        else
+            echo 'GRUB_PRELOAD_MODULES="part_gpt part_msdos"' | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
         fi
 
         if [[ -n $gfxmode && $gfxmode != "auto" ]]; then
@@ -343,55 +496,6 @@ update_grub_config() {
     fi
 }
 
-patch_grub_cfg() {
-    local grub_cfg="/boot/grub/grub.cfg"
-    local theme_choice=$(get_var "GRUB_THEME_CHOICE" "retropunk")
-
-    if [[ -f $grub_cfg ]]; then
-        rx_log_file "info" "Patching GRUB cfg with theme settings (theme=$theme_choice)"
-
-        local temp_cfg=$(mktemp)
-        local found_terminal_output=false
-        local patched=false
-
-        while IFS= read -r line; do
-            echo "$line" >>"$temp_cfg"
-
-            if [[ $line =~ terminal_output.*gfxterm ]] && [[ $patched == false ]]; then
-                found_terminal_output=true
-            elif [[ $found_terminal_output == true ]] && [[ $patched == false ]] && [[ -n $line ]]; then
-                local font_file=""
-
-                case "$theme_choice" in
-                    retrolinux) font_file="victor-pixel-24.pf2" ;;
-                    retropunk | *) font_file="Rajdhani_Regular_24.pf2" ;;
-                esac
-
-                rx_log_file "info" "Injecting theme font: $font_file"
-                cat >>"$temp_cfg" <<GRUB_SETTINGS
-
-if [ -f /boot/grub/themes/$theme_choice/theme.txt ]; then
-    loadfont /boot/grub/themes/$theme_choice/$font_file
-    set theme=/boot/grub/themes/$theme_choice/theme.txt
-fi
-GRUB_SETTINGS
-                patched=true
-            fi
-        done <"$grub_cfg"
-
-        if [[ $patched == true ]]; then
-            $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
-            rx_log_file "success" "GRUB cfg patched with theme settings"
-        else
-            rx_log_file "warn" "Could not patch GRUB cfg automatically (terminal_output gfxterm not found)"
-        fi
-
-        rm -f "$temp_cfg"
-    else
-        rx_log_file "error" "GRUB config not found: $grub_cfg"
-    fi
-}
-
 remove_grub_echo_messages() {
     local grub_cfg="/boot/grub/grub.cfg"
 
@@ -405,209 +509,6 @@ remove_grub_echo_messages() {
         $SUDO_CMD sed -i "/echo.*Loading initial ramdisk/d" "$grub_cfg"
 
         rx_log_file "success" "GRUB loading messages removed ($removed_count entries cleaned)"
-    else
-        rx_log_file "error" "GRUB config not found: $grub_cfg"
-    fi
-}
-
-patch_grub_menu_entries() {
-    local grub_cfg="/boot/grub/grub.cfg"
-
-    if [[ -f $grub_cfg ]]; then
-        rx_log_file "info" "Patching GRUB menu entries..."
-
-        local arch_count=$(grep -c "Arch Linux\|GNU/Linux\|Archlinux" "$grub_cfg" 2>/dev/null || echo "0")
-        rx_log_file "info" "Replacing $arch_count Arch Linux references with RetroLinux"
-
-        $SUDO_CMD sed -i 's/Arch Linux/RetroLinux/g' "$grub_cfg"
-        $SUDO_CMD sed -i 's/GNU\/Linux/RetroLinux/g' "$grub_cfg"
-        $SUDO_CMD sed -i 's/Archlinux/RetroLinux/g' "$grub_cfg"
-        $SUDO_CMD sed -i 's/RetroLinux Linux/RetroLinux/g' "$grub_cfg"
-
-        local temp_grub=$(mktemp)
-        local skip_block=0
-        local brace_count=0
-        local removed_entries=0
-
-        while IFS= read -r line; do
-            if [[ $skip_block -eq 0 ]] && [[ $line =~ ^submenu\ \'Advanced\ options\ for ]]; then
-                skip_block=1
-                local open_b=$(echo "$line" | tr -cd '{' | wc -c)
-                local close_b=$(echo "$line" | tr -cd '}' | wc -c)
-                brace_count=$((open_b - close_b))
-                ((removed_entries++))
-                continue
-            fi
-
-            if [[ $skip_block -eq 1 ]]; then
-                local open_braces=$(echo "$line" | tr -cd '{' | wc -c)
-                local close_braces=$(echo "$line" | tr -cd '}' | wc -c)
-                brace_count=$((brace_count + open_braces - close_braces))
-
-                if [[ $brace_count -le 0 ]]; then
-                    skip_block=0
-                fi
-                continue
-            fi
-
-            echo "$line" >>"$temp_grub"
-        done <"$grub_cfg"
-
-        $SUDO_CMD cp "$temp_grub" "$grub_cfg"
-        rm -f "$temp_grub"
-
-        rx_log_file "success" "GRUB menu entries updated to RetroLinux ($removed_entries submenu entries removed)"
-    else
-        rx_log_file "error" "GRUB config not found: $grub_cfg"
-    fi
-}
-
-add_shutdown_reboot_entries() {
-    local grub_cfg="/boot/grub/grub.cfg"
-
-    if [[ -f $grub_cfg ]]; then
-        rx_log_file "info" "Adding shutdown and reboot entries..."
-
-        local temp_grub=$(mktemp)
-        local skip_block=0
-        local skip_uefi=false
-        local skip_shutdown=false
-        local skip_reboot=false
-        local skip_memtest=false
-        local skip_windows=false
-        local if_depth=0
-        local removed_uefi=false
-        local removed_shutdown=false
-        local removed_reboot=false
-        local removed_memtest=false
-        local removed_windows=false
-
-        while IFS= read -r line; do
-            if [[ $line =~ ^if.*grub_platform.*efi ]] && [[ $skip_uefi == false ]]; then
-                skip_uefi=true
-                if_depth=1
-                removed_uefi=true
-                continue
-            fi
-
-            if [[ $skip_uefi == true ]]; then
-                if [[ $line =~ ^if ]]; then
-                    ((if_depth++))
-                fi
-                if [[ $line =~ ^fi$ ]]; then
-                    ((if_depth--))
-                    if [[ $if_depth -le 0 ]]; then
-                        skip_uefi=false
-                    fi
-                fi
-                continue
-            fi
-
-            if [[ $line =~ ^menuentry.*System\ shutdown ]]; then
-                skip_shutdown=true
-                skip_block=0
-                removed_shutdown=true
-                continue
-            fi
-
-            if [[ $skip_shutdown == true ]]; then
-                local open_braces=$(echo "$line" | tr -cd '{' | wc -c)
-                local close_braces=$(echo "$line" | tr -cd '}' | wc -c)
-                skip_block=$((skip_block + open_braces - close_braces))
-
-                if [[ $skip_block -le 0 ]]; then
-                    skip_shutdown=false
-                fi
-                continue
-            fi
-
-            if [[ $line =~ ^menuentry.*System\ restart ]]; then
-                skip_reboot=true
-                skip_block=0
-                removed_reboot=true
-                continue
-            fi
-
-            if [[ $skip_reboot == true ]]; then
-                local open_braces=$(echo "$line" | tr -cd '{' | wc -c)
-                local close_braces=$(echo "$line" | tr -cd '}' | wc -c)
-                skip_block=$((skip_block + open_braces - close_braces))
-
-                if [[ $skip_block -le 0 ]]; then
-                    skip_reboot=false
-                fi
-                continue
-            fi
-
-            if [[ $line =~ ^[[:space:]]*(if|elif).*[Mm]emtest ]] || [[ $line =~ ^[[:space:]]*menuentry.*[Mm]emtest ]]; then
-                skip_memtest=true
-                skip_block=0
-                removed_memtest=true
-                continue
-            fi
-
-            if [[ $skip_memtest == true ]]; then
-                local open_braces=$(echo "$line" | tr -cd '{' | wc -c)
-                local close_braces=$(echo "$line" | tr -cd '}' | wc -c)
-                skip_block=$((skip_block + open_braces - close_braces))
-
-                if [[ $skip_block -le 0 ]]; then
-                    skip_memtest=false
-                fi
-                continue
-            fi
-
-            if [[ $line =~ ^[[:space:]]*menuentry.*[Ww]indows ]]; then
-                skip_windows=true
-                skip_block=0
-                removed_windows=true
-                continue
-            fi
-
-            if [[ $skip_windows == true ]]; then
-                local open_braces=$(echo "$line" | tr -cd '{' | wc -c)
-                local close_braces=$(echo "$line" | tr -cd '}' | wc -c)
-                skip_block=$((skip_block + open_braces - close_braces))
-
-                if [[ $skip_block -le 0 ]]; then
-                    skip_windows=false
-                fi
-                continue
-            fi
-
-            echo "$line" >>"$temp_grub"
-        done <"$grub_cfg"
-
-        local added_entries=""
-        [[ $removed_uefi == true ]] && added_entries+="UEFI firmware "
-        [[ $removed_shutdown == true ]] && added_entries+="shutdown "
-        [[ $removed_reboot == true ]] && added_entries+="reboot "
-        [[ $removed_memtest == true ]] && added_entries+="memtest86+ "
-        [[ $removed_windows == true ]] && added_entries+="windows "
-
-        cat >>"$temp_grub" <<'UEFI_ENTRY'
-
-if [ "${grub_platform}" == "efi" ]; then
-    menuentry 'UEFI Firmware Settings' --class efi --id 'uefi-firmware' {
-        fwsetup
-    }
-fi
-
-menuentry 'System shutdown' --class shutdown --class poweroff {
-    echo 'System shutting down...'
-    halt
-}
-
-menuentry 'System restart' --class reboot --class restart {
-    echo 'System rebooting...'
-    reboot
-}
-UEFI_ENTRY
-
-        $SUDO_CMD cp "$temp_grub" "$grub_cfg"
-        rm -f "$temp_grub"
-
-        rx_log_file "success" "GRUB entries refreshed: ${added_entries:-all}"
     else
         rx_log_file "error" "GRUB config not found: $grub_cfg"
     fi
@@ -635,7 +536,7 @@ set_default_kernel() {
     local patched_initrd=false
 
     while IFS= read -r line; do
-        if [[ $in_first_entry == false && $line =~ ^menuentry\ \'RetroLinux\' ]]; then
+        if [[ $in_first_entry == false && $line =~ ^menuentry\ \'RetroLinux ]]; then
             in_first_entry=true
             brace_depth=0
         fi
@@ -697,85 +598,33 @@ patch_snapshot_entry() {
         return 1
     fi
 
+    # Safety net: the template emits the snapshots submenu with the right title
+    # and --class, so this only normalizes a stock grub-btrfs submenu when the
+    # user regenerates with a plain `grub-mkconfig` (which would otherwise
+    # produce "RetroLinux snapshots"). Memtest/os-prober entries are emitted by
+    # the template / 30_os-prober and must NOT be injected here.
     rx_log_file "info" "Patching snapshot submenu entry..."
 
     local patched=false
-    local in_snapshot=false
-    local snapshot_depth=0
-    local memtest_injected=false
     local temp_cfg=$(mktemp)
 
     while IFS= read -r line; do
-        if [[ $in_snapshot == false && $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
-            line="${line/\{/--class retrolinux \{}"
-            line="${line/\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
-            line="${line/\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
-            echo "$line" >>"$temp_cfg"
-            in_snapshot=true
-            snapshot_depth=$(echo "$line" | tr -cd '{' | wc -c)
-            snapshot_depth=$((snapshot_depth - $(echo "$line" | tr -cd '}' | wc -c)))
-            patched=true
-        elif [[ $in_snapshot == true ]]; then
-            local open_b=$(echo "$line" | tr -cd '{' | wc -c)
-            local close_b=$(echo "$line" | tr -cd '}' | wc -c)
-            snapshot_depth=$((snapshot_depth + open_b - close_b))
-            echo "$line" >>"$temp_cfg"
-            if [[ $snapshot_depth -le 0 && $memtest_injected == false ]]; then
-                memtest_injected=true
-                local os_prober_enabled=$(get_var "GRUB_OS_PROBER" "false")
-                if [[ $os_prober_enabled == "true" ]] && command -v os-prober >/dev/null 2>&1; then
-                    local os_prober_output
-                    os_prober_output=$(timeout 10 sudo os-prober 2>/dev/null || true)
-                    if [[ -z $os_prober_output ]]; then
-                        rx_log_file "info" "OS prober: no other operating systems detected"
-                    else
-                        local detected_list=""
-                        while IFS= read -r probe_line; do
-                            [[ -z $probe_line ]] && continue
-                            local os_name=$(echo "$probe_line" | cut -d: -f3)
-                            local os_title=$(echo "$probe_line" | cut -d: -f2)
-                            [[ -n $detected_list ]] && detected_list="${detected_list}, "
-                            detected_list="${detected_list}${os_name} (${os_title})"
-                            if [[ $os_name == "Windows" ]]; then
-                                local efi_path="${probe_line%%:*}"
-                                efi_path="${efi_path#*@}"
-                                local efi_file="${efi_path#/}"
-                                cat >>"$temp_cfg" <<WINDOWS_ENTRY
-
-menuentry "Windows Boot Manager" --class windows --class os {
-    insmod part_gpt
-    insmod fat
-    search --file --no-floppy --set=root /${efi_file}
-    chainloader /${efi_file}
-}
-WINDOWS_ENTRY
-                            fi
-                        done <<<"$os_prober_output"
-                        rx_log_file "success" "OS prober detected: ${detected_list}"
-                    fi
-                fi
-                cat >>"$temp_cfg" <<'MEMTEST'
-
-menuentry "Run Memtest86+ (RAM test)" --class memtest86 --class memtest --class gnu --class tool {
-    set gfxpayload=1920x1080,1024x768
-    if [ -f "/boot/memtest86+/memtest.efi" ]; then
-        linux /boot/memtest86+/memtest.efi
-    else
-        linux /boot/memtest86+/memtest
-    fi
-}
-MEMTEST
+        if [[ $line =~ ^[[:space:]]*submenu\ \'Retro[[:space:]]*Linux\ [Ss]napshots ]]; then
+            line="${line//\'Retro Linux snapshots\'/\'RetroLinux Snapshots\'}"
+            line="${line//\'RetroLinux snapshots\'/\'RetroLinux Snapshots\'}"
+            if [[ $line != *--class*retrolinux* ]]; then
+                line="${line/\{/--class retrolinux \{}"
             fi
-        else
-            echo "$line" >>"$temp_cfg"
+            patched=true
         fi
+        echo "$line" >>"$temp_cfg"
     done <"$grub_cfg"
 
     if [[ $patched == true ]]; then
         $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
         rx_log_file "success" "Snapshot submenu entry patched"
     else
-        rx_log_file "warn" "Could not patch snapshot submenu entry"
+        rx_log_file "info" "No snapshot submenu entry found to patch"
     fi
 
     rm -f "$temp_cfg"
@@ -942,7 +791,7 @@ patch_kernel_cmdline() {
     local patched=false
 
     while IFS= read -r line; do
-        if [[ $in_entry == false && $line =~ ^menuentry\ \'RetroLinux\' ]]; then
+        if [[ $in_entry == false && $line =~ ^menuentry\ \'RetroLinux ]]; then
             in_entry=true
             echo "$line" >>"$temp_cfg"
         elif [[ $in_entry == true && $line =~ ^[[:space:]]*linux[[:space:]] ]]; then
@@ -986,20 +835,21 @@ regenerate_grub() {
 
     rx_log_file "info" "Regenerating GRUB configuration..."
 
+    # Themes + the RetroLinux menu template must be in place before we write
+    # /etc/default/grub and run grub-mkconfig, so every regeneration produces
+    # the same deterministic menu.
+    install_grub_themes
+    install_grub_template
+    disable_grub_d_scripts
+
     setup_hibernation
+
+    update_grub_config
 
     if ! command -v grub-mkconfig >/dev/null 2>&1; then
         rx_log_file "error" "grub-mkconfig not found"
         return 1
     fi
-
-    rx_log_file "info" "Running grub-mkconfig -o /boot/grub/grub.cfg"
-    if ! $SUDO_CMD grub-mkconfig -o /boot/grub/grub.cfg >/dev/null; then
-        rx_log_file "error" "GRUB regeneration failed"
-        return 1
-    fi
-
-    rx_log_file "success" "GRUB config regenerated"
 
     local target_kernel=$(get_var "GRUB_KERNEL" "linux")
     _grub_ensure_kernel "$target_kernel" || return 1
@@ -1023,10 +873,14 @@ regenerate_grub() {
         fi
     fi
 
-    rx_log_file "info" "Applying GRUB patches..."
-    patch_grub_cfg
-    patch_grub_menu_entries
-    add_shutdown_reboot_entries
+    rx_log_file "info" "Running grub-mkconfig -o /boot/grub/grub.cfg"
+    if ! $SUDO_CMD grub-mkconfig -o /boot/grub/grub.cfg >/dev/null; then
+        rx_log_file "error" "GRUB regeneration failed"
+        return 1
+    fi
+
+    # The snapshot submenu is generated dynamically by grub-btrfsd and the main
+    # entry's kernel comes from the template; only patch those two parts.
     remove_grub_echo_messages
     if [[ $remove_snapshots == true ]]; then
         remove_snapshot_entry
@@ -1035,22 +889,15 @@ regenerate_grub() {
     fi
     set_default_kernel
 
-    local resume_params=$(_compute_resume_params)
-    if [[ -n $resume_params ]]; then
-        IFS='|' read -r resume_dev resume_offset <<<"$resume_params"
-        if [[ -n $resume_dev && -n $resume_offset ]]; then
-            add_resume_params "$resume_dev" "$resume_offset"
-        fi
-    fi
+    # Re-apply the user's manually edited menu entries (from the settings
+    # boot menu editor) so they survive the deterministic regeneration.
+    apply_manual_entries
+    # Then apply the drag-and-drop order the user picked in the settings GUI.
+    apply_menu_order
 
-    local driver_params=$(get_var "DRIVER_KERNEL_PARAMS" "")
-    if [[ -n $driver_params ]]; then
-        patch_kernel_cmdline "$driver_params"
-    fi
+    verify_grub_cfg
 
-    sudo sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/ { /"$/! s/$/"/ }' /etc/default/grub 2>/dev/null || true
-
-    rx_log_file "success" "GRUB configuration regenerated and patched"
+    rx_log_file "success" "GRUB configuration regenerated"
 }
 
 if [[ $# -gt 0 ]]; then
@@ -1063,6 +910,8 @@ if [[ $# -gt 0 ]]; then
         "--apply-resume") add_resume_params "$2" "$3" ;;
         "--apply-kernel-params") apply_kernel_params "$2" ;;
         "--regenerate") regenerate_grub "$2" ;;
+        "--apply-manual-entries") apply_manual_entries ;;
+        "--apply-menu-order") apply_menu_order ;;
         "--update-config") update_grub_config ;;
         "--themes") install_grub_themes ;;
         "--ensure-kernel") _grub_ensure_kernel "$2" ;;
