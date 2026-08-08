@@ -2,6 +2,7 @@
 
 source "$RETRO_DIR/lib/help.sh"
 source "$RETRO_DIR/lib/helpers.sh"
+source "$RETRO_DIR/lib/setup.sh"
 source "$RETRO_DIR/lib/wallpaper.sh"
 
 cmd_wallpaper() {
@@ -290,12 +291,19 @@ cmd_wallpaper() {
             ;;
 
         "res" | "setup")
+            rx_setup_parse "$@"
+
             local active_mon=$(hyprctl activeworkspace -j | jq -r '.monitor')
             local mon_info=$(hyprctl monitors -j | jq -r --arg m "$active_mon" '.[] | select(.name==$m)')
 
             local mon_desc=$(echo "$mon_info" | jq -r '.description')
             local current_w=$(echo "$mon_info" | jq -r '.width')
             local current_h=$(echo "$mon_info" | jq -r '.height')
+
+            local native_w native_h native_res=""
+            native_w=$(echo "$mon_info" | jq -r '(.width/.scale)|0floor')
+            native_h=$(echo "$mon_info" | jq -r '(.height/.scale)|0floor')
+            [[ -n $native_w && -n $native_h ]] && native_res="${native_w}x${native_h}"
 
             local res_map=$(get_var "WALL_RES_MAP")
             local custom_res=""
@@ -308,6 +316,26 @@ cmd_wallpaper() {
 
             if [[ -n $custom_res ]]; then
                 active_res="$custom_res"
+            fi
+
+            if [[ $RX_SETUP_YES == "true" || $SKIP_PROMPT == "true" || $RX_SETUP_MODE == "non-interactive" ]]; then
+                if [[ -n $res_map && $res_map != "null" ]]; then
+                    rx_log "info" "Keeping current wallpaper resolution configuration."
+                    return 0
+                fi
+
+                local cap_res="$native_res"
+                [[ -z $cap_res ]] && cap_res="$active_res"
+                local entry="${mon_desc}|${cap_res}"
+                set_var "WALL_RES_MAP" "$entry"
+                rx_log "success" "Wallpapers resolution capped at native ${PINK}${cap_res}${RESET}."
+
+                rx_log "info" "Analyzing repository and generating optimized video feeds..."
+                bash "$wall_script" --optimize
+
+                rx_log "info" "Restarting wallpaper engine to apply changes..."
+                bash "$wall_script" --restore
+                return 0
             fi
 
             rx_log "info" "Configuring the display this terminal is running on:"
@@ -466,7 +494,7 @@ cmd_wallpaper() {
             rx_help_cmd "collection [name|list]" "View or switch wallpaper collection"
             rx_help_cmd "cache [value]" "Build animated wallpaper cache"
             rx_help_cmd "restore" "Restore previous wallpaper"
-            rx_help_cmd "res" "Set wallpaper render resolution"
+            rx_help_cmd "res|setup [--yes|-y]" "Set wallpaper render resolution (use -y for native defaults)"
             rx_help_cmd "optimize" "Optimize video feeds for resolution"
             rx_help_cmd "status" "Show active wallpaper info"
             rx_help_cmd "gpu [mode]" "Configure GPU offloading for mpvpaper"

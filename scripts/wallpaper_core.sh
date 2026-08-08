@@ -64,7 +64,9 @@ slideshow_next() {
 
 optimize_wallpapers() {
     local target_res=$(get_var "WALL_RES_MAP")
-    if [[ -z $target_res || $target_res == "null" ]]; then
+    if [[ -n $target_res && $target_res != "null" ]]; then
+        target_res=$(echo "$target_res" | tr ',' '\n' | sed 's/^.*|//' | grep -E '^[0-9]+x[0-9]+$' | head -1)
+    else
         target_res=$(get_monitor_resolutions | head -1)
     fi
     local target_w="${target_res%x*}"
@@ -128,7 +130,7 @@ get_monitor_resolutions() {
     local res_map=$(get_var "WALL_RES_MAP")
 
     if [[ -n $res_map && $res_map != "null" ]]; then
-        echo "$res_map"
+        echo "$res_map" | tr ',' '\n' | sed 's/^[^|]*|//'
         return 0
     fi
 
