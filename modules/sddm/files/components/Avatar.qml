@@ -50,6 +50,13 @@ Rectangle {
             }
         }
 
+        Component.onCompleted: {
+            if (!parent.source || parent.source === "") {
+                source = Config.getIcon("user-default");
+                faceEffects.colorization = 1;
+            }
+        }
+
         // Border
         Rectangle {
             anchors.fill: parent

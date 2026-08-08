@@ -40,5 +40,28 @@ EOF
     rx_log "success" "SDDM configured to use Silent theme"
 }
 
+install_face_icons() {
+    local faces_dir="/usr/share/sddm/faces"
+    local user_home=""
+
+    mkdir -p "$faces_dir"
+    rm -f "$faces_dir/"*.face.icon
+
+    rx_log "info" "Syncing user face icons for the greeter..."
+
+    for user_home in /home/*; do
+        [[ -d $user_home ]] || continue
+        local user="$(basename "$user_home")"
+        if [[ -f "$user_home/.face.icon" ]]; then
+            cp -f "$user_home/.face.icon" "$faces_dir/${user}.face.icon"
+            chmod 644 "$faces_dir/${user}.face.icon"
+            rx_log "success" "Face icon installed for ${PINK}${user}${RESET}"
+        fi
+    done
+
+    rx_log "success" "Face icons synced to $faces_dir"
+}
+
 install_silent_sddm
 configure_sddm
+install_face_icons
