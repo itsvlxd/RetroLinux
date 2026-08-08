@@ -8,7 +8,6 @@ grep
 rsync
 unzip
 expect
-bazaar
 udisks2
 usbutils
 gstreamer
@@ -43,6 +42,13 @@ xdg-desktop-portal
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 
+# Fonts
+ttf-dejavu
+noto-fonts
+noto-fonts-emoji
+noto-fonts-cjk
+ttf-dejavu-nerd
+
 # Icons
 papirus-folders
 papirus-icon-theme
@@ -68,6 +74,7 @@ python-hyprland-state
 python-pygobject-stubs
 
 # Apps
+bazaar
 loupe
 mpv
 
