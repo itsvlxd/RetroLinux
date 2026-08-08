@@ -422,7 +422,8 @@ class GrubPage:
 
     def _on_regen(self, _btn) -> None:
         self._window.show_toast("Regenerating GRUB config\u2026", timeout=3)
-        self._launch_kitty("sudo grub-mkconfig -o /boot/grub/grub.cfg && retro grub apply")
+        self._persist_values()
+        self._launch_kitty("retro grub apply")
         for delay in (6, 14, 26):
             GLib.timeout_add(delay * 1000, self._rebuild_entries)
 
@@ -478,9 +479,7 @@ class GrubPage:
         vals["snapshots"] = "true" if self._snapshots.get_active() else "false"
         return vals
 
-    def mark_saved(self) -> None:
-        if not self._dirty:
-            return
+    def _persist_values(self) -> None:
         from lib.python.variable import set_var
 
         vals = self._get_current_values()
@@ -494,6 +493,10 @@ class GrubPage:
         self._orig.update(vals)
         self._dirty = False
 
+    def mark_saved(self) -> None:
+        if not self._dirty:
+            return
+        self._persist_values()
         self._launch_kitty("retro grub apply")
 
     def discard(self) -> None:

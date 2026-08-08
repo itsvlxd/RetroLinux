@@ -395,6 +395,7 @@ update_grub_config() {
 
     local gfxmode=$(get_var "BOOT_VIDEO_GRUB" "1920x1080")
     local theme_choice=$(get_var "GRUB_THEME_CHOICE" "retropunk")
+    [[ -z $theme_choice ]] && theme_choice="retropunk"
     local os_prober=$(get_var "GRUB_OS_PROBER" "false")
     local timeout_val=$(get_var "GRUB_TIMEOUT" "10")
     local cmdline=$(get_grub_cmdline)
