@@ -53,6 +53,7 @@ libfido2
 libusb-compat
 linux
 linux-atm
+linux-firmware
 linux-firmware-amdgpu
 linux-firmware-intel
 linux-firmware-realtek
