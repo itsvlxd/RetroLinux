@@ -65,6 +65,29 @@ rx_setup_parse() {
     fi
 }
 
+_rx_split_on_pipe() {
+    local s="$1"
+    local buf=""
+    local depth=0
+    local ch
+    local -i i
+
+    for (( i = 0; i < ${#s}; i++ )); do
+        ch="${s:i:1}"
+        if [[ $ch == "|" && $depth -eq 0 ]]; then
+            printf '%s\n' "$buf"
+            buf=""
+        else
+            buf+="$ch"
+            case "$ch" in
+                "(") depth=$((depth + 1)) ;;
+                ")") depth=$((depth - 1)) ;;
+            esac
+        fi
+    done
+    printf '%s\n' "$buf"
+}
+
 _rx_setup_get_rules_for_key() {
     local target_key="$1"
     local validation_rules="$2"
@@ -73,7 +96,7 @@ _rx_setup_get_rules_for_key() {
         return
     fi
 
-    IFS='|' read -ra pieces <<< "$validation_rules"
+    mapfile -t pieces < <(_rx_split_on_pipe "$validation_rules")
     local in_key=false
     local result=""
 
@@ -100,7 +123,7 @@ _rx_setup_describe_rules() {
         return
     fi
 
-    IFS='|' read -ra rules <<< "$rules_string"
+    mapfile -t rules < <(_rx_split_on_pipe "$rules_string")
     local parts=()
     for rule in "${rules[@]}"; do
         case "$rule" in
@@ -155,13 +178,13 @@ rx_setup_validate() {
     fi
 
     if [[ $RX_SETUP_MODE == "non-interactive" && -n $validation_rules ]]; then
-        IFS='|' read -ra rules_array <<< "$validation_rules"
+        mapfile -t rules_array < <(_rx_split_on_pipe "$validation_rules")
         for rule in "${rules_array[@]}"; do
             local key="${rule%%:*}"
             local rules="${rule#*:}"
             local value="${RX_SETUP_OPTS[$key]:-}"
 
-            IFS='|' read -ra key_rules <<< "$rules"
+            mapfile -t key_rules < <(_rx_split_on_pipe "$rules")
             for kr in "${key_rules[@]}"; do
                 case "$kr" in
                     required)
