@@ -5,6 +5,12 @@ if [[ ! -d /opt/spotify ]]; then
     return 1
 fi
 
+spicetify_config="${XDG_CONFIG_HOME:-$HOME/.config}/spicetify"
+if [[ -d $spicetify_config ]]; then
+    rx_log "info" "Spicetify already configured — skipping Spotify launch and re-initialization"
+    return 0
+fi
+
 rx_log "info" "Launching Spotify — please log in to generate your profile..."
 rx_log "info" "Waiting for ~/.config/spotify/prefs to appear..."
 
