@@ -8,6 +8,7 @@ grep
 rsync
 unzip
 expect
+bazaar
 udisks2
 usbutils
 gstreamer
