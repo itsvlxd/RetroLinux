@@ -75,7 +75,7 @@ run_postinstall() {
         sudo ln -snf "$HOME/.config/$_dir" "/root/.config/$_dir"
     done
 
-    retro grub apply -y
+    retro grub setup --needed -y -o "theme=${GRUB_THEME_CHOICE:-retropunk},resolution=${BOOT_VIDEO_GRUB:-1920x1080},timeout=${GRUB_TIMEOUT:-10},os-prober=${GRUB_OS_PROBER:-false},snapshots=${GRUB_SNAPSHOTS_ENABLED:-true},kernel=${GRUB_KERNEL:-linux}"
 
     retro power setup --needed -o "profile=recommended"
     retro font setup --needed -y
