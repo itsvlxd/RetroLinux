@@ -36,6 +36,42 @@ if command -v gsettings >/dev/null 2>&1; then
     fi
 fi
 
+hide_nm_applet() {
+    local found=""
+    local dir
+    for dir in /etc/xdg/autostart "$HOME/.config/autostart" /usr/share/autostart; do
+        if [[ -f "$dir/nm-applet.desktop" ]]; then
+            found="$dir/nm-applet.desktop"
+            break
+        fi
+    done
+
+    if [[ -z $found ]]; then
+        rx_log "info" "nm-applet.desktop not found; nothing to hide"
+        return 0
+    fi
+
+    if grep -q '^Hidden=true' "$found" 2>/dev/null; then
+        rx_log "success" "nm-applet.desktop already hidden ($found)"
+        return 0
+    fi
+
+    mkdir -p "$HOME/.config/autostart"
+    cat >"$HOME/.config/autostart/nm-applet.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=NetworkManager
+Hidden=true
+EOF
+    rx_log "success" "nm-applet hidden via user autostart override"
+
+    if pgrep -x nm-applet >/dev/null 2>&1; then
+        pkill -x nm-applet 2>/dev/null || true
+        rx_log "info" "Stopped running nm-applet"
+    fi
+}
+hide_nm_applet
+
 setup_cronie
 retro_fix_permissions
 
