@@ -71,6 +71,7 @@ class FontsPage:
         self._orig_active: dict[str, str] = {}
         self._fonts_dirty = False
         self._on_dirty_changed = None
+        self._suppress_combo = False
 
         self._combo_rows: dict[str, Adw.ComboRow] = {}
         self._font_list: Gtk.ListBox
@@ -132,6 +133,7 @@ class FontsPage:
             "emoji": get_var("RETRO_FONT_EMOJI") or "",
         }
         self._orig_active = dict(self._active)
+        self._fonts_dirty = False
 
         # Sort: active fonts first (main → nerd → emoji), then alphabetical
         self._fonts.sort(key=lambda f: (
@@ -166,6 +168,8 @@ class FontsPage:
             self._combo_rows[cat_id] = row
 
     def _on_combo_changed(self, row: Adw.ComboRow, _pspec, cat_id: str) -> None:
+        if self._suppress_combo:
+            return
         idx = row.get_selected()
         if 0 <= idx < len(self._fonts):
             self._active[cat_id] = self._fonts[idx]
@@ -179,17 +183,21 @@ class FontsPage:
         self._rebuild_font_list()
 
     def _refresh_combo_rows(self) -> None:
-        for cat_id, row in self._combo_rows.items():
-            current = self._active.get(cat_id, "")
-            model = Gtk.StringList.new(self._fonts) if self._fonts else Gtk.StringList.new([])
-            row.set_model(model)
-            if current:
-                for i, f in enumerate(self._fonts):
-                    if f.lower() == current.lower():
-                        row.set_selected(i)
-                        break
-            else:
-                row.set_selected(0)
+        self._suppress_combo = True
+        try:
+            for cat_id, row in self._combo_rows.items():
+                current = self._active.get(cat_id, "")
+                model = Gtk.StringList.new(self._fonts) if self._fonts else Gtk.StringList.new([])
+                row.set_model(model)
+                if current:
+                    for i, f in enumerate(self._fonts):
+                        if f.lower() == current.lower():
+                            row.set_selected(i)
+                            break
+                else:
+                    row.set_selected(0)
+        finally:
+            self._suppress_combo = False
 
     # ── Installed Fonts ──
 
