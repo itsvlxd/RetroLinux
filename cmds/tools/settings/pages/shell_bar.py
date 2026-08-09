@@ -304,15 +304,17 @@ class ShellBarPage:
     # ── Lifecycle ──
 
     def is_dirty(self) -> bool:
-        return self._data != self._saved
+        return any(self._data.get(key) != self._saved.get(key) for key in self._rows)
 
     def mark_saved(self) -> None:
         if not self.is_dirty():
             return
-        save_bar(self._data)
-        self._saved = dict(self._data)
+        current = load_bar()
+        current.update({key: self._data.get(key, BAR_DEFAULTS[key]) for key in self._rows})
+        save_bar(current)
+        self._saved = dict(current)
         for key, mrow in self._rows.items():
-            mrow.set_baseline(self._data.get(key, BAR_DEFAULTS[key]))
+            mrow.set_baseline(self._saved.get(key, BAR_DEFAULTS[key]))
 
     def discard(self) -> None:
         self._data = dict(self._saved)
