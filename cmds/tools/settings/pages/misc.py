@@ -1,12 +1,16 @@
-"""Shell Misc page — OCR, Weather, and Performance settings.
+"""Miscellaneous page — Hyprland misc options plus OCR, Weather, Performance, and capture settings.
 
-Configs:
-- OCR  → ``system.json``  (only the ``ocr`` sub-object is managed)
-- Weather     → ``weather.json``
+Sections:
+- Behavior / Startup → Hyprland's ``misc`` schema group (embedded via
+  ``window.build_schema_group_widgets``; keys route to this page through
+  ``parent_page: "misc"``).
+- OCR       → ``system.json``  (only the ``ocr`` sub-object is managed)
+- Weather   → ``weather.json``
 - Performance → ``performance.json``
+- Screenshot & Recording / Emoji → ``tools.json``
 
-All three files are watched by the shell's ``FileView`` with ``watchChanges``,
-so changes apply live without a shell restart.
+All shell JSON files are watched by the shell's ``FileView`` with
+``watchChanges``, so changes apply live without a shell restart.
 """
 
 from collections.abc import Iterable
@@ -55,8 +59,8 @@ _PERF_TOGGLES = [
 ]
 
 
-class ShellMiscPage:
-    """Shell miscellaneous settings."""
+class MiscPage:
+    """Miscellaneous settings — Hyprland behavior plus shell extras."""
 
     def __init__(self, window: "RetroSettingsWindow"):
         self._window = window
@@ -87,6 +91,10 @@ class ShellMiscPage:
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar, _page_box, content_box, _scrolled = make_page_layout(header=header)
+
+        # ── Hyprland misc schema group (Behavior, Startup) ──
+        for pref_group in self._window.build_schema_group_widgets("misc"):
+            content_box.append(pref_group)
 
         # ── OCR ──
         ocr_group = Adw.PreferencesGroup(
@@ -576,10 +584,10 @@ class ShellMiscPage:
             changed.append("Screenshot & Recording")
         if changed:
             yield PendingChange(
-                category="Shell Misc",
+                category="Miscellaneous",
                 title="Miscellaneous",
                 subtitle=", ".join(changed[:3]),
-                navigate_to="shell_misc",
+                navigate_to="misc",
                 icon=MISC_ICON,
                 kind="modified",
                 revert=self.discard,
@@ -587,19 +595,19 @@ class ShellMiscPage:
 
     def get_search_entries(self) -> list[dict]:
         return [
-            {"key": "shell_misc:ocr", "label": "OCR Languages",
+            {"key": "misc:ocr", "label": "OCR Languages",
              "description": "Optical character recognition language toggles",
-             "_group_id": "shell_misc", "_group_label": "Miscellaneous", "_section_label": "OCR"},
-            {"key": "shell_misc:weather", "label": "Weather",
+             "_group_id": "misc", "_group_label": "Miscellaneous", "_section_label": "OCR"},
+            {"key": "misc:weather", "label": "Weather",
              "description": "Weather widget location and temperature unit",
-             "_group_id": "shell_misc", "_group_label": "Miscellaneous", "_section_label": "Weather"},
-            {"key": "shell_misc:performance", "label": "Performance",
+             "_group_id": "misc", "_group_label": "Miscellaneous", "_section_label": "Weather"},
+            {"key": "misc:performance", "label": "Performance",
              "description": "Visual effects toggles for better performance",
-             "_group_id": "shell_misc", "_group_label": "Miscellaneous", "_section_label": "Performance"},
-            {"key": "shell_misc:tools", "label": "Screenshot & Recording",
+             "_group_id": "misc", "_group_label": "Miscellaneous", "_section_label": "Performance"},
+            {"key": "misc:tools", "label": "Screenshot & Recording",
              "description": "Capture settings, save locations, and timed countdown",
-             "_group_id": "shell_misc", "_group_label": "Miscellaneous", "_section_label": "Screenshot & Recording"},
+             "_group_id": "misc", "_group_label": "Miscellaneous", "_section_label": "Screenshot & Recording"},
         ]
 
 
-__all__ = ["ShellMiscPage"]
+__all__ = ["MiscPage"]

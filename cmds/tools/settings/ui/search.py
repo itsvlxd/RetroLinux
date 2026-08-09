@@ -22,6 +22,10 @@ class SearchResultRow(Adw.ActionRow):
         self.option_key = option["key"]
         self.group_id = option.get("_group_id", "")
 
+        # Page results carry their page icon as a prefix
+        if icon_name := option.get("_icon"):
+            self.add_prefix(Gtk.Image.new_from_icon_name(icon_name))
+
         # Show the key as a dim suffix
         key_label = Gtk.Label(label=option["key"])
         key_label.add_css_class("dim-label")

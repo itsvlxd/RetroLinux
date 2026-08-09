@@ -1218,6 +1218,8 @@
       "id": "misc",
       "label": "Miscellaneous",
       "icon": "applications-system-symbolic",
+      "hidden": true,
+      "parent_page": "misc",
       "sections": [
         {
           "id": "misc",

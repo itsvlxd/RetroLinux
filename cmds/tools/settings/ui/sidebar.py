@@ -240,7 +240,6 @@ class Sidebar:
         add_row(shell, "shell_desktop", "Desktop", DESKTOP_ICON)
         add_row(shell, "shell_lock", "Lockscreen", LOCK_ICON)
         add_row(shell, "shell_presets", "Presets", PRESETS_ICON)
-        add_row(shell, "shell_misc", "Miscellaneous", MISC_ICON)
 
         input_cat = new_category("Input")
         add_row(input_cat, "binds", "Keybinds", BINDS_ICON)
@@ -285,9 +284,7 @@ class Sidebar:
         add_row(advanced, "logs", "Logs", LOGS_ICON)
         add_schema_row(advanced, "xwayland")
         add_schema_row(advanced, "ecosystem")
-        add_schema_row(advanced, "misc")
-
-        # Pinned list is NOT added to _lists so select_first() ignores it.
+        add_row(advanced, "misc", "Miscellaneous", MISC_ICON)
 
     def select_first(self) -> None:
         """Select the first row in the first list."""

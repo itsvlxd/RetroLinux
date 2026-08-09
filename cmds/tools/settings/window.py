@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from settings.pages.layer_rules import LayerRulesPage
     from settings.pages.layouts import LayoutsPage
     from settings.pages.logs import LogsPage
+    from settings.pages.misc import MiscPage
     from settings.pages.monitors import MonitorsPage
     from settings.pages.network import NetworkPage
     from settings.pages.pending import PendingChangesPage
@@ -47,7 +48,6 @@ if TYPE_CHECKING:
     from settings.pages.shell_dock import ShellDockPage
     from settings.pages.shell_frame import ShellFramePage
     from settings.pages.shell_lock import ShellLockPage
-    from settings.pages.shell_misc import ShellMiscPage
     from settings.pages.shell_notch import ShellNotchPage
     from settings.pages.shell_overview import ShellOverviewPage
     from settings.pages.shell_presets import ShellPresetsPage
@@ -153,6 +153,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._settings_page: object | None = None
         self._pending_page: object | None = None
         self._pre_search_page_id: str | None = None
+        self._current_page_id: str | None = None
         self._search_results: list | None = None
         # Populated at the end of _build_ui() once section pages exist;
         # initialized empty so has_dirty() is safe during initial builds.
@@ -338,10 +339,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._setup_shortcuts()
         self._setup_help_overlay()
 
-        if groups:
-            first_id = groups[0]["id"]
-            self.show_page(first_id)
-            self._sidebar.select_first()
+        # Home is the landing page (Windows-style start page) but is not a
+        # sidebar entry; show it without highlighting any navigation row.
+        self.show_page("home")
+        self._sidebar.deselect_all()
         _bt4 = time.monotonic()
         print(f'[TIMING]   finalize={_bt4-_bt3:.3f}s', file=__import__('sys').stderr)
 
@@ -453,10 +454,12 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.env_vars import EnvVarsPage
         from settings.pages.fonts import FontsPage
         from settings.pages.grub import GrubPage
+        from settings.pages.home import HomePage, PAGE_REGISTRY
         from settings.pages.hypridle import HypridlePage
         from settings.pages.layer_rules import LayerRulesPage
         from settings.pages.layouts import LayoutsPage
         from settings.pages.logs import LogsPage
+        from settings.pages.misc import MiscPage
         from settings.pages.monitors import MonitorsPage
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
@@ -467,7 +470,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_dock import ShellDockPage
         from settings.pages.shell_frame import ShellFramePage
         from settings.pages.shell_lock import ShellLockPage
-        from settings.pages.shell_misc import ShellMiscPage
         from settings.pages.shell_notch import ShellNotchPage
         from settings.pages.shell_overview import ShellOverviewPage
         from settings.pages.shell_presets import ShellPresetsPage
@@ -534,11 +536,28 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
         from settings.pages.cursor import CursorPage as _CursorPage
         self._search_page_builder.add_entries(_CursorPage.get_search_entries())
+        # Pages are searchable too: every registered page gets a result row
+        # that navigates straight to it (see SearchPage.build_results_widget).
+        self._search_page_builder.add_entries(
+            [
+                {
+                    "key": f"{slug}:page",
+                    "label": title,
+                    "description": description,
+                    "_group_id": slug,
+                    "_group_label": "Settings Pages",
+                    "_section_label": "Page",
+                    "_icon": icon,
+                }
+                for slug, title, description, icon in PAGE_REGISTRY
+            ]
+        )
         _bt2 = time.monotonic()
         print(f'[TIMING]    section_pages={_bt2-_bt1:.3f}s', file=__import__('sys').stderr)
 
         # Store standalone page specs for lazy building
         standalone_page_specs: list[tuple[type, str, str, str]] = [
+            (HomePage, "_home_page", "home", "Home"),
             (AboutPage, "_about_page", "about", "About"),
             (AppsPage, "_apps_page", "apps", "Applications"),
             (AudioPage, "_audio_page", "audio", "Audio"),
@@ -564,7 +583,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (ShellLockPage, "_shell_lock_page", "shell_lock", "Lockscreen"),
             (ShellWorkspacesPage, "_shell_workspaces_page", "shell_workspaces", "Workspaces"),
             (ShellOverviewPage, "_shell_overview_page", "shell_overview", "Overview"),
-            (ShellMiscPage, "_shell_misc_page", "shell_misc", "Miscellaneous"),
+            (MiscPage, "_misc_page", "misc", "Miscellaneous"),
             (ShellPresetsPage, "_shell_presets_page", "shell_presets", "Presets"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
@@ -986,9 +1005,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         shell_overview_page = getattr(self, "_shell_overview_page", None)
         if shell_overview_page is not None and shell_overview_page.is_dirty():
             counts["shell_overview"] = 1
-        shell_misc_page = getattr(self, "_shell_misc_page", None)
-        if shell_misc_page is not None and shell_misc_page.is_dirty():
-            counts["shell_misc"] = 1
+        misc_page = getattr(self, "_misc_page", None)
+        if misc_page is not None and misc_page.is_dirty():
+            counts["misc"] = 1
         shell_presets_page = getattr(self, "_shell_presets_page", None)
         if shell_presets_page is not None and shell_presets_page.is_dirty():
             counts["shell_presets"] = 1
@@ -1126,7 +1145,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
         # Save current page before showing search
         if not self._pre_search_page_id:
-            self._pre_search_page_id = self._sidebar.get_selected_group_id()
+            self._pre_search_page_id = (
+                self._sidebar.get_selected_group_id() or self._current_page_id
+            )
 
         self._search_results = self._search_page_builder.search(query)
         widget = self._search_page_builder.build_results_widget(
@@ -1222,6 +1243,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.grub import GrubPage
         from settings.pages.hypridle import HypridlePage
         from settings.pages.logs import LogsPage
+        from settings.pages.misc import MiscPage
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
@@ -1230,7 +1252,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_dock import ShellDockPage
         from settings.pages.shell_frame import ShellFramePage
         from settings.pages.shell_lock import ShellLockPage
-        from settings.pages.shell_misc import ShellMiscPage
         from settings.pages.shell_notch import ShellNotchPage
         from settings.pages.shell_overview import ShellOverviewPage
         from settings.pages.shell_presets import ShellPresetsPage
@@ -1344,7 +1365,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellMiscPage:
+        elif cls is MiscPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
@@ -1368,6 +1389,15 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
             return
+        if gid == "backups":
+            # "Backups" is an action, not a page: launch Timeshift (same
+            # Exec as the timeshift-gtk desktop entry) and keep the current
+            # page visible, mirroring the keyring behaviour above.
+            subprocess.Popen(
+                ["timeshift-launcher"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            return
         if gid in self._deferred_groups:
             self._build_lazy_group_page(gid)
         elif gid in self._lazy_section_specs:
@@ -1380,6 +1410,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             if gid == "pending" and self._pending_page is not None:
                 # Catch up on any changes that happened while the page wasn't visible
                 self._pending_page.refresh()
+            self._current_page_id = gid
             self._page_stack.set_visible_child_name(gid)
             self._content_nav.set_title(self._page_titles[gid])
 

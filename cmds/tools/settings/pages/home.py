@@ -42,7 +42,6 @@ from settings.ui.icons import (
     NETWORK_ICON,
     NOTCH_ICON,
     OVERVIEW_ICON,
-    PENDING_ICON,
     POWER_ICON,
     PRESETS_ICON,
     SETTINGS_ICON,
@@ -80,7 +79,6 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("shell_desktop", "Desktop", "Desktop widgets", DESKTOP_ICON),
     ("shell_lock", "Lockscreen", "Lock screen styling", LOCK_ICON),
     ("shell_presets", "Presets", "Shell presets", PRESETS_ICON),
-    ("shell_misc", "Miscellaneous (Shell)", "Other shell options", MISC_ICON),
     # Input
     ("binds", "Keybinds", "Keyboard shortcuts and bindings", BINDS_ICON),
     ("input", "Devices", "Keyboard, mouse and touchpad", "input-keyboard-symbolic"),
@@ -113,9 +111,8 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("logs", "Logs", "System and app logs", LOGS_ICON),
     ("xwayland", "XWayland", "XWayland compatibility", "application-x-executable-symbolic"),
     ("ecosystem", "Ecosystem", "Ecosystem integration", "sprout-symbolic"),
-    ("misc", "Miscellaneous", "Extra options", "applications-system-symbolic"),
+    ("misc", "Miscellaneous", "Misc options, startup and OCR", "applications-system-symbolic"),
     # Pinned
-    ("pending", "Pending Changes", "Review unsaved changes", PENDING_ICON),
     ("about", "About", "System info, updates and links", ABOUT_ICON),
     ("settings", "Settings", "App preferences and config path", SETTINGS_ICON),
 ]
