@@ -13,12 +13,12 @@ else
 fi
 
 _detect_bootloader() {
-    if [[ -f /boot/grub/grub.cfg ]]; then
+    if $SUDO_CMD test -f /boot/grub/grub.cfg; then
         echo "grub|/etc/default/grub|GRUB_CMDLINE_LINUX_DEFAULT|grub-mkconfig -o /boot/grub/grub.cfg"
-    elif [[ -d /boot/loader/entries ]]; then
-        local entry=$(ls /boot/loader/entries/*.conf 2>/dev/null | head -1)
+    elif $SUDO_CMD test -d /boot/loader/entries; then
+        local entry=$($SUDO_CMD ls /boot/loader/entries/*.conf 2>/dev/null | head -1)
         echo "systemd-boot|${entry}|options|systemctl reboot"
-    elif [[ -f /boot/refind_linux.conf ]]; then
+    elif $SUDO_CMD test -f /boot/refind_linux.conf; then
         echo 'refind|/boot/refind_linux.conf|"Boot with standard options"|refind-install'
     else
         echo "unknown|||"
@@ -28,12 +28,12 @@ _detect_bootloader() {
 _get_kernel_params() {
     local bl_info=$(_detect_bootloader)
     IFS='|' read -r bl_type bl_file bl_key bl_update_cmd <<<"$bl_info"
-    if [[ $bl_type == "grub" && -f $bl_file ]]; then
-        grep "^${bl_key}=" "$bl_file" | cut -d'"' -f2
+    if [[ $bl_type == "grub" ]] && $SUDO_CMD test -f "$bl_file"; then
+        $SUDO_CMD grep "^${bl_key}=" "$bl_file" | cut -d'"' -f2
     elif [[ $bl_type == "systemd-boot" && -n $bl_file ]]; then
-        grep "^options " "$bl_file" | sed 's/^options //'
-    elif [[ $bl_type == "refind" && -f $bl_file ]]; then
-        grep '^"' "$bl_file" | head -1 | sed 's/^[^"]*"\([^"]*\)".*/\1/'
+        $SUDO_CMD grep "^options " "$bl_file" | sed 's/^options //'
+    elif [[ $bl_type == "refind" ]] && $SUDO_CMD test -f "$bl_file"; then
+        $SUDO_CMD grep '^"' "$bl_file" | head -1 | sed 's/^[^"]*"\([^"]*\)".*/\1/'
     fi
 }
 
@@ -66,7 +66,7 @@ _compute_resume_params() {
 }
 
 _check_resume_status() {
-    if grep -q "resume=" /boot/grub/grub.cfg 2>/dev/null; then
+    if $SUDO_CMD grep -q "resume=" /boot/grub/grub.cfg 2>/dev/null; then
         echo "configured"
     else
         echo "missing"
@@ -304,8 +304,8 @@ disable_grub_d_scripts() {
 
 verify_grub_cfg() {
     local grub_cfg="/boot/grub/grub.cfg"
-    if command -v grub-script-check >/dev/null 2>&1 && [[ -f $grub_cfg ]]; then
-        if grub-script-check "$grub_cfg" 2>/dev/null; then
+    if command -v grub-script-check >/dev/null 2>&1 && $SUDO_CMD test -f $grub_cfg; then
+        if $SUDO_CMD grub-script-check "$grub_cfg" 2>/dev/null; then
             rx_log_file "success" "grub.cfg passed grub-script-check"
         else
             rx_log_file "error" "grub.cfg FAILED grub-script-check - the boot menu may be broken!"
@@ -322,7 +322,7 @@ apply_manual_entries() {
 
     local grub_cfg="/boot/grub/grub.cfg"
     local out
-    out=$("$RETRO_DIR/scripts/python/grub_manual_entries.py" --apply "$grub_cfg" "$store") || {
+    out=$($SUDO_CMD "$RETRO_DIR/scripts/python/grub_manual_entries.py" --apply "$grub_cfg" "$store") || {
         rx_log_file "error" "Failed to apply manual GRUB menu entries"
         return 1
     }
@@ -339,7 +339,7 @@ apply_menu_order() {
 
     local grub_cfg="/boot/grub/grub.cfg"
     local out
-    out=$("$RETRO_DIR/scripts/python/grub_manual_entries.py" --reorder "$grub_cfg" "$store") || {
+    out=$($SUDO_CMD "$RETRO_DIR/scripts/python/grub_manual_entries.py" --reorder "$grub_cfg" "$store") || {
         rx_log_file "error" "Failed to reorder GRUB menu entries"
         return 1
     }
@@ -467,14 +467,14 @@ update_grub_config() {
         fi
 
         local theme_path="/boot/grub/themes/$theme_choice/theme.txt"
-        if [[ -d "/boot/grub/themes/$theme_choice" ]]; then
+        if [[ -d "$RETRO_DIR/modules/grub/files/$theme_choice" ]]; then
             if grep -q "^GRUB_THEME=" "$grub_defaults"; then
                 $SUDO_CMD sed -i "s|^GRUB_THEME=.*|GRUB_THEME=$theme_path|" "$grub_defaults"
             else
                 echo "GRUB_THEME=$theme_path" | $SUDO_CMD tee -a "$grub_defaults" >/dev/null
             fi
         else
-            rx_log_file "warn" "Theme directory not found: /boot/grub/themes/$theme_choice"
+            rx_log_file "warn" "Theme not found in module: $RETRO_DIR/modules/grub/files/$theme_choice"
         fi
 
         if grep -q "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_defaults"; then
@@ -500,11 +500,11 @@ update_grub_config() {
 remove_grub_echo_messages() {
     local grub_cfg="/boot/grub/grub.cfg"
 
-    if [[ -f $grub_cfg ]]; then
+    if $SUDO_CMD test -f $grub_cfg; then
         rx_log_file "info" "Removing GRUB loading messages..."
 
         local removed_count=0
-        removed_count=$(grep -c "echo.*Loading Linux linux\|echo.*Loading initial ramdisk" "$grub_cfg" 2>/dev/null || echo "0")
+        removed_count=$($SUDO_CMD grep -c "echo.*Loading Linux linux\|echo.*Loading initial ramdisk" "$grub_cfg" 2>/dev/null || echo "0")
 
         $SUDO_CMD sed -i "/echo.*Loading Linux linux/d" "$grub_cfg"
         $SUDO_CMD sed -i "/echo.*Loading initial ramdisk/d" "$grub_cfg"
@@ -523,7 +523,7 @@ set_default_kernel() {
         return 0
     fi
 
-    if [[ ! -f $grub_cfg ]]; then
+    if ! $SUDO_CMD test -f $grub_cfg; then
         rx_log_file "error" "GRUB config not found: $grub_cfg"
         return 1
     fi
@@ -562,7 +562,7 @@ set_default_kernel() {
         fi
 
         echo "$line" >>"$temp_cfg"
-    done <"$grub_cfg"
+    done < <($SUDO_CMD cat "$grub_cfg")
 
     if [[ $patched_vmlinuz == true || $patched_initrd == true ]]; then
         $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
@@ -594,7 +594,7 @@ create_timeshift_backup() {
 patch_snapshot_entry() {
     local grub_cfg="/boot/grub/grub.cfg"
 
-    if [[ ! -f $grub_cfg ]]; then
+    if ! $SUDO_CMD test -f $grub_cfg; then
         rx_log_file "error" "GRUB config not found: $grub_cfg"
         return 1
     fi
@@ -619,7 +619,7 @@ patch_snapshot_entry() {
             patched=true
         fi
         echo "$line" >>"$temp_cfg"
-    done <"$grub_cfg"
+    done < <($SUDO_CMD cat "$grub_cfg")
 
     if [[ $patched == true ]]; then
         $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
@@ -634,7 +634,7 @@ patch_snapshot_entry() {
 remove_snapshot_entry() {
     local grub_cfg="/boot/grub/grub.cfg"
 
-    if [[ ! -f $grub_cfg ]]; then
+    if ! $SUDO_CMD test -f $grub_cfg; then
         rx_log_file "error" "GRUB config not found: $grub_cfg"
         return 1
     fi
@@ -666,7 +666,7 @@ remove_snapshot_entry() {
         fi
 
         echo "$line" >>"$temp_cfg"
-    done <"$grub_cfg"
+    done < <($SUDO_CMD cat "$grub_cfg")
 
     if [[ $removed == true ]]; then
         $SUDO_CMD cp "$temp_cfg" "$grub_cfg"
@@ -685,7 +685,7 @@ _grub_ensure_kernel() {
     local img="/boot/vmlinuz-${kernel}"
     local initrd="/boot/initramfs-${kernel}.img"
 
-    if [[ -f $img && -f $initrd ]]; then
+    if $SUDO_CMD test -f $img && $SUDO_CMD test -f $initrd; then
         rx_log_file "info" "Kernel ${kernel} already present"
         return 0
     fi
@@ -697,7 +697,7 @@ _grub_ensure_kernel() {
     }
     $SUDO_CMD mkinitcpio -P 2>/dev/null || true
 
-    if [[ -f $img && -f $initrd ]]; then
+    if $SUDO_CMD test -f $img && $SUDO_CMD test -f $initrd; then
         rx_log_file "success" "Kernel ${kernel} installed and initramfs rebuilt"
         return 0
     fi
@@ -720,7 +720,7 @@ add_resume_params() {
         fi
     fi
 
-    if [[ -f /boot/grub/grub.cfg ]]; then
+    if $SUDO_CMD test -f /boot/grub/grub.cfg; then
         $SUDO_CMD sed -i '/^\s*linux\s/s| resume=[^ ]*||g; /^\s*linux\s/s| resume_offset=[^ ]*||g' /boot/grub/grub.cfg
         $SUDO_CMD sed -i "s|^\(\s*linux.*\)|\1 resume=$device resume_offset=$offset|" /boot/grub/grub.cfg
     fi
@@ -742,7 +742,7 @@ apply_kernel_params() {
             else
                 local grub_cfg="/boot/grub/grub.cfg"
                 local grub_defaults="/etc/default/grub"
-                if [[ -f $grub_cfg ]]; then
+                if $SUDO_CMD test -f $grub_cfg; then
                     $SUDO_CMD sed -i '/^\s*linux\s/s/ i915\.force_probe=[^ ]*//g; /^\s*linux\s/s/ xe\.force_probe=[^ ]*//g' "$grub_cfg"
                 fi
                 if [[ -f $grub_defaults ]]; then
@@ -806,7 +806,7 @@ patch_kernel_cmdline() {
         else
             echo "$line" >>"$temp_cfg"
         fi
-    done <"$grub_cfg"
+    done < <($SUDO_CMD cat "$grub_cfg")
 
     if [[ $patched == true ]]; then
         $SUDO_CMD cp "$temp_cfg" "$grub_cfg"

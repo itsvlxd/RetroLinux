@@ -40,7 +40,7 @@ def _parse_grub_entries() -> list[dict]:
     """Return the top-level menuentry/submenu blocks from /boot/grub/grub.cfg."""
     try:
         result = subprocess.run(
-            ["python3", _GRUB_SPLICER, "--parse", _GRUB_CFG],
+            ["sudo", "-n", _GRUB_SPLICER, "--parse", _GRUB_CFG],
             capture_output=True, text=True, timeout=10,
             stdin=subprocess.DEVNULL,
         )

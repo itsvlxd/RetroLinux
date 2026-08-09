@@ -55,8 +55,8 @@ cmd_grub() {
             local theme=$(grep "^GRUB_THEME=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
             local os_prober=$(grep "^GRUB_DISABLE_OS_PROBER=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2)
             local cmdline=""
-            if [[ -f /boot/grub/grub.cfg ]]; then
-                cmdline=$(grep -A10 "^menuentry 'RetroLinux'" /boot/grub/grub.cfg | grep "^\s*linux\s" | head -1 | sed 's/^\s*linux\s\+[^ ]\+\s\+//')
+            if $SUDO_CMD test -f /boot/grub/grub.cfg; then
+                cmdline=$($SUDO_CMD grep -A10 "^menuentry 'RetroLinux'" /boot/grub/grub.cfg | grep "^\s*linux\s" | head -1 | sed 's/^\s*linux\s\+[^ ]\+\s\+//')
             fi
             [[ -z $cmdline ]] && cmdline=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
             local distributor=$(grep "^GRUB_DISTRIBUTOR=" "$grub_defaults" 2>/dev/null | cut -d'=' -f2 | tr -d '"')
@@ -149,7 +149,7 @@ cmd_grub() {
             rx_table_separator
 
             local grub_cfg="/boot/grub/grub.cfg"
-            if [[ -f $grub_cfg ]]; then
+            if $SUDO_CMD test -f $grub_cfg; then
                 local entries=()
                 local entry_details=()
                 local in_submenu=false
@@ -224,7 +224,7 @@ cmd_grub() {
                             submenu_name=""
                         fi
                     fi
-                done <"$grub_cfg"
+                done < <($SUDO_CMD cat "$grub_cfg")
 
                 if [[ -n $first_entry_kernel ]]; then
                     entry_details[0]="$first_entry_kernel"
@@ -256,10 +256,9 @@ cmd_grub() {
                 for t in "$theme_dir"/*/; do
                     [[ -d $t ]] || continue
                     local tname=$(basename "$t")
-                    local tpath="/boot/grub/themes/$tname"
                     local installed="No"
                     local status_color="$MUTE"
-                    if [[ -d $tpath ]]; then
+                    if [[ -d "$RETRO_DIR/modules/grub/files/$tname" ]]; then
                         installed="Installed"
                         status_color="$PINK"
                     fi
@@ -282,10 +281,9 @@ cmd_grub() {
                 for t in "$theme_dir"/*/; do
                     [[ -d $t ]] || continue
                     local tname=$(basename "$t")
-                    local tpath="/boot/grub/themes/$tname"
                     local installed="No"
                     local status_color="$MUTE"
-                    if [[ -d $tpath ]]; then
+                    if [[ -d "$RETRO_DIR/modules/grub/files/$tname" ]]; then
                         installed="Installed"
                         status_color="$PINK"
                     fi
