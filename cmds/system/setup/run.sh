@@ -67,6 +67,7 @@ run_postinstall() {
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${xdg_browser},filemanager=${FILEMANAGER_CHOICE:-nemo},image=loupe,video=mpv"
 
     retro wallpaper setup --needed -y -o "theme=retro"
+    retro wallpaper sync
     retro theme setup --needed -y
     retro theme mode dark
 
@@ -82,6 +83,7 @@ run_postinstall() {
     retro input setup --needed -y
 
     retro audio setup
+    retro audio eq download JackHack96
 
     retro polkit setup --needed -y
     retro firewall setup --needed -o "default=drop"
