@@ -63,12 +63,9 @@ slideshow_next() {
 }
 
 optimize_wallpapers() {
-    local target_res=$(get_var "WALL_RES_MAP")
-    if [[ -n $target_res && $target_res != "null" ]]; then
-        target_res=$(echo "$target_res" | tr ',' '\n' | sed 's/^.*|//' | grep -E '^[0-9]+x[0-9]+$' | head -1)
-    else
-        target_res=$(get_monitor_resolutions | head -1)
-    fi
+    local target_res
+    target_res=$(_wallpaper_first_res "$(get_var "WALL_RES_MAP")")
+    [[ -z $target_res ]] && target_res=$(get_monitor_resolutions | head -1)
     local target_w="${target_res%x*}"
     local target_h="${target_res#*x}"
     [[ -z $target_w || -z $target_h ]] && return 0
@@ -130,12 +127,12 @@ get_monitor_resolutions() {
     local res_map=$(get_var "WALL_RES_MAP")
 
     if [[ -n $res_map && $res_map != "null" ]]; then
-        echo "$res_map" | tr ',' '\n' | sed 's/^[^|]*|//'
+        echo "$res_map" | tr ',' '\n' | sed 's/^[^|]*|//' | grep -E '^[0-9]+x[0-9]+$'
         return 0
     fi
 
     if command -v hyprctl >/dev/null 2>&1; then
-        hyprctl monitors -j | jq -r '.[] | "\(.description)|\(.x)\((.width/.scale)|0floor)x\((.height/.scale)|0floor)"' 2>/dev/null | cut -d'|' -f2
+        hyprctl monitors -j | jq -r '.[] | "\(.description)|\((.width/.scale)|floor)x\((.height/.scale)|floor)"' 2>/dev/null | cut -d'|' -f2 | grep -E '^[0-9]+x[0-9]+$'
         return 0
     fi
 
@@ -147,6 +144,14 @@ get_monitor_resolutions() {
     fi
 
     echo "1920x1080"
+}
+
+# Extract the first valid "WxH" resolution from a WALL_RES_MAP value
+# ("desc|res,desc|res" or a bare "WxH"); prints nothing if none found.
+_wallpaper_first_res() {
+    local map="$1"
+    [[ -z $map || $map == "null" ]] && return 1
+    echo "$map" | tr ',' '\n' | sed 's/^.*|//' | grep -E '^[0-9]+x[0-9]+$' | head -1
 }
 
 get_image_resolution() {
@@ -172,11 +177,13 @@ check_wallpaper_resolution() {
 
     local file_w="${file_res%x*}"
     local file_h="${file_res#*x}"
+    [[ $file_w =~ ^[0-9]+$ && $file_h =~ ^[0-9]+$ ]] || return 1
 
     while IFS= read -r mon_res; do
         [[ -z $mon_res ]] && continue
         local mon_w="${mon_res%x*}"
         local mon_h="${mon_res#*x}"
+        [[ $mon_w =~ ^[0-9]+$ && $mon_h =~ ^[0-9]+$ ]] || continue
 
         if [[ $file_w -eq $mon_w && $file_h -eq $mon_h ]]; then
             return 0
@@ -424,8 +431,20 @@ sync_wallpapers() {
     local upgraded=0
 
     local res_map=$(get_var "WALL_RES_MAP")
-    local map_w="${res_map%x*}"
-    local map_h="${res_map#*x}"
+    # WALL_RES_MAP stores "desc|res,desc|res" (or a bare "WxH"). Reduce it
+    # to the first valid resolution; fall back to the live monitors when the
+    # map is missing, "null", or malformed (e.g. from a system that never ran
+    # wallpaper setup), and repopulate the map with only the resolution.
+    local target_res
+    target_res=$(_wallpaper_first_res "$res_map")
+    if [[ -z $target_res ]]; then
+        target_res=$(get_monitor_resolutions | head -1)
+        if [[ -n $target_res ]]; then
+            set_var "WALL_RES_MAP" "$target_res"
+        fi
+    fi
+    local map_w="${target_res%x*}"
+    local map_h="${target_res#*x}"
 
     for theme_dir in "$source_dir"/*/; do
         [[ -d $theme_dir ]] || continue
@@ -445,8 +464,9 @@ sync_wallpapers() {
                 local src_w="${src_res%x*}" src_h="${src_res#*x}"
                 local tgt_w="${tgt_res%x*}" tgt_h="${tgt_res#*x}"
 
-                if [[ -n $src_w && -n $src_h && -n $tgt_w && -n $tgt_h &&
-                    -n $map_w && -n $map_h ]]; then
+                if [[ $src_w =~ ^[0-9]+$ && $src_h =~ ^[0-9]+$ &&
+                    $tgt_w =~ ^[0-9]+$ && $tgt_h =~ ^[0-9]+$ &&
+                    $map_w =~ ^[0-9]+$ && $map_h =~ ^[0-9]+$ ]]; then
                     local src_area=$((src_w * src_h))
                     local tgt_area=$((tgt_w * tgt_h))
                     local map_area=$((map_w * map_h))

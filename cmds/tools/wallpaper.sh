@@ -301,8 +301,8 @@ cmd_wallpaper() {
             local current_h=$(echo "$mon_info" | jq -r '.height')
 
             local native_w native_h native_res=""
-            native_w=$(echo "$mon_info" | jq -r '(.width/.scale)|0floor')
-            native_h=$(echo "$mon_info" | jq -r '(.height/.scale)|0floor')
+            native_w=$(echo "$mon_info" | jq -r '(.width/.scale)|floor')
+            native_h=$(echo "$mon_info" | jq -r '(.height/.scale)|floor')
             [[ -n $native_w && -n $native_h ]] && native_res="${native_w}x${native_h}"
 
             local res_map=$(get_var "WALL_RES_MAP")
