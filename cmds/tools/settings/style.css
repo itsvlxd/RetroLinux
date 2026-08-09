@@ -64,6 +64,34 @@ row:hover .reset-button,
     transition: background-color 150ms ease-in-out;
 }
 
+/* Home page tile grid — Windows-style start page cards.
+   The home page applies ``home-tile`` to plain flat buttons; this styling
+   is what makes the grid of settings pages visible as cards (background,
+   rounded corners, hover feedback). Keep it in the app stylesheet so the
+   homepage renders properly without relying on user custom CSS. */
+.home-tile {
+    background-color: alpha(@card_bg_color, 0.55);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px alpha(@view_fg_color, 0.06);
+    padding: 10px 12px;
+    min-height: 84px;
+    transition: background-color 150ms ease-in-out,
+                box-shadow 150ms ease-in-out;
+}
+
+.home-tile:hover {
+    background-color: alpha(@accent_bg_color, 0.12);
+    box-shadow: inset 0 0 0 1px alpha(@accent_bg_color, 0.28);
+}
+
+.home-tile:active {
+    background-color: alpha(@accent_bg_color, 0.2);
+}
+
+.home-tile image {
+    color: @accent_color;
+}
+
 /* Active profile card — accent border + subtle tint */
 .profile-active {
     border-left: 3px solid @accent_bg_color;

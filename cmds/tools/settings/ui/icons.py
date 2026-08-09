@@ -53,6 +53,8 @@ SLEEP_ICON = "weather-clear-night-symbolic"
 KEYRING_ICON = "dialog-password-symbolic"
 LOGS_ICON = "document-properties-symbolic"
 ABOUT_ICON = "help-about-symbolic"
+TIMESHIFT_ICON = "backup-symbolic"
+HOME_ICON = "go-home-symbolic"
 
 # Used by pages/pending.py when a change can't be matched to a known
 # group_id (defensive — should not happen in practice).

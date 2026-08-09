@@ -41,6 +41,7 @@ from settings.ui.icons import (
     SIDEBAR_ICON,
     SLEEP_ICON,
     THEMES_ICON,
+    TIMESHIFT_ICON,
     WALLPAPERS_ICON,
     WINDOW_RULES_ICON,
     WORKSPACES_ICON,
@@ -277,6 +278,7 @@ class Sidebar:
         add_row(system, "grub", "Bootloader", GRUB_ICON)
         add_row(system, "driver", "Drivers", DRIVER_ICON)
         add_row(system, "daemon", "Daemon", DAEMON_ICON)
+        add_row(system, "backups", "Backups", TIMESHIFT_ICON)
 
         advanced = new_category("Advanced")
         add_row(advanced, "keyring", "Keyring", KEYRING_ICON)
