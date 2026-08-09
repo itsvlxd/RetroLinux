@@ -1,5 +1,11 @@
-"""Power management page — profiles, wattage limits, auto-optimize."""
+"""Power Management page — profiles, wattage limits, and idle/sleep configuration.
 
+Combines power management (profiles, AC/BAT wattage limits, logind hardware
+buttons) with hypridle idle configuration (lock/unlock commands, inhibit,
+and timeout listeners).
+"""
+
+import html
 import os
 import subprocess
 import time
@@ -8,8 +14,19 @@ from typing import TYPE_CHECKING
 
 from gi.repository import Adw, GdkPixbuf, GLib, Gtk, cairo
 
+from settings.core import config
+from settings.core.hypridle import (
+    IdleGeneral,
+    IdleListener,
+    hypridle_config_path,
+    parse_hypridle,
+    write_hypridle,
+)
 from settings.core.pending import PendingChange
 from settings.ui import clear_children, make_page_layout
+from settings.ui.empty_state import EmptyState
+from settings.ui.hypridle_dialog import IdleListenerDialog
+from settings.ui.icons import POWER_ICON, SLEEP_ICON
 
 if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
@@ -27,6 +44,16 @@ def _restore() -> None:
         ["retro", "power", "restore"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
+
+
+def _summarize_listener(l: IdleListener) -> str:
+    parts = [f"{l.timeout}s"]
+    if l.on_timeout:
+        cmd = l.on_timeout[:40] + "…" if len(l.on_timeout) > 40 else l.on_timeout
+        parts.append(f"→ {cmd}")
+    if l.ignore_inhibit:
+        parts.append("(no-inhibit)")
+    return "  ".join(parts)
 
 
 class SystemUsageStats:
@@ -81,7 +108,6 @@ class SystemUsageStats:
                 p = f"/sys/class/drm/{d}/device/gpu_busy_percent"
                 if os.path.isfile(p):
                     return float(open(p).read().strip())
-                # Intel xe / i915: compute from frequency ratio
                 for gt_dir in (f"/sys/class/drm/{d}/gt",):
                     if not os.path.isdir(gt_dir):
                         break
@@ -198,7 +224,6 @@ class SystemUsageGraph(Gtk.DrawingArea):
         def sc_y(v):
             return margin_t + plot_h - (v / mx) * plot_h
 
-        # Draw all lines on the same plot
         for data, color, _label, _unit in lines:
             n = len(data)
             if n < 2:
@@ -212,7 +237,6 @@ class SystemUsageGraph(Gtk.DrawingArea):
                 cr.line_to(margin_l + i * step, sc_y(data[i]))
             cr.stroke()
 
-        # Legend on the right side
         cr.set_font_size(9)
         y_pos = margin_t + 4
         for _, color, label, unit in lines:
@@ -228,13 +252,15 @@ class SystemUsageGraph(Gtk.DrawingArea):
 
 
 class PowerPage:
-    """Power management — profile, limits, and auto-optimize."""
+    """Power & sleep — profile, limits, idle config, and listeners."""
 
     def __init__(self, window: "RetroSettingsWindow"):
         self._window = window
         self._content_box: Gtk.Box
         self._dirty = False
         self._on_dirty_changed = None
+
+        # ── Power state ──
         self._orig: dict[str, str] = {}
         self._spin_rows: dict[str, Gtk.SpinButton] = {}
         self._pwr_btn_row: Adw.ComboRow | None = None
@@ -243,11 +269,25 @@ class PowerPage:
         self._has_hibernate = False
         self._check_hibernate()
 
+        # ── Hypridle state ──
+        self._general = IdleGeneral()
+        self._listeners: list[IdleListener] = []
+        self._original_general = IdleGeneral()
+        self._original_listeners: list[IdleListener] = []
+        self._general_widgets: dict[str, Gtk.Widget] = {}
+        self._inhibit_spin: Gtk.SpinButton | None = None
+        self._enable_idle_switch: Adw.SwitchRow | None = None
+        self._enable_idle_value = True
+        self._enable_idle_original = True
+        self._listener_group: Adw.PreferencesGroup | None = None
+        self._listener_listbox: Gtk.ListBox | None = None
+        self._listener_rows: list[Adw.ActionRow] = []
+
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
-        self._load_data()
+        self._load_power_data()
+        self._load_idle()
 
-        # Combined hero + usage graph card
         cpu_model = self._get_cpu_model()
         gpu_model = self._get_gpu_model()
 
@@ -255,7 +295,6 @@ class PowerPage:
         hero = self._make_hero_row(cpu_model, gpu_model)
         if hero is not None:
             usage_group.add(hero)
-
         graph = SystemUsageGraph()
         graph_row = Adw.ActionRow(title="")
         graph_row.set_activatable(False)
@@ -265,7 +304,6 @@ class PowerPage:
 
         group = Adw.PreferencesGroup(title="Power Configuration")
 
-        # Profile dropdown
         from settings.ui.managed_row import make_combo_row
         model = Gtk.StringList.new([p.capitalize() for p in _PROFILES])
         cur = self._orig.get("profile", "balanced")
@@ -275,8 +313,7 @@ class PowerPage:
         self._profile_row = cr
         group.add(cr)
 
-        # AC + BAT limits as SpinRows
-        for label, desc, var, key in [
+        for label, desc, _var, key in [
             ("AC Saver", "AC power limit for power-saver mode", "PWR_AC_SAVER", "ac_saver"),
             ("AC Balanced", "AC power limit for balanced mode", "PWR_AC_BALANCED", "ac_balanced"),
             ("AC Performance", "AC power limit for maximum performance mode", "PWR_AC_PERFORMANCE", "ac_performance"),
@@ -299,7 +336,6 @@ class PowerPage:
             group.add(row)
             self._spin_rows[key] = spin
 
-        # Optimize
         opt_row = Adw.ActionRow(
             title="Auto-optimize",
             subtitle="Detects your CPU model and applies recommended wattage limits from the RetroLinux database",
@@ -313,15 +349,13 @@ class PowerPage:
 
         self._content_box.append(group)
 
-        # ── Hardware Buttons ──────────────────────────────────────────
+        # ── Hardware Buttons ──
         btn_group = Adw.PreferencesGroup(title="Hardware Buttons")
         btn_group.set_description(
             "What happens when you press the power button, hold it, or "
             "close the laptop lid. Changes are applied via systemd-logind "
             "and require a restart to take full effect."
         )
-
-        from settings.ui.managed_row import make_combo_row
 
         def _make_logind_combo(var: str, title: str, subtitle: str) -> Adw.ComboRow:
             actions, labels = self._get_logind_options()
@@ -337,26 +371,145 @@ class PowerPage:
             row.connect("notify::selected", self._on_logind_changed, var)
             return row
 
-        self._pwr_btn_row = _make_logind_combo(
-            "pwr_btn", "Power Button",
-            "Action when the power button is pressed briefly",
-        )
+        self._pwr_btn_row = _make_logind_combo("pwr_btn", "Power Button", "Action when the power button is pressed briefly")
         btn_group.add(self._pwr_btn_row)
-
-        self._pwr_btn_long_row = _make_logind_combo(
-            "pwr_btn_long", "Power Button Long Press",
-            "Action when the power button is held for 5+ seconds",
-        )
+        self._pwr_btn_long_row = _make_logind_combo("pwr_btn_long", "Power Button Long Press", "Action when the power button is held for 5+ seconds")
         btn_group.add(self._pwr_btn_long_row)
-
-        self._lid_row = _make_logind_combo(
-            "lid_close", "Lid Close",
-            "Action when the laptop lid is closed",
-        )
+        self._lid_row = _make_logind_combo("lid_close", "Lid Close", "Action when the laptop lid is closed")
         btn_group.add(self._lid_row)
 
+        logout_row = Adw.ActionRow(
+            title="Logout Command",
+            subtitle="Custom command executed when you log out from the power menu",
+        )
+        logout_entry = Gtk.Entry(text=self._orig.get("logout_cmd") or "hyprctl dispatch exit")
+        logout_entry.set_width_chars(32)
+        logout_entry.set_valign(Gtk.Align.CENTER)
+        logout_entry.connect("changed", self._on_logout_cmd_changed)
+        logout_row.set_activatable_widget(logout_entry)
+
+        reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
+        reset_btn.set_valign(Gtk.Align.CENTER)
+        reset_btn.set_tooltip_text("Reset to default")
+        reset_btn.connect("clicked", lambda _b: logout_entry.set_text("hyprctl dispatch exit"))
+
+        logout_row.add_suffix(logout_entry)
+        logout_row.add_suffix(reset_btn)
+        btn_group.add(logout_row)
+        self._logout_entry = logout_entry
+
         self._content_box.append(btn_group)
+
+        # ── Idle Configuration ──
+        gen_group = Adw.PreferencesGroup(title="Idle Configuration")
+        gen_group.set_description("Lock/unlock commands, sleep hooks, inhibit, and idle daemon toggle.")
+
+        self._enable_idle_switch = Adw.SwitchRow(title="Enable Idle Daemon")
+        self._enable_idle_switch.set_subtitle("Starts hypridle at boot to manage screen blanking, locking, and suspend")
+        self._enable_idle_switch.set_active(self._enable_idle_value)
+        self._enable_idle_switch.connect("notify::active", self._on_enable_idle_changed)
+        gen_group.add(self._enable_idle_switch)
+
+        for var, title, hint in [
+            ("lock_cmd", "Lock Command", "Command to lock the session (e.g. 'pidof hyprlock || hyprlock')"),
+            ("unlock_cmd", "Unlock Command", "Command to unlock the session"),
+            ("on_lock_cmd", "On Lock Command", "Command run when the session gets locked by a lock screen app"),
+            ("on_unlock_cmd", "On Unlock Command", "Command run when the session gets unlocked"),
+            ("before_sleep_cmd", "Before Sleep Command", "Command run before the system suspends"),
+            ("after_sleep_cmd", "After Sleep Command", "Command run after the system wakes up"),
+        ]:
+            row = Adw.EntryRow(title=title)
+            row.set_text(getattr(self._general, var, ""))
+            row.connect("changed", self._on_general_changed, var)
+            gen_group.add(row)
+            self._general_widgets[var] = row
+
+        for var, title, hint in [
+            ("ignore_dbus_inhibit", "Ignore D-Bus Inhibit", "Bypass Firefox and other apps' idle inhibit"),
+            ("ignore_systemd_inhibit", "Ignore systemd Inhibit", "Bypass systemd-inhibit idle blockers"),
+            ("ignore_wayland_inhibit", "Ignore Wayland Inhibit", "Bypass Wayland protocol idle inhibitors"),
+        ]:
+            sw = Adw.SwitchRow(title=title)
+            sw.set_subtitle(hint)
+            sw.set_active(getattr(self._general, var, False))
+            sw.connect("notify::active", self._on_general_switch_changed, var)
+            gen_group.add(sw)
+            self._general_widgets[var] = sw
+
+        inhibit_row = Adw.ActionRow(title="Inhibit Sleep Mode")
+        inhibit_row.set_subtitle("0=disable  1=wait cmd  2=auto  3=lock")
+        adj = Gtk.Adjustment(
+            value=float(self._general.inhibit_sleep),
+            lower=0, upper=3, step_increment=1, page_increment=1,
+        )
+        self._inhibit_spin = Gtk.SpinButton(adjustment=adj, digits=0)
+        self._inhibit_spin.set_valign(Gtk.Align.CENTER)
+        self._inhibit_spin.connect("notify::value", self._on_inhibit_changed)
+        inhibit_row.add_suffix(self._inhibit_spin)
+        gen_group.add(inhibit_row)
+
+        self._content_box.append(gen_group)
+
+        # ── Listeners ──
+        self._listener_group = Adw.PreferencesGroup(title="Listeners")
+        self._listener_group.set_description("Commands that fire after a set period of inactivity.")
+
+        add_btn = Gtk.Button.new_from_icon_name("list-add-symbolic")
+        add_btn.set_valign(Gtk.Align.CENTER)
+        add_btn.add_css_class("flat")
+        add_btn.set_tooltip_text("Add a listener")
+        add_btn.connect("clicked", lambda _b: self._on_add_listener())
+        self._listener_group.set_header_suffix(add_btn)
+
+        self._listener_listbox = Gtk.ListBox()
+        self._listener_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._listener_listbox.add_css_class("boxed-list")
+        self._listener_group.add(self._listener_listbox)
+        self._content_box.append(self._listener_group)
+
+        self._rebuild_listener_list()
         return toolbar_view
+
+    # ── Data ──
+
+    def _load_power_data(self) -> None:
+        from lib.python.variable import get_var
+
+        self._orig = {}
+        for var, key in [
+            ("PWR_AC_SAVER", "ac_saver"),
+            ("PWR_AC_BALANCED", "ac_balanced"),
+            ("PWR_AC_PERFORMANCE", "ac_performance"),
+            ("PWR_BAT_SAVER", "bat_saver"),
+            ("PWR_BAT_BALANCED", "bat_balanced"),
+            ("PWR_BAT_PERFORMANCE", "bat_performance"),
+            ("PWR_POWER_BTN", "pwr_btn"),
+            ("PWR_POWER_BTN_LONG", "pwr_btn_long"),
+            ("PWR_LID_CLOSE", "lid_close"),
+            ("RETRO_LOGOUT_CMD", "logout_cmd"),
+        ]:
+            self._orig[key] = get_var(var) or ""
+
+        try:
+            r = subprocess.run(["bash", _PWR_CORE, "--get"], capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
+            self._orig["profile"] = r.stdout.strip() or "balanced"
+        except Exception:
+            self._orig["profile"] = "balanced"
+
+    def _load_idle(self) -> None:
+        path = hypridle_config_path()
+        if not path.exists():
+            default = config.RETRO_SETTINGS_DIR / "hypridle.conf"
+            if default.exists():
+                path = default
+        self._general, self._listeners = parse_hypridle(path)
+        self._original_general = IdleGeneral(
+            **{f.name: getattr(self._general, f.name) for f in IdleGeneral.__dataclass_fields__.values()}
+        )
+        self._original_listeners = [IdleListener(**{f.name: getattr(l, f.name) for f in IdleListener.__dataclass_fields__.values()}) for l in self._listeners]
+        from lib.python.variable import get_var as _get_var
+        self._enable_idle_original = _get_var("HYPRIDLE_ENABLE", "true") == "true"
+        self._enable_idle_value = self._enable_idle_original
 
     def _check_hibernate(self) -> None:
         try:
@@ -417,25 +570,9 @@ class PowerPage:
             return ""
         return ""
 
-    def _resolve_brand_path(self, vendor: str, component: str, model: str = "") -> str | None:
-        if vendor == "intel":
-            if component == "gpu":
-                if any(k in model for k in ("Arc", "Meteor", "Lunar", "Battlemage")):
-                    return os.path.join(_BRAND_DIR, "intel-arc.png")
-                return os.path.join(_BRAND_DIR, "intel-core.png")
-            return os.path.join(_BRAND_DIR, "intel-core.png")
-        if vendor == "nvidia":
-            return os.path.join(_BRAND_DIR, "nvidia-rtx.png") if "RTX" in model else os.path.join(_BRAND_DIR, "nvidia-gtx.png")
-        if vendor == "amd":
-            if component == "gpu" and "Radeon" in model:
-                return os.path.join(_BRAND_DIR, "amd-radeon.png")
-            return os.path.join(_BRAND_DIR, "amd.png")
-        return None
-
     def _make_hero_row(self, cpu_model: str, gpu_model: str) -> Adw.ActionRow | None:
         if not cpu_model and not gpu_model:
             return None
-
         cpu_info = self._get_cpu_info()
         title = cpu_model or "System"
         subtitle_parts = []
@@ -444,151 +581,9 @@ class PowerPage:
         if cpu_info["cores"] > 0:
             subtitle_parts.append(f"{cpu_info['cores']}C / {cpu_info['threads']}T")
         subtitle = " · ".join(subtitle_parts) if subtitle_parts else ""
-
         row = Adw.ActionRow(title=title, subtitle=subtitle)
         row.set_activatable(False)
         return row
-
-    def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
-        toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
-        self._load_data()
-
-        # Combined hero + usage graph card
-        cpu_model = self._get_cpu_model()
-        gpu_model = self._get_gpu_model()
-        usage_group = Adw.PreferencesGroup(title="System")
-        hero = self._make_hero_row(cpu_model, gpu_model)
-        if hero is not None:
-            usage_group.add(hero)
-        graph = SystemUsageGraph()
-        graph_row = Adw.ActionRow(title="")
-        graph_row.set_activatable(False)
-        graph_row.set_child(graph)
-        usage_group.add(graph_row)
-        self._content_box.append(usage_group)
-
-        group = Adw.PreferencesGroup(title="Power Configuration")
-
-        # Profile dropdown
-        from settings.ui.managed_row import make_combo_row
-        model = Gtk.StringList.new([p.capitalize() for p in _PROFILES])
-        cur = self._orig.get("profile", "balanced")
-        idx = _PROFILES.index(cur) if cur in _PROFILES else 1
-        cr = make_combo_row("Active Profile", subtitle="Switch between Performance, Balanced, or Power Saver", model=model, selected=idx)
-        cr.connect("notify::selected", self._on_profile_changed)
-        self._profile_row = cr
-        group.add(cr)
-
-        for label, desc, var, key in [
-            ("AC Saver", "AC power limit for power-saver mode", "PWR_AC_SAVER", "ac_saver"),
-            ("AC Balanced", "AC power limit for balanced mode", "PWR_AC_BALANCED", "ac_balanced"),
-            ("AC Performance", "AC power limit for maximum performance mode", "PWR_AC_PERFORMANCE", "ac_performance"),
-            ("BAT Saver", "Battery power limit for power-saver mode", "PWR_BAT_SAVER", "bat_saver"),
-            ("BAT Balanced", "Battery power limit for balanced mode", "PWR_BAT_BALANCED", "bat_balanced"),
-            ("BAT Performance", "Battery power limit for maximum performance mode", "PWR_BAT_PERFORMANCE", "bat_performance"),
-        ]:
-            val = int(self._orig.get(key, "15")) if self._orig.get(key, "").isdigit() else 15
-            adj = Gtk.Adjustment(value=val, lower=1, upper=200, step_increment=1, page_increment=5)
-            row = Adw.ActionRow(title=label, subtitle=desc)
-            spin = Gtk.SpinButton(adjustment=adj, digits=0)
-            spin.set_valign(Gtk.Align.CENTER)
-            wl = Gtk.Label(label="W")
-            wl.set_valign(Gtk.Align.CENTER)
-            wl.set_opacity(0.7)
-            wl.set_margin_start(4)
-            spin.connect("notify::value", self._on_spin_changed, key)
-            row.add_suffix(wl)
-            row.add_suffix(spin)
-            group.add(row)
-            self._spin_rows[key] = spin
-
-        opt_row = Adw.ActionRow(
-            title="Auto-optimize",
-            subtitle="Detects your CPU model and applies recommended wattage limits from the RetroLinux database",
-        )
-        opt_btn = Gtk.Button(label="Optimize")
-        opt_btn.set_valign(Gtk.Align.CENTER)
-        opt_btn.add_css_class("suggested-action")
-        opt_btn.connect("clicked", lambda _b: self._run_optimize())
-        opt_row.add_suffix(opt_btn)
-        group.add(opt_row)
-        self._content_box.append(group)
-
-        btn_group = Adw.PreferencesGroup(title="Hardware Buttons")
-        btn_group.set_description(
-            "What happens when you press the power button, hold it, or "
-            "close the laptop lid. Changes are applied via systemd-logind "
-            "and require a restart to take full effect."
-        )
-        from settings.ui.managed_row import make_combo_row as _mcr
-        def _make_logind_combo(var: str, title: str, subtitle: str) -> Adw.ComboRow:
-            actions, labels = self._get_logind_options()
-            val = self._orig.get(var, "suspend")
-            if val not in actions:
-                val = "suspend"
-            try:
-                idx = actions.index(val)
-            except ValueError:
-                idx = 0
-            model = Gtk.StringList.new(labels)
-            row = _mcr(title, subtitle=subtitle, model=model, selected=idx)
-            row.connect("notify::selected", self._on_logind_changed, var)
-            return row
-
-        self._pwr_btn_row = _make_logind_combo("pwr_btn", "Power Button", "Action when the power button is pressed briefly")
-        btn_group.add(self._pwr_btn_row)
-        self._pwr_btn_long_row = _make_logind_combo("pwr_btn_long", "Power Button Long Press", "Action when the power button is held for 5+ seconds")
-        btn_group.add(self._pwr_btn_long_row)
-        self._lid_row = _make_logind_combo("lid_close", "Lid Close", "Action when the laptop lid is closed")
-        btn_group.add(self._lid_row)
-
-        # Logout command
-        logout_row = Adw.ActionRow(
-            title="Logout Command",
-            subtitle="Custom command executed when you log out from the power menu",
-        )
-        logout_entry = Gtk.Entry(text=self._orig.get("logout_cmd") or "hyprctl dispatch exit")
-        logout_entry.set_width_chars(32)
-        logout_entry.set_valign(Gtk.Align.CENTER)
-        logout_entry.connect("changed", self._on_logout_cmd_changed)
-        logout_row.set_activatable_widget(logout_entry)
-
-        reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
-        reset_btn.set_valign(Gtk.Align.CENTER)
-        reset_btn.set_tooltip_text("Reset to default")
-        reset_btn.connect("clicked", lambda _b: logout_entry.set_text("hyprctl dispatch exit"))
-
-        logout_row.add_suffix(logout_entry)
-        logout_row.add_suffix(reset_btn)
-        btn_group.add(logout_row)
-        self._logout_entry = logout_entry
-
-        self._content_box.append(btn_group)
-        return toolbar_view
-
-    def _load_data(self) -> None:
-        from lib.python.variable import get_var
-
-        self._orig = {}
-        for var, key in [
-            ("PWR_AC_SAVER", "ac_saver"),
-            ("PWR_AC_BALANCED", "ac_balanced"),
-            ("PWR_AC_PERFORMANCE", "ac_performance"),
-            ("PWR_BAT_SAVER", "bat_saver"),
-            ("PWR_BAT_BALANCED", "bat_balanced"),
-            ("PWR_BAT_PERFORMANCE", "bat_performance"),
-            ("PWR_POWER_BTN", "pwr_btn"),
-            ("PWR_POWER_BTN_LONG", "pwr_btn_long"),
-            ("PWR_LID_CLOSE", "lid_close"),
-            ("RETRO_LOGOUT_CMD", "logout_cmd"),
-        ]:
-            self._orig[key] = get_var(var) or ""
-
-        try:
-            r = subprocess.run(["bash", _PWR_CORE, "--get"], capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
-            self._orig["profile"] = r.stdout.strip() or "balanced"
-        except Exception:
-            self._orig["profile"] = "balanced"
 
     # ── Callbacks ──
 
@@ -679,29 +674,140 @@ class PowerPage:
         except Exception as e:
             self._window.show_toast(f"Optimization failed — {e}", timeout=5, copy=True)
 
+    # ── Hypridle callbacks ──
+
+    def _on_enable_idle_changed(self, sw: Adw.SwitchRow, _pspec) -> None:
+        self._enable_idle_value = sw.get_active()
+        self._check_dirty()
+
+    def _on_general_changed(self, entry: Adw.EntryRow, var: str) -> None:
+        setattr(self._general, var, entry.get_text().strip())
+        self._check_dirty()
+
+    def _on_general_switch_changed(self, sw: Adw.SwitchRow, _pspec, var: str) -> None:
+        setattr(self._general, var, sw.get_active())
+        self._check_dirty()
+
+    def _on_inhibit_changed(self, spin: Gtk.SpinButton, _pspec) -> None:
+        self._general.inhibit_sleep = int(spin.get_value())
+        self._check_dirty()
+
+    # ── Listener management ──
+
+    def _on_add_listener(self) -> None:
+        def on_apply(listener: IdleListener) -> None:
+            self._listeners.append(listener)
+            self._check_dirty()
+            self._rebuild_listener_list()
+
+        IdleListenerDialog.present_singleton(self._window, on_apply=on_apply)
+
+    def _on_edit_listener(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._listeners):
+            return
+        current = self._listeners[idx]
+
+        def on_apply(new_listener: IdleListener) -> None:
+            if new_listener == current:
+                return
+            self._listeners[idx] = new_listener
+            self._check_dirty()
+            self._rebuild_listener_list()
+
+        IdleListenerDialog.present_singleton(self._window, listener=current, on_apply=on_apply)
+
+    def _on_delete_listener(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._listeners):
+            return
+        del self._listeners[idx]
+        self._check_dirty()
+        self._rebuild_listener_list()
+
+    def _rebuild_listener_list(self) -> None:
+        if self._listener_listbox is None:
+            return
+        child = self._listener_listbox.get_first_child()
+        while child is not None:
+            self._listener_listbox.remove(child)
+            child = self._listener_listbox.get_first_child()
+        self._listener_rows = []
+
+        if not self._listeners:
+            empty = EmptyState(
+                title="No Sleep Listeners",
+                description="Add a listener to run commands when your system is idle — dim the screen, lock the session, suspend, and more.",
+                icon_name=SLEEP_ICON,
+                primary_action=("Add Listener", self._on_add_listener),
+            )
+            self._listener_listbox.append(empty)
+            return
+
+        for i, listener in enumerate(self._listeners):
+            row = Adw.ActionRow(title=html.escape(_summarize_listener(listener)))
+            row.set_subtitle_lines(1)
+            row.add_prefix(Gtk.Image.new_from_icon_name("clock-symbolic"))
+
+            edit_btn = Gtk.Button.new_from_icon_name("document-edit-symbolic")
+            edit_btn.set_valign(Gtk.Align.CENTER)
+            edit_btn.add_css_class("flat")
+            edit_btn.set_tooltip_text("Edit listener")
+            edit_btn.connect("clicked", lambda _b, idx=i: self._on_edit_listener(idx))
+            row.add_suffix(edit_btn)
+
+            delete_btn = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+            delete_btn.set_valign(Gtk.Align.CENTER)
+            delete_btn.add_css_class("flat")
+            delete_btn.set_tooltip_text("Remove listener")
+            delete_btn.connect("clicked", lambda _b, idx=i: self._on_delete_listener(idx))
+            row.add_suffix(delete_btn)
+
+            row.set_activatable(True)
+            row.connect("activated", lambda _r, idx=i: self._on_edit_listener(idx))
+            row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
+
+            self._listener_listbox.append(row)
+            self._listener_rows.append(row)
+
     # ── Dirty ──
 
     _LOGIND_KEYS = ("pwr_btn", "pwr_btn_long", "lid_close")
     _LOGIND_VARS = ("PWR_POWER_BTN", "PWR_POWER_BTN_LONG", "PWR_LID_CLOSE")
 
     def _check_dirty(self) -> None:
+        from lib.python.variable import get_var
         was = self._dirty
         self._dirty = False
+
+        # Power side
         for key, spin in self._spin_rows.items():
             if str(int(spin.get_value())) != self._orig.get(key, ""):
                 self._dirty = True
                 break
         if not self._dirty:
             for key in self._LOGIND_KEYS:
-                from lib.python.variable import get_var
                 var_name = dict(zip(self._LOGIND_KEYS, self._LOGIND_VARS))[key]
                 if get_var(var_name, "") != self._orig.get(key, ""):
                     self._dirty = True
                     break
         if not self._dirty:
-            from lib.python.variable import get_var
             if get_var("RETRO_LOGOUT_CMD", "") != self._orig.get("logout_cmd", ""):
                 self._dirty = True
+
+        # Hypridle side
+        if not self._dirty:
+            self._dirty = self._enable_idle_value != self._enable_idle_original or any(
+                getattr(self._general, f.name) != getattr(self._original_general, f.name)
+                for f in IdleGeneral.__dataclass_fields__.values()
+            )
+        if not self._dirty:
+            self._dirty = len(self._listeners) != len(self._original_listeners) or any(
+                self._listeners[i].timeout != self._original_listeners[i].timeout
+                or self._listeners[i].on_timeout != self._original_listeners[i].on_timeout
+                or self._listeners[i].on_resume != self._original_listeners[i].on_resume
+                or self._listeners[i].ignore_inhibit != self._original_listeners[i].ignore_inhibit
+                for i in range(min(len(self._listeners), len(self._original_listeners)))
+            )
+
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
 
@@ -726,6 +832,19 @@ class PowerPage:
         for key, var_name in [("pwr_btn", "PWR_POWER_BTN"), ("pwr_btn_long", "PWR_POWER_BTN_LONG"), ("lid_close", "PWR_LID_CLOSE")]:
             self._orig[key] = get_var(var_name, "suspend")
         self._orig["logout_cmd"] = get_var("RETRO_LOGOUT_CMD", "")
+
+        # Hypridle side
+        write_hypridle(general=self._general, listeners=self._listeners)
+        set_var("HYPRIDLE_ENABLE", "true" if self._enable_idle_value else "false")
+        self._original_general = IdleGeneral(
+            **{f.name: getattr(self._general, f.name) for f in IdleGeneral.__dataclass_fields__.values()}
+        )
+        self._original_listeners = [
+            IdleListener(**{f.name: getattr(l, f.name) for f in IdleListener.__dataclass_fields__.values()})
+            for l in self._listeners
+        ]
+        self._enable_idle_original = self._enable_idle_value
+
         self._dirty = False
         _restore()
 
@@ -746,7 +865,30 @@ class PowerPage:
                 row.set_selected(idx)
         if hasattr(self, "_logout_entry"):
             self._logout_entry.set_text(self._orig.get("logout_cmd") or "hyprctl dispatch exit")
+
+        # Hypridle side
+        self._general = IdleGeneral(
+            **{f.name: getattr(self._original_general, f.name) for f in IdleGeneral.__dataclass_fields__.values()}
+        )
+        self._listeners = [
+            IdleListener(**{f.name: getattr(l, f.name) for f in IdleListener.__dataclass_fields__.values()})
+            for l in self._original_listeners
+        ]
+        self._enable_idle_value = self._enable_idle_original
         self._dirty = False
+        self._sync_idle_widgets()
+        self._rebuild_listener_list()
+
+    def _sync_idle_widgets(self) -> None:
+        if self._enable_idle_switch is not None:
+            self._enable_idle_switch.set_active(self._enable_idle_value)
+        for var, widget in self._general_widgets.items():
+            if isinstance(widget, Adw.EntryRow):
+                widget.set_text(getattr(self._general, var, ""))
+            elif isinstance(widget, Adw.SwitchRow):
+                widget.set_active(getattr(self._general, var, False))
+        if self._inhibit_spin is not None:
+            self._inhibit_spin.set_value(float(self._general.inhibit_sleep))
 
     def flush_pending(self) -> None:
         self._run_terminal("retro system apply")
@@ -765,8 +907,8 @@ class PowerPage:
         if self._dirty:
             yield PendingChange(
                 category="Power",
-                title="Power Limits",
-                subtitle="AC and battery wattage limits changed",
+                title="Power Management",
+                subtitle="Power limits, idle config, and sleep listeners changed",
                 navigate_to="power",
                 icon=_PWR_ICON,
                 kind="modified",
@@ -781,4 +923,13 @@ class PowerPage:
             {"key": "power:logout", "label": "Logout Command",
              "description": "Custom command executed when logging out from the power menu",
              "_group_id": "power", "_group_label": "Power", "_section_label": "Configuration"},
+            {"key": "power:idle", "label": "Idle Configuration",
+             "description": "Lock/unlock commands, sleep hooks, and idle inhibition",
+             "_group_id": "power", "_group_label": "Power", "_section_label": "Idle Configuration"},
+            {"key": "power:listeners", "label": "Sleep Listeners",
+             "description": "Timeout-based idle listeners with commands",
+             "_group_id": "power", "_group_label": "Power", "_section_label": "Listeners"},
         ]
+
+
+__all__ = ["PowerPage"]

@@ -89,7 +89,9 @@ def _parse_block_body(lines: list[str], start: int) -> tuple[dict[str, str], int
         m = re.match(r"^(\S+)\s*=\s*(.*?)(?:\s+#.*)?$", line)
         if m:
             key = m.group(1)
-            val = m.group(2).strip().strip("\"'")
+            val = m.group(2).strip()
+            if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+                val = val[1:-1]
             kv[key] = val
     return kv, i
 
