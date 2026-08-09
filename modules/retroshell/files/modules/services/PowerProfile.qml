@@ -8,10 +8,10 @@ import qs.modules.theme
 Singleton {
     id: root
 
-    property var availableProfiles: []
+    property var availableProfiles: ["power-saver", "balanced", "performance"]
     property string currentProfile: ""
-    property bool isAvailable: false
-    property string backendType: "" // "powerprofilesctl" atau "tlp"
+    property bool isAvailable: true
+    property string backendType: "retro" // Retro's native power engine (power_core.sh)
 
     signal profileChanged(string profile)
 
@@ -27,90 +27,24 @@ Singleton {
     function initialize() {
         if (_initialized) return;
         _initialized = true;
-        console.info("PowerProfile: Component initialized");
-        checkPowerProfilesCtl.running = true;
+        console.info("PowerProfile: Using Retro native power engine (power_core.sh)");
+        updateCurrentProfile();
     }
 
-    // ============================================
-    // POWERPROFILESCTL CHECK
-    // ============================================
-    Process {
-        id: checkPowerProfilesCtl
-        workingDirectory: "/"
-        command: ["powerprofilesctl", "version"]
-        running: false
-        stdout: SplitParser {}
-
-        onExited: exitCode => {
-            if (exitCode === 0) {
-                console.info("PowerProfile: powerprofilesctl detected");
-                backendType = "powerprofilesctl";
-                isAvailable = true;
-
-                // Delay untuk ensure process ready
-                Qt.callLater(() => {
-                    console.info("PowerProfile: Getting profiles...");
-                    updateCurrentProfile();
-                });
-
-                Qt.callLater(() => {
-                    console.info("PowerProfile: Listing profiles...");
-                    listProc.running = true;
-                }, 100);
-            } else {
-                console.info("PowerProfile: powerprofilesctl not available, trying tlp...");
-                checkTLP.running = true;
-            }
-        }
-    }
-
-    // ============================================
-    // TLP CHECK (FALLBACK)
-    // ============================================
-    Process {
-        id: checkTLP
-        workingDirectory: "/"
-        command: ["/sbin/tlp", "--version"]
-        running: false
-        stdout: SplitParser {
-            onRead: data => {
-                const output = data.trim();
-                if (output && output.length > 0) {
-                    console.info("PowerProfile: " + output);
-                }
-            }
-        }
-        onExited: exitCode => {
-            if (exitCode === 0) {
-                console.info("PowerProfile: ✓ TLP detected");
-                backendType = "tlp";
-                isAvailable = true;
-                availableProfiles = ["power-saver", "balanced", "performance"];
-                getTLPProc.running = true;
-            } else {
-                console.warn("PowerProfile: Neither powerprofilesctl nor tlp available");
-                isAvailable = false;
-            }
-        }
-    }
-
-    // ============================================
-    // POWERPROFILESCTL - Get current profile
-    // ============================================
     Process {
         id: getProc
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
                 var val = text.trim();
-                if (!val) return;
+                if (!val) val = "balanced";
                 var profile = "";
                 if (val === "saver") profile = "power-saver";
                 else if (val === "balanced") profile = "balanced";
                 else if (val === "performance") profile = "performance";
                 else profile = val;
                 if (profile && profile !== currentProfile) {
-                    console.info("PowerProfile: Current profile from retro:", profile);
+                    console.info("PowerProfile: Current profile:", profile);
                     currentProfile = profile;
                     profileChanged(profile);
                 }
@@ -118,111 +52,8 @@ Singleton {
         }
     }
 
-    // ============================================
-    // POWERPROFILESCTL - List available profiles
-    // ============================================
-    Process {
-        id: listProc
-        workingDirectory: "/"
-        command: ["bash", "-c", "powerprofilesctl list 2>&1"]
-        running: false
-
-        property string fullOutput: ""
-
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: data => {
-                listProc.fullOutput += data + "\n";
-            }
-        }
-
-        onExited: exitCode => {
-            console.info("PowerProfile: listProc exit code:", exitCode);
-
-            if (exitCode === 0 && fullOutput.trim().length > 0) {
-                console.info("PowerProfile: Full output:", fullOutput);
-                const lines = fullOutput.split('\n');
-                const profiles = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (line.endsWith(':')) {
-                        const profileName = line.replace('*', '').replace(':', '').trim();
-                        if (profileName && profileName.length > 0 && profiles.indexOf(profileName) === -1) {
-                            profiles.push(profileName);
-                        }
-                    }
-                }
-
-                const order = ["power-saver", "balanced", "performance"];
-                profiles.sort((a, b) => {
-                    const indexA = order.indexOf(a);
-                    const indexB = order.indexOf(b);
-                    if (indexA === -1)
-                        return 1;
-                    if (indexB === -1)
-                        return -1;
-                    return indexA - indexB;
-                });
-
-                availableProfiles = profiles;
-                console.info("PowerProfile: powerprofilesctl profiles loaded:", availableProfiles);
-            } else {
-                // Fallback ke TLP jika powerprofilesctl gagal
-                console.warn("PowerProfile: powerprofilesctl list failed, falling back to TLP...");
-                backendType = "";
-                isAvailable = false;
-                checkTLP.running = true;
-            }
-            fullOutput = "";
-        }
-    }
-
-    // ============================================
-    // TLP - Get current profile
-    // ============================================
-    Process {
-        id: getTLPProc
-        workingDirectory: "/"
-        command: ["bash", "-c", "/sbin/tlp-stat -p 2>/dev/null | grep -i 'Active profile' | head -1"]
-        running: false
-        stdout: SplitParser {
-            onRead: data => {
-                const line = data.trim();
-                if (!line)
-                    return;
-
-                console.info("PowerProfile: tlp-stat output:", line);
-                let profile = "";
-
-                if (line.includes("power-saver") || line.includes("powersaver")) {
-                    profile = "power-saver";
-                } else if (line.includes("balanced")) {
-                    profile = "balanced";
-                } else if (line.includes("performance")) {
-                    profile = "performance";
-                }
-
-                if (profile && currentProfile !== profile) {
-                    currentProfile = profile;
-                    console.info("PowerProfile: ✓ Current profile set to:", profile);
-                    profileChanged(profile);
-                }
-            }
-        }
-        onExited: exitCode => {
-            if (exitCode !== 0) {
-                console.warn("PowerProfile: Failed to get TLP profile");
-            }
-        }
-    }
-
-    // ============================================
-    // SET PROFILE - Support both backends
-    // ============================================
     Process {
         id: setProc
-        workingDirectory: "/"
         running: false
         stdout: SplitParser {}
         stderr: SplitParser {
@@ -247,23 +78,13 @@ Singleton {
     }
 
     function updateCurrentProfile() {
-        if (!isAvailable) return;
         var retroDir = Quickshell.env("RETRO_DIR");
         getProc.command = ["bash", retroDir + "/scripts/power_core.sh", "--get"];
         getProc.running = true;
     }
 
     function updateAvailableProfiles() {
-        if (!isAvailable)
-            return;
-
-        if (backendType === "powerprofilesctl") {
-            availableProfiles = [];
-            listProc.running = true;
-        } else if (backendType === "tlp") {
-            // TLP profiles sudah hardcoded
-            console.info("PowerProfile: Available profiles:", availableProfiles);
-        }
+        console.info("PowerProfile: Available profiles:", availableProfiles);
     }
 
     function setProfile(profileName) {
