@@ -27,7 +27,7 @@ readonly INTEL_DB=(
     "10875H|25,45,95|15,25,45" "10750H|20,45,75|12,20,35" "14900K|65,125,253|35,65,95"
     "13900K|65,125,253|35,65,95" "12900K|65,125,241|35,65,95" "11900K|65,125,250|35,65,95"
     "10900K|65,125,250|35,65,95" "9900K|65,95,210|35,65,95" "8700K|65,95,140|35,65,95"
-    "10300H|15,35,50|10,18,30" "1135G7|12,20,32|8,12,18"
+    "10300H|15,35,50|10,18,30" "1135G7|12,20,32|8,12,18" "1235U|10,15,25|7,10,15"
 )
 
 readonly AMD_DB=(
@@ -141,7 +141,7 @@ set_profile() {
     profile="${profile,,}"
 
     local prev=$(get_var "PWR_CURRENT")
-    if [[ "$prev" != "$profile" ]]; then
+    if [[ $prev != "$profile" ]]; then
         set_var "PWR_PREVIOUS" "$prev"
     fi
     set_var "PWR_CURRENT" "$profile"
@@ -409,8 +409,12 @@ case "$1" in
         apply_permissions
 
         if [[ $# -ge 7 ]]; then
-            s_ac="$2"; s_bal="$3"; s_perf="$4"
-            s_bats="$5"; s_batb="$6"; s_batp="$7"
+            s_ac="$2"
+            s_bal="$3"
+            s_perf="$4"
+            s_bats="$5"
+            s_batb="$6"
+            s_batp="$7"
             cpu_name=$(grep -m 1 'model name' /proc/cpuinfo | sed 's/model name\s*:\s*//')
         else
             match=$(optimize_cpu)
