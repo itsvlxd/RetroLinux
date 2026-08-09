@@ -8,6 +8,7 @@ grep
 rsync
 unzip
 expect
+notify
 udisks2
 usbutils
 gstreamer
