@@ -124,11 +124,11 @@ jobs:
           </p>
 
           <p align="center">
-            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-blueviolet?style=for-the-badge&logo=linux">
-            <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
-            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=develop&label=Tests&style=for-the-badge">
-            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=develop&label=Build&style=for-the-badge">
-            <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&color=cyan">
+            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-0a0a0a?style=for-the-badge&labelColor=0a0a0a&color=ff79c6&logo=linux">
+            <img src="https://img.shields.io/badge/Platform-x86__64-0a0a0a?style=for-the-badge&labelColor=0a0a0a&color=00d9ff">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=develop&label=Tests&style=for-the-badge&labelColor=0a0a0a">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=develop&label=Build&style=for-the-badge&labelColor=0a0a0a">
+            <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&labelColor=0a0a0a&color=00d9ff">
           </p>
 
           ### ⚠️ Warnings
@@ -220,11 +220,11 @@ jobs:
           </p>
 
           <p align="center">
-            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-blueviolet?style=for-the-badge&logo=linux">
-            <img src="https://img.shields.io/badge/Platform-x86__64-ff00ff?style=for-the-badge">
-            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=main&label=Tests&style=for-the-badge">
-            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=main&label=Build&style=for-the-badge">
-            <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&color=cyan">
+            <img src="https://img.shields.io/badge/Kernel-${KERNEL_VERSION}-0a0a0a?style=for-the-badge&labelColor=0a0a0a&color=ff79c6&logo=linux">
+            <img src="https://img.shields.io/badge/Platform-x86__64-0a0a0a?style=for-the-badge&labelColor=0a0a0a&color=00d9ff">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/tests.yml?branch=main&label=Tests&style=for-the-badge&labelColor=0a0a0a">
+            <img src="https://img.shields.io/github/actions/workflow/status/itsvlxd/RetroLinux/iso-build.yml?branch=main&label=Build&style=for-the-badge&labelColor=0a0a0a">
+            <img src="https://img.shields.io/github/downloads/itsvlxd/RetroLinux/total?style=for-the-badge&labelColor=0a0a0a&color=00d9ff">
           </p>
 
           ### 💻 About
