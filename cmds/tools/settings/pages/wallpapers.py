@@ -15,13 +15,15 @@ FRAME_CACHE = Path.home() / ".config" / "retro" / "wallpaper_frames"
 WALLPAPER_CORE = Path(os.environ.get("RETRO_DIR", "")) / "scripts" / "wallpaper_core.sh"
 
 
-def _list_wallpapers() -> list[dict]:
+def _list_wallpapers(collection: str | None = None) -> list[dict]:
     current = get_var("WALL_CURRENT", "")
     wall_dir = Path.home() / ".config" / "retro" / "wallpapers"
+    if collection is None:
+        collection = get_var("RETRO_WALL_COLLECTION", "retro")
 
     res_map: dict[str, str] = {}
     result = subprocess.run(
-        ["bash", str(WALLPAPER_CORE), "--list-with-res"],
+        ["bash", str(WALLPAPER_CORE), "--list-with-res", collection or ""],
         capture_output=True, text=True, timeout=15,
     )
     for line in result.stdout.strip().split("\n"):
@@ -30,10 +32,11 @@ def _list_wallpapers() -> list[dict]:
         name, res = line.split("|", 1)
         res_map[name] = res
 
+    search_root = wall_dir / collection if collection and collection != "all" else wall_dir
     wallpapers = []
     for f in sorted(FRAME_CACHE.glob("*.png")):
         orig_name = f.name[:-4]
-        matches = list(wall_dir.rglob(orig_name))
+        matches = list(search_root.rglob(orig_name))
         if not matches:
             continue
         full_path = str(matches[0])
@@ -125,6 +128,11 @@ class WallpapersPage:
         self._static_row: Gtk.Widget | None = None
         self._bat_row: Gtk.Widget | None = None
         self._col_row: Gtk.Widget | None = None
+        self._col_delete_btn: Gtk.Widget | None = None
+        repo_walls = Path(os.environ.get("RETRO_DIR", "")) / "wallpapers"
+        self._repo_collections: list[str] = []
+        if repo_walls.is_dir():
+            self._repo_collections = [p.name for p in repo_walls.iterdir() if p.is_dir()]
         self._slide_row: Gtk.Widget | None = None
         self._interval_row: Gtk.Widget | None = None
         self._res_row: Gtk.Widget | None = None
@@ -362,8 +370,14 @@ class WallpapersPage:
             sync_btn.connect("clicked", self._on_sync)
             header.pack_start(sync_btn)
 
+            new_col_btn = Gtk.Button(icon_name="folder-pictures-symbolic")
+            new_col_btn.set_tooltip_text("New collection\u2026")
+            new_col_btn.add_css_class("flat")
+            new_col_btn.connect("clicked", self._on_new_collection)
+            header.pack_start(new_col_btn)
+
             add_btn = Gtk.Button(icon_name="list-add-symbolic")
-            add_btn.set_tooltip_text("Add wallpaper\u2026")
+            add_btn.set_tooltip_text("Add wallpapers\u2026")
             add_btn.add_css_class("flat")
             add_btn.connect("clicked", self._on_add)
             header.pack_start(add_btn)
@@ -441,9 +455,19 @@ class WallpapersPage:
         )
         col_row.add_suffix(self._col_actions.box)
         self._col_actions.reorder_first()
-        col_row.connect("notify::selected", self._on_collection_changed, collections)
+
+        delete_col_btn = Gtk.Button(icon_name="user-trash-symbolic")
+        delete_col_btn.set_tooltip_text("Delete collection")
+        delete_col_btn.add_css_class("flat")
+        delete_col_btn.set_valign(Gtk.Align.CENTER)
+        delete_col_btn.connect("clicked", self._on_delete_collection)
+        col_row.add_suffix(delete_col_btn)
+        self._col_delete_btn = delete_col_btn
+
+        col_row.connect("notify::selected", self._on_collection_changed)
         pref_group.add(col_row)
         self._col_row = col_row
+        self._update_col_delete_visibility()
 
         # Slideshow
         slide_row = Adw.SwitchRow(title="Enable Slideshow")
@@ -587,9 +611,14 @@ class WallpapersPage:
 
     def _load_wallpapers_async(self) -> None:
         def worker():
-            wallpapers = _list_wallpapers()
+            wallpapers = _list_wallpapers(self._active_collection())
             GLib.idle_add(self._on_wallpapers_loaded, wallpapers)
         threading.Thread(target=worker, daemon=True).start()
+
+    def _active_collection(self) -> str:
+        if self._pending_collection is not None:
+            return self._pending_collection
+        return self._selected_collection()
 
     def _on_wallpapers_loaded(self, wallpapers: list[dict]) -> None:
         self._all_wallpapers = wallpapers
@@ -604,7 +633,7 @@ class WallpapersPage:
     def _refresh(self):
         self._search_term = self._search_entry.get_text().strip().lower() if self._search_entry else ""
         def worker():
-            wallpapers = _list_wallpapers()
+            wallpapers = _list_wallpapers(self._active_collection())
             GLib.idle_add(self._on_refreshed, wallpapers)
         threading.Thread(target=worker, daemon=True).start()
 
@@ -736,19 +765,69 @@ class WallpapersPage:
             self._notify_dirty()
             self._refresh_managed()
 
-    def _on_collection_changed(self, row, _pspec, collections: list[str]):
+    def _on_collection_changed(self, row, _pspec):
         if self._setting_value:
             return
         idx = row.get_selected()
-        if idx < 0 or idx >= len(collections):
+        if idx < 0 or idx >= len(self._collections):
             return
-        name = collections[idx]
+        name = self._collections[idx]
         if name == get_var("RETRO_WALL_COLLECTION", ""):
             return
+        from lib.python.variable import set_var
+        set_var("RETRO_WALL_COLLECTION", name)
         self._pending_collection = name
         self._dirty = True
         self._notify_dirty()
         self._refresh_managed()
+        self._update_col_delete_visibility()
+        self._refresh()
+
+    def _update_col_delete_visibility(self) -> None:
+        if self._col_delete_btn is None:
+            return
+        name = self._selected_collection()
+        self._col_delete_btn.set_visible(name not in ("all", "") and name not in self._repo_collections)
+
+    def _on_delete_collection(self, _btn) -> None:
+        name = self._selected_collection()
+        if not name or name in ("all", "") or name in self._repo_collections:
+            self._window.show_toast("Only custom collections can be deleted", timeout=2)
+            return
+        dialog = Adw.AlertDialog(
+            heading="Delete Collection?",
+            body=f'Delete "{name}" and all its wallpapers? This cannot be undone.',
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_default_response("delete")
+        dialog.set_close_response("cancel")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def _on_response(dialog_obj, response):
+            if response != "delete":
+                return
+
+            def worker():
+                result = subprocess.run(
+                    ["bash", str(WALLPAPER_CORE), "--collection-delete", name],
+                    capture_output=True, text=True, timeout=15,
+                )
+                ok = "result=ok" in result.stdout
+                GLib.idle_add(self._on_collection_deleted, name, ok)
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    def _on_collection_deleted(self, name: str, ok: bool) -> None:
+        if ok:
+            self._window.show_toast(f"Collection deleted: {name}", timeout=2)
+        else:
+            self._window.show_toast("Failed to delete collection", timeout=3)
+        self._refresh_collections(select=None)
+        self._refresh()
 
     def _on_gpu_changed(self, row, _pspec, modes: list[str]):
         if self._setting_value:
@@ -998,32 +1077,182 @@ class WallpapersPage:
         dialog.connect("response", _on_response)
         dialog.present(self._window)
 
+    def _on_new_collection(self, _btn):
+        entry = Gtk.Entry()
+        entry.set_activates_default(True)
+        entry.set_placeholder_text("e.g. My Favorites")
+
+        dialog = Adw.AlertDialog(
+            heading="New Collection",
+            body="Enter a name for the new wallpaper collection.",
+            extra_child=entry,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("create", "Create")
+        dialog.set_default_response("create")
+        dialog.set_close_response("cancel")
+
+        def _on_response(dialog_obj, response):
+            if response != "create":
+                return
+            name = entry.get_text().strip().replace("/", "_").replace(" ", "_")
+            if not name:
+                self._window.show_toast("Collection name cannot be empty", timeout=2)
+                return
+
+            def worker():
+                subprocess.run(
+                    ["bash", str(WALLPAPER_CORE), "--collection-create", name],
+                    capture_output=True, text=True, timeout=15,
+                )
+                GLib.idle_add(self._on_collection_created, name)
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    def _on_collection_created(self, name: str) -> None:
+        self._refresh_collections(select=name)
+        self._window.show_toast(f"Collection created: {name}", timeout=2)
+        self._refresh()
+
+    def _refresh_collections(self, select: str | None = None) -> None:
+        col_result = subprocess.run(
+            ["bash", str(WALLPAPER_CORE), "--collection", "list"],
+            capture_output=True, text=True, timeout=10,
+        )
+        collections = [l.strip() for l in col_result.stdout.split("\n") if l.strip()]
+        collections.sort()
+        collections.insert(0, "all")
+        self._collections = collections
+        if self._col_row is None:
+            return
+        col_display = [c[0].upper() + c[1:] if c else c for c in collections]
+        if select and select in collections:
+            idx = collections.index(select)
+        else:
+            current_col = get_var("RETRO_WALL_COLLECTION", "retro")
+            idx = collections.index(current_col) if current_col in collections else 0
+        self._setting_value = True
+        self._col_row.set_model(Gtk.StringList.new(col_display))
+        self._col_row.set_selected(idx)
+        self._setting_value = False
+        self._update_col_delete_visibility()
+
     def _on_add(self, _btn):
         dialog = Gtk.FileChooserNative.new(
-            title="Select Wallpaper",
+            title="Select Wallpapers",
             parent=self._window,
             action=Gtk.FileChooserAction.OPEN,
             accept_label="Add",
             cancel_label="Cancel",
         )
+        dialog.set_select_multiple(True)
         all_formats = Gtk.FileFilter.new()
         all_formats.set_name("Images & Videos")
         for pat in ("*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif", "*.mp4", "*.mkv", "*.webm"):
             all_formats.add_pattern(pat)
         dialog.add_filter(all_formats)
-        dialog.connect("response", self._on_file_chosen)
+        dialog.connect("response", self._on_files_chosen)
         dialog.show()
 
-    def _on_file_chosen(self, dialog, response):
+    def _on_files_chosen(self, dialog, response):
         if response == Gtk.ResponseType.ACCEPT:
-            path = dialog.get_file().get_path()
-            subprocess.run(
-                ["bash", str(WALLPAPER_CORE), "--add", path],
+            files = dialog.get_files()
+            paths = []
+            for i in range(files.get_n_items()):
+                f = files.get_item(i)
+                p = f.get_path() if f else None
+                if p:
+                    paths.append(p)
+            dialog.destroy()
+            if not paths:
+                return
+            self._add_to_collection(paths)
+        else:
+            dialog.destroy()
+
+    def _add_to_collection(self, paths: list[str]) -> None:
+        collection = self._selected_collection()
+
+        if collection == "all":
+            entry = Gtk.Entry()
+            entry.set_activates_default(True)
+            entry.set_placeholder_text("Collection name")
+
+            dialog = Adw.AlertDialog(
+                heading="Choose a Collection",
+                body="Selecting \u201call\u201d isn\u2019t allowed. Enter a collection name to add these wallpapers to:",
+                extra_child=entry,
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("add", "Add Here")
+            dialog.set_default_response("add")
+            dialog.set_close_response("cancel")
+
+            def _on_response(dialog_obj, response):
+                if response != "add":
+                    return
+                name = entry.get_text().strip().replace("/", "_").replace(" ", "_")
+                if not name:
+                    self._window.show_toast("Collection name cannot be empty", timeout=2)
+                    return
+
+                def worker():
+                    subprocess.run(
+                        ["bash", str(WALLPAPER_CORE), "--collection-create", name],
+                        capture_output=True, text=True, timeout=15,
+                    )
+                    self._add_files_worker(paths, name)
+                    GLib.idle_add(self._on_files_added, name)
+
+                threading.Thread(target=worker, daemon=True).start()
+
+            dialog.connect("response", _on_response)
+            dialog.present(self._window)
+            return
+
+        self._add_files(paths, collection)
+
+    def _add_files(self, paths: list[str], collection: str) -> None:
+        self._window.show_toast("Adding wallpapers\u2026", timeout=2)
+        threading.Thread(
+            target=self._add_files_worker, args=(paths, collection), daemon=True,
+        ).start()
+
+    def _add_files_worker(self, paths: list[str], collection: str) -> None:
+        added = 0
+        errors = 0
+        for p in paths:
+            result = subprocess.run(
+                ["bash", str(WALLPAPER_CORE), "--add", p, collection],
                 capture_output=True, text=True, timeout=30,
             )
-            self._window.show_toast("Wallpaper added", timeout=2)
-            self._refresh()
-        dialog.destroy()
+            if "result=error" in result.stdout:
+                errors += 1
+            else:
+                added += 1
+        GLib.idle_add(self._on_files_done, added, errors, collection)
+
+    def _on_files_done(self, added: int, errors: int, collection: str) -> None:
+        if added:
+            self._window.show_toast(
+                f"Added {added} wallpaper(s) to {collection}", timeout=2,
+            )
+        if errors:
+            self._window.show_toast(f"{errors} file(s) failed", timeout=3)
+        self._refresh()
+
+    def _on_files_added(self, name: str) -> None:
+        self._refresh_collections(select=name)
+
+    def _selected_collection(self) -> str:
+        if self._col_row is not None:
+            idx = self._col_row.get_selected()
+            if 0 <= idx < len(self._collections):
+                return self._collections[idx]
+        return get_var("RETRO_WALL_COLLECTION", "retro")
 
     def _on_click(self, _gesture, _n_press, _x, _y, path: str, display: str):
         if not path or not Path(path).exists():
@@ -1042,6 +1271,4 @@ class WallpapersPage:
             self._refresh()
         else:
             self._window.show_toast(f"Failed to set: {display}", timeout=3)
-
-
 

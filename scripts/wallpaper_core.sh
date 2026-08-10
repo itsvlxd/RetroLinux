@@ -8,6 +8,7 @@ rx_log_register "wallpaper"
 
 add_wallpaper() {
     local source_file="$1"
+    local collection="${2:-}"
     if [[ ! -f $source_file ]]; then
         rx_log_file "ERROR" "Add failed: source file not found: $source_file"
         echo "result=error|reason=file_not_found|path=$source_file"
@@ -21,8 +22,12 @@ add_wallpaper() {
         return 1
     fi
 
-    local collection
-    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+    [[ -z $collection ]] && collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+    if [[ $collection == "all" ]]; then
+        rx_log_file "ERROR" "Add failed: cannot add to the 'all' collection"
+        echo "result=error|reason=invalid_collection|collection=all"
+        return 1
+    fi
     local target_dir="$WALL_DIR/$collection"
     mkdir -p "$target_dir"
 
@@ -500,7 +505,7 @@ sync_wallpapers() {
 case "$1" in
     "--current") get_var "WALL_CURRENT" ;;
     "--set") set_wallpaper "$2" "${3:-false}" "$4" ;;
-    "--add") add_wallpaper "$2" ;;
+    "--add") add_wallpaper "$2" "$3" ;;
     "--slideshow-next") slideshow_next ;;
     "--optimize") optimize_wallpapers ;;
     "--check-resolution")
@@ -562,7 +567,7 @@ case "$1" in
             res=$(get_image_resolution "$f")
             [[ -z $res ]] && res="unknown"
             echo "$filename|$res"
-        done < <(rx_wallpaper_list_files)
+        done < <(rx_wallpaper_list_files "$2")
         ;;
     "--resolve-name")
         resolve_name "$2"
@@ -593,7 +598,9 @@ case "$1" in
             found=false
             for d in "$WALL_DIR"/*/; do
                 [[ -d $d ]] || continue
-                echo "$(basename "$d")"
+                name=$(basename "$d")
+                [[ $name == "all" ]] && continue
+                echo "$name"
                 found=true
             done
             [[ $found == false ]] && echo "(no collections yet)"
@@ -609,6 +616,42 @@ case "$1" in
 
         restore_wallpaper >/dev/null 2>&1
         echo "collection=$new_collection"
+        ;;
+    "--collection-create")
+        name="$2"
+        if [[ -z $name || $name == "all" ]]; then
+            echo "result=error|reason=invalid_collection"
+            exit 1
+        fi
+        target="$WALL_DIR/$name"
+        if [[ -d $target ]]; then
+            set_var "RETRO_WALL_COLLECTION" "$name"
+            echo "result=ok|exists=1|collection=$name"
+            exit 0
+        fi
+        mkdir -p "$target"
+        set_var "RETRO_WALL_COLLECTION" "$name"
+        echo "result=ok|collection=$name"
+        ;;
+    "--collection-delete")
+        name="$2"
+        if [[ -z $name || $name == "all" ]]; then
+            echo "result=error|reason=invalid_collection"
+            exit 1
+        fi
+        if [[ -d "$REPO_WALLS/$name" ]]; then
+            echo "result=error|reason=repo_collection|collection=$name"
+            exit 1
+        fi
+        if [[ ! -d "$WALL_DIR/$name" ]]; then
+            echo "result=error|reason=not_found|collection=$name"
+            exit 1
+        fi
+        rm -rf "$WALL_DIR/$name"
+        if [[ $(get_var "RETRO_WALL_COLLECTION" "retro") == "$name" ]]; then
+            set_var "RETRO_WALL_COLLECTION" "retro"
+        fi
+        echo "result=ok|collection=$name"
         ;;
     "--setup-get")
         theme=$(get_var "RETRO_THEME" "retro")
