@@ -11,6 +11,7 @@ expect
 notify
 udisks2
 usbutils
+dmidecode
 gstreamer
 net-tools
 inetutils
@@ -75,9 +76,10 @@ python-hyprland-state
 python-pygobject-stubs
 
 # Apps
-bazaar
-loupe
 mpv
+loupe
+bazaar
+resources
 
 # Bluetooth
 bluez
