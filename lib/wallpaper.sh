@@ -46,10 +46,22 @@ rx_wallpaper_get_theme_dir() {
 }
 
 rx_wallpaper_list_files() {
+    local collection_override="${1:-}"
     local target_dir
-    target_dir=$(rx_wallpaper_get_theme_dir)
     local collection
-    collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+
+    if [[ -n $collection_override ]]; then
+        collection="$collection_override"
+    else
+        collection=$(get_var "RETRO_WALL_COLLECTION" "retro")
+    fi
+
+    if [[ $collection == "all" ]]; then
+        target_dir="$WALL_DIR"
+    else
+        target_dir="$WALL_DIR/$collection"
+        mkdir -p "$target_dir"
+    fi
 
     if [[ $collection == "all" ]]; then
         find "$target_dir" -maxdepth 2 \( -type f -o -type l \) 2>/dev/null \
@@ -127,7 +139,7 @@ rx_wallpaper_is_static() {
 }
 
 rx_wallpaper_ensure_awww() {
-    if ! pgrep -x "awww-daemon" >/dev/null; then
+    if ! pgrep -f "awww-daemon" >/dev/null 2>&1; then
         nohup awww-daemon >/dev/null 2>&1 &
         for i in $(seq 1 10); do
             sleep 0.2
@@ -223,7 +235,7 @@ rx_wallpaper_launch_mpvpaper() {
 
     local base="${filename%.*}"
     local ext="${filename##*.}"
-    local res_map=$(get_var "WALL_RES_MAP")
+    local custom_res=$(get_var "WALL_RESOLUTION")
     local gpu_env=$(rx_wallpaper_get_gpu_env)
     local gpu_mode=$(get_var "WALL_GPU_OFFLOAD" "auto")
     local hwdec="auto"
@@ -233,15 +245,14 @@ rx_wallpaper_launch_mpvpaper() {
         [[ -z $m_name ]] && continue
         [[ -n $target_monitor && $m_name != "$target_monitor" ]] && continue
 
+        pkill -9 -f "mpvpaper.*\"$m_name\"" 2>/dev/null
+
         local target_video="$video_path"
 
-        if [[ -n $res_map ]]; then
-            local custom_res=$(echo "$res_map" | tr ',' '\n' | grep -F "$m_desc|" | cut -d'|' -f2)
-            if [[ -n $custom_res ]]; then
-                local clean_base=$(echo "$base" | sed -E 's/\.[0-9]+x[0-9]+$//')
-                local opt_file="$theme_dir/${clean_base}.${custom_res}.${ext}"
-                [[ -f $opt_file ]] && target_video="$opt_file"
-            fi
+        if [[ -n $custom_res && $custom_res != "null" ]]; then
+            local clean_base=$(echo "$base" | sed -E 's/\.[0-9]+x[0-9]+$//')
+            local opt_file="$theme_dir/${clean_base}.${custom_res}.${ext}"
+            [[ -f $opt_file ]] && target_video="$opt_file"
         fi
 
         local mpv_opts="--loop --panscan=1.0 --no-audio --hwdec=$hwdec --input-ipc-server=$MPV_SOCKET"
@@ -284,10 +295,11 @@ rx_wallpaper_start() {
         set_var "WALL_MONITOR_$monitor" "$wall_path"
     fi
 
+    pkill -9 mpvpaper 2>/dev/null
+
     rx_wallpaper_set_image "$static_source" "$quick" "$is_first_load" "$monitor"
 
     if [[ $is_video == "true" ]]; then
-        pkill mpvpaper 2>/dev/null
         local v_static=$(get_var "WALL_STATIC_FORCED" "false")
         local v_paused=$(get_var "WALL_PAUSED" "false")
         if [[ $v_static != "true" && $v_paused != "true" ]]; then
@@ -297,6 +309,9 @@ rx_wallpaper_start() {
             fi
             (
                 sleep $trans_delay
+                local current_check=$(get_var "WALL_CURRENT")
+                [[ $current_check != "$wall_path" ]] && exit 0
+                pkill -9 mpvpaper 2>/dev/null
                 rx_wallpaper_launch_mpvpaper "$wall_path" "$theme_dir" "$filename" "$monitor"
             ) >>/tmp/retro_wallpaper_launch.log 2>&1 &
         fi
@@ -347,7 +362,7 @@ rx_wallpaper_restore() {
 }
 
 rx_wallpaper_pause() {
-    pkill mpvpaper 2>/dev/null
+    pkill -9 mpvpaper 2>/dev/null
     set_var "WALL_PAUSED" "true"
 }
 
