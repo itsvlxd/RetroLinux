@@ -17,7 +17,7 @@ cmd_load() {
 
     startup_tasks+=(
         "retro xdg portal inject|Injecting session env into XDG portal daemon"
-        "retro firewall on|Enabling nftables firewall"
+        # FIX:"retro firewall on|Enabling nftables firewall"
 
         "retro bluetooth restore|Initializing bluetooth radio cards"
         "retro audio easyeffects start|Initializing audio drivers"
