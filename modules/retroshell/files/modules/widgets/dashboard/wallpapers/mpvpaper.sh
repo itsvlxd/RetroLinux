@@ -15,11 +15,11 @@ MONITOR="${3:-ALL}"
 # For now, we'll kill by checking the command line args if MONITOR != ALL.
 # We must avoid killing this script itself, so we filter by the exact executable name.
 if [ "$MONITOR" = "ALL" ]; then
-    pkill -x "mpvpaper" 2>/dev/null
+    pkill -9 -x "mpvpaper" 2>/dev/null
 else
     pgrep -x mpvpaper | while read -r pid; do
         if ps -p "$pid" -o args= | grep -q "$MONITOR"; then
-            kill "$pid" 2>/dev/null
+            kill -9 "$pid" 2>/dev/null
         fi
     done
 fi

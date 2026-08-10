@@ -71,8 +71,8 @@ ActionGrid {
             command: ""
         },
         {
-            icon: GlobalStates.mirrorWindowVisible ? Icons.webcamSlash : Icons.webcam,
-            tooltip: "Mirror",
+            icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
+            tooltip: "Webcam Overlay",
             command: ""
         }
     ]
@@ -177,8 +177,8 @@ ActionGrid {
             Screenshot.captureMode = "lens";
             root.itemSelected();
             screenshotDelay.start();
-        } else if (action.tooltip === "Mirror") {
-            GlobalStates.mirrorWindowVisible = !GlobalStates.mirrorWindowVisible;
+        } else if (action.tooltip === "Webcam Overlay") {
+            GlobalStates.webcamOverlayVisible = !GlobalStates.webcamOverlayVisible;
         }
     }
 }
