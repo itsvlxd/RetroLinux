@@ -3,7 +3,7 @@
 # Check dependencies
 for dep in grim slurp tesseract wl-copy notify-send; do
     if ! command -v $dep &> /dev/null; then
-        notify-send "OCR Error" "Missing dependency: $dep" -u critical
+        notify-send -a RetroLinux "OCR Error" "Missing dependency: $dep" -u critical
         exit 1
     fi
 done
@@ -34,7 +34,7 @@ TEXT=$(echo "$TEXT" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
 if [ -n "$TEXT" ]; then
     echo "$TEXT" | wl-copy
-    notify-send "OCR Result" "Text copied to clipboard" -i edit-paste
+    notify-send -a RetroLinux "OCR Result" "Text copied to clipboard" -i edit-paste
 else
-    notify-send "OCR Result" "No text detected" -u low -i dialogue-error
+    notify-send -a RetroLinux "OCR Result" "No text detected" -u low -i dialogue-error
 fi

@@ -16,6 +16,8 @@ for dep in ("grim", "slurp", "magick", "wl-copy", "notify-send"):
         subprocess.call(
             [
                 "notify-send",
+                "-a",
+                "RetroLinux",
                 "Color Picker",
                 f"Missing dependency: {dep}",
                 "-u",
@@ -61,7 +63,7 @@ proc = subprocess.Popen(
         "-i",
         str(icon),
         "-a",
-        "ColorPicker",
+        "RetroLinux",
         "-u",
         "normal",
         "--action=hex=Copy HEX",
@@ -78,6 +80,8 @@ if action == "rgb":
     subprocess.call(
         [
             "notify-send",
+            "-a",
+            "RetroLinux",
             "Color Picker",
             f"RGB copied: {rgb_color}",
             "-i",
@@ -91,6 +95,8 @@ elif action == "hsv":
     subprocess.call(
         [
             "notify-send",
+            "-a",
+            "RetroLinux",
             "Color Picker",
             f"HSV copied: {hsv_color}",
             "-i",
@@ -104,6 +110,8 @@ elif action == "hex":
     subprocess.call(
         [
             "notify-send",
+            "-a",
+            "RetroLinux",
             "Color Picker",
             f"HEX copied: {hex_color}",
             "-i",

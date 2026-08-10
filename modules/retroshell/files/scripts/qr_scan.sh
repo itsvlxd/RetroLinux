@@ -3,7 +3,7 @@
 # Check dependencies
 for dep in grim slurp zbarimg wl-copy notify-send; do
     if ! command -v $dep &> /dev/null; then
-        notify-send "QR Scan Error" "Missing dependency: $dep" -u critical
+        notify-send -a RetroLinux "QR Scan Error" "Missing dependency: $dep" -u critical
         exit 1
     fi
 done
@@ -23,7 +23,7 @@ if [ -n "$RESULT" ]; then
     # zbarimg might return multiple lines if multiple codes are found
     # We'll just copy everything
     echo -n "$RESULT" | wl-copy
-    notify-send "QR/Barcode Result" "Content copied to clipboard" -i qr-code
+    notify-send -a RetroLinux "QR/Barcode Result" "Content copied to clipboard" -i qr-code
 else
-    notify-send "QR/Barcode Result" "No code detected" -u low -i dialogue-error
+    notify-send -a RetroLinux "QR/Barcode Result" "No code detected" -u low -i dialogue-error
 fi

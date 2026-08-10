@@ -8,14 +8,14 @@ IMAGE_PATH="/tmp/image.png"
 
 # Verify image exists
 if [[ ! -f "$IMAGE_PATH" ]]; then
-	notify-send -u critical "Google Lens" "No image found at $IMAGE_PATH" >&2
+	notify-send -a RetroLinux -u critical "Google Lens" "No image found at $IMAGE_PATH" >&2
 	echo "ERROR: Image file not found at $IMAGE_PATH" >&2
 	exit 1
 fi
 
 # Verify image is readable
 if [[ ! -r "$IMAGE_PATH" ]]; then
-	notify-send -u critical "Google Lens" "Cannot read image at $IMAGE_PATH" >&2
+	notify-send -a RetroLinux -u critical "Google Lens" "Cannot read image at $IMAGE_PATH" >&2
 	echo "ERROR: Image file not readable at $IMAGE_PATH" >&2
 	exit 1
 fi
@@ -29,7 +29,7 @@ for cmd in curl jq xdg-open notify-send; do
 done
 
 # Notify user that processing has started
-notify-send -u normal "Google Lens" "Uploading image for analysis..."
+notify-send -a RetroLinux -u normal "Google Lens" "Uploading image for analysis..."
 
 # Upload to uguu.se with error handling
 echo "Uploading image to uguu.se..." >&2
@@ -41,7 +41,7 @@ curlExit=$?
 set -e
 
 if [[ $curlExit -ne 0 ]]; then
-	notify-send -u critical "Google Lens" "Upload failed (curl error $curlExit)" >&2
+	notify-send -a RetroLinux -u critical "Google Lens" "Upload failed (curl error $curlExit)" >&2
 	echo "ERROR: Upload failed with curl exit code $curlExit" >&2
 	echo "Response: $uploadResponse" >&2
 	exit 1
@@ -52,7 +52,7 @@ imageLink=$(echo "$uploadResponse" | jq -r '.files[0].url' 2>&1)
 jqExit=$?
 
 if [[ $jqExit -ne 0 ]] || [[ -z "$imageLink" ]] || [[ "$imageLink" == "null" ]]; then
-	notify-send -u critical "Google Lens" "Failed to parse upload response" >&2
+	notify-send -a RetroLinux -u critical "Google Lens" "Failed to parse upload response" >&2
 	echo "ERROR: Failed to parse upload response" >&2
 	echo "Response: $uploadResponse" >&2
 	exit 1
@@ -65,12 +65,12 @@ lensUrl="https://lens.google.com/uploadbyurl?url=${imageLink}"
 echo "Opening in Google Lens: $lensUrl" >&2
 
 if ! xdg-open "$lensUrl" 2>&1; then
-	notify-send -u critical "Google Lens" "Failed to open browser" >&2
+	notify-send -a RetroLinux -u critical "Google Lens" "Failed to open browser" >&2
 	echo "ERROR: Failed to open browser" >&2
 	exit 1
 fi
 
 # Clean up
 rm -f "$IMAGE_PATH"
-notify-send "Google Lens" "Image opened in browser successfully"
+notify-send -a RetroLinux "Google Lens" "Image opened in browser successfully"
 echo "Success: Google Lens opened" >&2
