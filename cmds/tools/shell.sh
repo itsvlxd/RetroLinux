@@ -8,6 +8,23 @@ cmd_shell() {
     local action="${1,,}"
     local core="$RETRO_DIR/scripts/shell_core.sh"
 
+    _kill_axctl() {
+        local cleaned=0
+        if command -v pkill >/dev/null 2>&1; then
+            if pkill -x axctl 2>/dev/null; then
+                cleaned=1
+            fi
+            pkill -f 'axctl.*daemon' 2>/dev/null
+        fi
+        if ls /tmp/axctl-*.sock >/dev/null 2>&1; then
+            rm -f /tmp/axctl-*.sock
+            cleaned=1
+        fi
+        if [[ $cleaned -eq 1 ]]; then
+            rx_log "info" "Killed lingering axctl processes"
+        fi
+    }
+
     case "$action" in
         start)
             local result=$(bash "$core" --start)
@@ -28,6 +45,7 @@ cmd_shell() {
         restart|reload)
             bash "$core" --stop >/dev/null 2>&1
             sleep 1
+            _kill_axctl
             local result=$(bash "$core" --start)
             if echo "$result" | grep -q "^OK"; then
                 rx_log "success" "RetroShell restarted"
