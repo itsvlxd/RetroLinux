@@ -474,7 +474,7 @@ cmd_audio() {
                     if [[ $status == "Started" ]]; then
                         rx_log "success" "EasyEffects daemon restarted"
                         if [[ ${AUDIO_EE_NOTIFY:-1} == "1" ]]; then
-                            notify-send -a retro -u normal -t 10000 -i audio-card-symbolic \
+                            notify-send -a RetroLinux -u normal -t 10000 -i audio-card-symbolic \
                                 "EasyEffects Restarted" "EasyEffects was restarted and the audio engine is back online."
                         fi
                     else

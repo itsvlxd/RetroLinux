@@ -57,3 +57,31 @@ const processNotificationBody = (body, appName) => {
     // No reemplazar saltos de línea con espacios
     return processedBody;
 };
+
+// Sanitize a notification body for safe rich-text (HTML) rendering.
+// Escapes everything, then re-allows only a small whitelist of tags so
+// <b> / <i> / <u> / <br> format properly while literal <, >, & and
+// arbitrary HTML (images, links, etc.) are neutralized.
+const sanitizeBody = (body, appName) => {
+    const stripped = processNotificationBody(body, appName);
+    if (!stripped)
+        return "";
+
+    let escaped = stripped
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Restore whitelisted inline tags
+    escaped = escaped
+        .replace(/&lt;b&gt;/gi, "<b>")
+        .replace(/&lt;\/b&gt;/gi, "</b>")
+        .replace(/&lt;i&gt;/gi, "<i>")
+        .replace(/&lt;\/i&gt;/gi, "</i>")
+        .replace(/&lt;u&gt;/gi, "<u>")
+        .replace(/&lt;\/u&gt;/gi, "</u>")
+        // <br>, <br/>, <br />, <br/>
+        .replace(/&lt;br\s*\/?&gt;/gi, "<br/>");
+
+    return escaped;
+};

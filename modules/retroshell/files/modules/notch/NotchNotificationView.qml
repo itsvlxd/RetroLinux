@@ -529,7 +529,8 @@ Item {
 
                                                 Text {
                                                     width: parent.width
-                                                    text: notification ? processNotificationBody(notification.body, notification.appName) : ""
+                                                    text: notification ? NotificationUtils.sanitizeBody(notification.body, notification.appName) : ""
+                                                    textFormat: Text.RichText
                                                     font.family: Config.theme.font
                                                     font.pixelSize: Config.theme.fontSize
                                                     font.weight: notification && notification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -587,7 +588,8 @@ Item {
                                                         }
                                                         return Math.min(implicitWidth, Math.max(60, availableWidth, parent.width * 0.3));
                                                     }
-                                                    text: notification ? processNotificationBody(notification.body || "").replace(/\n/g, ' ') : ""
+                                                    text: notification ? NotificationUtils.sanitizeBody(notification.body || "").replace(/\n/g, ' ') : ""
+                                                    textFormat: Text.RichText
                                                     font.family: Config.theme.font
                                                     font.pixelSize: Config.theme.fontSize
                                                     font.weight: notification && notification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -838,30 +840,5 @@ Item {
                 }
             }
         }
-    }
-
-    // Función auxiliar para procesar el cuerpo de la notificación
-    function processNotificationBody(body, appName) {
-        if (!body)
-            return "";
-
-        let processedBody = body;
-
-        // Limpiar notificaciones de navegadores basados en Chromium
-        if (appName) {
-            const lowerApp = appName.toLowerCase();
-            const chromiumBrowsers = ["brave", "chrome", "chromium", "vivaldi", "opera", "microsoft edge"];
-
-            if (chromiumBrowsers.some(name => lowerApp.includes(name))) {
-                const lines = body.split('\n\n');
-
-                if (lines.length > 1 && lines[0].startsWith('<a')) {
-                    processedBody = lines.slice(1).join('\n\n');
-                }
-            }
-        }
-
-        // No reemplazar saltos de línea con espacios
-        return processedBody;
     }
 }

@@ -165,7 +165,7 @@ Item {
         // Prepare notification command before running
         let cmd = [
             "notify-send",
-            "-a", "Pomodoro",
+            "-a", "RetroLinux",
             "Pomodoro",
             finishedSession + " session finished!"
         ];

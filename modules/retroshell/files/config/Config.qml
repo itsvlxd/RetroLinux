@@ -2500,7 +2500,7 @@ Singleton {
                     "actions": [
                         {
                             "dispatcher": "exec",
-                            "argument": "notify-send \"Soon\"",
+                            "argument": "notify-send -a RetroLinux \"Soon\"",
                             "flags": "",
                             "layouts": []
                         }

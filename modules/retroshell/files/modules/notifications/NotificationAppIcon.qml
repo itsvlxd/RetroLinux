@@ -44,8 +44,12 @@ Item {
                 anchors.centerIn: parent
                 text: {
                     if (root.urgency == NotificationUrgency.Critical) return Icons.alert;
-                    if (root.appName === "Pomodoro") return Icons.timer;
-                    if (root.appName === "RetroLinux") return Icons.caffeine;
+                    if (root.summary === "Pomodoro") return Icons.timer;
+                    if (root.appName === "RetroLinux") {
+                        if (String(root.summary).indexOf("Recording") === 0) return Icons.recordScreen;
+                        if (String(root.summary).indexOf("Screenshot") === 0) return Icons.screenshots;
+                        return Icons.caffeine;
+                    }
                     return Icons.bell;
                 }
                 font.family: Icons.font

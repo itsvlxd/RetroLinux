@@ -220,7 +220,8 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: latestNotification ? NotificationUtils.processNotificationBody(latestNotification.body, latestNotification.appName) : ""
+                                text: latestNotification ? NotificationUtils.sanitizeBody(latestNotification.body, latestNotification.appName) : ""
+                                textFormat: Text.RichText
                                 font.family: Config.theme.font
                                 font.pixelSize: Config.theme.fontSize
                                 font.weight: latestNotification && latestNotification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -323,7 +324,8 @@ Item {
 
                                             Text {
                                                 width: parent.width
-                                                text: NotificationUtils.processNotificationBody(modelData.body || "", modelData.appName)
+                                                text: NotificationUtils.sanitizeBody(modelData.body || "", modelData.appName)
+                                                textFormat: Text.RichText
                                                 font.family: Config.theme.font
                                                 font.pixelSize: root.fontSize
                                                 font.weight: modelData.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
@@ -364,12 +366,14 @@ Item {
                                 }
 
                                 Text {
-                                    text: latestNotification ? NotificationUtils.processNotificationBody(latestNotification.body || "").replace(/\n/g, ' ') : ""
+                                    text: latestNotification ? NotificationUtils.sanitizeBody(latestNotification.body || "").replace(/\n/g, ' ') : ""
+                                    textFormat: Text.RichText
                                     font.family: Config.theme.font
                                     font.pixelSize: root.fontSize
                                     font.weight: latestNotification && latestNotification.urgency == NotificationUrgency.Critical ? Font.Bold : Font.Normal
                                     color: latestNotification && latestNotification.urgency == NotificationUrgency.Critical ? Colors.criticalText : Colors.overBackground
                                     wrapMode: Text.NoWrap
+                                    maximumLineCount: 1
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                     visible: text.length > 0

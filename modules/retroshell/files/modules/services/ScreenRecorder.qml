@@ -11,6 +11,7 @@ QtObject {
     property bool isRecording: false
     property string duration: ""
     property string lastError: ""
+    property string lastOutputFile: ""
     property bool canRecordDirectly: true // Optimistic default
 
     property bool _initialized: false
@@ -118,6 +119,7 @@ QtObject {
 
         var outDir = root.resolveOutputDir();
         var outputFile = outDir + "/" + new Date().toISOString().replace(/[:.]/g, "-") + ".mp4";
+        root.lastOutputFile = outputFile;
         var fps = Config.tools.recordingFps || 60;
         var cmd = "gpu-screen-recorder -f " + fps;
 
@@ -174,7 +176,8 @@ QtObject {
     // 2. Notify
     property Process notifyStartProcess: Process {
         id: notifyStartProcess
-        command: ["notify-send", "Screen Recorder", "Starting recording..."]
+        running: false
+        command: ["notify-send", "-a", "RetroLinux", "Recording Started", "Recording will be saved to " + root.resolveOutputDir() + "."]
     }
 
     // 3. Start
@@ -199,27 +202,54 @@ QtObject {
                 root.isRecording = false;
                 notifyErrorProcess.running = true;
             } else {
-                notifySavedProcess.running = true;
+                root._notifySaved();
             }
         }
     }
 
     property Process notifyErrorProcess: Process {
         id: notifyErrorProcess
-        command: ["notify-send", "-u", "critical", "Screen Recorder Error", "Failed to start. Check logs."]
+        running: false
+        command: ["notify-send", "-a", "RetroLinux", "-u", "critical", "Recording Failed", "Could not start the recording. Check the logs and try again."]
     }
 
     property Process notifySavedProcess: Process {
         id: notifySavedProcess
-        command: ["notify-send", "Screen Recorder", "Recording saved to " + root.resolveOutputDir()]
+        running: false
+        command: ["true"]
+    }
+
+    function _notifySaved() {
+        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        var dir = root.resolveOutputDir();
+        var file = root.lastOutputFile;
+        var name = file ? file.split("/").pop() : "";
+        var msg = name ? (name + " saved to " + dir + ".") : ("Recording saved to " + dir + ".");
+        var esc = s => String(s).replace(/'/g, "'\\''");
+        notifySavedProcess.command = ["bash", "-c",
+            "source '" + cfg + "/variables.sh' 2>/dev/null; " +
+            "fm=${RETRO_FILEMANAGER_CMD:-nemo}; " +
+            "action=$(notify-send -a RetroLinux -t 8000 -w -A 'open=Open Folder' " +
+            "'Recording Saved' '" + esc(msg) + "' 2>/dev/null); " +
+            "if [[ \"$action\" == \"open\" || \"$action\" == \"default\" ]]; then " +
+            "\"$fm\" '" + esc(dir) + "' >/dev/null 2>&1 & fi"];
+        notifySavedProcess.running = true;
     }
 
     property Process openVideosProcess: Process {
         id: openVideosProcess
-        command: ["xdg-open", root.videosDir]
+        running: false
+        command: ["true"]
     }
 
     function openRecordingsFolder() {
+        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        var dir = root.resolveOutputDir();
+        var esc = s => String(s).replace(/'/g, "'\\''");
+        openVideosProcess.command = ["bash", "-c",
+            "source '" + cfg + "/variables.sh' 2>/dev/null; " +
+            "fm=${RETRO_FILEMANAGER_CMD:-nemo}; " +
+            "\"$fm\" '" + esc(dir) + "' >/dev/null 2>&1 &"];
         openVideosProcess.running = true;
     }
 

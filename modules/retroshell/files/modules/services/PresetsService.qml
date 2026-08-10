@@ -97,7 +97,7 @@ Singleton {
 
         if (isOfficialName(presetName)) {
             console.warn("Cannot create preset with official name:", presetName)
-            Quickshell.execDetached(["notify-send", "Error", `Cannot use reserved official name "${presetName}".`])
+            Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", `Cannot use reserved official name "${presetName}".`])
             return
         }
 
@@ -277,7 +277,7 @@ Singleton {
 
         if (isOfficialName(newName)) {
             console.warn("Cannot rename to official name")
-            Quickshell.execDetached(["notify-send", "Error", `Cannot rename to reserved official name "${newName}".`])
+            Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", `Cannot rename to reserved official name "${newName}".`])
             return
         }
 
@@ -359,12 +359,12 @@ Singleton {
         onExited: function(exitCode) {
             if (exitCode === 0) {
                 console.log("Preset saved successfully:", root.pendingPresetName)
-                Quickshell.execDetached(["notify-send", "Preset Saved", `Preset "${root.pendingPresetName}" saved successfully.`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Preset Saved", `Preset "${root.pendingPresetName}" saved successfully.`])
                 // Trigger scan
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to save preset:", root.pendingPresetName)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to save preset "${root.pendingPresetName}".`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", `Failed to save preset "${root.pendingPresetName}".`])
             }
             root.pendingPresetName = ""
         }
@@ -378,7 +378,7 @@ Singleton {
         onExited: function(exitCode) {
             if (exitCode === 0 && root.pendingRename) {
                 console.log("Preset renamed successfully:", root.pendingRename.oldName, "->", root.pendingRename.newName)
-                Quickshell.execDetached(["notify-send", "Preset Renamed", `Preset renamed to "${root.pendingRename.newName}".`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Preset Renamed", `Preset renamed to "${root.pendingRename.newName}".`])
                 // Update active preset if it was the renamed one
                 if (root.activePreset === root.pendingRename.oldName) {
                     root.activePreset = root.pendingRename.newName
@@ -389,7 +389,7 @@ Singleton {
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to rename preset")
-                Quickshell.execDetached(["notify-send", "Error", "Failed to rename preset."])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", "Failed to rename preset."])
             }
             root.pendingRename = null
         }
@@ -403,11 +403,11 @@ Singleton {
         onExited: function(exitCode) {
             if (exitCode === 0) {
                 console.log("Preset updated successfully:", root.pendingUpdateName)
-                Quickshell.execDetached(["notify-send", "Preset Updated", `Preset "${root.pendingUpdateName}" updated successfully.`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Preset Updated", `Preset "${root.pendingUpdateName}" updated successfully.`])
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to update preset:", root.pendingUpdateName)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to update preset "${root.pendingUpdateName}".`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", `Failed to update preset "${root.pendingUpdateName}".`])
             }
             root.pendingUpdateName = ""
         }
@@ -421,7 +421,7 @@ Singleton {
         onExited: function(exitCode) {
             if (exitCode === 0) {
                 console.log("Preset deleted successfully:", root.pendingDeleteName)
-                Quickshell.execDetached(["notify-send", "Preset Deleted", `Preset "${root.pendingDeleteName}" deleted.`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Preset Deleted", `Preset "${root.pendingDeleteName}" deleted.`])
                 // Clear active preset if it was the deleted one
                 if (root.activePreset === root.pendingDeleteName) {
                     root.activePreset = ""
@@ -429,7 +429,7 @@ Singleton {
                 root.scanProcess.running = true
             } else {
                 console.warn("Failed to delete preset:", root.pendingDeleteName)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to delete preset "${root.pendingDeleteName}".`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", `Failed to delete preset "${root.pendingDeleteName}".`])
             }
             root.pendingDeleteName = ""
         }
@@ -449,11 +449,11 @@ Singleton {
         onExited: function(exitCode) {
             if (exitCode === 0) {
                 console.log("Preset loaded successfully:", root.currentPreset)
-                Quickshell.execDetached(["notify-send", "Preset Loaded", `Preset "${root.currentPreset}" loaded successfully.`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Preset Loaded", `Preset "${root.currentPreset}" loaded successfully.`])
                 root.activePreset = root.currentPreset
             } else {
                 console.warn("Failed to load preset:", root.currentPreset)
-                Quickshell.execDetached(["notify-send", "Error", `Failed to load preset "${root.currentPreset}".`])
+                Quickshell.execDetached(["notify-send", "-a", "RetroLinux", "Error", `Failed to load preset "${root.currentPreset}".`])
             }
             root.currentPreset = ""
         }

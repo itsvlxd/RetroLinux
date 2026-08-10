@@ -48,7 +48,7 @@ return {
                     local name = Bluetooth.get_device_name(mac)
                     local display = Bluetooth.get_profile_display_name(profile)
                     Watcher.log("bluetooth", "Sending notification: Forced " .. display .. " for " .. name, "info")
-                    os.execute('notify-send -a "RetroBT" -u normal -i "bluetooth-active-symbolic" "Profile Restored" "Forced ' .. display .. ' applied to ' .. name .. '" 2>/dev/null')
+                    os.execute('notify-send -a "RetroLinux" -u normal -i "bluetooth-active-symbolic" "Profile Restored" "Forced ' .. display .. ' applied to ' .. name .. '" 2>/dev/null')
                 end
                 Watcher.log("bluetooth", "Forced profile applied to " .. mac .. ": " .. profile, "info")
                 return true

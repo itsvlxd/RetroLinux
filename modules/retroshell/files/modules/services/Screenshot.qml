@@ -189,6 +189,7 @@ QtObject {
                 } else {
                     copyProcess.running = true
                     root.imageSaved(root.finalPath)
+                    root._notifySaved()
                 }
             } else {
                 root.errorOccurred("Failed to save image")
@@ -428,6 +429,30 @@ QtObject {
              openScreenshotsProcess.command = ["xdg-open", root.screenshotsDir];
         }
         openScreenshotsProcess.running = true;
+    }
+
+    property Process savedNotifyProcess: Process {
+        id: savedNotifyProcess
+        running: false
+        command: ["true"]
+    }
+
+    function _notifySaved() {
+        var file = root.finalPath;
+        var dir = root.screenshotsDir;
+        var name = file ? file.split("/").pop() : "";
+        var msg = name ? (name + " saved to " + dir + ".") : ("Screenshot saved to " + dir + ".");
+        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        var esc = s => String(s).replace(/'/g, "'\\''");
+        savedNotifyProcess.command = ["bash", "-c",
+            "source '" + cfg + "/variables.sh' 2>/dev/null; " +
+            "action=$(notify-send -a RetroLinux -t 8000 -w -A 'open=Open' -A 'delete=Delete' " +
+            "'Screenshot Taken' '" + esc(msg) + "' 2>/dev/null); " +
+            "if [[ \"$action\" == \"open\" ]]; then " +
+            "xdg-open '" + esc(file) + "' >/dev/null 2>&1 & " +
+            "elif [[ \"$action\" == \"delete\" ]]; then " +
+            "rm -f '" + esc(file) + "'; fi"];
+        savedNotifyProcess.running = true;
     }
 
     function runLensScript() {
