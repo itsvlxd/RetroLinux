@@ -305,29 +305,23 @@ cmd_wallpaper() {
             native_h=$(echo "$mon_info" | jq -r '(.height/.scale)|floor')
             [[ -n $native_w && -n $native_h ]] && native_res="${native_w}x${native_h}"
 
-            local res_map=$(get_var "WALL_RES_MAP")
-            local custom_res=""
-
-            if [[ -n $res_map && $res_map != "null" ]]; then
-                custom_res=$(echo "$res_map" | tr ',' '\n' | grep -F "$mon_desc|" | cut -d'|' -f2)
-            fi
+            local current_res=$(get_var "WALL_RESOLUTION")
 
             local active_res="${current_w}x${current_h}"
 
-            if [[ -n $custom_res ]]; then
-                active_res="$custom_res"
+            if [[ -n $current_res && $current_res != "null" ]]; then
+                active_res="$current_res"
             fi
 
             if [[ $RX_SETUP_YES == "true" || $SKIP_PROMPT == "true" || $RX_SETUP_MODE == "non-interactive" ]]; then
-                if [[ -n $res_map && $res_map != "null" ]]; then
+                if [[ -n $current_res && $current_res != "null" ]]; then
                     rx_log "info" "Keeping current wallpaper resolution configuration."
                     return 0
                 fi
 
                 local cap_res="$native_res"
                 [[ -z $cap_res ]] && cap_res="$active_res"
-                local entry="${mon_desc}|${cap_res}"
-                set_var "WALL_RES_MAP" "$entry"
+                set_var "WALL_RESOLUTION" "$cap_res"
                 rx_log "success" "Wallpapers resolution capped at native ${PINK}${cap_res}${RESET}."
 
                 rx_log "info" "Analyzing repository and generating optimized video feeds..."
@@ -347,7 +341,7 @@ cmd_wallpaper() {
             read user_res
 
             if [[ -z $user_res ]]; then
-                if [[ -n $res_map && $res_map != "null" ]]; then
+                if [[ -n $current_res && $current_res != "null" ]]; then
                     rx_log "info" "No changes made. Keeping your optimized configuration."
                     return 0
                 else
@@ -356,15 +350,10 @@ cmd_wallpaper() {
                 fi
             fi
 
-            local res_map=$(get_var "WALL_RES_MAP")
-
-            local new_map=""
-            if [[ -n $res_map && $res_map != "null" ]]; then
-                new_map=$(echo "$res_map" | tr ',' '\n' | grep -vF "$mon_desc|" | paste -sd, -)
-            fi
-
+            local new_res=""
             if [[ $user_res == "reset" ]]; then
                 rx_log "success" "monitor reset to native rendering scale."
+                set_var "WALL_RESOLUTION" ""
             else
                 if [[ ! $user_res =~ ^[0-9]+x[0-9]+$ ]]; then
                     rx_log "error" "invalid format! you must use wxh (e.g. 1280x720)."
@@ -379,16 +368,10 @@ cmd_wallpaper() {
                     return 1
                 fi
 
-                local entry="${mon_desc}|${user_res}"
-                if [[ -z $new_map ]]; then
-                    new_map="$entry"
-                else
-                    new_map="${new_map},${entry}"
-                fi
+                new_res="$user_res"
+                set_var "WALL_RESOLUTION" "$new_res"
                 rx_log "success" "Wallpapers resolution have been capped at ${PINK}${user_res}${RESET}."
             fi
-
-            set_var "WALL_RES_MAP" "$new_map"
 
             rx_log "info" "Analyzing repository and generating optimized video feeds..."
             bash "$wall_script" --optimize
