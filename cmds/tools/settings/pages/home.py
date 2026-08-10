@@ -98,7 +98,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("bluetooth", "Bluetooth", "Bluetooth devices", BLUETOOTH_ICON),
     ("audio", "Audio", "Sound devices and volume", AUDIO_ICON),
     ("battery", "Battery", "Battery status and care", BATTERY_ICON),
-    ("power", "Power Management", "Power profiles, idle and sleep", POWER_ICON),
+    ("power", "Power", "Power profiles, idle and sleep", POWER_ICON),
     ("disks", "Disks", "Disk health and storage", DISKS_ICON),
     ("grub", "Bootloader", "Boot entries and kernel options", GRUB_ICON),
     ("driver", "Drivers", "Hardware drivers", DRIVER_ICON),
