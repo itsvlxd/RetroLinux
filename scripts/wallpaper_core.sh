@@ -69,15 +69,15 @@ slideshow_next() {
 
 optimize_wallpapers() {
     local target_res
-    target_res=$(_wallpaper_first_res "$(get_var "WALL_RES_MAP")")
-    [[ -z $target_res ]] && target_res=$(get_monitor_resolutions | head -1)
+    target_res=$(get_var "WALL_RESOLUTION")
+    [[ -z $target_res || $target_res == "null" ]] && target_res=$(get_monitor_resolutions | head -1)
     local target_w="${target_res%x*}"
     local target_h="${target_res#*x}"
     [[ -z $target_w || -z $target_h ]] && return 0
 
     # Pause wallpaper system so the daemon doesn't restart mpvpaper
     set_var "WALL_PAUSED" "true"
-    pkill mpvpaper 2>/dev/null
+    pkill -9 mpvpaper 2>/dev/null
     sleep 1
 
     local optimized=0 skipped=0
@@ -129,10 +129,11 @@ optimize_wallpapers() {
 }
 
 get_monitor_resolutions() {
-    local res_map=$(get_var "WALL_RES_MAP")
+    local target_res
+    target_res=$(get_var "WALL_RESOLUTION")
 
-    if [[ -n $res_map && $res_map != "null" ]]; then
-        echo "$res_map" | tr ',' '\n' | sed 's/^[^|]*|//' | grep -E '^[0-9]+x[0-9]+$'
+    if [[ -n $target_res && $target_res != "null" ]]; then
+        echo "$target_res" | grep -E '^[0-9]+x[0-9]+$'
         return 0
     fi
 
@@ -149,14 +150,6 @@ get_monitor_resolutions() {
     fi
 
     echo "1920x1080"
-}
-
-# Extract the first valid "WxH" resolution from a WALL_RES_MAP value
-# ("desc|res,desc|res" or a bare "WxH"); prints nothing if none found.
-_wallpaper_first_res() {
-    local map="$1"
-    [[ -z $map || $map == "null" ]] && return 1
-    echo "$map" | tr ',' '\n' | sed 's/^.*|//' | grep -E '^[0-9]+x[0-9]+$' | head -1
 }
 
 get_image_resolution() {
@@ -336,7 +329,7 @@ static_wallpaper() {
 }
 
 pause_wallpaper() {
-    pkill mpvpaper 2>/dev/null
+    pkill -9 mpvpaper 2>/dev/null
     set_var "WALL_PAUSED" "true"
     rx_log_file "INFO" "Wallpaper paused (mpvpaper killed)"
     echo "OK|paused"
@@ -435,17 +428,15 @@ sync_wallpapers() {
     local skipped=0
     local upgraded=0
 
-    local res_map=$(get_var "WALL_RES_MAP")
-    # WALL_RES_MAP stores "desc|res,desc|res" (or a bare "WxH"). Reduce it
-    # to the first valid resolution; fall back to the live monitors when the
-    # map is missing, "null", or malformed (e.g. from a system that never ran
-    # wallpaper setup), and repopulate the map with only the resolution.
     local target_res
-    target_res=$(_wallpaper_first_res "$res_map")
-    if [[ -z $target_res ]]; then
+    target_res=$(get_var "WALL_RESOLUTION")
+    # WALL_RESOLUTION stores a single "WxH". If missing, "null", or malformed
+    # (e.g. from a system that never ran wallpaper setup), fall back to the
+    # live monitors and repopulate the variable with the resolution.
+    if [[ -z $target_res || $target_res == "null" ]] || ! [[ $target_res =~ ^[0-9]+x[0-9]+$ ]]; then
         target_res=$(get_monitor_resolutions | head -1)
         if [[ -n $target_res ]]; then
-            set_var "WALL_RES_MAP" "$target_res"
+            set_var "WALL_RESOLUTION" "$target_res"
         fi
     fi
     local map_w="${target_res%x*}"

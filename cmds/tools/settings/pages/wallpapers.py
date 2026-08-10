@@ -162,7 +162,7 @@ class WallpapersPage:
             (self._col_row, "RETRO_WALL_COLLECTION", self._col_actions),
             (self._slide_row, "WALL_SLIDESHOW_ACTIVE", self._slide_actions),
             (self._interval_row, "WALL_SLIDESHOW_INTERVAL", self._interval_actions),
-            (self._res_row, "WALL_RES_MAP", self._res_actions),
+            (self._res_row, "WALL_RESOLUTION", self._res_actions),
             (self._gpu_row, "WALL_GPU_OFFLOAD", self._gpu_actions),
         ):
             if row is None or actions is None:
@@ -198,7 +198,7 @@ class WallpapersPage:
             return "true" if self._pending_slideshow else "false"
         if var_name == "WALL_SLIDESHOW_INTERVAL":
             return str(self._pending_interval) if self._pending_interval is not None else None
-        if var_name == "WALL_RES_MAP":
+        if var_name == "WALL_RESOLUTION":
             return self._pending_res_map
         if var_name == "WALL_GPU_OFFLOAD":
             return self._pending_gpu
@@ -215,7 +215,7 @@ class WallpapersPage:
             return self._pending_slideshow is not None
         if var_name == "WALL_SLIDESHOW_INTERVAL":
             return self._pending_interval is not None
-        if var_name == "WALL_RES_MAP":
+        if var_name == "WALL_RESOLUTION":
             return self._pending_res_map is not None
         if var_name == "WALL_GPU_OFFLOAD":
             return self._pending_gpu is not None
@@ -232,7 +232,7 @@ class WallpapersPage:
             self._pending_slideshow = value == "true"
         elif var_name == "WALL_SLIDESHOW_INTERVAL":
             self._pending_interval = int(value) if value.isdigit() else None  # type: ignore[arg-type]
-        elif var_name == "WALL_RES_MAP":
+        elif var_name == "WALL_RESOLUTION":
             self._pending_res_map = value
         elif var_name == "WALL_GPU_OFFLOAD":
             self._pending_gpu = value
@@ -248,7 +248,7 @@ class WallpapersPage:
             self._pending_slideshow = None
         elif var_name == "WALL_SLIDESHOW_INTERVAL":
             self._pending_interval = None
-        elif var_name == "WALL_RES_MAP":
+        elif var_name == "WALL_RESOLUTION":
             self._pending_res_map = None
         elif var_name == "WALL_GPU_OFFLOAD":
             self._pending_gpu = None
@@ -271,7 +271,7 @@ class WallpapersPage:
         elif var_name == "WALL_SLIDESHOW_INTERVAL":
             if self._interval_spin is not None and value.isdigit():
                 self._interval_spin.set_value(float(value))
-        elif var_name == "WALL_RES_MAP":
+        elif var_name == "WALL_RESOLUTION":
             w, h = (value.split("x") + ["1920", "1080"])[:2]
             if self._spin_w is not None:
                 self._spin_w.set_value(float(w))
@@ -302,7 +302,7 @@ class WallpapersPage:
             self._has_pending(v)
             for v in (
                 "WALL_STATIC_FORCED", "WALL_STATIC_ON_BAT", "RETRO_WALL_COLLECTION",
-                "WALL_SLIDESHOW_ACTIVE", "WALL_SLIDESHOW_INTERVAL", "WALL_RES_MAP",
+                "WALL_SLIDESHOW_ACTIVE", "WALL_SLIDESHOW_INTERVAL", "WALL_RESOLUTION",
                 "WALL_GPU_OFFLOAD",
             )
         )
@@ -313,16 +313,15 @@ class WallpapersPage:
 
     def _parse_res(self, res_str: str) -> tuple[int, int]:
         try:
-            s = res_str.rsplit("|", 1)[-1] if "|" in res_str else res_str
-            if "x" in s:
-                parts = s.split("x")
+            if "x" in res_str:
+                parts = res_str.split("x")
                 return int(parts[0]), int(parts[1])
         except (ValueError, IndexError):
             pass
         return 0, 0
 
     def _check_needs_optimization(self) -> bool:
-        target = get_var("WALL_RES_MAP", "")
+        target = get_var("WALL_RESOLUTION", "")
         tw, th = self._parse_res(target)
         if tw == 0 or th == 0:
             return False
@@ -505,12 +504,11 @@ class WallpapersPage:
         self._interval_row = interval_row
         self._interval_spin = interval_spin
 
-        # Resolution map — W x H spinners
-        current_res = get_var("WALL_RES_MAP", "")
+        # Resolution — W x H spinners
+        current_res = get_var("WALL_RESOLUTION", "")
         try:
-            cur_res = current_res.rsplit("|", 1)[-1] if "|" in current_res else current_res
-            if "x" in cur_res:
-                parts = cur_res.split("x")
+            if "x" in current_res:
+                parts = current_res.split("x")
                 cur_w, cur_h = parts[0], parts[1]
             else:
                 cur_w, cur_h = "1920", "1080"
@@ -530,8 +528,8 @@ class WallpapersPage:
         res_row.add_suffix(spin_w)
         self._res_actions = RowActions(
             res_row,
-            on_discard=lambda: self._discard_var("WALL_RES_MAP"),
-            on_reset=lambda: self._reset_var("WALL_RES_MAP"),
+            on_discard=lambda: self._discard_var("WALL_RESOLUTION"),
+            on_reset=lambda: self._reset_var("WALL_RESOLUTION"),
         )
         res_row.add_suffix(self._res_actions.box)
         self._res_actions.reorder_first()
@@ -712,9 +710,9 @@ class WallpapersPage:
                 "_section_label": "Settings",
             },
             {
-                "key": "wallpapers:res_map",
+                "key": "wallpapers:resolution",
                 "label": "Wallpaper Resolution",
-                "description": "Set a custom render resolution per monitor",
+                "description": "Set a custom render resolution",
                 "_group_id": "wallpapers",
                 "_group_label": "Wallpapers",
                 "_section_label": "Settings",
@@ -759,7 +757,7 @@ class WallpapersPage:
         w = int(self._spin_w.get_value()) if self._spin_w is not None else 1920
         h = int(self._spin_h.get_value()) if self._spin_h is not None else 1080
         text = f"{w}x{h}"
-        if text != get_var("WALL_RES_MAP", ""):
+        if text != get_var("WALL_RESOLUTION", ""):
             self._pending_res_map = text
             self._dirty = True
             self._notify_dirty()
@@ -901,7 +899,7 @@ class WallpapersPage:
 
         if self._pending_res_map is not None:
             from lib.python.variable import set_var
-            set_var("WALL_RES_MAP", self._pending_res_map)
+            set_var("WALL_RESOLUTION", self._pending_res_map)
             subprocess.Popen(
                 ["retro", "wallpaper", "optimize"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -968,7 +966,7 @@ class WallpapersPage:
         badge_box.append(type_badge)
 
         # Warning icon if wallpaper exceeds target resolution
-        target = get_var("WALL_RES_MAP", "")
+        target = get_var("WALL_RESOLUTION", "")
         tw, th = self._parse_res(target)
         w, h = self._parse_res(wp.get("resolution", ""))
         if tw > 0 and th > 0 and (w > tw or h > th):
