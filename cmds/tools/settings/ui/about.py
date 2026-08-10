@@ -1,5 +1,10 @@
 """About dialog — standard GNOME ``Adw.AboutDialog``."""
 
+import os
+import re
+import subprocess
+from urllib.parse import quote
+
 from gi.repository import Adw, Gtk
 
 from settings.constants import APPLICATION_ID
@@ -8,14 +13,13 @@ from settings.core.system_info import (
     _kernel_build_date,
     _os_branch,
     _os_version,
-    _release_line,
     display_version,
     get_preloaded_info,
 )
 from settings.core.system_info import _run as _run_cmd
 
 APPLICATION_NAME = "Retro Settings"
-DEVELOPER_NAME = "RetroLinux"
+DEVELOPER_NAME = "The all-in-one control center for Retro Linux"
 COPYRIGHT = "© 2026 RetroLinux"
 COMMENTS = (
     "One app for the whole system — from style to hardware. Retro Settings "
@@ -26,24 +30,72 @@ COMMENTS = (
 )
 DEVELOPERS = ["RetroLinux https://github.com/anomalyco/retrolinux"]
 
+_REPO_FALLBACK = "https://github.com/anomalyco/retrolinux"
+
+
+def _repo_url() -> str:
+    """Best-effort https URL for the origin remote."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", os.environ.get("RETRO_DIR", "/opt/retrolinux"),
+             "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=3,
+            stdin=subprocess.DEVNULL,
+        ).stdout.strip()
+    except Exception:
+        out = ""
+    if out.startswith("git@"):
+        m = re.match(r"git@([^:]+):(.+?)(?:\.git)?$", out)
+        if m:
+            return f"https://{m.group(1)}/{m.group(2)}"
+    if out.endswith(".git"):
+        out = out[:-4]
+    return out or _REPO_FALLBACK
+
+
+def _issue_url() -> str:
+    """Prefilled GitHub issue URL carrying the debug info, like the About page."""
+    title = f"Retro Settings — Bug Report ({_retro_linux_version()})"
+    body = (
+        "## Description\n\nPlease describe the issue you're seeing with the "
+        "Retro Settings app.\n\n\n"
+        "## System Information\n```\n"
+        f"{_build_debug_info(None)}\n```\n\n"
+        "## Steps to Reproduce\n1.\n2.\n3.\n\n"
+        "## Expected Behavior\n\n\n## Actual Behavior\n"
+    )
+    repo = _repo_url().rstrip("/")
+    return f"{repo}/issues/new?title={quote(title)}&body={quote(body)}"
+
 
 def _retro_linux_version() -> str:
-    """Retro Linux version (git tag/branch), e.g. ``nightly (develop)``."""
-    version = display_version(_os_version())
-    branch = _os_branch()
-    return f"{version} ({branch})" if branch else version
+    """Retro Linux version (git tag), e.g. ``nightly``."""
+    return display_version(_os_version())
+
+
+def _os_commit() -> str:
+    """Short git commit hash of the installed RetroLinux build."""
+    from settings.core.system_info import _retro_dir
+    return _run_cmd(["git", "-C", _retro_dir(), "rev-parse", "--short", "HEAD"])
 
 
 def _build_debug_info(running_hyprland_version: str | None) -> str:
     """Full system detail for the debug section, using the preloaded specs
     when available and falling back to a lightweight subset otherwise."""
     version = _retro_linux_version()
+    branch = _os_branch()
+    commit = _os_commit()
     kernel = _run_cmd(["uname", "-r"])
     kernel_parts = [kernel or "—", _kernel_arch() or "—"]
     if _kernel_build_date():
         kernel_parts.append(f"built {_kernel_build_date()}")
+    version_line = f"Retro Linux {version}"
+    if branch:
+        version_line += f" ({branch}@{commit})"
+    elif commit:
+        version_line += f" @{commit}"
     lines = [
-        f"Retro Linux {version} — {_release_line()}",
+        version_line,
         f"Kernel: {' · '.join(kernel_parts)}",
         f"Hyprland (running): {running_hyprland_version or 'not detected'}",
     ]
@@ -61,7 +113,7 @@ def _build_debug_info(running_hyprland_version: str | None) -> str:
 def build_about_dialog(running_hyprland_version: str | None = None) -> Adw.AboutDialog:
     version = _retro_linux_version()
 
-    return Adw.AboutDialog(
+    dialog = Adw.AboutDialog(
         application_name=APPLICATION_NAME,
         application_icon=APPLICATION_ID,
         version=version,
@@ -71,4 +123,6 @@ def build_about_dialog(running_hyprland_version: str | None = None) -> Adw.About
         license_type=Gtk.License.GPL_3_0,
         comments=COMMENTS,
         debug_info=_build_debug_info(running_hyprland_version),
+        issue_url=_issue_url(),
     )
+    return dialog
