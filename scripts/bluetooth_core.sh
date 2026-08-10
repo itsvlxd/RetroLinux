@@ -617,7 +617,7 @@ bt_obex_ask() {
             -r 48923 \
             -u critical \
             -i "$icon_path" \
-            -a "RetroLink" \
+            -a "RetroLinux" \
             -A "accept=Accept" \
             -A "deny=Deny" \
             "Incoming Bluetooth File" \
@@ -680,7 +680,7 @@ bt_obex_notify_progress() {
         local action
         action=$(notify-send \
             -r "$notif_id" \
-            -a "RetroTransfer" \
+            -a "RetroLinux" \
             -i "$icon_path" \
             -t 20000 \
             -h "string:x-canonical-private-synchronous:bt-transfer" \
@@ -715,7 +715,7 @@ bt_obex_receive_cancel_monitor() {
     action=$(notify-send \
         --wait \
         -r "$notif_id" \
-        -a "RetroTransfer" \
+        -a "RetroLinux" \
         -i "$icon_path" \
         -t 60000 \
         -h "string:x-canonical-private-synchronous:bt-transfer" \
@@ -752,7 +752,7 @@ bt_obex_notify_done() {
     if [[ $status == "complete" ]]; then
         notify-send \
             -r "$notif_id" \
-            -a "RetroTransfer" \
+            -a "RetroLinux" \
             -i "$icon_path" \
             -u normal \
             "Transfer Complete" \
@@ -761,7 +761,7 @@ bt_obex_notify_done() {
     elif [[ $status == "cancelled" ]]; then
         notify-send \
             -r "$notif_id" \
-            -a "RetroTransfer" \
+            -a "RetroLinux" \
             -i "$icon_path" \
             -u normal \
             "Transfer Aborted" \
@@ -770,7 +770,7 @@ bt_obex_notify_done() {
     else
         notify-send \
             -r "$notif_id" \
-            -a "RetroTransfer" \
+            -a "RetroLinux" \
             -i "$icon_path" \
             -u normal \
             "Transfer Failed" \
@@ -804,7 +804,7 @@ bt_obex_send_cancel_monitor() {
     action=$(notify-send \
         --wait \
         -r "$notif_id" \
-        -a "RetroTransfer" \
+        -a "RetroLinux" \
         -i "$icon_path" \
         -t 120000 \
         -h "string:x-canonical-private-synchronous:bt-transfer" \
@@ -869,7 +869,7 @@ bt_send_file() {
         local status_msg="$2"
         local ACTION
 
-        ACTION=$(notify-send -r "$notif_id" -a "RetroTransfer" \
+        ACTION=$(notify-send -r "$notif_id" -a "RetroLinux" \
             -i "$icon_path" \
             -t 20000 \
             -h "string:x-canonical-private-synchronous:bt-transfer" \
@@ -897,7 +897,7 @@ bt_send_file() {
                 bt_disconnect "$mac"
 
                 _bt_dismiss_notif "$notif_id"
-                notify-send -r "$notif_id" -a "RetroTransfer" -i "$icon_path" -u normal \
+                notify-send -r "$notif_id" -a "RetroLinux" -i "$icon_path" -u normal \
                     "Transfer Aborted" "Connection to <b>$device_name</b> severed."
                 echo "ERR|cancelled" >"$result_file"
                 rm -f "$log_file" "$cancel_flag"
@@ -922,7 +922,7 @@ bt_send_file() {
 
         if grep -qi "Completed" "$log_file"; then
             _bt_dismiss_notif "$notif_id"
-            notify-send -r "$notif_id" -a "RetroTransfer" -u normal \
+            notify-send -r "$notif_id" -a "RetroLinux" -u normal \
                 -i "$icon_path" \
                 "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed} seconds."
             echo "OK|$elapsed" >"$result_file"
@@ -930,7 +930,7 @@ bt_send_file() {
             rx_log_file "success" "File $file_name sent to $device_name ($mac) in ${elapsed}s"
         else
             _bt_dismiss_notif "$notif_id"
-            notify-send -r "$notif_id" -a "RetroTransfer" -u normal -i "$icon_path" \
+            notify-send -r "$notif_id" -a "RetroLinux" -u normal -i "$icon_path" \
                 "Transfer Failed" "<b>$device_name</b> rejected the request."
             echo "ERR|rejected" >"$result_file"
             source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
