@@ -5,12 +5,7 @@ RETRO_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/git.sh"
-
-ALL_VARS=$(bash "$RETRO_DIR/scripts/variable_core.sh" --list 2>/dev/null)
-get_var() {
-    local val=$(echo "$ALL_VARS" | grep -m 1 "^$1=" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
-    echo "${val:-$2}"
-}
+source "$RETRO_DIR/lib/variable.sh"
 
 count="$1"
 shift
@@ -32,4 +27,4 @@ sudo pacman -Syu
 echo -e "${PINK}[ INFO]${RESET} Syncing AUR packages ($helper)..."
 $helper -Sua
 echo -e "${PINK}[ INFO]${RESET} All updates complete. Press Enter to close."
-read
+read -r
