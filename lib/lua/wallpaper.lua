@@ -35,7 +35,7 @@ function Wallpaper.pause_wallpaper()
 end
 
 function Wallpaper.stop_wallpaper()
-	Watcher.run_cmd("pkill -x mpvpaper 2>/dev/null")
+	Watcher.run_cmd("pkill -9 -x mpvpaper 2>/dev/null")
 	return true
 end
 
