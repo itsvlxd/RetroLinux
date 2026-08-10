@@ -15,10 +15,12 @@ This document serves as the **single source of truth** for all RetroLinux develo
 - Project structure and file naming conventions
 - Code style rules and shellcheck compliance
 - The two-layer architecture (frontend + backend)
-- Multi-language libraries (Bash + Lua + Python 1:1 mapping)
+- Multi-language libraries (Bash + Lua + Python) and when each port must stay 1:1
 - Color, logging, and UI patterns (rx_log for console, rx_log_file for files)
 - Command registration and execution flow
 - The daemon system and background watchers
+- The Retro Settings GUI and its page architecture
+- RetroShell — the QML desktop shell and its three-layer control flow
 - The installer system (bin/) in detail
 - Module system (properties.json)
 - Quick reference for common patterns
@@ -30,14 +32,19 @@ This document serves as the **single source of truth** for all RetroLinux develo
 | `retro.sh` | Main entry point, command routing, global state |
 | `lib/` | **Internal** core libraries (colors, logging, fs, driver detection, setup wizard, etc.) |
 | `lib/setup.sh` | **Setup wizard library** — two-mode (interactive/`-o key=val`) config flow with validation, summary, confirm, and success stages |
-| `lib/lua/` | Lua libraries for the event daemon (help.lua, colors.lua, log.lua) |
-| `lib/python/` | Python libraries (log.py, env.py, obex.py) |
-| `scripts/python/` | Python backend scripts (bluetooth_receive.py, log_core.py) |
+| `lib/lua/` | Lua libraries for the event daemon (audio, battery, bluetooth, colors, firewall, format, fs, helpers, help, icons, log, notify, power, variable, wallpaper, xdg) |
+| `lib/python/` | Python libraries (log.py, env.py, obex.py, variable.py, input_config.py, haptic/) |
+| `scripts/` | Backend automation scripts (core logic for each feature, `*_core.sh` pattern) |
+| `scripts/lib/` | Scripts shared by core scripts (e.g., `system_update.sh`, invoked from daemon events) |
+| `scripts/lua/` | Lua helper modules for core scripts (e.g., `log_core.lua`) |
+| `scripts/python/` | Python backend scripts (bluetooth_receive.py, log_core.py, grub_manual_entries.py) |
 | `bin/` | **Installer** system (retroinstall, lib, setup, post) |
 | `cmds/` | **User-facing** commands (tools, system, modules subdirectories) |
-| `scripts/` | Backend automation scripts (core logic for each feature, `*_core.sh` pattern, `log_core.sh` for file logging) |
+| `cmds/tools/settings/` | **Retro Settings** GTK4/libadwaita GUI (also shipped as `retro-settings.pyz`) |
 | `daemon/` | **Lua event daemon** (engine.lua, event_daemon.lua, watcher.lua, watchers/, events/) |
-| `modules/` | Desktop environment configurations (hyprland, ags, rofi, etc.) |
+| `modules/` | Desktop environment configurations (hyprland, retro, grub, sddm, plymouth, kitty, etc.) |
+| `modules/retroshell/` | **RetroShell** — QML desktop shell (bar, dock, notifications, launcher, lockscreen) built on Quickshell (`qs`) |
+| `themes/` | Terminal color theme JSON palettes (used by the theme system) |
 | `iso/` | Live ISO build system (archiso profile + Docker) |
 | `assets/` | Project branding assets |
 | `icons/` | Project icons |
@@ -54,22 +61,30 @@ This document serves as the **single source of truth** for all RetroLinux develo
 
 | Pattern | Location | Example |
 |---------|----------|---------|
-| Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `helpers.sh`, `help.sh`, `battery.sh` |
-| Lua libraries | `lib/lua/` | `help.lua`, `colors.lua`, `log.lua` |
-| Python libraries | `lib/python/` | `log.py`, `env.py`, `obex.py` |
-| Python scripts | `scripts/python/` | `bluetooth_receive.py`, `log_core.py` |
-| Installer libraries | `bin/lib/` | `display.sh`, `wifi.sh`, `errors.sh`, `gum.sh`, `disk.sh`, `handlers.sh`, `output.sh`, `debug.sh`, `crypto.sh` |
-| Backend core scripts | `scripts/` | `audio_core.sh`, `network_core.sh`, `driver_core.sh`, `fans_core.sh`, `theme_core.sh`, `grub_core.sh`, `test_core.sh`, `log_core.sh` |
+| Internal libraries | `lib/` | `colors.sh`, `log.sh`, `fs.sh`, `helpers.sh`, `help.sh`, `battery.sh`, `driver.sh`, `git.sh`, `icons.sh`, `logo.sh`, `menu.sh`, `module.sh`, `pkg.sh`, `setup.sh`, `timeshift.sh`, `variable.sh`, `wallpaper.sh`, `xdg.sh` |
+| Lua libraries | `lib/lua/` | `audio.lua`, `battery.lua`, `bluetooth.lua`, `colors.lua`, `firewall.lua`, `format.lua`, `fs.lua`, `helpers.lua`, `help.lua`, `icons.lua`, `log.lua`, `notify.lua`, `power.lua`, `variable.lua`, `wallpaper.lua`, `xdg.lua` |
+| Lua utilities | `scripts/lua/` | `log_core.lua` (file logging, mirrors `scripts/log_core.sh`) |
+| Python libraries | `lib/python/` | `log.py`, `env.py`, `obex.py`, `variable.py`, `input_config.py`, `haptic/` |
+| Python scripts | `scripts/python/` | `bluetooth_receive.py`, `log_core.py`, `grub_manual_entries.py` |
+| Installer libraries | `bin/lib/` | `display.sh`, `wifi.sh`, `errors.sh`, `gum.sh`, `disk.sh`, `handlers.sh`, `output.sh`, `debug.sh`, `locale.sh`, `timezone.sh`, `progress.sh`, `qr.sh`, `setup_lib.sh` |
+| Backend core scripts | `scripts/` | `audio_core.sh`, `battery_core.sh`, `benchmark_core.sh`, `bluetooth_core.sh`, `cleanup_core.sh`, `disk_core.sh`, `display_core.sh`, `driver_core.sh`, `fans_core.sh`, `firewall_core.sh`, `font_core.sh`, `grub_core.sh`, `input_core.sh`, `keyring_core.sh`, `log_core.sh`, `network_core.sh`, `polkit_core.sh`, `power_core.sh`, `service_core.sh`, `shell_core.sh`, `ssh_core.sh`, `system_core.sh`, `test_core.sh`, `theme_core.sh`, `timeshift_core.sh`, `variable_core.sh`, `wallpaper_core.sh`, `window_core.sh`, `xdg_core.sh` |
 | Event daemon core | `daemon/` | `engine.lua`, `event_daemon.lua`, `watcher.lua` |
-| Event handlers | `daemon/events/` | `battery.lua`, `power.lua`, `notifications.lua`, `wallpaper.lua` |
-| Watchers | `daemon/watchers/` | `battery.lua`, `bluetooth.lua`, `power.lua`, `usb.lua`, `audio.lua`, `wallpaper.lua`, `portal.lua`, `slideshow.lua`, `timers.lua` |
-| Standalone scripts | `scripts/` | `system_update.sh` (UI, invoked from events) |
-| Frontend commands | `cmds/tools/` | `audio.sh`, `network.sh`, `driver.sh`, `grub.sh`, `xdg.sh`, `power.sh`, `fingerprint.sh`, `bitwarden.sh`, `app.sh` |
+| Event handlers | `daemon/events/` | `battery.lua`, `power.lua`, `notifications.lua`, `wallpaper.lua`, `rotation.lua` |
+| Watchers | `daemon/watchers/` | `audio.lua`, `axctl.lua`, `battery.lua`, `bluetooth.lua`, `fans.lua`, `hypridle.lua`, `portal.lua`, `power.lua`, `rotation.lua`, `slideshow.lua`, `ssh.lua`, `timers.lua`, `usb.lua`, `wallpaper.lua` |
+| Standalone scripts | `scripts/lib/` | `system_update.sh` (UI, invoked from events) |
+| Frontend commands | `cmds/tools/` | `audio.sh`, `app.sh`, `battery.sh`, `benchmark.sh`, `bitwarden.sh`, `bluetooth.sh`, `cleanup.sh`, `daemon.sh`, `disk.sh`, `display.sh`, `driver.sh`, `fans.sh`, `fingerprint.sh`, `firewall.sh`, `font.sh`, `grub.sh`, `input.sh`, `keyring.sh`, `log.sh`, `network.sh`, `polkit.sh`, `power.sh`, `service.sh`, `settings.sh`, `shell.sh`, `ssh.sh`, `system.sh`, `theme.sh`, `timeshift.sh`, `variable.sh`, `wallpaper.sh`, `window.sh`, `xdg.sh` |
+| Settings GUI | `cmds/tools/settings/` | `main.py`, `window.py`, `core/`, `ui/`, `pages/`, `data/` (+ `retro-settings.pyz` zipapp) |
+| Settings pages | `cmds/tools/settings/pages/` | `audio.py`, `grub.py`, `battery.py`, `shell_bar.py`, `shell_theme.py`, `themes.py`, ... |
+| Settings core | `cmds/tools/settings/core/` | `config.py`, `schema.py`, `state.py`, `undo.py`, `pending.py`, `keystore.py`, `shell_config.py`, ... |
+| RetroShell root | `modules/retroshell/files/` | `shell.qml` (root), `config/Config.qml`, `modules/`, `assets/`, `scripts/` |
 | System commands | `cmds/system/` | `load.sh`, `update.sh`, `setup.sh`, `help.sh`, `version.sh`, `about.sh`, `test.sh` |
 | Module commands | `cmds/modules/` | `install.sh`, `uninstall.sh`, `mirror.sh`, `pull.sh`, `list.sh` |
-| Setup sub-commands | `cmds/system/setup/` | `audio.sh`, `network.sh`, `wallpaper.sh`, `ricing.sh`, `fonts.sh`, `drivers.sh`, etc. |
-| Module definitions | `modules/<name>/` | `modules/hyprland/`, `modules/ags/` |
+| Setup sub-commands | `cmds/system/setup/` | `audio.sh`, `drivers.sh`, `modules.sh`, `network.sh`, `ricing.sh`, `run.sh`, `variables.sh` |
+| Module definitions | `modules/<name>/` | `modules/hyprland/`, `modules/retro/`, `modules/grub/` |
+| Theme palettes | `themes/` | `retro.json`, `tokyo-night.json`, `gruvbox.json`, `solarized-dark.json` |
 | Installer entry | `bin/` | `retroinstall` |
+| Installer steps | `bin/setup/` | `install.sh`, `branch.sh`, `ricing.sh`, `user.sh`, ..., `config.sh` |
+| Post-install | `bin/post/` | `run.sh`, `packages.sh`, `network.sh`, `aur.sh`, `clone.sh`, `state.sh` |
 | ISO build | `iso/` | `build.sh`, `Dockerfile`, `profile/` |
 
 ---
@@ -84,7 +99,7 @@ This document serves as the **single source of truth** for all RetroLinux develo
   - `rx_` prefix for library functions (e.g., `rx_log`, `rx_get_json`)
   - `_` prefix for private helper functions (e.g., `_kernel_version_ge`)
 - **Variable naming**: lowercase with underscores (e.g., `wifi_iface`, `action`)
-- **Constants**: uppercase (e.g., `RETRO_DIR`, `RETRO_CACHE`)
+- **Constants**: uppercase (e.g., `RETRO_DIR`, `RETRO_CONFIG`)
 
 ### Shellcheck Compliance
 
@@ -180,19 +195,21 @@ source "$RETRO_DIR/lib/colors.sh"
 
 ### Overview
 
-RetroLinux is a **multi-language codebase**. The primary language is **Bash** (shell scripts), but the daemon system and some tooling use **Lua**. To keep the codebase coherent and avoid developer confusion, every library in `lib/` has a **1:1 port** in `lib/lua/`.
+RetroLinux is a **multi-language codebase**. The primary language is **Bash** (shell scripts), but the daemon system and some tooling use **Lua**, and DBus-heavy or GUI tooling uses **Python**.
+
+The core shared libraries (`colors`, `log`, `help`, `helpers`, `variable`, `fs`, `battery`, `bluetooth`, `wallpaper`, `xdg`, `icons`) are ported **1:1** across the languages that need them. Language-specific libraries exist *only* where one language genuinely needs them (e.g., `notify.lua`, `obex.py`) — they don't need a port.
 
 ### The 1:1 Mapping Rule
 
 > [!WARNING]
-> **Critical:** Every function in a shell library must have an equivalent in its Lua port with identical behavior.
+> **Critical:** For the shared libraries, every function in a library must have an equivalent in its port in the other language(s) with identical behavior.
 >
 > **Why this matters:** Developers constantly switch between shell and Lua code. If `rx_format_time(3600)` returns `"1 hours"` in Bash but `"60 min"` in Lua, the watcher that parses core script output will break silently. This rule eliminates an entire class of subtle bugs where the same function behaves differently depending on which language calls it.
 - Same function name (adapted to language conventions: `rx_format_time` → `Helpers.format_time`)
 - Same input parameters
 - Same output format and return values
 - Same edge-case handling
-- **NO custom logic that diverges from the shell equivalent**
+- **NO custom logic that diverges from the shared equivalent**
 
 If `rx_format_time(3600)` in `lib/helpers.sh` returns `"1 hours"`, then `Helpers.format_time(3600)` in `lib/lua/helpers.lua` **must** return `"1 hours"` — not `"60 minutes"` or anything else.
 
@@ -201,6 +218,14 @@ This rule exists because:
 2. Watchers (Lua) call core scripts (Bash) and vice versa
 3. Output parsed by one language may be produced by the other
 4. Divergent behavior is a major source of subtle bugs
+
+> [!NOTE]
+> **Language-specific libraries** (no port required):
+> - **Shell only**: `driver.sh`, `git.sh`, `logo.sh`, `menu.sh`, `module.sh`, `pkg.sh`, `timeshift.sh`
+> - **Lua only**: `notify.lua`, `firewall.lua`, `format.lua`, `binds_parser.lua` (a script, not a library)
+> - **Python only**: `env.py`, `obex.py`, `variable.py`, `input_config.py`
+>
+> Adding new functions to a language-specific library does not require a port in the other languages.
 
 ### Library Mapping Table
 
@@ -214,32 +239,46 @@ This rule exists because:
 | `log.sh` | `log.lua` | `log.py` | Logging (info, success, warn, error) |
 | `help.sh` | `help.lua` | — | Table rendering, help formatting, confirmations |
 | `helpers.sh` | `helpers.lua` | — | Utilities (format_time, format_size, battery icon, etc.) |
-| `variable.sh` | `variable.lua` | `env.py` | Persistent key-value store (get_var, set_var) |
-| `fs.sh` | `fs.lua` | — | File operations (get_json, read_file, write_file) |
-| `battery.sh` | `battery.lua` | — | Battery management (saver, stats, limits) |
+| `variable.sh` | `variable.lua` | `variable.py` | Persistent key-value store (get_var, set_var, reload_vars) |
+| `fs.sh` | `fs.lua` | — | File operations (get_json, link, mirror, sanitize) |
+| `battery.sh` | `battery.lua` | — | Battery detection, saver, limits |
 | `bluetooth.sh` | `bluetooth.lua` | `obex.py` | Bluetooth device detection, OBEX transfers |
 | `wallpaper.sh` | `wallpaper.lua` | — | Wallpaper paths, slideshow, pause/resume |
-| `audio.sh` | `audio.lua` | — | Audio device management |
 | `xdg.sh` | `xdg.lua` | — | XDG directory handling |
-| `power.sh` | `power.lua` | — | Power profile management |
 | `icons.sh` | `icons.lua` | — | Nerd Font icon definitions |
+| `driver.sh` | — | — | Driver/GPU/CPU detection (shell only) |
+| `git.sh` | — | — | Git operations (shell only) |
+| `logo.sh` | — | — | Logo rendering (shell only) |
+| `menu.sh` | — | — | Menus (`rx_menu`, `rx_tools_menu`) (shell only) |
+| `module.sh` | — | — | Module system (shell only) |
+| `pkg.sh` | — | — | Package installation (`rx_pkg_install`) (shell only) |
+| `timeshift.sh` | — | — | Timeshift helpers (shell only) |
+| `—` | `audio.lua` | — | Audio device management (Lua only) |
+| `—` | `power.lua` | — | Power profile management (Lua only) |
 | `—` | `notify.lua` | — | Desktop notifications (Lua only) |
+| `—` | `firewall.lua` | — | Firewall helpers (Lua only) |
+| `—` | `format.lua` | — | Uptime formatting (Lua only) |
+| `—` | `binds_parser.lua` | — | Hyprland binds parsing (Lua script) |
+| `—` | — | `env.py` | DBus/env setup for subprocesses (Python only) |
+| `—` | — | `obex.py` | Bluetooth OBEX constants/helpers (Python only) |
+| `—` | — | `variable.py` | get_var/set_var/reload_vars (Python only) |
+| `—` | — | `input_config.py` | Hyprland input config regeneration (Python only) |
 
 </details>
 
 ### Naming Convention
 
-| Shell pattern | Lua pattern | Example |
-|---------------|-------------|---------|
-| `rx_function_name` | `ModuleName.function_name` | `rx_format_time` → `Helpers.format_time` |
-| Global variables | Module fields | `$PINK` → `Colors.PINK` |
-| `source "$RETRO_DIR/lib/x.sh"` | `local X = require("x")` | Import pattern |
+| Shell pattern | Lua pattern | Python pattern | Example |
+|---------------|-------------|----------------|---------|
+| `rx_function_name` | `ModuleName.function_name` | `function_name` / `module.function_name` | `rx_format_time` → `Helpers.format_time` |
+| Global variables | Module fields | — | `$PINK` → `Colors.PINK` |
+| `source "$RETRO_DIR/lib/x.sh"` | `local X = require("x")` | `from lib.python.x import ...` | Import pattern |
 
-### Adding a New Library
+### Adding a New Shared Library
 
 1. Create the shell version in `lib/name.sh`
-2. Create the Lua port in `lib/lua/name.lua`
-3. Ensure all functions have matching behavior
+2. Create the Lua port in `lib/lua/name.lua` (and a Python port in `lib/python/name.py` if Python needs it)
+3. Ensure all functions have matching behavior across languages
 4. Update this mapping table
 
 ### What NOT to Do
@@ -263,18 +302,22 @@ This rule exists because:
 > **Why Python:** Shell scripting becomes impractical for DBus-heavy operations.
 >
 > **Why this matters:** Python's `dbus-python` and `pygobject` libraries provide clean APIs for BlueZ OBEX file transfers, GLib main loops, and structured logging. Python is used *only* where shell would be fragile — the rest of the codebase stays in Bash/Lua.
-Python is used for **DBus-heavy operations** (Bluetooth OBEX file transfers) and **structured logging** where shell scripting would be impractical. Python scripts are called from shell commands via `python3` and follow the same 1:1 mapping rule as Lua.
+Python is used for **DBus-heavy operations** (Bluetooth OBEX file transfers), **structured logging**, the **Hyprland config management GUI** (Retro Settings), and **file regeneration** where shell scripting would be impractical. Python scripts are called from shell commands via `python3` and, where they overlap a shared library, follow the same 1:1 behavior rule as Lua.
 
 ### Library Files
 
 | File | Purpose |
 |------|---------|
 | `lib/python/log.py` | Console logging with colors/icons (mirrors `lib/log.sh`) |
-| `lib/python/env.py` | Environment setup, variable persistence (mirrors `lib/variable.sh`) |
+| `lib/python/env.py` | DBus/session environment setup (`ensure_dbus`, `get_shell_env`) — no variable persistence |
+| `lib/python/variable.py` | Variable persistence (mirrors `lib/variable.sh` / `lib/lua/variable.lua`) |
 | `lib/python/obex.py` | Bluetooth OBEX constants and helpers (no shell equivalent) |
-| `lib/python/__init__.py` | Package exports for `obex` and `env` modules |
+| `lib/python/input_config.py` | Regenerates the managed Hyprland input section (`--apply`) |
+| `lib/python/haptic/` | Touchpad haptic feedback helpers (ELAN/Sensel; source currently absent, only compiled `.pyc`) |
+| `lib/python/__init__.py` | Package exports for `obex`, `env`, and `variable` modules |
 | `scripts/python/log_core.py` | File-based logging with rotation (used by Python scripts) |
 | `scripts/python/bluetooth_receive.py` | OBEX agent for Bluetooth file transfers (DBus + GLib) |
+| `scripts/python/grub_manual_entries.py` | Preserves/manages manual GRUB menu entries across `grub-mkconfig` regenerations |
 
 ### log.py — Console Logging
 
@@ -298,23 +341,34 @@ error("Operation failed")
 [󰅙 ERROR] Operation failed
 ```
 
-### env.py — Environment and Variables
+### env.py — DBus and Environment Setup
 
-Mirrors `lib/variable.sh` and `lib/lua/variable.lua`. Same `get_var`/`set_var` API:
+`env.py` does **not** handle variables — it only prepares the DBus/session environment for subprocesses. Use it when spawning shell commands from Python:
 
 ```python
-from lib.python.env import get_var, set_var, reload_vars, ensure_dbus, get_shell_env
-
-# Variable persistence (same file: $RETRO_CONFIG/variables.sh)
-val = get_var("KEY", "default")
-set_var("KEY", "value")
-reload_vars()
+from lib.python.env import ensure_dbus, get_shell_env
 
 # DBus setup (for scripts that need DBus)
 ensure_dbus()
 
 # Get shell environment for subprocess calls
 env = get_shell_env({"EXTRA_VAR": "value"})
+```
+
+### variable.py — Variable Persistence
+
+Mirrors `lib/variable.sh` and `lib/lua/variable.lua`. Same `get_var`/`set_var`/`reload_vars` API, same file (`$RETRO_CONFIG/variables.sh`):
+
+```python
+from lib.python.variable import get_var, set_var, reload_vars, get_module_default
+
+# Variable persistence (same file: $RETRO_CONFIG/variables.sh)
+val = get_var("KEY", "default")
+set_var("KEY", "value")
+reload_vars()
+
+# Read a default from the module's variables.sh
+default = get_module_default("KEY", "fallback")
 ```
 
 ### obex.py — Bluetooth OBEX Helpers
@@ -405,9 +459,26 @@ info("message")  # → "[ INFO] message"  ← CORRECT
 # Python: stores in /tmp/my_vars.json  ← WRONG
 
 # GOOD: Python uses same variables.sh file
-from lib.python.env import get_var, set_var
+from lib.python.variable import get_var, set_var
 set_var("KEY", "value")  # writes to $RETRO_CONFIG/variables.sh  ← CORRECT
 ```
+
+### grub_manual_entries.py — GRUB Menu Entry Persistence
+
+Re-applies user-curated GRUB `menuentry`/`submenu` blocks and menu ordering after `grub-mkconfig` regenerates the config:
+
+```bash
+python3 scripts/python/grub_manual_entries.py --parse /boot/grub/grub.cfg          # print stored entries
+python3 scripts/python/grub_manual_entries.py --parse-store "$RETRO_CONFIG/grub/manual-entries.cfg"
+python3 scripts/python/grub_manual_entries.py --apply /boot/grub/grub.cfg "$RETRO_CONFIG/grub/manual-entries.cfg"
+python3 scripts/python/grub_manual_entries.py --reorder /boot/grub/grub.cfg "$RETRO_CONFIG/grub/manual-entries.cfg"
+```
+
+Entries are delimited in the config by `### RETRO_MANUAL_ENTRY: <key> ###` markers; ordering uses `### RETRO_MENU_ORDER ###` markers. Called by `scripts/grub_core.sh`, `modules/grub/install.sh`, and the settings GUI.
+
+### Retro Settings GUI
+
+The **Retro Settings GUI** (`cmds/tools/settings/`, GTK4 + libadwaita) is a full Python application, not a library. See **[Section 18 — Retro Settings GUI](#18-retro-settings-gui)** for its architecture, the page pattern, and the managed-config model.
 
 ---
 ## 7. Color and Logging System 🔥
@@ -672,7 +743,10 @@ rx_help_example "retro tool status" "Show current status" 30
 | `rx_help_examples` | Shows "Examples:" header |
 | `rx_help_example "cmd" "desc" [width]` | Prints an example line (width default: 26) |
 | `rx_help_header "icon" "title"` | Shows section header with icon |
+| `rx_help_section "icon" "title"` | Prints a section heading with icon |
+| `rx_help_option "opt" "desc" [width]` | Prints an option/flag line |
 | `rx_help_separator` | Prints separator line |
+| `rx_help_wrap "text" [width]` | Wraps text to a given width |
 | `rx_help_footer` | Prints footer with separator |
 
 ### Table and Status Display Functions
@@ -766,8 +840,10 @@ register_command "GROUP" "alias1|alias2" "Description" "cmd_function"
 **Example** (from `cmds/tools/audio.sh`):
 
 ```bash
-register_command "TOOLS" "audio|a" "Manage audio settings and EasyEffects" "cmd_audio"
+register_command "TOOLS" "audio" "Audio management with PipeWire/WirePlumber" "cmd_audio"
 ```
+
+Aliases are pipe-separated (`"cmd|alias1|alias2"`). In practice the MODULES commands use this (`"-i|--install"`); most TOOLS commands register a single alias and handle subcommands internally.
 
 ### Command Function Pattern
 
@@ -1113,8 +1189,11 @@ fi
 | `rx_input "label" "default"` | Free text input | `editor=$(rx_input "Editor" "nvim")` |
 | `rx_input_numeric "label" "default" min max` | Numbers with range | `count=$(rx_input_numeric "Count" "5" 1 10)` |
 | `rx_input_choice "icon" "label" "default" opt1 opt2` | Numbered menu | `choice=$(rx_input_choice "󰇩" "Pick:" "opt1" opt1 opt2 opt3)` |
-| `rx_menu "icon" "label" options...` | Gum-style menu | `device=$(rx_menu "󰏗" "Select:" "${devices[@]}")` |
+| `rx_menu "icon" "label" options...` | Gum-style menu (lives in `lib/menu.sh` — source it too) | `device=$(rx_menu "󰏗" "Select:" "${devices[@]}")` |
 | `rx_setup_get_opt "key" "default"` | Non-interactive read | `val=$(rx_setup_get_opt "key" "default")` |
+
+> [!NOTE]
+> **`rx_menu` is defined in `lib/menu.sh`, not `lib/setup.sh`.** If you use `rx_menu` (or `rx_tools_menu`) in a setup flow, source `$RETRO_DIR/lib/menu.sh` alongside `lib/setup.sh`. `rx_setup_parse` also recognizes `-f`/`--force` (see `rx_setup_is_force`) — provide it when a tool must be allowed to override existing configuration.
 
 > [!WARNING]
 > **Always use the same variable names in both branches:** The rest of your setup code should reference `$editor`, `$browser`, etc. regardless of how they were collected. This keeps the apply logic identical for both modes.
@@ -1280,7 +1359,7 @@ EOF
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
-| `rx_setup_parse` | `"$@"` | Parse `-o key=val,...`, `--needed`, and `-y/--yes`; sets `RX_SETUP_MODE`, `RX_SETUP_NEEDED`, `RX_SETUP_YES` globals |
+| `rx_setup_parse` | `"$@"` | Parse `-o key=val,...`, `--needed`, `-y/--yes`, and `-f/--force`; sets `RX_SETUP_MODE`, `RX_SETUP_NEEDED`, `RX_SETUP_YES` globals |
 | `rx_setup_validate` | `"keys" "rules"` | Validate provided `-o` values; warn on unknown keys |
 | `rx_setup_get_opt` | `"key" "default"` | Read a parsed option value (non-interactive mode) |
 | `rx_setup_current` | `icon title key val...` | Show current config table (returns 0 if anything configured) |
@@ -1289,10 +1368,11 @@ EOF
 | `rx_setup_summary` | `icon title key val...` | Show setup summary table |
 | `rx_setup_confirm` | — | "Apply these settings?" prompt; returns 1 if cancelled |
 | `rx_setup_success` | `icon title key val...` | Show success table + log "Setup complete" |
+| `rx_setup_is_force` | — | Return 0 if `-f/--force` was passed (bypass `--needed` skip) |
 | `rx_input` | `"label" "default" "pattern" "err"` | Text input with optional regex validation |
 | `rx_input_numeric` | `"label" "default" [min] [max]` | Numeric input with optional range (min/max are optional) |
 | `rx_input_choice` | `icon "label" "default" opt1 opt2 ...` | Numbered choice menu |
-| `rx_menu` | `icon "label" options...` | Gum-style menu selection (returns selected option) |
+| `rx_menu` | `icon "label" options...` | Gum-style menu selection (returns selected option) — in `lib/menu.sh` |
 | `rx_setup_show_options` | `"keys" "rules"` | Show valid keys and their validation rules in a table (used by display mode) |
 
 ### Validation Rules
@@ -1437,10 +1517,12 @@ modules/<name>/
 ├── packages.sh       # List of packages to install (one per line)
 ├── install.sh        # Custom installation logic (optional)
 ├── uninstall.sh      # Custom uninstallation logic (optional)
-├── pre.sh            # Pre-installation hook (optional)
 ├── post.sh           # Post-installation hook (optional)
 └── files/            # Configuration files to link/copy
 ```
+
+> [!NOTE]
+> **Hooks:** `post.sh` is supported by `lib/module.sh` but currently only `modules/hyprland/` uses it. `pre.sh` is not used by any module.
 
 ### properties.json Format
 
@@ -1456,7 +1538,8 @@ modules/<name>/
     "access": "user",
     "defaults": true,
     "mode": "install",
-    "config": "~/.config/name",
+    "config": "./files",
+    "install": "~/.config/name",
     "overwrite": false
 }
 ```
@@ -1466,9 +1549,17 @@ modules/<name>/
 - `type`: `core` (cannot uninstall) or `extra`
 - `access`: `user` or `root` (root modules auto-elevate via sudo)
 - `defaults`: Whether to install by default
-- `mode`: `install` (symlink), `mirror` (copy), or `all`
-- `config`: Target config path
+- `mode`: `install` (symlink), `mirror` (copy), or `all` (both)
+- `config`: **Source** path — where the module's files live (e.g., `./files`)
+- `install`: **Destination** path — where files get linked/copied (e.g., `~/.config/name`)
 - `overwrite`: Whether to overwrite existing files
+
+> [!TIP]
+> `config` is the *source*, `install` is the *destination*. Common mistake: swapping them. `lib/module.sh` also reads an optional `gui` field (defaults to `false`) to skip modules that require a desktop session during chroot/setup.
+
+### Available Modules
+
+`btop`, `cava`, `fastfetch`, `grub`, `hyprland`, `kitty`, `mangohud`, `matugen`, `plymouth`, `qt5ct`, `qt6ct`, `retro`, `retroshell`, `sddm`, `spotify`
 
 ### Module Commands
 
@@ -1526,10 +1617,11 @@ check_dep "jq" "jq" || return 1
 
 ### Manual Package Check
 
+`rx_is_pkg_installed` lives in `lib/driver.sh` (it's also used there by `rx_get_missing_packages`):
+
 ```bash
-rx_is_pkg_installed() {
-    pacman -Qq "$1" >/dev/null 2>&1
-}
+source "$RETRO_DIR/lib/driver.sh"
+rx_is_pkg_installed "jq" || echo "jq not installed"
 ```
 
 ---
@@ -1548,11 +1640,11 @@ The **Daemon System** is a background daemon written in **Lua** that continuousl
 | File | Purpose |
 |------|---------|
 | `daemon/engine.lua` | Core engine - loads watchers, dispatches events via coroutines |
-| `daemon/event_daemon.lua` | CLI interface - start/stop/status/trigger/list/log |
+| `daemon/event_daemon.lua` | CLI interface - loop/trigger/status/list-events/stop |
 | `daemon/watcher.lua` | Shared watcher utilities - variable persistence, logging, sysfs reading |
-| `daemon/watchers/*.lua` | Watcher modules (battery, bluetooth, power, usb, audio, wallpaper, portal, slideshow, timers) |
-| `daemon/events/*.lua` | Event handler modules (battery, power, notifications, wallpaper) |
-| `cmds/tools/event.sh` | Frontend command to manage the daemon |
+| `daemon/watchers/*.lua` | Watcher modules (audio, axctl, battery, bluetooth, fans, hypridle, portal, power, rotation, slideshow, ssh, timers, usb, wallpaper) |
+| `daemon/events/*.lua` | Event handler modules (battery, power, notifications, rotation, wallpaper) |
+| `cmds/tools/daemon.sh` | Frontend command to manage the daemon (`cmd_event`, registered as `retro daemon`) |
 
 ### Architecture
 
@@ -1565,11 +1657,15 @@ local engine = Engine.new(daemon_dir)
 -- Core methods:
 engine:load_watchers()          -- Dynamically loads *.lua from watchers/
 engine:load_event_handlers()    -- Dynamically loads *.lua from events/
-engine:emit(event_name, ...)    -- Fire event to all handlers (async)
-engine:emit_sync(event_name, ...) -- Fire event to all handlers (sync)
+engine:emit(event_name, ...)    -- Fire event to all handlers (sync, pcall-wrapped)
 engine:run_loop()               -- Main coroutine scheduler loop
-engine:trigger(event_name, ...) -- Manually fire an event
+engine:get_status()             -- Show engine status
+engine:list_watchers()          -- List discovered watchers
+engine:stop()                   -- Stop the engine
 ```
+
+> [!NOTE]
+> `emit` is the only dispatch method — there is no separate `emit_sync`. Manual event firing (`trigger`) is implemented as a CLI action in `event_daemon.lua`, not as an Engine method.
 
 ### How It Works
 
@@ -1589,96 +1685,126 @@ engine:trigger(event_name, ...) -- Manually fire an event
    - Export a table mapping event names to handler functions
    - Run in the same coroutine context (pcall-wrapped for safety)
 
-4. **Event Commands**:
-   - `retro daemon start` - Start the daemon in background
-   - `retro daemon loop` - Internal: run the event loop (called by start)
+4. **Event Commands** (from `cmds/tools/daemon.sh`):
+   - `retro daemon start` - Start the daemon in the background
    - `retro daemon stop` - Stop the daemon via stop file signal
+   - `retro daemon restart` - Restart the daemon
    - `retro daemon status` - Show daemon PID and uptime
-   - `retro daemon trigger <name>` - Manually fire an event
-   - `retro daemon list` - List available watchers
-   - `retro daemon log [name]` - View watcher logs
-   - `retro daemon log true/false` - Enable/disable log generation
-   - `retro daemon log limit <name> <lines>` - Set log line cap
+   - `retro daemon trigger <name> [args...]` - Manually fire an event
+   - `retro daemon watchers` (alias `list`) - List available watchers
+   - `retro daemon events` - List all available events
+   - `retro daemon enable <name|all>` / `retro daemon disable <name>` - Enable/disable a watcher
+
+> [!NOTE]
+> `loop` is an internal action (`nohup lua event_daemon.lua loop`) invoked by `start` — not meant for direct use. The daemon's log **flag** is controlled via the `RETRO_EVENT_LOG_ENABLED` variable; watcher log files are managed through `retro log` (see Section 7), not `retro daemon log`.
 
 ### Available Watchers
 
 | Watcher | File | Purpose |
 |---------|------|---------|
 | Battery | `watchers/battery.lua` | Battery capacity, saver mode, low/critical thresholds |
-| Power | `watchers/power.lua` | AC power connect/disconnect detection |
+| Power | `watchers/power.lua` | AC power connect/disconnect, power profile changes |
 | Bluetooth | `watchers/bluetooth.lua` | Device pairing/connection/disconnection |
-| USB | `watchers/usb.lua` | USB device connect/disconnect |
-| Audio | `watchers/audio.lua` | Audio device changes |
-| Wallpaper | `watchers/wallpaper.lua` | Wallpaper slideshow tick |
+| USB | `watchers/usb.lua` | USB device connect/disconnect (tick-based) |
+| Audio | `watchers/audio.lua` | Default sink/source fallback changes, EasyEffects restarts |
+| Wallpaper | `watchers/wallpaper.lua` | Wallpaper slideshow management |
 | Portal | `watchers/portal.lua` | XDG portal monitoring |
 | Slideshow | `watchers/slideshow.lua` | Slideshow timing |
 | Timers | `watchers/timers.lua` | Package/Retro update checks |
+| Axctl | `watchers/axctl.lua` | Axctl touchpad gestures (active when `/tmp/axctl-*.sock` exists) |
+| Fans | `watchers/fans.lua` | Fan control monitoring |
+| Hypridle | `watchers/hypridle.lua` | Hypridle idle daemon monitoring |
+| Rotation | `watchers/rotation.lua` | Display rotation detection (tick-based) |
+| SSH | `watchers/ssh.lua` | SSH login/failed/close events |
 
 ### Available Events
 
-| Event | Trigger |
-|-------|---------|
-| `on_event_loop_start` | Daemon starts |
-| `on_power_disconnect` | AC power removed |
-| `on_power_connect` | AC power connected |
-| `on_battery_low` | Battery below threshold |
-| `on_battery_critical` | Battery critically low |
-| `on_battery_saver_enabled` | Saver mode activated |
-| `on_battery_saver_disabled` | Saver mode deactivated |
-| `on_power_profile_changed` | Power profile switched |
-| `on_battery_usage_high` | High-usage app detected |
-| `on_usb_connected` | USB device inserted |
-| `on_usb_disconnected` | USB device removed |
-| `on_pkg_updates_available` | System updates available |
-| `on_retro_update_available` | RetroLinux update available |
-| `on_bluetooth_pairing_request` | New BT device pairing |
-| `on_bluetooth_connected` | BT device connected |
-| `on_bluetooth_disconnected` | BT device disconnected |
-| `on_slideshow_tick` | Wallpaper slideshow tick |
+| Event | Emitted by |
+|-------|-----------|
+| `on_event_loop_start` | Engine (daemon startup) |
+| `on_power_disconnect` | Power watcher |
+| `on_power_connect` | Power watcher |
+| `on_power_profile_changed` | Power watcher |
+| `on_battery_low` | Battery watcher |
+| `on_battery_critical` | Battery watcher |
+| `on_battery_saver_enabled` | Battery watcher |
+| `on_battery_saver_disabled` | Battery watcher |
+| `on_audio_sink_fallback` | Audio watcher |
+| `on_audio_source_fallback` | Audio watcher |
+| `on_audio_ee_restarted` | Audio watcher |
+| `on_bluetooth_pairing_request` | Bluetooth watcher |
+| `on_bluetooth_connected` | Bluetooth watcher |
+| `on_bluetooth_disconnected` | Bluetooth watcher |
+| `on_usb_connected` | USB watcher |
+| `on_usb_disconnected` | USB watcher |
+| `on_hypridle_restarted` | Hypridle watcher |
+| `on_display_rotation` | Rotation watcher |
+| `on_ssh_login` | SSH watcher |
+| `on_ssh_failed` | SSH watcher |
+| `on_ssh_close` | SSH watcher |
+| `on_slideshow_tick` | Slideshow watcher |
+| `on_pkg_updates_available` | Timers watcher |
+| `on_retro_update_available` | Timers watcher |
+
+> [!NOTE]
+> `on_battery_usage_high` is **handler-only**: it's implemented in `daemon/events/notifications.lua` but no watcher currently emits it. You can fire it manually with `retro daemon trigger on_battery_usage_high <app> <watts> <cpu> <pid>`.
 
 ### Creating a New Watcher (Lua)
 
+Watchers are plain tables returned from a module in `daemon/watchers/`. Two styles are supported:
+
+**1. Coroutine style** — `start(engine)` runs in its own coroutine and must loop + yield:
+
 ```lua
 -- daemon/watchers/mytemp.lua
-local Watcher = require("watcher")
+return {
+    name = "mytemp",
+    interval = 30,  -- seconds between checks
 
-local M = {}
-M.name = "mytemp"
-M.interval = 30  -- seconds between checks
+    enabled = function()
+        -- Optional: return false to skip loading this watcher
+        return true
+    end,
 
-function M.enabled()
-    -- Optional: return false to skip loading this watcher
-    return true
-end
+    start = function(engine)
+        while true do
+            local temp = Watcher.read_sys("/sys/class/thermal/thermal_zone0/temp")
+            local temp_c = math.floor(temp / 1000)
 
-function M.start(engine)
-    while true do
-        local temp = Watcher.read_sys("/sys/class/thermal/thermal_zone0/temp")
-        local temp_c = math.floor(temp / 1000)
+            if temp_c >= 80 then
+                engine:emit("on_temperature_critical", temp_c)
+            elseif temp_c >= 70 then
+                engine:emit("on_temperature_high", temp_c)
+            end
 
-        if temp_c >= 80 then
-            engine:emit("on_temperature_critical", temp_c)
-        elseif temp_c >= 70 then
-            engine:emit("on_temperature_high", temp_c)
+            coroutine.yield()  -- REQUIRED in coroutine style: yield to avoid blocking the scheduler
         end
-
-        coroutine.yield()  -- REQUIRED: must yield to avoid blocking the scheduler
-    end
-end
-
-return M
+    end,
+}
 ```
 
-2. The engine automatically discovers and runs it:
-   - Module must export `start(engine)` function
-   - Set `M.name` for unique identifier
-   - Set `M.interval` for check frequency (default: 15s)
-   - `M.enabled()` to conditionally load (required)
-   - Wrap logic in `while true do ... end` loop
-   - `coroutine.yield()` must be called inside the loop
+**2. Tick style** — `tick(engine)` is a plain function called every `interval` seconds. No coroutine, no `while` loop, no `coroutine.yield()`. Used by `usb.lua` and `rotation.lua`:
+
+```lua
+-- daemon/watchers/mycheck.lua
+return {
+    name = "mycheck",
+    interval = 5,
+    enabled = function() return true end,
+    tick = function(engine)
+        -- runs every 5 seconds; no yielding needed
+        engine:emit("on_mycheck", "value")
+    end,
+}
+```
+
+Engine behavior:
+   - Module must return a table with `name`, `interval`, and `enabled()` (all watchers define `enabled`)
+   - `interval` defaults to 15s
+   - Provide either `start(engine)` (coroutine style) or `tick(engine)` (tick style), not both
 
 > [!WARNING]
-> **Critical:** Watcher functions MUST use `while true do` loops. Without it, the coroutine runs once, yields, then enters a 'dead' state on the next resume (function body ends). The scheduler cannot revive dead coroutines — the watcher will run exactly once then break silently.
+> **Coroutine-style watchers MUST loop.** In `start()` style, the function body runs as a coroutine. If it returns instead of looping, the coroutine becomes "dead" — the engine detects this and recreates it, so the watcher effectively runs once per interval and then restarts (with a `coroutine dead, restarting` warning). Wrap logic in `while true do ... end` and call `coroutine.yield()` so the engine can schedule other watchers between ticks.
 
 > [!TIP]
 > **Tip:** Do NOT use `os.execute("sleep ...")` — use `Watcher.sleep(seconds)` or `coroutine.yield()` instead.
@@ -1690,7 +1816,6 @@ return M
 |----------|---------|
 | `Watcher.get_var(key, default)` | Read persistent variable (auto-reloads on file change) |
 | `Watcher.set_var(key, value)` | Write persistent variable to `$RETRO_CONFIG/variables.sh` |
-| `Watcher.reload_vars()` | Force reload variables from file |
 | `Watcher.run_cmd(cmd)` | Execute shell command, return trimmed stdout |
 | `Watcher.read_sys(path)` | Read a sysfs file (returns empty string on failure) |
 | `Watcher.has_battery()` | Check if system has a battery (caches BAT_PATH) |
@@ -1698,7 +1823,7 @@ return M
 | `Watcher.parse_pipe(line)` | Split pipe-delimited string into table |
 | `Watcher.time()` | Current Unix timestamp (`os.time()`) |
 | `Watcher.sleep(seconds)` | Sleep for N seconds |
-| `Watcher.log(name, msg)` | Write to watcher log file (respects caps and enabled flag) |
+| `Watcher.log(name, msg, level)` | Write to watcher log file (respects caps and enabled flag) |
 | `Watcher.tail_log(name, limit)` | Read last N lines from watcher log |
 | `Watcher.clear_log(name)` | Truncate watcher log file |
 | `Watcher.list_logs()` | List all watcher log files |
@@ -1708,6 +1833,9 @@ return M
 | `Watcher.is_log_enabled()` | Check if log generation is globally enabled |
 | `Watcher.set_log_enabled(enabled)` | Enable/disable log generation |
 | `Watcher.is_log_disabled(name)` | Check if a specific watcher log is disabled |
+
+> [!NOTE]
+> There is no `Watcher.reload_vars()`. Force-reloading variables is available only in `lib/lua/variable.lua` (`Variable.reload_vars()`). `Watcher.get_var()` already auto-reloads when the variables file's mtime changes.
 
 ### Variable Persistence in Watchers
 
@@ -1738,10 +1866,12 @@ Each watcher runs in its own coroutine with independent crash tracking:
 
 ### Log Management
 
-- Enable/disable: `retro daemon log true/false`
-- View: `retro daemon log <name> [limit]`
-- Set cap: `retro daemon log limit <name> <lines>` (minimum 10)
-- List all: `retro daemon log`
+Watcher logs live in `/tmp/retro_logs/watcher_<name>.log` and are managed through the standard log tool (`retro log`, see Section 7):
+
+- View: `retro log <name> [limit]` or `retro log open <name>` (live tail)
+- List all: `retro log list`
+- Log caps default to 100 lines per watcher and are set programmatically via `Watcher.set_log_cap(name, cap)`
+- Global enable/disable of daemon log generation is a persistent variable (`RETRO_EVENT_LOG_ENABLED`), read via `Watcher.is_log_enabled()`
 
 ### Adding a New Event Handler
 
@@ -1788,7 +1918,202 @@ return M
 > - PID stored in `/tmp/retro_event_daemon.pid`
 > - Stop signal via `/tmp/retro_event_daemon_stop` file
 ---
-## 17. Walkthrough: Adding a New Tool 🛠️
+## 17. RetroShell — QML Desktop Shell 🌴
+
+RetroShell is the QML-based desktop shell: a bar with systray/workspaces/clock, a dock, notifications, an app launcher, a dashboard (clipboard, emoji, tmux, notes, wallpapers), an overview, a lockscreen and a dynamic island. It is built on **Quickshell** (the `qs` runtime) and shipped as a module (`modules/retroshell/`, mirror mode → `~/.local/share/retroshell`).
+
+### The Three-Layer Control Flow
+
+RetroShell is controlled from the CLI through a three-layer flow — the standard frontend → core → runtime pattern:
+
+```
+┌──────────────────────────────────────────────────┐
+│  FRONTEND  cmds/tools/shell.sh  (`retro shell`)  │
+│  - start, stop, restart, status, lock, idle, run │
+└───────────────────────┬──────────────────────────┘
+                        │ calls core script
+                        ▼
+┌──────────────────────────────────────────────────┐
+│  CORE  scripts/shell_core.sh                     │
+│  - Flags: --start --stop --restart --status      │
+│           --lock --pid --run <cmd>               │
+│  - Machine-parseable output (OK|... / ERR|...)   │
+└───────────────────────┬──────────────────────────┘
+                        │ IPC (FIFO / qs ipc)
+                        ▼
+┌──────────────────────────────────────────────────┐
+│  RUNTIME  modules/retroshell/files/shell.qml     │
+│  - GlobalShortcuts.qml dispatches commands       │
+└──────────────────────────────────────────────────┘
+```
+
+#### Frontend (`retro shell`)
+
+| Subcommand | Purpose |
+|------------|---------|
+| `retro shell start` | Launch RetroShell |
+| `retro shell stop` / `quit` | Stop RetroShell |
+| `retro shell restart` / `reload` | Restart (also kills lingering axctl processes) |
+| `retro shell status` | `● Running (PID ...)` / `○ Not running` |
+| `retro shell lock` | Activate the lockscreen (via loginctl) |
+| `retro shell idle` | Start hypridle with the custom config |
+| `retro shell run <cmd>` | Send an IPC command (whitelisted) |
+
+#### Core (`scripts/shell_core.sh`)
+
+- `--start` — sets `QS_ICON_THEME` / `QT_QPA_PLATFORMTHEME=qt6ct`, launches `nohup qs -p modules/retroshell/files/shell.qml &`, writes the PID to `/tmp/retroshell.pid`, and waits up to 5s for the IPC pipe
+- `--run <cmd>` — writes the command to the IPC FIFO `/tmp/retroshell_ipc.pipe`; falls back to `qs ipc --pid <pid> call retroshell run <cmd>` if the FIFO is missing
+- `--stop` — sends `quit` via IPC, kills the process, cleans up the pipe/PID file
+- `--status` — outputs `running|<pid>` or `stopped|`
+- `--lock` / `--pid` — session-lock helpers
+- Output is machine-parseable: `OK|...`, `ERR|not_running`, `ERR|already_running|<pid>`, etc. (see Section 10)
+
+> [!TIP]
+> `scripts/wallpaper_core.sh` and `scripts/display_core.sh` call `shell_core.sh --run` directly (e.g. `wallpaper_ping`, `brightness_ping`), bypassing the frontend whitelist.
+
+#### Runtime IPC dispatch
+
+`modules/retroshell/files/modules/services/GlobalShortcuts.qml` owns both IPC entry points:
+- a FIFO listener (`tail -f /tmp/retroshell_ipc.pipe`)
+- an `IpcHandler` with target `retroshell` (`qs ipc --pid <pid> call retroshell run <cmd>`)
+
+Its `run()` switch maps each command to a QML action — toggling the launcher/dashboard/overview/powermenu, screenshot/screenrecord tools, the lockscreen, media controls, etc. Other IPC targets: `lockscreen` (toggle/lock/unlock) and `suspend` (prepare/wake).
+
+#### The `retro shell run` command surface
+
+Frontend whitelist (`cmd_shell` in `cmds/tools/shell.sh`):
+
+```
+launcher clipboard emoji tmux notes wallpapers screenshot screenrecord lockscreen overview
+powermenu tools assistant config dashboard media-play-pause media-next media-prev
+```
+
+> [!NOTE]
+> `GlobalShortcuts.qml` also handles commands that are **not** in the frontend whitelist — `lens`, `dashboard-widgets`, `media-seek-backward/forward`, `wallpaper_ping`, `brightness_ping`. These are sent via `shell_core.sh --run` directly (from Hyprland keybinds or other core scripts) and bypass `retro shell run`.
+
+### File Layout (`modules/retroshell/files/`)
+
+```
+files/
+├── shell.qml                 # Root shell (launched by `qs -p`)
+├── config/
+│   ├── Config.qml            # 15 module loaders (FileView + JsonAdapter)
+│   ├── ConfigValidator.js    # Deep-merge/type validation of module JSON
+│   ├── KeybindActions.js     # Action catalog + legacy→new bind migration
+│   └── defaults/*.js         # Defaults for every module
+├── modules/                  # QML widgets & services (qs.modules.*)
+│   ├── bar/                  # Top/bottom bar, systray, workspaces, clock, pomodoro, weather
+│   ├── dock/  desktop/  frame/  corners/  notch/  lockscreen/  overview/
+│   ├── notifications/        # Popups, history, actions
+│   ├── shell/                # UnifiedShellPanel, OSD, ReservationWindows
+│   ├── sidebar/              # AI assistant sidebar
+│   ├── services/             # ~30 singletons (GlobalShortcuts, AxctlService, MprisController, ...)
+│   ├── tools/                # Screenshot, screenrecord, webcam, countdown
+│   └── widgets/              # Dashboard, launcher, powermenu, presets, ...
+├── assets/                   # aiproviders/, clipboard/ (emoji), compositors/, presets/RetroLinux/, retro/, sound/
+└── scripts/                  # Helper scripts (clipboard, colorpicker.py, google_lens.sh, ocr.sh, qr_scan.sh, keystore.py, thumbgen, weather.sh, ...)
+```
+
+### Config Model
+
+RetroShell reads **per-module JSON** — not `variables.sh`:
+
+- **Location:** `~/.config/retro/shell/*.json` (`bar.json`, `theme.json`, `workspaces.json`, `overview.json`, `notch.json`, `compositor.json`, `performance.json`, `tools.json`, `weather.json`, `desktop.json`, `lockscreen.json`, `prefix.json`, `system.json`, `dock.json`, `ai.json`, `binds.json`, `pinnedapps.json`)
+- **Defaults:** `config/defaults/*.js` define the schema; `ConfigValidator.js` deep-merges and type-checks
+- **First run:** the bundled `assets/presets/RetroLinux/*.json` are copied into the config dir (no overwrite)
+- **Live reload:** `Config.qml` uses `watchChanges: true` on every `FileView`, so external writers (e.g. the Retro Settings GUI) apply instantly without a restart
+- **Module on/off:** a plain `enabled` boolean inside each module's JSON
+
+### Presets
+
+- Bundled set: `assets/presets/RetroLinux/` (bar, compositor, desktop, dock, lockscreen, notch, overview, performance, system, theme, workspaces)
+- Applied from the Settings GUI (`shell_presets` page → `settings/core/shell_config.py`) or in-shell via `PresetsService.qml`
+- User presets live in `~/.config/retro/shell/presets/`
+
+### axctl (touchpad gestures)
+
+- `modules/retroshell/install.sh` builds `axctl` from GitHub (requires Go) and installs it to `/usr/local/bin/axctl`
+- `AxctlService.qml` starts `axctl -c ~/.config/retro/shellctl.toml daemon` and feeds window/workspace state to the shell widgets
+- `daemon/watchers/axctl.lua` restarts the axctl daemon if it dies (see Section 16)
+
+### Integration with the Settings GUI
+
+The Retro Settings GUI is the primary way to configure RetroShell: the `shell_*` pages (`pages/shell_bar.py`, `pages/shell_theme.py`, `pages/shell_dock.py`, `pages/shell_overview.py`, ...) read/write the same `~/.config/retro/shell/*.json` files through `settings/core/shell_config.py`. See Section 18.
+
+---
+## 18. Retro Settings GUI 🎛️
+
+The **Retro Settings GUI** is a GTK4 + libadwaita desktop application for managing Hyprland and every `retro` tool. It lives in `cmds/tools/settings/` (Python package `settings`) and is also shipped as the `retro-settings.pyz` zipapp.
+
+### Launch
+
+```bash
+retro settings               # launch the GUI in the background
+retro settings --debug       # run in the foreground (for debugging)
+retro settings <page>        # open a specific page by slug (e.g. "grub", "shell_bar")
+retro settings --compile     # recompile the settings package bytecode
+```
+
+`cmds/tools/settings.sh` runs `python -m settings` with `PYTHONPATH=cmds/tools:scripts:RETRO_DIR`. The desktop entry is `data/applications/io.github.retrolinux.settings.desktop`.
+
+### Architecture
+
+- **Entry point:** `settings/main.py` → `RetroSettingsApp(Adw.Application)` (app id `io.github.retrolinux.settings`); window in `settings/window.py`
+- **`core/`** — config, schema, state, undo, pending changes, keystore, autostart, env vars, workspaces, layer rules, window rules, shell config, hypridle, system info
+- **`ui/`** — reusable widgets/dialogs (sidebar, search, dialogs, monitor preview, bezier editor, ...)
+- **`pages/`** — one page module per tool
+- **`binds/`** — keybind editing (dispatchers, dialog, live override tracking)
+- **`data/`** — GSettings schema, icons, desktop entry, bundled option overlay (`data/schema/options.json`)
+
+### The Page Pattern
+
+Every `retro` tool has a page in `pages/` (audio, battery, bluetooth, driver, fonts, grub, network, power, themes, wallpapers, disk, logs, daemon, `shell_*`, ...). Two kinds:
+
+1. **`SectionPage`** (`pages/section.py`, ABC) — pages that own a slice of the managed Hyprland config with a full dirty/save/discard/undo lifecycle. Must implement `is_dirty()`, `mark_saved()`, `discard()`. `SavedListSectionPage` is the specialised base for list pages (autostart, env vars, window rules, layer rules, workspaces).
+2. **Standalone pages** (Home, Audio, Grub, Battery, ...) — duck-type the same lifecycle. They load state by calling `scripts/*_core.sh` or reading `variables.sh`.
+
+**Adding a page** (e.g. for a new `retro foo` tool) requires registering it in 5 places:
+
+1. `window.py::_build_pages` — add to `standalone_page_specs` (or `section_page_specs` for a `SectionPage`)
+2. `window.py::_build_lazy_standalone_page` — wire `_on_dirty_changed`, append to `_section_pages`, register `get_search_entries()`
+3. `pages/home.py::PAGE_REGISTRY` — add `("foo", "Foo", "description", FOO_ICON)`
+4. `ui/sidebar.py::populate` — `add_row(category, "foo", "Foo", FOO_ICON)`
+5. `ui/icons.py` — define `FOO_ICON`
+
+> [!TIP]
+> Pages share state with the CLI through `lib/python/variable.py` (`get_var`/`set_var` on `$RETRO_CONFIG/variables.sh`) and shell out to the same `scripts/*_core.sh` the CLI uses. Don't duplicate core logic inside a page.
+
+### The Managed Config Model
+
+The GUI owns a generated Hyprland config it writes directly:
+
+| File | Purpose |
+|------|---------|
+| `~/.config/retro/settings.{conf,lua}` | Managed Hyprland config (Hyprlang or Lua, matching Hyprland's mode). Written via the installed `hyprland_config` package (`Document`, `atomic_write`). |
+| `~/.config/retro/keybinds.{conf,lua}` | Keybinds (`RETRO_ACTIONS` map to `hl.bind(...)` in Lua mode) |
+| `~/.config/retro/shell/*.json` | RetroShell module configs (via `core/shell_config.py`) |
+| `$RETRO_CONFIG/variables.sh` | Shared state with the CLI (`lib/python/variable.py`) |
+| `~/.config/retro/hypridle.conf` | Idle listeners (via `core/hypridle.py`) |
+
+- **GSettings** schema `io.github.retrolinux.settings` stores `auto-save`, `config-path`, and banner-dismissed flags
+- **Live apply:** option changes go through `HyprlandState.apply()` (hyprctl socket / Lua exec) immediately; the managed file is written on save
+- **Undo:** `core/undo.py` keeps double-ended stacks (max 100) for option, binds, cursor, monitors and list-snapshot changes
+
+### External Dependencies
+
+`hyprland_config`, `hyprland_socket`, `hyprland_state`, `hyprland_schema` are **installed pip packages**, not vendored in the repo. They provide `Document`, `Rule`, `load_any`/`serialize_any`, `atomic_write`, `BindData`, `HyprlandState`, schema catalogs, etc. The repo's own `settings/pyrightconfig.json` excludes these.
+
+### Relationship to the CLI
+
+The GUI is a **peer of the CLI**, not a client:
+
+- Hyprland config options are written directly to the managed file
+- Hardware/system features shell out to the same `scripts/*_core.sh`
+- Some actions launch the CLI (`retro audio eq <profile>`, `retro grub apply`, `retro --load list-raw`)
+- Shared state flows through `variables.sh`, so CLI and GUI stay in sync
+
+---
+## 19. Walkthrough: Adding a New Tool 🛠️
 
 Now that you know ALL the rules, let's add a hypothetical `temperature` tool:
 
@@ -1798,8 +2123,6 @@ Now that you know ALL the rules, let's add a hypothetical `temperature` tool:
 #!/bin/bash
 
 # scripts/temperature_core.sh - Backend logic only
-
-CORE_SCRIPT="$0"
 
 case "$1" in
     --status)
@@ -1819,6 +2142,41 @@ case "$1" in
         ;;
 esac
 ```
+
+> [!WARNING]
+> **`local` is only valid inside functions.** The `--status`/`--current` branches above use `local` at the top level of the script, which is **invalid Bash** (`local: can only be used in a function`). In real core scripts, wrap the logic in a function or use plain variables. For example:
+
+```bash
+#!/bin/bash
+
+# scripts/temperature_core.sh - Backend logic only
+
+get_thermal_zones() {
+    for zone in /sys/class/thermal/thermal_zone*; do
+        [[ -f "$zone/temp" ]] || continue
+        local temp
+        temp=$(cat "$zone/temp")
+        local temp_c=$((temp / 1000))
+        local type
+        type=$(cat "$zone/type" 2>/dev/null || echo "unknown")
+        local critical
+        critical=$(cat "$zone/trip_point_0_temp" 2>/dev/null || echo "0")
+        echo "thermal|$type|${temp_c}C|${critical}"
+    done
+}
+
+case "$1" in
+    --status) get_thermal_zones ;;
+    --current)
+        local temp  # also invalid at top level — assign without local instead
+        temp=$(cat /sys/class/thermal/thermal_zone0/temp)
+        echo $((temp / 1000))
+        ;;
+esac
+```
+
+> [!TIP]
+> The existing core scripts follow this pattern: each CLI flag maps to a dedicated function (e.g., `cmd_status`, `cmd_current`) or the logic lives inside a function so `local` is valid. Follow that convention in new core scripts.
 
 ### Step 2: Create the Frontend (cmds/tools/temperature.sh)
 
@@ -1873,7 +2231,7 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 ```
 
 ---
-## 18. Best Practices and Gotchas ✅
+## 20. Best Practices and Gotchas ✅
 
 ### Do
 
@@ -1885,9 +2243,8 @@ register_command "TOOLS" "temperature|temp" "Monitor system temperatures" "cmd_t
 - Handle `-y/--yes` flag by checking `$SKIP_PROMPT`
 - Use icons consistently from the Nerd Font set
 - Check existing lib functions before writing new ones
-- Keep Lua library functions 1:1 with their shell equivalents
+- Keep shared library functions 1:1 across Bash/Lua/Python (see Section 5)
 - Use `require("module")` for Lua imports, not `dofile()`
-- Keep Python library functions 1:1 with their shell equivalents
 - Use `from lib.python.x import ...` for Python imports
 - Use `ensure_dbus()` before any DBus operations in Python
 
@@ -1943,37 +2300,35 @@ esac
 > [!WARNING]
 > **Required:** Every watcher in `daemon/watchers/*.lua` **MUST** follow this structure.
 >
-> **Why this matters:** The engine discovers watchers by scanning for `*.lua` files and expects specific fields. Missing `M.name` means no log source. Missing `M.interval` means the engine doesn't know when to schedule it. Missing `M.enabled()` causes a nil error on load. Missing `coroutine.yield()` blocks the entire daemon loop.
+> **Why this matters:** The engine discovers watchers by scanning for `*.lua` files and expects specific fields. Missing `name` means no log source. Missing `interval` means the engine doesn't know when to schedule it. Missing `enabled()` causes a nil error on load. Missing `coroutine.yield()` in a coroutine-style watcher blocks the entire daemon loop.
 ```lua
-local Watcher = require("watcher")
+return {
+    name = "my_watcher",
+    interval = 30,  -- seconds between checks
 
-local M = {}
-M.name = "my_watcher"
-M.interval = 30  -- seconds between checks
+    enabled = function()
+        return true  -- or check a condition
+    end,
 
-function M.enabled()
-    return true  -- or check a condition
-end
-
-function M.start(engine)
-    -- ... watcher logic ...
-    engine:emit("on_my_event", data)
-    coroutine.yield()  -- REQUIRED: must yield to avoid blocking
-end
-
-return M
+    start = function(engine)
+        -- ... watcher logic ...
+        engine:emit("on_my_event", data)
+        coroutine.yield()  -- REQUIRED in coroutine style: must yield to avoid blocking
+    end,
+}
 ```
 
 > [!NOTE]
 > **Required fields:**
 >
-> - `M.name` — unique watcher identifier
-> - `M.interval` — check frequency in seconds
-> - `M.enabled()` — function that returns true/false
-> - `M.start(engine)` — main watcher logic
+> - `name` — unique watcher identifier
+> - `interval` — check frequency in seconds
+> - `enabled()` — function that returns true/false
+> - `start(engine)` — main watcher logic (coroutine style, with `while true do ... end`)
+> - or `tick(engine)` — plain function style (no coroutine, no yield)
 >
 >
-> **Why this matters:** The engine discovers watchers by scanning for `*.lua` files and expects these specific fields. Missing `M.name` means no log source. Missing `M.interval` means the engine doesn't know when to schedule it. Missing `M.enabled()` causes a nil error on load. Missing `coroutine.yield()` blocks the entire daemon loop.
+> **Why this matters:** The engine discovers watchers by scanning for `*.lua` files and expects these specific fields. Missing `name` means no log source. Missing `interval` means the engine doesn't know when to schedule it. Missing `enabled()` causes a nil error on load. Missing `coroutine.yield()` in a coroutine-style watcher blocks the entire daemon loop.
 ### Lua Event Handler Structure Rules
 
 > [!WARNING]
@@ -2004,17 +2359,17 @@ return M
 > - Stop signal via `/tmp/retro_event_daemon_stop` file
 ### Common Gotchas
 
-2. **Lowercase actions**: Always use `${action,,}` to lowercase user input for consistent case handling.
+1. **Lowercase actions**: Always use `${action,,}` to lowercase user input for consistent case handling.
 
-3. **Array handling**: Use `local arr=()` for local arrays to avoid polluting global state.
+2. **Array handling**: Use `local arr=()` for local arrays to avoid polluting global state.
 
-4. **Exit codes**: Core scripts should return 0 on success, 1 for failure. Frontend handles the messaging.
+3. **Exit codes**: Core scripts should return 0 on success, 1 for failure. Frontend handles the messaging.
 
-5. **Icon padding**: Always use `${PINK}icon${RESET}` pattern, never plain icon alone.
+4. **Icon padding**: Always use `${PINK}icon${RESET}` pattern, never plain icon alone.
 
-6. **rx_log vs rx_log_file**: `rx_log` = console output (frontend only), `rx_log_file` = file output (core/daemon only). Never mix them.
+5. **rx_log vs rx_log_file**: `rx_log` = console output (frontend only), `rx_log_file` = file output (core/daemon only). Never mix them.
 
-7. **Log registration**: Every core script must call `rx_log_register` before any `rx_log_file` calls.
+6. **Log registration**: Every core script must call `rx_log_register` before any `rx_log_file` calls.
 
 ### <kbd>Ctrl</kbd> + <kbd>C</kbd> Trap (Graceful Exits)
 
@@ -2039,7 +2394,7 @@ trap - INT TERM  # clear trap on success
 Failing to handle interrupts can leave the system in a broken state (half-installed packages, incomplete symlinks, broken database entries).
 
 ---
-## 19. Installer System 💾 (bin/)
+## 21. Installer System 💾 (bin/)
 
 > [!NOTE]
 > **Why a separate installer system:** The installer (`bin/`) is isolated from the main tool system (`cmds/`, `scripts/`) because it runs in a fundamentally different environment.
@@ -2070,9 +2425,8 @@ The Installer is a self-contained system that runs during initial system setup. 
 ┌─────────────────────────────────────────────────────────────┐
 │  UTILITIES (bin/lib/*)                                      │
 │  - Pure functions, no orchestration                         │
-│  - crypto, display, errors, gum, wifi, locale, timezone,    │
-│    disk, handlers, output, debug, progress, qr, setup_lib,  │
-│    setup                                                    │
+│  - display, errors, gum, wifi, locale, timezone,            │
+│    disk, handlers, output, debug, progress, qr, setup_lib   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -2084,25 +2438,24 @@ The Installer is a self-contained system that runs during initial system setup. 
 
 ```
 bin/
-├── retroinstall              # Main entry point (317 lines)
-├── lib/                      # Low-level utilities (15 files)
-│   ├── crypto.sh            # rx_hash_password (yescrypt via Python/archinstall)
+├── retroinstall              # Main entry point (349 lines)
+├── lib/                      # Low-level utilities (13 files)
 │   ├── debug.sh             # rx_debug conditional output
-│   ├── disk.sh              # rx_get_disk_info, rx_get_available_disks, rx_write_configuration
+│   ├── disk.sh              # rx_get_disk_info, rx_get_available_disks, rx_confirm_disk_wipe
 │   ├── display.sh           # Terminal sizing, logo rendering, GUM styles, padding system
 │   ├── errors.sh            # rx_retry_or_exit, rx_step_error, rx_abort
 │   ├── gum.sh               # rx_notice (gum spin wrapper)
 │   ├── handlers.sh          # rx_setup_traps, rx_catch_errors, rx_save_state, rx_load_state
 │   ├── locale.sh            # Keyboard/layout names, LOCALE_LANG_NAMES, KEYBOARD_LAYOUT_NAMES
-│   ├── output.sh            # rx_start_log_output, rx_start_install_log, rx_run_logged
-│   ├── progress.sh          # rx_step progress tracking [n/total]
+│   ├── output.sh            # rx_start_log_output, rx_start_install_log
+│   ├── progress.sh          # rx_step step banner
 │   ├── qr.sh                # rx_generate_error_qr, rx_gather_system_info
 │   ├── setup_lib.sh         # Shared sourcing hub, rx_setup_fail
-│   ├── setup.sh             # rx_chrootable_systemctl_enable wrapper
-│   ├── timezone.sh          # rx_list_timezones, rx_get_current_timezone
+│   ├── timezone.sh          # rx_get_current_timezone
 │   └── wifi.sh              # WiFi setup functions (iwctl based), rx_check_internet
-├── setup/                    # Modular setup step scripts (24 scripts)
+├── setup/                    # Modular setup step scripts (25 scripts)
 │   ├── install.sh           # Installation type: complete vs minimal
+│   ├── branch.sh            # RetroLinux branch: stable (main) vs rolling (develop)
 │   ├── ricing.sh            # Ricing mode: stable (symlink) vs advanced (copy)
 │   ├── user.sh              # Username, user password, sudo access
 │   ├── root.sh              # Root password
@@ -2115,7 +2468,7 @@ bin/
 │   ├── disk.sh              # Disk selection, wipe confirmation, returns 42 on go-back
 │   ├── luks.sh              # LUKS encryption enable/password/iteration time
 │   ├── kernel.sh            # Kernel selection (linux, linux-lts, linux-zen, linux-hardened)
-│   ├── boot.sh              # Bootloader config (GRUB theme, resolution, OS prober)
+│   ├── boot.sh              # Bootloader config (GRUB theme, resolution, OS prober, snapshots, timeout)
 │   ├── bluetooth.sh         # Bluetooth service enable toggle
 │   ├── fingerprint.sh       # Fingerprint authentication setup
 │   ├── print.sh             # CUPS printing service enable toggle
@@ -2127,7 +2480,12 @@ bin/
 │   ├── network.sh           # Network connectivity check and WiFi/Ethernet setup
 │   └── config.sh            # Write user_configuration.json and user_credentials.json
 └── post/                     # Post-install scripts (run in chroot after archinstall)
-    └── run.sh               # Post-install orchestrator
+    ├── run.sh               # Post-install orchestrator (priority order: packages, network, aur, clone, state)
+    ├── packages.sh          # Install essential packages, sudoers NOPASSWD, fc-cache
+    ├── network.sh           # Enable NetworkManager, configure Ethernet/WiFi in chroot
+    ├── aur.sh               # Install AUR helper (yay/paru) in chroot
+    ├── clone.sh             # Deploy repo to /mnt/opt/retrolinux + first-boot autostart hook
+    └── state.sh             # Write ~/.retro_install with all install-time variables
 ```
 
 </details>
@@ -2141,29 +2499,30 @@ bin/
 ```bash
 SETUP_SCRIPTS=(
     "install.sh"      # index 0  - Installation type (complete/minimal)
-    "ricing.sh"       # index 1  - Ricing mode (stable/advanced)
-    "user.sh"         # index 2  - Username, password, sudo
-    "root.sh"         # index 3  - Root password
-    "hostname.sh"     # index 4  - Machine hostname
-    "display.sh"      # index 5  - Display resolution detection
-    "keyboard.sh"     # index 6  - Keyboard layout
-    "locale.sh"       # index 7  - System language
-    "mirrors.sh"      # index 8  - Mirror selection
-    "timezone.sh"     # index 9  - Timezone
-    "disk.sh"         # index 10 - Disk selection (go-back point, exit 42)
-    "luks.sh"         # index 11 - LUKS encryption
-    "kernel.sh"       # index 12 - Kernel selection
-    "boot.sh"         # index 13 - Bootloader configuration
-    "bluetooth.sh"    # index 14 - Bluetooth toggle
-    "fingerprint.sh"  # index 15 - Fingerprint auth
-    "print.sh"        # index 16 - Printing service
-    "ssh.sh"          # index 17 - SSH configuration
-    "aur.sh"          # index 18 - AUR helper
-    "editor.sh"       # index 19 - Editor choice
-    "filemanager.sh"  # index 20 - File manager choice
-    "browser.sh"      # index 21 - Browser choice
-    "network.sh"      # index 22 - Network setup
-    "config.sh"       # index 23 - Generate JSON configs
+    "branch.sh"       # index 1  - RetroLinux branch (stable main / rolling develop)
+    "ricing.sh"       # index 2  - Ricing mode (stable/advanced)
+    "user.sh"         # index 3  - Username, password, sudo
+    "root.sh"         # index 4  - Root password
+    "hostname.sh"     # index 5  - Machine hostname
+    "display.sh"      # index 6  - Display resolution detection
+    "keyboard.sh"     # index 7  - Keyboard layout
+    "locale.sh"       # index 8  - System language
+    "mirrors.sh"      # index 9  - Mirror selection
+    "timezone.sh"     # index 10 - Timezone
+    "disk.sh"         # index 11 - Disk selection (go-back point, exit 42)
+    "luks.sh"         # index 12 - LUKS encryption
+    "kernel.sh"       # index 13 - Kernel selection
+    "boot.sh"         # index 14 - Bootloader configuration
+    "bluetooth.sh"    # index 15 - Bluetooth toggle
+    "fingerprint.sh"  # index 16 - Fingerprint auth
+    "print.sh"        # index 17 - Printing service
+    "ssh.sh"          # index 18 - SSH configuration
+    "aur.sh"          # index 19 - AUR helper
+    "editor.sh"       # index 20 - Editor choice
+    "filemanager.sh"  # index 21 - File manager choice
+    "browser.sh"      # index 22 - Browser choice
+    "network.sh"      # index 23 - Network setup
+    "config.sh"       # index 24 - Generate JSON configs
 )
 ```
 
@@ -2187,9 +2546,9 @@ rx_run_step() {
     local exit_code=$?
     rx_load_state                    # Reload state after step
 
-    # Exit code 42 = go back (skip to disk.sh at index 10, then restart)
+    # Exit code 42 = go back (skip back to keyboard.sh at index 7, then restart)
     if [[ $exit_code -eq 42 ]]; then
-        RX_SKIP_STEP=9
+        RX_SKIP_STEP=6
         rx_save_state
         exec /opt/retrolinux/bin/retroinstall  # Restart installer
     elif [[ $exit_code -ne 0 ]]; then
@@ -2198,7 +2557,7 @@ rx_run_step() {
 }
 ```
 
-**Main loop** (retroinstall lines 135-137):
+**Main loop** (retroinstall lines 155-157):
 ```bash
 for i in "${!SETUP_SCRIPTS[@]}"; do
     rx_run_step "${SETUP_SCRIPTS[$i]}" "$i"
@@ -2212,8 +2571,8 @@ done
 
 **Go-back mechanism:**
 - `disk.sh` returns exit code `42` when user declines disk wipe confirmation
-- On `42`: Sets `RX_SKIP_STEP=9`, saves state, restarts installer via `exec`
-- The installer loops, skipping steps 0-9, resumes from `disk.sh` (index 10)
+- On `42`: Sets `RX_SKIP_STEP=6`, saves state, restarts installer via `exec`
+- The installer loops, skipping steps 0-6, resumes from `keyboard.sh` (index 7) — the earliest step the user could still change
 
 ### State Management 🔐 (CRITICAL)
 
@@ -2233,11 +2592,11 @@ done
 # Installation type
 INSTALL_TYPE          # "complete" or "minimal"
 RICE_MODE             # "stable" (symlink) or "advanced" (copy)
+RETRO_BRANCH          # "main" (stable) or "develop" (rolling)
 
 # User credentials
 USER_NAME             # Username
 USER_PASSWORD         # Plain text user password
-USER_PASSWORD_HASH    # Yescrypt hash of user password (via bin/lib/crypto.sh)
 USER_SUDO             # "true" or "false"
 
 # System configuration
@@ -2281,54 +2640,57 @@ BROWSER_CHOICE        # Default browser
 GRUB_THEME_CHOICE     # "retropunk" or "retrolinux"
 BOOT_VIDEO_GRUB       # GRUB resolution (e.g., "1920x1080")
 GRUB_OS_PROBER        # "true" or "false"
+GRUB_SNAPSHOTS_ENABLED # "true" or "false"
+GRUB_TIMEOUT          # GRUB menu timeout in seconds
+GRUB_KERNEL           # Kernel to boot by default
 
 # Network
 NETWORK_TYPE          # "WiFi" or "Ethernet"
 WIFI_SSID             # WiFi SSID if connected via WiFi
+WIFI_PASSWORD         # WiFi password if connected via WiFi
 
 # Root
 ROOT_PASSWORD         # Plain text root password
-ROOT_PASSWORD_HASH    # Yescrypt hash of root password (via bin/lib/crypto.sh)
 
 # Flow control
 RX_SKIP_STEP          # Step index to skip to (used for "go back")
 RX_GO_BACK_TO         # Name of step to go back to
+RX_CURRENT_STEP       # Currently running step (set by rx_restore_disk_selection)
+RX_START_STEP         # Starting step index (default: 1)
+WALLPAPER_RES         # Wallpaper resolution (unused placeholder)
+FIREWALL_ENGINE       # Firewall engine (default: "nftables", applied post-install)
 ```
 
-**Password hashing**: Uses **yescrypt** via `bin/lib/crypto.sh` (`rx_hash_password`), which calls Python's `archinstall.lib.crypt.crypt_yescrypt`. This replaced the old SHA-512 (`openssl passwd -6`) method.
-
-> [!TIP]
-> **Why yescrypt over SHA-512:** Yescrypt is a memory-hard password hashing function designed to resist GPU and ASIC-based attacks.
->
-> **Why this matters:** SHA-512 is fast, which makes it vulnerable to brute-force attacks on modern hardware. Yescrypt's configurable iteration time (stored as `LUKS_ITER_TIME`) lets users balance security vs. boot time. This is critical for full-disk encryption where password strength directly determines data security.
+**Passwords**: Passwords are stored as plain text in `$RETRO_STATE` during the flow and written to `user_credentials.json` using archinstall's `!password` / `!root_password` prefix. That prefix tells **archinstall to hash the password during installation** (with its default password hashing), so no pre-hashing happens in the installer itself. The installer's old SHA-512/yescrypt pre-hashing was removed because archinstall handles it — the plaintext only ever lives in the temporary state/JSON files, which are on the live ISO's tmpfs.
 **Setup Scripts and Their Variables**:
 
 | Step | Script | Variables Set |
 |------|--------|---------------|
 | 0 | `install.sh` | `INSTALL_TYPE` |
-| 1 | `ricing.sh` | `RICE_MODE` |
-| 2 | `user.sh` | `USER_NAME`, `USER_PASSWORD`, `USER_PASSWORD_HASH`, `USER_SUDO` |
-| 3 | `root.sh` | `ROOT_PASSWORD`, `ROOT_PASSWORD_HASH` |
-| 4 | `hostname.sh` | `USER_HOSTNAME` |
-| 5 | `display.sh` | `DISPLAY_RES_X`, `DISPLAY_RES_Y`, `DISPLAY_ASPECT_RATIO` |
-| 6 | `keyboard.sh` | `KEYBOARD` |
-| 7 | `locale.sh` | `SYS_LANG`, `SYS_ENC` |
-| 8 | `mirrors.sh` | `MIRROR_REGIONS`, `CUSTOM_MIRRORS` |
-| 9 | `timezone.sh` | `USER_TIMEZONE` |
-| 10 | `disk.sh` | `DISK_SELECTED`, `RX_GO_BACK_TO`; returns 42 on decline |
-| 11 | `luks.sh` | `LUKS_ENABLED`, `LUKS_PASSWORD`, `LUKS_ITER_TIME` |
-| 12 | `kernel.sh` | `KERNEL_SELECTION` |
-| 13 | `boot.sh` | `GRUB_THEME_CHOICE`, `BOOT_VIDEO_GRUB`, `GRUB_OS_PROBER` |
-| 14 | `bluetooth.sh` | `BLUETOOTH_ENABLED` |
-| 15 | `fingerprint.sh` | `FINGERPRINT_ENABLED` |
-| 16 | `print.sh` | `PRINT_SERVICE_ENABLED` |
-| 17 | `ssh.sh` | `SSH_ENABLED`, `SSH_PORT`, `SSH_PASSWORD_LOGIN`, `SSH_KEY_LOGIN`, `SSH_ROOT_LOGIN` |
-| 18 | `aur.sh` | `AUR_HELPER` |
-| 19 | `editor.sh` | `EDITOR_CHOICE` |
-| 20 | `filemanager.sh` | `FILEMANAGER_CHOICE` |
-| 21 | `browser.sh` | `BROWSER_CHOICE` |
-| 22 | `network.sh` | `NETWORK_TYPE`, `WIFI_SSID` |
-| 23 | `config.sh` | Writes JSON files (no state variables) |
+| 1 | `branch.sh` | `RETRO_BRANCH` |
+| 2 | `ricing.sh` | `RICE_MODE` |
+| 3 | `user.sh` | `USER_NAME`, `USER_PASSWORD`, `USER_SUDO` |
+| 4 | `root.sh` | `ROOT_PASSWORD` |
+| 5 | `hostname.sh` | `USER_HOSTNAME` |
+| 6 | `display.sh` | `DISPLAY_RES_X`, `DISPLAY_RES_Y`, `DISPLAY_ASPECT_RATIO`, `BOOT_VIDEO_GRUB` |
+| 7 | `keyboard.sh` | `KEYBOARD` |
+| 8 | `locale.sh` | `SYS_LANG` (as `<lang>.UTF-8`; encoding is derived in `config.sh`) |
+| 9 | `mirrors.sh` | `MIRROR_REGIONS`, `CUSTOM_MIRRORS` |
+| 10 | `timezone.sh` | `USER_TIMEZONE` |
+| 11 | `disk.sh` | `DISK_SELECTED`, `RX_GO_BACK_TO`; returns 42 on decline |
+| 12 | `luks.sh` | `LUKS_ENABLED`, `LUKS_PASSWORD`, `LUKS_ITER_TIME` |
+| 13 | `kernel.sh` | `KERNEL_SELECTION`, `GRUB_KERNEL` |
+| 14 | `boot.sh` | `GRUB_THEME_CHOICE`, `BOOT_VIDEO_GRUB`, `GRUB_OS_PROBER`, `GRUB_SNAPSHOTS_ENABLED`, `GRUB_TIMEOUT` |
+| 15 | `bluetooth.sh` | `BLUETOOTH_ENABLED` |
+| 16 | `fingerprint.sh` | `FINGERPRINT_ENABLED` |
+| 17 | `print.sh` | `PRINT_SERVICE_ENABLED` |
+| 18 | `ssh.sh` | `SSH_ENABLED`, `SSH_PORT`, `SSH_PASSWORD_LOGIN`, `SSH_KEY_LOGIN`, `SSH_ROOT_LOGIN` |
+| 19 | `aur.sh` | `AUR_HELPER` |
+| 20 | `editor.sh` | `EDITOR_CHOICE` |
+| 21 | `filemanager.sh` | `FILEMANAGER_CHOICE` |
+| 22 | `browser.sh` | `BROWSER_CHOICE` |
+| 23 | `network.sh` | `NETWORK_TYPE`, `WIFI_SSID` (`WIFI_PASSWORD` is set by `bin/lib/wifi.sh`) |
+| 24 | `config.sh` | Writes JSON files (no state variables) |
 
 ### rx_install_system Function 🔧
 
@@ -2462,7 +2824,7 @@ rx_generate_error_qr() {
 | 240 | Dark gray | Unselected items background |
 
 ---
-## 20. Quick Reference 📚
+## 22. Quick Reference 📚
 
 ### File Locations
 
@@ -2474,41 +2836,59 @@ RetroLinux/
 │   ├── log.sh
 │   ├── help.sh
 │   ├── fs.sh
+│   ├── helpers.sh
+│   ├── variable.sh
+│   ├── setup.sh
+│   ├── module.sh
 │   └── ...
 ├── lib/lua/                    # Lua libraries for daemon
 │   ├── colors.lua
 │   ├── help.lua
-│   └── log.lua
+│   ├── log.lua
+│   ├── audio.lua
+│   ├── notify.lua
+│   └── ...
 ├── lib/python/                 # Python libraries
 │   ├── log.py
 │   ├── env.py
-│   └── obex.py
+│   ├── obex.py
+│   ├── variable.py
+│   └── input_config.py
 ├── bin/                        # Installer system
 │   ├── retroinstall            # Main entry point
 │   ├── lib/                    # Low-level utilities
 │   │   ├── display.sh
 │   │   ├── handlers.sh
-│   │   ├── crypto.sh
 │   │   ├── wifi.sh
 │   │   └── ...
-│   ├── setup/                  # Setup step scripts (24)
+│   ├── setup/                  # Setup step scripts (25)
 │   │   ├── install.sh
+│   │   ├── branch.sh
 │   │   ├── ricing.sh
 │   │   ├── user.sh
 │   │   ├── disk.sh
 │   │   ├── config.sh
 │   │   └── ...
 │   └── post/                   # Post-install scripts
-│       └── run.sh
+│       ├── run.sh
+│       ├── packages.sh
+│       ├── network.sh
+│       ├── aur.sh
+│       ├── clone.sh
+│       └── state.sh
 ├── scripts/                    # Backend core scripts
 │   ├── audio_core.sh
 │   ├── network_core.sh
 │   ├── theme_core.sh
 │   ├── grub_core.sh
+│   ├── log_core.sh
 │   └── ...
+├── scripts/lib/                # Shared scripts for core scripts
+│   └── system_update.sh
 ├── scripts/python/             # Python backend scripts
 │   ├── bluetooth_receive.py
-│   └── log_core.py
+│   ├── log_core.py
+│   └── grub_manual_entries.py
 ├── daemon/                     # Lua event daemon
 │   ├── engine.lua
 │   ├── event_daemon.lua
@@ -2516,17 +2896,24 @@ RetroLinux/
 │   ├── watchers/               # Watcher modules
 │   │   ├── battery.lua
 │   │   ├── bluetooth.lua
+│   │   ├── rotation.lua
+│   │   ├── ssh.lua
 │   │   └── ...
 │   └── events/                 # Event handlers
 │       ├── battery.lua
 │       ├── power.lua
+│       ├── notifications.lua
+│       ├── rotation.lua
 │       └── ...
 ├── cmds/tools/                 # Frontend commands
 │   ├── audio.sh
 │   ├── network.sh
 │   ├── grub.sh
+│   ├── daemon.sh
+│   ├── settings.sh
 │   ├── xdg.sh
 │   ├── power.sh
+│   ├── settings/               # GTK4 settings GUI source
 │   └── ...
 ├── cmds/system/                # System commands
 │   ├── load.sh
@@ -2543,12 +2930,39 @@ RetroLinux/
 │   └── list.sh
 ├── modules/                    # Desktop environment configs
 │   ├── hyprland/
-│   ├── ags/
+│   ├── retro/
+│   ├── retroshell/             # QML desktop shell (files/shell.qml + modules/ + config/)
+│   ├── grub/
+│   └── ...
+├── themes/                     # Terminal color theme palettes
+│   ├── retro.json
+│   ├── tokyo-night.json
 │   └── ...
 └── iso/                        # Live ISO build system
     ├── build.sh
     ├── Dockerfile
     └── profile/
+```
+
+RetroShell and the Settings GUI share the same config files:
+
+```
+~/.config/retro/
+├── settings.{conf,lua}         # Managed Hyprland config (written by Retro Settings)
+├── keybinds.{conf,lua}         # Keybinds (written by Retro Settings)
+├── variables.sh                # Shared state (CLI + GUI via lib/python/variable.py)
+├── shell/                      # RetroShell per-module JSON (bar.json, theme.json, ...)
+│   └── presets/                # User shell presets
+└── hypridle.conf               # Idle listeners (Retro Settings)
+```
+
+Runtime IPC/temp files:
+
+```
+/tmp/retroshell_ipc.pipe        # RetroShell command FIFO (tail -f by GlobalShortcuts.qml)
+/tmp/retroshell.pid             # RetroShell PID file
+/tmp/retro_event_daemon.pid     # Event daemon PID
+/tmp/retro_event_daemon_stop    # Event daemon stop signal
 ```
 
 ### Key Patterns Summary 📋
@@ -2567,20 +2981,26 @@ RetroLinux/
 | Log file (core) | `rx_log_file "info" "Message"` |
 | Register cmd | `register_command "TOOLS" "cmd|alias" "desc" "cmd_cmd"` |
 | Event handler (Lua) | `M.on_event_name = function(...) ... end` in `daemon/events/*.lua` |
-| Watcher (Lua) | `M.start(engine)` in `daemon/watchers/*.lua` |
+| Watcher (Lua) | `return { name=..., interval=..., enabled=function()..., start=function(engine)... }` in `daemon/watchers/*.lua` (or `tick = function(engine)` for tick style) |
 | Emit event (Lua) | `engine:emit("event_name", args...)` |
 | Lua log | `Log.info("message")` in `lib/lua/log.lua` |
 | Lua table row | `Help.table_row("icon", "Label:", "Value", Colors.PINK, 26)` |
 | Lua get/set var | `Watcher.get_var("KEY")` / `Watcher.set_var("KEY", "value")` |
 | Lua run cmd | `Watcher.run_cmd("command")` |
 | Lua require | `local Module = require("module")` |
-| Lua yield | `coroutine.yield()` (required in watcher loops) |
+| Lua yield | `coroutine.yield()` (required in coroutine-style watcher loops) |
 | Lua sleep | `Watcher.sleep(seconds)` (NOT `os.execute("sleep")`) |
 | Python log | `from lib.python.log import info, error` |
 | Python log (file) | `from scripts.python.log_core import register, rx_log_file` |
-| Python get/set var | `from lib.python.env import get_var, set_var` |
+| Python get/set var | `from lib.python.variable import get_var, set_var` |
 | Python run cmd | `run_shell_cmd("command", "--args", capture=True)` |
 | Python import lib | `from lib.python.obex import BUS_NAME, run_shell_cmd` |
+| Shell start | `retro shell start` → `scripts/shell_core.sh --start` |
+| Shell IPC | `retro shell run <cmd>` → FIFO `/tmp/retroshell_ipc.pipe` / `qs ipc --pid <pid> call retroshell run <cmd>` |
+| Shell core status | `bash scripts/shell_core.sh --status` → `running|<pid>` / `stopped|` |
+| Settings launch | `retro settings [page]` → `python -m settings` (in `cmds/tools/settings.sh`) |
+| Settings page | `pages/<tool>.py` registered in `window.py`, `pages/home.py`, `ui/sidebar.py`, `ui/icons.py` |
+| Shell config JSON | `~/.config/retro/shell/*.json` (live-reloaded by `config/Config.qml`) |
 | Installer clear | `rx_clear_logo` in `bin/lib/display.sh` |
 | Installer error | `rx_retry_or_exit "message"` in `bin/lib/errors.sh` |
 | Setup script guard | `if ! setup_foo; then rx_setup_fail "Foo"; fi` |
@@ -2589,7 +3009,7 @@ RetroLinux/
 | Gum confirm with style | `gum confirm ... --padding "$GUM_CONFIRM_PADDING" $GUM_CONFIRM_STYLE` |
 | Save state | `rx_save_state` (in `bin/lib/handlers.sh`) |
 | Load state | `rx_load_state` (in `bin/lib/handlers.sh`) |
-| Hash password | `rx_hash_password "$password"` (in `bin/lib/crypto.sh`, yescrypt) |
+| Passwords | Written to JSON with `!password` / `!root_password` prefix (archinstall hashes them) |
 | Variable get/set | `get_var "KEY"` / `set_var "KEY" "value"` (in `lib/variable.sh`) |
 | Log manage | `retro log <status|list|<name>|open|enable|disable|clear>` |
 
