@@ -32,3 +32,18 @@ hl.window_rule({
 	no_initial_focus = true,
 	opacity = "0.00 override 0.00 override",
 })
+
+hl.window_rule({
+	match = {
+		class = "^(be\\.alexandervanhee\\.gradia)$",
+	},
+	float = true,
+	size = "1280 720",
+})
+
+hl.window_rule({
+	match = {
+		class = "^(org\\.gnome\\.Calculator)$",
+	},
+	float = true,
+})
