@@ -12,7 +12,6 @@ source "$RETRO_INSTALL/lib/output.sh"
 source "$RETRO_INSTALL/lib/debug.sh"
 source "$RETRO_INSTALL/lib/progress.sh"
 source "$RETRO_INSTALL/lib/disk.sh"
-source "$RETRO_INSTALL/lib/crypto.sh"
 
 rx_set_retro_colors
 rx_load_state

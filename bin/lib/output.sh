@@ -84,27 +84,6 @@ rx_stop_install_log() {
     fi
 }
 
-rx_run_logged() {
-    local script="$1"
-
-    export CURRENT_SCRIPT="$script"
-
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting: $script" >>"$RETRO_INSTALL_LOG_FILE"
-
-    bash -c "source '$script'" </dev/null >>"$RETRO_INSTALL_LOG_FILE" 2>&1
-
-    local exit_code=$?
-
-    if (( exit_code == 0 )); then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Completed: $script" >>"$RETRO_INSTALL_LOG_FILE"
-        unset CURRENT_SCRIPT
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failed: $script (exit code: $exit_code)" >>"$RETRO_INSTALL_LOG_FILE"
-    fi
-
-    return $exit_code
-}
-
 start_log_output() {
     rx_start_log_output "$@"
 }
