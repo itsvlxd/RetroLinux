@@ -1,4 +1,4 @@
-"""Power Management page — profiles, wattage limits, and idle/sleep configuration.
+"""Power page — profiles, wattage limits, and idle/sleep configuration.
 
 Combines power management (profiles, AC/BAT wattage limits, logind hardware
 buttons) with hypridle idle configuration (lock/unlock commands, inhibit,
@@ -259,6 +259,8 @@ class PowerPage:
         self._content_box: Gtk.Box
         self._dirty = False
         self._on_dirty_changed = None
+        self._logind_changed = False
+        self._hypridle_changed = False
 
         # ── Power state ──
         self._orig: dict[str, str] = {}
@@ -632,6 +634,7 @@ class PowerPage:
             if var_name:
                 from lib.python.variable import set_var
                 set_var(var_name, val)
+            self._logind_changed = True
             self._check_dirty()
 
     def _on_logout_cmd_changed(self, entry: Gtk.Entry) -> None:
@@ -678,18 +681,22 @@ class PowerPage:
 
     def _on_enable_idle_changed(self, sw: Adw.SwitchRow, _pspec) -> None:
         self._enable_idle_value = sw.get_active()
+        self._hypridle_changed = True
         self._check_dirty()
 
     def _on_general_changed(self, entry: Adw.EntryRow, var: str) -> None:
         setattr(self._general, var, entry.get_text().strip())
+        self._hypridle_changed = True
         self._check_dirty()
 
     def _on_general_switch_changed(self, sw: Adw.SwitchRow, _pspec, var: str) -> None:
         setattr(self._general, var, sw.get_active())
+        self._hypridle_changed = True
         self._check_dirty()
 
     def _on_inhibit_changed(self, spin: Gtk.SpinButton, _pspec) -> None:
         self._general.inhibit_sleep = int(spin.get_value())
+        self._hypridle_changed = True
         self._check_dirty()
 
     # ── Listener management ──
@@ -697,6 +704,7 @@ class PowerPage:
     def _on_add_listener(self) -> None:
         def on_apply(listener: IdleListener) -> None:
             self._listeners.append(listener)
+            self._hypridle_changed = True
             self._check_dirty()
             self._rebuild_listener_list()
 
@@ -711,6 +719,7 @@ class PowerPage:
             if new_listener == current:
                 return
             self._listeners[idx] = new_listener
+            self._hypridle_changed = True
             self._check_dirty()
             self._rebuild_listener_list()
 
@@ -720,6 +729,7 @@ class PowerPage:
         if idx < 0 or idx >= len(self._listeners):
             return
         del self._listeners[idx]
+        self._hypridle_changed = True
         self._check_dirty()
         self._rebuild_listener_list()
 
@@ -783,30 +793,30 @@ class PowerPage:
             if str(int(spin.get_value())) != self._orig.get(key, ""):
                 self._dirty = True
                 break
-        if not self._dirty:
-            for key in self._LOGIND_KEYS:
-                var_name = dict(zip(self._LOGIND_KEYS, self._LOGIND_VARS))[key]
-                if get_var(var_name, "") != self._orig.get(key, ""):
-                    self._dirty = True
-                    break
+        self._logind_changed = False
+        for key in self._LOGIND_KEYS:
+            var_name = dict(zip(self._LOGIND_KEYS, self._LOGIND_VARS))[key]
+            if get_var(var_name, "") != self._orig.get(key, ""):
+                self._dirty = True
+                self._logind_changed = True
+                break
         if not self._dirty:
             if get_var("RETRO_LOGOUT_CMD", "") != self._orig.get("logout_cmd", ""):
                 self._dirty = True
 
         # Hypridle side
-        if not self._dirty:
-            self._dirty = self._enable_idle_value != self._enable_idle_original or any(
-                getattr(self._general, f.name) != getattr(self._original_general, f.name)
-                for f in IdleGeneral.__dataclass_fields__.values()
-            )
-        if not self._dirty:
-            self._dirty = len(self._listeners) != len(self._original_listeners) or any(
-                self._listeners[i].timeout != self._original_listeners[i].timeout
-                or self._listeners[i].on_timeout != self._original_listeners[i].on_timeout
-                or self._listeners[i].on_resume != self._original_listeners[i].on_resume
-                or self._listeners[i].ignore_inhibit != self._original_listeners[i].ignore_inhibit
-                for i in range(min(len(self._listeners), len(self._original_listeners)))
-            )
+        self._hypridle_changed = self._enable_idle_value != self._enable_idle_original or any(
+            getattr(self._general, f.name) != getattr(self._original_general, f.name)
+            for f in IdleGeneral.__dataclass_fields__.values()
+        ) or len(self._listeners) != len(self._original_listeners) or any(
+            self._listeners[i].timeout != self._original_listeners[i].timeout
+            or self._listeners[i].on_timeout != self._original_listeners[i].on_timeout
+            or self._listeners[i].on_resume != self._original_listeners[i].on_resume
+            or self._listeners[i].ignore_inhibit != self._original_listeners[i].ignore_inhibit
+            for i in range(min(len(self._listeners), len(self._original_listeners)))
+        )
+        if self._hypridle_changed:
+            self._dirty = True
 
         if was != self._dirty and self._on_dirty_changed:
             self._on_dirty_changed()
@@ -876,6 +886,8 @@ class PowerPage:
         ]
         self._enable_idle_value = self._enable_idle_original
         self._dirty = False
+        self._logind_changed = False
+        self._hypridle_changed = False
         self._sync_idle_widgets()
         self._rebuild_listener_list()
 
@@ -891,15 +903,29 @@ class PowerPage:
             self._inhibit_spin.set_value(float(self._general.inhibit_sleep))
 
     def flush_pending(self) -> None:
-        self._run_terminal("retro system apply")
+        if self._logind_changed:
+            self._apply_logind()
+            self._logind_changed = False
+        if self._hypridle_changed:
+            self._reload_hypridle()
+            self._hypridle_changed = False
 
     @staticmethod
-    def _run_terminal(command: str) -> None:
-        escaped = command.replace("'", "'\\''")
-        cmd = f"kitty -- bash -c '{escaped}; echo; echo Press Enter to close.; read'"
-        lua = f'hl.dsp.exec_cmd("{cmd}", {{ float = true, size = {{ 800, 500 }}, center = true }})'
+    def _apply_logind() -> None:
+        from lib.python.variable import get_var
+        power = get_var("PWR_POWER_BTN", "suspend")
+        try:
+            subprocess.run(
+                ["sudo", "-n", _SYS_CORE, "--set-power", power],
+                capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+
+    @staticmethod
+    def _reload_hypridle() -> None:
         subprocess.Popen(
-            ["hyprctl", "dispatch", lua],
+            ["pkill", "-x", "hypridle"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
 
@@ -907,7 +933,7 @@ class PowerPage:
         if self._dirty:
             yield PendingChange(
                 category="Power",
-                title="Power Management",
+                title="Power",
                 subtitle="Power limits, idle config, and sleep listeners changed",
                 navigate_to="power",
                 icon=_PWR_ICON,
