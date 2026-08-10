@@ -189,8 +189,8 @@ Singleton {
     // Screen Record Tool state
     property bool screenRecordToolVisible: false
 
-    // Mirror Tool state
-    property bool mirrorWindowVisible: false
+    // Webcam Overlay state
+    property bool webcamOverlayVisible: false
     property bool countdownOverlayVisible: false
     property string countdownMode: "" // "screenshot" or "recording"
     property bool screenshotTimedMode: false

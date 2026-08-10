@@ -23,7 +23,7 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
-    visible: GlobalStates.mirrorWindowVisible
+    visible: GlobalStates.webcamOverlayVisible
 
     property int xPos: Screen.width - root.currentWidth - 20
     property int yPos: (Screen.height / 2) - (root.currentHeight / 2)
@@ -191,7 +191,7 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: GlobalStates.mirrorWindowVisible = false
+                        onClicked: GlobalStates.webcamOverlayVisible = false
                     }
                 }
             }
