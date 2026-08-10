@@ -228,11 +228,11 @@ ShellRoot {
         }
     }
 
-    // Mirror tool
+    // Webcam Overlay
     Loader {
-        id: mirrorLoader
-        active: SuspendManager.wakeReady && GlobalStates.mirrorWindowVisible
-        source: "modules/tools/MirrorWindow.qml"
+        id: webcamOverlayLoader
+        active: SuspendManager.wakeReady && GlobalStates.webcamOverlayVisible
+        source: "modules/tools/WebcamOverlay.qml"
     }
 
     // Countdown overlay for timed tools
