@@ -5,7 +5,7 @@ import qs.modules.services
 
 ToggleButton {
     id: toolsButton
-    buttonIcon: Icons.toolbox
+    buttonIcon: Icons.wrench
     tooltipText: "Tools"
     onToggle: function () {
         if (Visibilities.currentActiveModule === "tools") {
