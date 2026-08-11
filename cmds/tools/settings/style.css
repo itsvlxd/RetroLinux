@@ -226,6 +226,24 @@ row.spin spinbutton > text {
     background-color: alpha(@success_bg_color, 0.15);
 }
 
+/* Wallpaper installed badge — orange override */
+.badge.installed-badge {
+    color: @warning_color;
+    background-color: alpha(@warning_bg_color, 0.18);
+}
+
+/* Wallpaper collection tag — static (image), blue */
+.badge.tag-static {
+    color: #4d9fff;
+    background-color: alpha(#4d9fff, 0.15);
+}
+
+/* Wallpaper collection tag — live (video), yellow */
+.badge.tag-live {
+    color: #f2c744;
+    background-color: alpha(#f2c744, 0.15);
+}
+
 /* Sidebar category header */
 .sidebar-category-header {
     font-size: 0.75em;

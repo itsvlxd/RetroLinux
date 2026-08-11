@@ -1,11 +1,12 @@
 """Wallpaper selection page — grid with thumbnails."""
 
 import os
+import re
 import subprocess
 import threading
 from pathlib import Path
 
-from gi.repository import Adw, GdkPixbuf, GLib, Gtk
+from gi.repository import Adw, GdkPixbuf, GLib, GObject, Gtk
 
 from lib.python.variable import get_var, get_module_default
 from settings.ui import make_page_layout
@@ -129,10 +130,6 @@ class WallpapersPage:
         self._bat_row: Gtk.Widget | None = None
         self._col_row: Gtk.Widget | None = None
         self._col_delete_btn: Gtk.Widget | None = None
-        repo_walls = Path(os.environ.get("RETRO_DIR", "")) / "wallpapers"
-        self._repo_collections: list[str] = []
-        if repo_walls.is_dir():
-            self._repo_collections = [p.name for p in repo_walls.iterdir() if p.is_dir()]
         self._slide_row: Gtk.Widget | None = None
         self._interval_row: Gtk.Widget | None = None
         self._res_row: Gtk.Widget | None = None
@@ -364,7 +361,7 @@ class WallpapersPage:
 
         if header:
             sync_btn = Gtk.Button(icon_name="view-refresh-symbolic")
-            sync_btn.set_tooltip_text("Sync from repository")
+            sync_btn.set_tooltip_text("Refresh installed collections")
             sync_btn.add_css_class("flat")
             sync_btn.connect("clicked", self._on_sync)
             header.pack_start(sync_btn)
@@ -785,12 +782,12 @@ class WallpapersPage:
         if self._col_delete_btn is None:
             return
         name = self._selected_collection()
-        self._col_delete_btn.set_visible(name not in ("all", "") and name not in self._repo_collections)
+        self._col_delete_btn.set_visible(name not in ("all", ""))
 
     def _on_delete_collection(self, _btn) -> None:
         name = self._selected_collection()
-        if not name or name in ("all", "") or name in self._repo_collections:
-            self._window.show_toast("Only custom collections can be deleted", timeout=2)
+        if not name or name in ("all", ""):
+            self._window.show_toast("This collection cannot be deleted", timeout=2)
             return
         dialog = Adw.AlertDialog(
             heading="Delete Collection?",
@@ -1139,6 +1136,425 @@ class WallpapersPage:
         self._update_col_delete_visibility()
 
     def _on_add(self, _btn):
+        dialog = AddWallpapersDialog(self._window)
+        dialog.connect("collections-changed", lambda *_: (self._refresh_collections(), self._refresh()))
+        dialog.present()
+
+    def _selected_collection(self) -> str:
+        if self._col_row is not None:
+            idx = self._col_row.get_selected()
+            if 0 <= idx < len(self._collections):
+                return self._collections[idx]
+        return get_var("RETRO_WALL_COLLECTION", "retro")
+
+    def _on_click(self, _gesture, _n_press, _x, _y, path: str, display: str):
+        if not path or not Path(path).exists():
+            self._window.show_toast(f"Wallpaper not found: {display}", timeout=3)
+            return
+
+        proc = subprocess.Popen(
+            ["bash", str(WALLPAPER_CORE), "--set", path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        GLib.child_watch_add(proc.pid, self._on_set_done, display)
+
+    def _on_set_done(self, pid: int, status: int, display: str) -> None:
+        if status == 0:
+            self._window.show_toast(f"Wallpaper set: {display}", timeout=2)
+            self._refresh()
+        else:
+            self._window.show_toast(f"Failed to set: {display}", timeout=3)
+
+
+
+class AddWallpapersDialog(Adw.Dialog):
+    """Dialog to download a wallpaper collection from GitHub, or import local files."""
+
+    __gsignals__ = {
+        "collections-changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
+    }
+
+    def __init__(self, window: Adw.ApplicationWindow):
+        super().__init__()
+        self._window = window
+        self.set_title("Add Wallpapers")
+        self.set_content_width(600)
+        self.set_content_height(400)
+
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+
+        import_btn = Gtk.Button(label="Import from file\u2026")
+        import_btn.connect("clicked", lambda _b: self._on_import_file())
+        header.pack_start(import_btn)
+
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic")
+        refresh_btn.set_tooltip_text("Refresh collection list")
+        refresh_btn.connect("clicked", lambda _b: self._load_remote())
+        header.pack_end(refresh_btn)
+
+        toolbar.add_top_bar(header)
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(600)
+        clamp.set_tightening_threshold(500)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(12)
+        box.set_margin_bottom(6)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        self._status_label = Gtk.Label(label="")
+        self._status_label.set_halign(Gtk.Align.START)
+        self._status_label.add_css_class("dim-label")
+        box.append(self._status_label)
+
+        self._progress_bar = Gtk.ProgressBar()
+        self._progress_bar.set_show_text(True)
+        self._progress_bar.set_visible(False)
+        self._progress_bar.set_valign(Gtk.Align.CENTER)
+        self._progress_bar.set_margin_top(4)
+        box.append(self._progress_bar)
+
+        self._collection_list = Gtk.ListBox()
+        self._collection_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(self._collection_list)
+        scrolled.set_vexpand(True)
+        frame = Gtk.Frame()
+        frame.set_child(scrolled)
+        box.append(frame)
+
+        clamp.set_child(box)
+        scrolled2 = Gtk.ScrolledWindow()
+        scrolled2.set_child(clamp)
+        scrolled2.set_vexpand(True)
+        toolbar.set_content(scrolled2)
+        self.set_child(toolbar)
+
+        self._remote: list[dict] = []
+        self._installed: set[str] = set()
+        self._load_installed()
+        self._load_remote()
+
+    # ── Data ──
+
+    def _load_installed(self) -> None:
+        self._installed = set()
+        result = subprocess.run(
+            ["bash", str(WALLPAPER_CORE), "--collection", "list"],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in result.stdout.splitlines():
+            name = line.strip()
+            if name and name != "(no collections yet)":
+                self._installed.add(name)
+
+    def _load_remote(self) -> None:
+        self._status_label.set_label("Fetching available collections\u2026")
+
+        def worker():
+            result = subprocess.run(
+                ["bash", str(WALLPAPER_CORE), "--pull-list"],
+                capture_output=True, text=True, timeout=30,
+            )
+            rows = []
+            if "result=error" not in result.stdout:
+                for line in result.stdout.splitlines():
+                    parts = line.split("\t")
+                    if len(parts) >= 5:
+                        tags = parts[6].split(",") if len(parts) > 6 and parts[6] else []
+                        rows.append({
+                            "name": parts[0],
+                            "branch": parts[1],
+                            "count": parts[2],
+                            "size": parts[3],
+                            "sha": parts[4],
+                            "desc": parts[5] if len(parts) > 5 else "",
+                            "tags": tags,
+                        })
+            GLib.idle_add(self._on_remote_loaded, rows)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_remote_loaded(self, rows: list[dict]) -> None:
+        self._remote = rows
+        while child := self._collection_list.get_first_child():
+            self._collection_list.remove(child)
+
+        if not rows:
+            self._status_label.set_label("No collections available (network error?)")
+            return
+
+        self._status_label.set_label(f"{len(rows)} collection(s) available")
+        for col in rows:
+            display_name = col["name"][:1].upper() + col["name"][1:]
+            col["display"] = display_name
+
+            row = Gtk.ListBoxRow()
+            main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            main_box.set_margin_top(8)
+            main_box.set_margin_bottom(8)
+            main_box.set_margin_start(12)
+            main_box.set_margin_end(12)
+
+            left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            left_box.set_hexpand(True)
+
+            name_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            name_label = Gtk.Label(label=display_name)
+            name_label.set_halign(Gtk.Align.START)
+            name_label.set_ellipsize(3)
+            name_label.set_max_width_chars(24)
+            name_label.add_css_class("title-4")
+            name_row.append(name_label)
+
+            size_badge = Gtk.Label(label=col["size"])
+            size_badge.add_css_class("badge")
+            size_badge.set_valign(Gtk.Align.CENTER)
+            name_row.append(size_badge)
+
+            for tag in col.get("tags", []):
+                if tag not in ("static", "live"):
+                    continue
+                tag_label = Gtk.Label(label="Static" if tag == "static" else "Live")
+                tag_label.add_css_class("badge")
+                tag_label.add_css_class(f"tag-{tag}")
+                tag_label.set_valign(Gtk.Align.CENTER)
+                name_row.append(tag_label)
+
+            left_box.append(name_row)
+
+            subtitle_parts = [f'{col["count"]} wallpapers']
+            if col["desc"]:
+                desc = col["desc"]
+                if len(desc) > 60:
+                    desc = desc[:60].rstrip() + "\u2026"
+                subtitle_parts.append(desc)
+            subtitle_label = Gtk.Label(label=" \u2014 ".join(subtitle_parts))
+            subtitle_label.set_halign(Gtk.Align.START)
+            subtitle_label.set_xalign(0.0)
+            subtitle_label.set_ellipsize(3)
+            subtitle_label.set_wrap(False)
+            subtitle_label.set_max_width_chars(70)
+            subtitle_label.add_css_class("dim-label")
+            subtitle_label.add_css_class("caption")
+            left_box.append(subtitle_label)
+
+            main_box.append(left_box)
+
+            right_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            right_box.set_valign(Gtk.Align.CENTER)
+
+            if col["name"] in self._installed:
+                badge = Gtk.Label(label="Installed")
+                badge.add_css_class("badge")
+                badge.add_css_class("active-badge")
+                badge.set_valign(Gtk.Align.CENTER)
+                right_box.append(badge)
+                col["_badge"] = badge
+                reinstall = Gtk.Button(icon_name="view-refresh-symbolic")
+                reinstall.add_css_class("flat")
+                reinstall.set_valign(Gtk.Align.CENTER)
+                reinstall.set_tooltip_text("Reinstall collection")
+                reinstall.connect("clicked", lambda _b, c=col, btn=reinstall: self._on_download(c, btn))
+                right_box.append(reinstall)
+                col["_reinstall_btn"] = reinstall
+                delete_btn = Gtk.Button(icon_name="user-trash-symbolic")
+                delete_btn.add_css_class("flat")
+                delete_btn.set_valign(Gtk.Align.CENTER)
+                delete_btn.set_tooltip_text("Delete collection")
+                delete_btn.connect("clicked", lambda _b, c=col: self._on_delete_local(c))
+                right_box.append(delete_btn)
+            else:
+                dl = Gtk.Button(label="Download")
+                dl.add_css_class("suggested-action")
+                dl.set_valign(Gtk.Align.CENTER)
+                dl.connect("clicked", lambda _b, c=col, btn=dl: self._on_download(c, btn))
+                right_box.append(dl)
+
+            main_box.append(right_box)
+            row.set_child(main_box)
+            self._collection_list.append(row)
+
+    # ── Actions ──
+
+    def _on_download(self, col: dict, btn: Gtk.Button | None = None) -> None:
+        self._status_label.set_label(f"Downloading {col.get('display', col['name'])}\u2026")
+        self._progress_bar.set_visible(True)
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text("Connecting\u2026")
+        if btn is not None:
+            btn.set_sensitive(False)
+            btn.set_label("Installing\u2026")
+        badge = col.get("_badge")
+        if badge is not None:
+            badge.set_label("Installing\u2026")
+            badge.remove_css_class("active-badge")
+            badge.add_css_class("installed-badge")
+
+        def worker():
+            try:
+                proc = subprocess.Popen(
+                    ["bash", str(WALLPAPER_CORE), "--pull", col["name"]],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                )
+                # git writes progress with \r separators (e.g.
+                # "Receiving objects:  45% (10/22), 12.5 MiB | 5.2 MiB/s").
+                # Split on whichever of \r or \n comes first so no segment is
+                # dropped. Only the "Receiving objects" phase reflects the real
+                # download (bytes + speed); Counting/Compressing would push the
+                # bar to 100% prematurely then drop it back.
+                total_txt = col.get("size", "")
+                buf = b""
+                last_pct = 0
+                last_received = ""
+                fd = proc.stderr.fileno()
+                while True:
+                    try:
+                        chunk = os.read(fd, 4096)
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    buf += chunk
+                    while True:
+                        r = buf.find(b"\r")
+                        n = buf.find(b"\n")
+                        if r == -1 and n == -1:
+                            break
+                        if r == -1:
+                            idx = n
+                        elif n == -1:
+                            idx = r
+                        else:
+                            idx = min(r, n)
+                        seg = buf[:idx]
+                        buf = buf[idx + 1:]
+                        if not seg.strip():
+                            continue
+                        if b"Receiving objects" not in seg:
+                            continue
+                        text = seg.decode("utf-8", "replace")
+                        m = re.search(r"(\d+)%", text)
+                        if m:
+                            pct = max(0, min(int(m.group(1)), 100))
+                            rm = re.search(
+                                r"([\d.]+)\s*(KiB|MiB|GiB|kB|MB|GB)\s*\|\s*([\d.]+)\s*(KiB|MiB|GiB|kB|MB|GB)/s",
+                                text,
+                            )
+                            received = f"{rm.group(1)} {rm.group(2)}" if rm else ""
+                            speed = f"{rm.group(3)} {rm.group(4)}/s" if rm else ""
+                            if pct > last_pct or (received and received != last_received):
+                                last_pct = max(last_pct, pct)
+                                if received:
+                                    last_received = received
+                                GLib.idle_add(
+                                    self._on_download_progress,
+                                    col, pct, received, speed, total_txt,
+                                )
+                proc.wait()
+                stdout = proc.stdout.read().decode("utf-8", "replace")
+                ok = "result=ok" in stdout
+                msg = stdout.strip()
+                GLib.idle_add(self._on_download_done, col, ok, msg, btn)
+            except (OSError, subprocess.TimeoutExpired):
+                GLib.idle_add(self._on_download_done, col, False, "", btn)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_download_progress(
+        self, col: dict, pct: int, received: str = "", speed: str = "", total: str = "",
+    ) -> None:
+        self._progress_bar.set_fraction(pct / 100.0)
+        parts = [f"{pct}%"]
+        if received:
+            parts.append(f"{received} / {total or received}")
+        if speed:
+            parts.append(speed)
+        self._progress_bar.set_text(" \u2014 ".join(parts))
+
+    def _on_download_done(self, col: dict, ok: bool, msg: str, btn: Gtk.Button | None = None) -> None:
+        self._progress_bar.set_visible(False)
+        self._progress_bar.set_fraction(0.0)
+        if btn is not None:
+            btn.set_sensitive(True)
+            if col["name"] in self._installed or "up_to_date" in msg:
+                btn.set_icon_name("view-refresh-symbolic")
+                btn.set_label("")
+            else:
+                btn.set_label("Download")
+                btn.set_icon_name("")
+        badge = col.get("_badge")
+        if badge is not None:
+            badge.set_label("Installed")
+            badge.remove_css_class("installed-badge")
+            badge.add_css_class("active-badge")
+        if ok:
+            n = 0
+            for part in msg.split("|"):
+                if part.startswith("synced="):
+                    try:
+                        n = int(part.split("=", 1)[1])
+                    except ValueError:
+                        n = 0
+            if "up_to_date" in msg:
+                self._status_label.set_label(f"{col.get('display', col['name'])} is already up to date")
+                self._window.show_toast(f"{col.get('display', col['name'])} is already up to date", timeout=2)
+            else:
+                self._status_label.set_label(
+                    f"Downloaded {n} wallpaper(s) into {col.get('display', col['name'])}"
+                )
+                self._window.show_toast(f"Downloaded collection: {col.get('display', col['name'])}", timeout=2)
+            self._load_installed()
+            self._load_remote()
+            self.emit("collections-changed")
+        else:
+            self._status_label.set_label(f"Failed to download {col.get('display', col['name'])}")
+            self._window.show_toast(f"Failed to download {col.get('display', col['name'])}", timeout=3)
+
+    def _on_delete_local(self, col: dict) -> None:
+        dialog = Adw.AlertDialog(
+            heading="Delete Collection?",
+            body=f'Delete "{col.get("display", col["name"])}" and all its wallpapers? This cannot be undone.',
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_default_response("delete")
+        dialog.set_close_response("cancel")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def _on_response(dialog_obj, response):
+            if response != "delete":
+                return
+
+            def worker():
+                result = subprocess.run(
+                    ["bash", str(WALLPAPER_CORE), "--collection-delete", col["name"]],
+                    capture_output=True, text=True, timeout=15,
+                )
+                ok = "result=ok" in result.stdout
+                GLib.idle_add(self._on_delete_local_done, col, ok)
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self)
+
+    def _on_delete_local_done(self, col: dict, ok: bool) -> None:
+        if ok:
+            self._status_label.set_label(f"Deleted {col.get('display', col['name'])}")
+            self._window.show_toast(f"Collection deleted: {col.get('display', col['name'])}", timeout=2)
+        else:
+            self._status_label.set_label(f"Failed to delete {col.get('display', col['name'])}")
+            self._window.show_toast(f"Failed to delete {col.get('display', col['name'])}", timeout=3)
+        self._load_installed()
+        self._load_remote()
+        self.emit("collections-changed")
+
+    def _on_import_file(self) -> None:
+        self.close()
         dialog = Gtk.FileChooserNative.new(
             title="Select Wallpapers",
             parent=self._window,
@@ -1168,105 +1584,26 @@ class WallpapersPage:
             if not paths:
                 return
             self._add_to_collection(paths)
+            self.emit("collections-changed")
         else:
             dialog.destroy()
 
     def _add_to_collection(self, paths: list[str]) -> None:
-        collection = self._selected_collection()
+        collection = get_var("RETRO_WALL_COLLECTION", "retro")
+        if collection in ("all", ""):
+            collection = "retro"
 
-        if collection == "all":
-            entry = Gtk.Entry()
-            entry.set_activates_default(True)
-            entry.set_placeholder_text("Collection name")
+        def worker():
+            self._add_files_worker(paths, collection)
+            GLib.idle_add(lambda: self._window.show_toast(
+                f"Added wallpaper(s) to {collection}", timeout=2,
+            ))
 
-            dialog = Adw.AlertDialog(
-                heading="Choose a Collection",
-                body="Selecting \u201call\u201d isn\u2019t allowed. Enter a collection name to add these wallpapers to:",
-                extra_child=entry,
-            )
-            dialog.add_response("cancel", "Cancel")
-            dialog.add_response("add", "Add Here")
-            dialog.set_default_response("add")
-            dialog.set_close_response("cancel")
-
-            def _on_response(dialog_obj, response):
-                if response != "add":
-                    return
-                name = entry.get_text().strip().replace("/", "_").replace(" ", "_")
-                if not name:
-                    self._window.show_toast("Collection name cannot be empty", timeout=2)
-                    return
-
-                def worker():
-                    subprocess.run(
-                        ["bash", str(WALLPAPER_CORE), "--collection-create", name],
-                        capture_output=True, text=True, timeout=15,
-                    )
-                    self._add_files_worker(paths, name)
-                    GLib.idle_add(self._on_files_added, name)
-
-                threading.Thread(target=worker, daemon=True).start()
-
-            dialog.connect("response", _on_response)
-            dialog.present(self._window)
-            return
-
-        self._add_files(paths, collection)
-
-    def _add_files(self, paths: list[str], collection: str) -> None:
-        self._window.show_toast("Adding wallpapers\u2026", timeout=2)
-        threading.Thread(
-            target=self._add_files_worker, args=(paths, collection), daemon=True,
-        ).start()
+        threading.Thread(target=worker, daemon=True).start()
 
     def _add_files_worker(self, paths: list[str], collection: str) -> None:
-        added = 0
-        errors = 0
         for p in paths:
-            result = subprocess.run(
+            subprocess.run(
                 ["bash", str(WALLPAPER_CORE), "--add", p, collection],
                 capture_output=True, text=True, timeout=30,
             )
-            if "result=error" in result.stdout:
-                errors += 1
-            else:
-                added += 1
-        GLib.idle_add(self._on_files_done, added, errors, collection)
-
-    def _on_files_done(self, added: int, errors: int, collection: str) -> None:
-        if added:
-            self._window.show_toast(
-                f"Added {added} wallpaper(s) to {collection}", timeout=2,
-            )
-        if errors:
-            self._window.show_toast(f"{errors} file(s) failed", timeout=3)
-        self._refresh()
-
-    def _on_files_added(self, name: str) -> None:
-        self._refresh_collections(select=name)
-
-    def _selected_collection(self) -> str:
-        if self._col_row is not None:
-            idx = self._col_row.get_selected()
-            if 0 <= idx < len(self._collections):
-                return self._collections[idx]
-        return get_var("RETRO_WALL_COLLECTION", "retro")
-
-    def _on_click(self, _gesture, _n_press, _x, _y, path: str, display: str):
-        if not path or not Path(path).exists():
-            self._window.show_toast(f"Wallpaper not found: {display}", timeout=3)
-            return
-
-        proc = subprocess.Popen(
-            ["bash", str(WALLPAPER_CORE), "--set", path],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        GLib.child_watch_add(proc.pid, self._on_set_done, display)
-
-    def _on_set_done(self, pid: int, status: int, display: str) -> None:
-        if status == 0:
-            self._window.show_toast(f"Wallpaper set: {display}", timeout=2)
-            self._refresh()
-        else:
-            self._window.show_toast(f"Failed to set: {display}", timeout=3)
-

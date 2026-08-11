@@ -159,16 +159,89 @@ cmd_wallpaper() {
             rx_table_spacer
             ;;
 
+        "pull")
+            local pull_collection="${1:-}"
+            if [[ $pull_collection == "-l" || $pull_collection == "list" || $pull_collection == "--list" ]]; then
+                rx_log "info" "Fetching available collections..."
+                local meta_result=$(bash "$wall_script" --pull-list)
+                if echo "$meta_result" | grep -q "result=error"; then
+                    rx_log "error" "Failed to fetch collection list (network or metadata error)."
+                    return 1
+                fi
+
+                rx_table_header "󰘓" "Available Wallpaper Collections"
+
+                while IFS=$'\t' read -r name branch count size_human sha desc; do
+                    [[ -z $name ]] && continue
+                    local installed=$(get_var "RETRO_WALL_COLLECTION")
+                    local tag=""
+                    if [[ $installed == "$name" ]]; then
+                        tag="  (current)"
+                    fi
+                    rx_table_row "󰇄" "$name" "${count} wallpapers · ${size_human}${tag}" "$PINK" "30"
+                done <<<"$meta_result"
+
+                rx_table_separator
+                rx_table_spacer
+                return 0
+            fi
+
+            if [[ $pull_collection == "--all" || $pull_collection == "-a" ]]; then
+                rx_log "info" "Pulling all collections..."
+                local all_result
+                local total=0
+                while IFS=$'\t' read -r name branch count size_human sha desc; do
+                    [[ -z $name ]] && continue
+                    local r
+                    r=$(bash "$wall_script" --pull "$name")
+                    local n=$(echo "$r" | grep -oP 'synced=\K[0-9]+' || echo 0)
+                    total=$((total + n))
+                    rx_log "info" "  ${PINK}${name}${RESET}: ${n} wallpaper(s)"
+                done <<<"$(bash "$wall_script" --pull-list | grep -v 'result=')"
+                rx_log "success" "Pull complete: ${PINK}${total}${RESET} wallpaper(s) added/updated."
+                return 0
+            fi
+
+            if [[ -z $pull_collection ]]; then
+                rx_log "error" "Usage: retro wallpaper pull [collection] | list | --all"
+                return 1
+            fi
+
+            rx_log "info" "Pulling collection: ${PINK}${pull_collection}${RESET}..."
+            local pull_result=$(bash "$wall_script" --pull "$pull_collection")
+            if echo "$pull_result" | grep -q "result=error"; then
+                local reason=$(echo "$pull_result" | grep -oP 'reason=\K[^|]+')
+                case "$reason" in
+                    "network") rx_log "error" "Network error while fetching metadata." ;;
+                    "clone_failed") rx_log "error" "Failed to clone the collection from GitHub." ;;
+                    "not_found") rx_log "error" "Collection not found: $pull_collection" ;;
+                    "invalid_collection") rx_log "error" "Cannot pull 'all'." ;;
+                    *) rx_log "error" "Pull failed." ;;
+                esac
+                return 1
+            fi
+
+            if echo "$pull_result" | grep -q "up_to_date"; then
+                rx_log "success" "Collection ${PINK}${pull_collection}${RESET} is already up to date."
+            else
+                local count=$(echo "$pull_result" | grep -oP 'synced=\K[0-9]+')
+                rx_log "success" "Pulled ${PINK}${count:-0}${RESET} wallpaper(s) into ${PINK}${pull_collection}${RESET}."
+            fi
+            ;;
+
         "sync")
-            rx_log "info" "Syncing wallpapers from repository..."
+            rx_log "info" "Checking installed collections for updates..."
             local sync_result=$(bash "$wall_script" --sync)
             if echo "$sync_result" | grep -q "result=error"; then
                 rx_log "error" "Sync failed."
                 return 1
             fi
+            if echo "$sync_result" | grep -q "no_collections"; then
+                rx_log "info" "No collections installed. Use ${PINK}retro wallpaper pull${RESET} to download one."
+                return 0
+            fi
             local count=$(echo "$sync_result" | grep -oP 'synced=\K[0-9]+')
-            local skipped=$(echo "$sync_result" | grep -oP 'skipped=\K[0-9]+')
-            rx_log "success" "Sync complete: ${PINK}${count}${RESET} new, ${GRAY}${skipped}${RESET} already present."
+            rx_log "success" "Sync complete: ${PINK}${count:-0}${RESET} wallpaper(s) added/updated."
             ;;
 
         "gpu")
@@ -473,7 +546,9 @@ cmd_wallpaper() {
             rx_help_cmd "slideshow [mode]" "Toggle slideshow mode"
             rx_help_cmd "static [mode]" "Toggle static wallpaper mode"
             rx_help_cmd "list" "List all wallpapers with resolution info"
-            rx_help_cmd "sync" "Sync wallpapers from repository and optimize"
+            rx_help_cmd "pull" "Download a wallpaper collection from GitHub"
+            rx_help_cmd "pull list" "List available remote collections"
+            rx_help_cmd "sync" "Refresh installed collections to the latest versions"
             rx_help_cmd "collection [name|list]" "View or switch wallpaper collection"
             rx_help_cmd "cache [value]" "Build animated wallpaper cache"
             rx_help_cmd "restore" "Restore previous wallpaper"
@@ -482,6 +557,10 @@ cmd_wallpaper() {
             rx_help_cmd "status" "Show active wallpaper info"
             rx_help_cmd "gpu [mode]" "Configure GPU offloading for mpvpaper"
             rx_help_examples
+            rx_help_example "retro wallpaper pull" "List collections on GitHub"
+            rx_help_example "retro wallpaper pull retro" "Download the retro collection"
+            rx_help_example "retro wallpaper pull --all" "Download all collections"
+            rx_help_example "retro wallpaper sync" "Update installed collections"
             rx_help_example "retro wallpaper set bmw-m760" "Set wallpaper by name"
             rx_help_example "retro wallpaper slideshow on 300" "Enable slideshow 5min"
             rx_help_example "retro wallpaper collection retro" "Switch to retro collection"

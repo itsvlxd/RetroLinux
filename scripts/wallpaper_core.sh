@@ -420,77 +420,139 @@ gpu_wallpaper() {
     esac
 }
 
-sync_wallpapers() {
-    local source_dir="$REPO_WALLS"
-    [[ ! -d $source_dir ]] && echo "result=error|reason=repo_not_found" && return 1
+WALLPAPER_REPO_URL="${WALLPAPER_REPO_URL:-https://github.com/itsvlxd/retrowallpapers.git}"
+WALLPAPER_RAW_BASE="${WALLPAPER_RAW_BASE:-https://raw.githubusercontent.com/itsvlxd/retrowallpapers/main}"
+WALLPAPER_STATE="$RETRO_CONFIG/.retro_wallpaper_state"
+
+_wallpaper_state_sha() {
+    local collection="$1"
+    [[ -f $WALLPAPER_STATE ]] || return 1
+    grep "^${collection}=" "$WALLPAPER_STATE" 2>/dev/null | cut -d= -f2 | head -1
+}
+
+_wallpaper_set_state_sha() {
+    local collection="$1"
+    local sha="$2"
+    mkdir -p "$RETRO_CONFIG"
+    if [[ -f $WALLPAPER_STATE ]] && grep -q "^${collection}=" "$WALLPAPER_STATE"; then
+        sed -i "s@^${collection}=.*@${collection}=${sha}@" "$WALLPAPER_STATE"
+    else
+        echo "${collection}=${sha}" >>"$WALLPAPER_STATE"
+    fi
+}
+
+list_remote_collections() {
+    local cache
+    cache=$(mktemp /tmp/retro_wall_meta.XXXXXX)
+    if ! curl -sL --max-time 15 "$WALLPAPER_RAW_BASE/metadata.json" -o "$cache"; then
+        rm -f "$cache" 2>/dev/null
+        echo "result=error|reason=network"
+        return 1
+    fi
+    if ! jq -e '.collections' "$cache" >/dev/null 2>&1; then
+        rm -f "$cache" 2>/dev/null
+        echo "result=error|reason=bad_metadata"
+        return 1
+    fi
+
+    jq -r '.collections[] | [.name,.branch,.count,.size_human,.sha,.description] | @tsv' "$cache"
+    rm -f "$cache" 2>/dev/null
+    return 0
+}
+
+pull_wallpapers() {
+    local collection="$1"
+    local force="${2:-false}"
+    [[ -z $collection ]] && echo "result=error|reason=collection_required" && return 1
+    [[ $collection == "all" ]] && echo "result=error|reason=invalid_collection" && return 1
+
+    local cache
+    cache=$(mktemp /tmp/retro_wall_meta.XXXXXX)
+    if ! curl -sL --max-time 15 "$WALLPAPER_RAW_BASE/metadata.json" -o "$cache"; then
+        rm -f "$cache" 2>/dev/null
+        echo "result=error|reason=network"
+        return 1
+    fi
+
+    local branch sha size_human
+    branch=$(jq -r --arg c "$collection" '.collections[] | select(.name==$c) | .branch' "$cache" 2>/dev/null | head -1)
+    sha=$(jq -r --arg c "$collection" '.collections[] | select(.name==$c) | .sha' "$cache" 2>/dev/null | head -1)
+    size_human=$(jq -r --arg c "$collection" '.collections[] | select(.name==$c) | .size_human' "$cache" 2>/dev/null | head -1)
+    rm -f "$cache" 2>/dev/null
+
+    if [[ -z $branch ]]; then
+        echo "result=error|reason=not_found|collection=$collection"
+        return 1
+    fi
+
+    local installed_sha
+    installed_sha=$(_wallpaper_state_sha "$collection")
+    if [[ $sha == "$installed_sha" && $force != "true" ]]; then
+        echo "result=ok|status=up_to_date|collection=$collection|sha=$sha"
+        return 0
+    fi
+
+    local tmpdir
+    tmpdir=$(mktemp -d /tmp/retro_wall_pull.XXXXXX)
+    if ! git clone --depth 1 --branch "$branch" --single-branch "$WALLPAPER_REPO_URL" "$tmpdir" >/dev/null 2>&1; then
+        rm -rf "$tmpdir" 2>/dev/null
+        echo "result=error|reason=clone_failed|collection=$collection"
+        return 1
+    fi
+
+    local dest="$WALL_DIR/$collection"
+    mkdir -p "$dest"
 
     local synced=0
-    local skipped=0
-    local upgraded=0
-
-    local target_res
-    target_res=$(get_var "WALL_RESOLUTION")
-    # WALL_RESOLUTION stores a single "WxH". If missing, "null", or malformed
-    # (e.g. from a system that never ran wallpaper setup), fall back to the
-    # live monitors and repopulate the variable with the resolution.
-    if [[ -z $target_res || $target_res == "null" ]] || ! [[ $target_res =~ ^[0-9]+x[0-9]+$ ]]; then
-        target_res=$(get_monitor_resolutions | head -1)
-        if [[ -n $target_res ]]; then
-            set_var "WALL_RESOLUTION" "$target_res"
-        fi
-    fi
-    local map_w="${target_res%x*}"
-    local map_h="${target_res#*x}"
-
-    for theme_dir in "$source_dir"/*/; do
-        [[ -d $theme_dir ]] || continue
-        local theme_name=$(basename "$theme_dir")
-        local config_theme="$WALL_DIR/$theme_name"
-        mkdir -p "$config_theme"
-
-        for src_file in "$theme_dir"/*; do
-            [[ -f $src_file ]] || continue
-
-            local filename=$(basename "$src_file")
-            local target_file="$config_theme/$filename"
-
-            if [[ -f $target_file || -L $target_file ]]; then
-                local src_res=$(get_image_resolution "$src_file")
-                local tgt_res=$(get_image_resolution "$target_file")
-                local src_w="${src_res%x*}" src_h="${src_res#*x}"
-                local tgt_w="${tgt_res%x*}" tgt_h="${tgt_res#*x}"
-
-                if [[ $src_w =~ ^[0-9]+$ && $src_h =~ ^[0-9]+$ &&
-                    $tgt_w =~ ^[0-9]+$ && $tgt_h =~ ^[0-9]+$ &&
-                    $map_w =~ ^[0-9]+$ && $map_h =~ ^[0-9]+$ ]]; then
-                    local src_area=$((src_w * src_h))
-                    local tgt_area=$((tgt_w * tgt_h))
-                    local map_area=$((map_w * map_h))
-
-                    if [[ $src_area -gt $tgt_area && $src_area -le $map_area ]]; then
-                        cp "$src_file" "$target_file"
-                        ((upgraded++))
-                        rx_log_file "info" "Upgraded $filename (${tgt_res} -> ${src_res})"
-                        continue
-                    fi
-                fi
-                ((skipped++))
-            else
-                cp "$src_file" "$target_file"
-                ((synced++))
+    local updated=0
+    while IFS= read -r -d '' src_file; do
+        [[ -f $src_file ]] || continue
+        local fn
+        fn=$(basename "$src_file")
+        if [[ ! -f "$dest/$fn" ]]; then
+            cp "$src_file" "$dest/$fn"
+            ((synced++))
+        else
+            if [[ $force == "true" ]]; then
+                cp "$src_file" "$dest/$fn"
+                ((updated++))
             fi
-        done
+        fi
+    done < <(find "$tmpdir" -maxdepth 1 -type f -print0)
+
+    rm -rf "$tmpdir" 2>/dev/null
+    _wallpaper_set_state_sha "$collection" "$sha"
+    rx_log_file "info" "Wallpaper pull $collection: ${synced} new, ${updated} updated (${size_human:-unknown})"
+    echo "result=ok|collection=$collection|synced=$synced|updated=$updated|size=${size_human:-unknown}"
+    return 0
+}
+
+sync_wallpapers() {
+    # Refresh every installed collection to the latest remote version.
+    local updated_total=0
+    local found=false
+    for d in "$WALL_DIR"/*/; do
+        [[ -d $d ]] || continue
+        local name
+        name=$(basename "$d")
+        [[ $name == "all" ]] && continue
+        found=true
+        local res
+        res=$(pull_wallpapers "$name")
+        if echo "$res" | grep -q "result=ok"; then
+            local n
+            n=$(echo "$res" | grep -oP 'synced=\K[0-9]+' || echo 0)
+            updated_total=$((updated_total + n))
+        fi
     done
 
-    local total=$((synced + upgraded))
-    rx_log_file "info" "Wallpaper sync: ${synced} new, ${upgraded} upgraded, ${skipped} skipped"
-
-    if [[ $total -gt 0 ]]; then
-        while IFS= read -r f; do
-            [[ -z $f ]] && continue
-            rx_wallpaper_generate_cache "$f" >/dev/null
-        done < <(rx_wallpaper_list_files)
+    if [[ $found == false ]]; then
+        echo "result=ok|status=no_collections"
+        return 0
     fi
+    rx_log_file "info" "Wallpaper sync: ${updated_total} new/updated across installed collections"
+    echo "result=ok|synced=$updated_total"
+    return 0
 }
 
 case "$1" in
@@ -573,6 +635,12 @@ case "$1" in
     "--sync")
         sync_wallpapers
         ;;
+    "--pull")
+        pull_wallpapers "$2" "$3"
+        ;;
+    "--pull-list")
+        list_remote_collections
+        ;;
     "--gpu")
         gpu_wallpaper "$2"
         ;;
@@ -630,10 +698,6 @@ case "$1" in
             echo "result=error|reason=invalid_collection"
             exit 1
         fi
-        if [[ -d "$REPO_WALLS/$name" ]]; then
-            echo "result=error|reason=repo_collection|collection=$name"
-            exit 1
-        fi
         if [[ ! -d "$WALL_DIR/$name" ]]; then
             echo "result=error|reason=not_found|collection=$name"
             exit 1
@@ -654,7 +718,7 @@ case "$1" in
         ;;
     "--setup-apply")
         theme="${2:-retro}"
-        sync_wallpapers
+        pull_wallpapers "$theme" >/dev/null 2>&1
         set_var "RETRO_THEME" "$theme"
         set_var "RETRO_WALL_COLLECTION" "$theme"
 

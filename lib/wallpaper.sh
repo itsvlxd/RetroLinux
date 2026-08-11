@@ -5,7 +5,6 @@ source "$RETRO_DIR/lib/battery.sh"
 
 WALL_DIR="$RETRO_CONFIG/wallpapers"
 FRAME_CACHE="$RETRO_CONFIG/wallpaper_frames"
-REPO_WALLS="$RETRO_DIR/wallpapers"
 MPV_SOCKET="/tmp/mpvsocket"
 
 mkdir -p "$FRAME_CACHE" "$WALL_DIR"
