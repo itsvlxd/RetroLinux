@@ -75,9 +75,6 @@ EOF
 }
 hide_nm_applet
 
-setup_cronie
-retro_fix_permissions
-
 if [[ $SECONDARY_INSTALL != "true" ]]; then
     setup_cronie
     retro_fix_permissions
