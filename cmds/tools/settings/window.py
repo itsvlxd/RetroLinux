@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from settings.pages.shell_theme import ShellThemePage
     from settings.pages.shell_workspaces import ShellWorkspacesPage
     from settings.pages.themes import ThemesPage
+    from settings.pages.users import UsersPage
     from settings.pages.wallpapers import WallpapersPage
     from settings.pages.window_rules import WindowRulesPage
     from settings.pages.workspaces import WorkspacesPage
@@ -475,6 +476,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.shell_workspaces import ShellWorkspacesPage
         from settings.pages.themes import ThemesPage
+        from settings.pages.users import UsersPage
         from settings.pages.wallpapers import WallpapersPage
         from settings.pages.window_rules import WindowRulesPage
         from settings.pages.workspaces import WorkspacesPage
@@ -584,6 +586,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (ShellPresetsPage, "_shell_presets_page", "shell_presets", "Presets"),
             (ThemesPage, "_themes_page", "themes", "Themes"),
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
+            (UsersPage, "_users_page", "users", "Users"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
         ]
         import os
@@ -1255,6 +1258,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.shell_workspaces import ShellWorkspacesPage
         from settings.pages.themes import ThemesPage
+        from settings.pages.users import UsersPage
         from settings.pages.wallpapers import WallpapersPage
         cls, attr, title = self._lazy_standalone_specs.pop(slug)
         page = cls(self)
@@ -1366,6 +1370,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is AboutPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is UsersPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

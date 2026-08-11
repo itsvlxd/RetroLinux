@@ -3,12 +3,15 @@
 source "$RETRO_DIR/cmds/tools/power.sh"
 
 : "${RETRO_CONFIG:=$HOME/.config/retro}"
+SECONDARY_INSTALL=${RETRO_SECONDARY_INSTALL:-false}
 source_bin="$RETRO_DIR/retro.sh"
 bin_dir="/usr/local/bin"
 cmd_name="retro"
 target="$bin_dir/$cmd_name"
 
-cmd_power "permissions"
+if [[ $SECONDARY_INSTALL != "true" ]]; then
+    cmd_power "permissions"
+fi
 
 setup_cronie() {
     rx_log "info" "Checking cronie service..."
@@ -75,9 +78,19 @@ hide_nm_applet
 setup_cronie
 retro_fix_permissions
 
-if [[ ! -L $target ]] || [[ "$(readlink -f "$target")" != "$source_bin" ]]; then
+if [[ $SECONDARY_INSTALL != "true" ]]; then
+    setup_cronie
+    retro_fix_permissions
+fi
+
+if [[ $SECONDARY_INSTALL != "true" && (! -L $target || "$(readlink "$target")" != "$source_bin") ]]; then
     rx_log "info" "Installing ${PINK}${cmd_name}${RESET} to ${bin_dir}..."
     [[ ! -d $bin_dir ]] && sudo mkdir -p "$bin_dir"
+
+    if [[ -e $target && ! -L $target ]]; then
+        rx_log "warn" "Removing non-symlink $target before linking retro"
+        sudo rm -f "$target"
+    fi
 
     if sudo ln -sf "$source_bin" "$target"; then
         sudo chmod +x "$source_bin"
@@ -219,8 +232,11 @@ install_settings_desktop() {
 
     rx_log "success" "Retro Settings desktop entry and icon installed"
 }
-install_settings_desktop
 
+# Only the primary user runs the system-wide sudoers/ownership setup; secondary
+# users just get their per-user config (env, variables, hypridle). Otherwise a
+# new user's retro module install would re-chown the SDDM dir to themselves and
+# steal it from the primary user.
 setup_theme_sudoers() {
     if command -v papirus-folders >/dev/null 2>&1; then
         sudo rm -f /etc/sudoers.d/papirus-folders
@@ -233,18 +249,35 @@ EOF
     fi
 
     local sddm_dir="/usr/share/sddm/themes/retro"
-    if [[ -d $sddm_dir ]]; then
+    if [[ -d $sddm_dir && $(stat -c %U "$sddm_dir" 2>/dev/null) == "$USER" ]]; then
         sudo chown -R "$USER:$USER" "$sddm_dir" 2>/dev/null || true
         rx_log "success" "SDDM theme dir made writable for $USER"
     fi
 
     local sddm_conf_d="/etc/sddm.conf.d"
-    if [[ -d $sddm_conf_d ]]; then
+    if [[ -d $sddm_conf_d && $(stat -c %U "$sddm_conf_d" 2>/dev/null) == "$USER" ]]; then
         sudo chown -R "$USER:$USER" "$sddm_conf_d" 2>/dev/null || true
         rx_log "success" "SDDM config dir made writable for $USER"
     fi
 }
-setup_theme_sudoers
+
+setup_sddm_sudoers() {
+    # Passwordless rules for rx_sddm_refresh (theme_core.sh) so the background
+    # theme apply never prompts for a sudo password. Scoped to the retro SDDM
+    # theme path and the exact commands it runs.
+    local sddm_dir="/usr/share/sddm/themes/retro"
+    [[ -d $sddm_dir ]] || return 0
+
+    sudo rm -f /etc/sudoers.d/99-retro-sddm
+    cat <<EOF | sudo tee /etc/sudoers.d/99-retro-sddm >/dev/null
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /usr/share/sddm/themes/retro/backgrounds /usr/share/sddm/themes/retro/configs
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/magick * -resize 1920x1080^ -gravity center -extent 1920x1080 /usr/share/sddm/themes/retro/backgrounds/retro-wallpaper.jpg
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/cp /home/*/.config/retro/themes/sddm.conf /usr/share/sddm/themes/retro/configs/retro.conf
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/sed -i * /usr/share/sddm/themes/retro/metadata.desktop
+EOF
+    sudo chmod 440 /etc/sudoers.d/99-retro-sddm
+    rx_log "success" "Sudoers rule added for SDDM theme refresh"
+}
 
 setup_smartctl_sudoers() {
     if command -v smartctl &>/dev/null; then
@@ -258,17 +291,23 @@ setup_smartctl_sudoers() {
         rx_log "info" "smartctl not found. Install smartmontools for SMART data"
     fi
 }
-setup_smartctl_sudoers
 
-SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"
-if [[ -f $SYSTEM_SCRIPT ]]; then
-    sudo rm -f /etc/sudoers.d/99-retro-system /etc/sudoers.d/99-retro-logind
-    echo "%wheel ALL=(ALL) NOPASSWD: ${SYSTEM_SCRIPT}" | sudo tee /etc/sudoers.d/99-retro-system >/dev/null
-    sudo chmod 440 /etc/sudoers.d/99-retro-system
-    rx_log "success" "Sudoers rule added for retro system (power, lid, zram, swap)"
-fi
+if [[ $SECONDARY_INSTALL != "true" ]]; then
+    install_settings_desktop
+    setup_theme_sudoers
+    setup_sddm_sudoers
+    setup_smartctl_sudoers
 
-if [[ ! -f /swapfile ]]; then
-    rx_log "info" "Setting up swap + hibernation (auto-calculated from RAM)..."
-    bash "$SYSTEM_SCRIPT" --apply
+    SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"
+    if [[ -f $SYSTEM_SCRIPT ]]; then
+        sudo rm -f /etc/sudoers.d/99-retro-system /etc/sudoers.d/99-retro-logind
+        echo "%wheel ALL=(ALL) NOPASSWD: ${SYSTEM_SCRIPT}" | sudo tee /etc/sudoers.d/99-retro-system >/dev/null
+        sudo chmod 440 /etc/sudoers.d/99-retro-system
+        rx_log "success" "Sudoers rule added for retro system (power, lid, zram, swap)"
+    fi
+
+    if [[ ! -f /swapfile ]]; then
+        rx_log "info" "Setting up swap + hibernation (auto-calculated from RAM)..."
+        bash "$SYSTEM_SCRIPT" --apply
+    fi
 fi

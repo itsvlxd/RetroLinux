@@ -1,4 +1,5 @@
 export RETRO_TERMINAL_CMD="kitty"
+export RETRO_BIN_SHELL="bash"
 export RETRO_FILEMANAGER_CMD="nemo"
 export RETRO_PKG_UPDATE_MIN="120"
 export RETRO_UPDATE_CHECK_MIN="1"

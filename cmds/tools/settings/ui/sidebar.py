@@ -41,6 +41,7 @@ from settings.ui.icons import (
     SIDEBAR_ICON,
     THEMES_ICON,
     TIMESHIFT_ICON,
+    USERS_ICON,
     WALLPAPERS_ICON,
     WINDOW_RULES_ICON,
     WORKSPACES_ICON,
@@ -265,6 +266,7 @@ class Sidebar:
         add_row(startup, "env_vars", "Env Variables", ENV_VARS_ICON)
 
         system = new_category("System")
+        add_row(system, "users", "Users", USERS_ICON)
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
         add_row(system, "audio", "Audio", AUDIO_ICON)

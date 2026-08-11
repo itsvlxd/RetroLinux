@@ -10,8 +10,10 @@ index both consume it so a new page shows up in both places.
 import getpass
 import os
 import socket
+import subprocess
+import threading
 
-from gi.repository import Adw, Gdk, Gtk
+from gi.repository import Adw, Gdk, GLib, Gtk
 
 from settings.ui import make_page_layout
 from settings.ui.icons import (
@@ -49,6 +51,7 @@ from settings.ui.icons import (
     SIDEBAR_ICON,
     THEMES_ICON,
     TIMESHIFT_ICON,
+    USERS_ICON,
     WALLPAPERS_ICON,
     WINDOW_RULES_ICON,
     WORKSPACES_ICON,
@@ -94,6 +97,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("autostart", "Autostart", "Apps that launch on login", AUTOSTART_ICON),
     ("env_vars", "Env Variables", "Environment variables", ENV_VARS_ICON),
     # System
+    ("users", "Users", "Create and manage system users", USERS_ICON),
     ("network", "Network", "Wi-Fi and connections", NETWORK_ICON),
     ("bluetooth", "Bluetooth", "Bluetooth devices", BLUETOOTH_ICON),
     ("audio", "Audio", "Sound devices and volume", AUDIO_ICON),
@@ -145,20 +149,41 @@ class HomePage:
         inner.set_margin_end(16)
         card.append(inner)
 
+        self._user = getpass.getuser()
+
         avatar = Adw.Avatar()
         avatar.set_size(84)
         avatar.set_show_initials(True)
         inner.append(avatar)
 
-        user = getpass.getuser()
-        avatar.set_text(user)
+        avatar.set_text(self._user)
         self._try_set_avatar_image(avatar)
+        self._avatar = avatar
+
+        avatar_btn = Gtk.Button()
+        avatar_btn.add_css_class("flat")
+        avatar_btn.add_css_class("circular")
+        avatar_btn.set_valign(Gtk.Align.CENTER)
+        avatar_btn.set_child(avatar)
+        avatar_btn.set_tooltip_text("Change profile picture")
+        avatar_btn.connect("clicked", lambda _b: self._on_change_picture())
+        self._avatar_btn = avatar_btn
+
+        avatar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        avatar_box.append(avatar_btn)
+
+        edit_lbl = Gtk.Label(label="Change picture")
+        edit_lbl.add_css_class("dim-label")
+        edit_lbl.add_css_class("caption")
+        edit_lbl.set_halign(Gtk.Align.CENTER)
+        avatar_box.append(edit_lbl)
+        inner.append(avatar_box)
 
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         text.set_valign(Gtk.Align.CENTER)
         text.set_hexpand(True)
 
-        name_lbl = Gtk.Label(label=user)
+        name_lbl = Gtk.Label(label=self._user)
         name_lbl.add_css_class("title-1")
         name_lbl.set_halign(Gtk.Align.START)
         text.append(name_lbl)
@@ -170,6 +195,41 @@ class HomePage:
 
         inner.append(text)
         return card
+
+    def _on_change_picture(self) -> None:
+        dialog = Gtk.FileDialog.new()
+        dialog.set_title("Choose a profile picture")
+
+        def on_chosen(_dlg, result):
+            try:
+                gfile = dialog.open_finish(result)
+            except GLib.Error:
+                return
+            if not gfile:
+                return
+            path = gfile.get_path()
+            if not path or not os.path.isfile(path):
+                return
+            self._set_face(path)
+
+        dialog.open(self._window, None, on_chosen)
+
+    def _set_face(self, path: str) -> None:
+        core = os.path.join(
+            os.environ.get("RETRO_DIR", "/opt/retrolinux"),
+            "scripts", "users_core.sh",
+        )
+        args = ["bash", core, "--set-face", self._user, path]
+
+        def worker():
+            subprocess.run(args, capture_output=True, text=True, timeout=30,
+                           stdin=subprocess.DEVNULL)
+            GLib.idle_add(self._refresh_avatar)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _refresh_avatar(self) -> None:
+        self._try_set_avatar_image(self._avatar)
 
     @staticmethod
     def _try_set_avatar_image(avatar: Adw.Avatar) -> None:
