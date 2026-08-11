@@ -140,13 +140,13 @@ class HomePage:
 
     def _build_user_card(self) -> Gtk.Widget:
         card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        card.add_css_class("card")
+        card.add_css_class("hero-card")
         card.set_margin_bottom(4)
-        inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        inner.set_margin_top(16)
-        inner.set_margin_bottom(16)
-        inner.set_margin_start(16)
-        inner.set_margin_end(16)
+        inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
+        inner.set_margin_top(18)
+        inner.set_margin_bottom(18)
+        inner.set_margin_start(18)
+        inner.set_margin_end(18)
         card.append(inner)
 
         self._user = getpass.getuser()
@@ -154,8 +154,6 @@ class HomePage:
         avatar = Adw.Avatar()
         avatar.set_size(84)
         avatar.set_show_initials(True)
-        inner.append(avatar)
-
         avatar.set_text(self._user)
         self._try_set_avatar_image(avatar)
         self._avatar = avatar
@@ -169,32 +167,132 @@ class HomePage:
         avatar_btn.connect("clicked", lambda _b: self._on_change_picture())
         self._avatar_btn = avatar_btn
 
-        avatar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        avatar_box.append(avatar_btn)
+        overlay = Gtk.Overlay()
+        overlay.set_child(avatar_btn)
 
-        edit_lbl = Gtk.Label(label="Change picture")
-        edit_lbl.add_css_class("dim-label")
-        edit_lbl.add_css_class("caption")
-        edit_lbl.set_halign(Gtk.Align.CENTER)
-        avatar_box.append(edit_lbl)
+        camera = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        camera.set_halign(Gtk.Align.CENTER)
+        camera.set_valign(Gtk.Align.CENTER)
+        camera.add_css_class("avatar-hover-icon")
+        cam_img = Gtk.Image.new_from_icon_name("camera-photo-symbolic")
+        cam_img.set_pixel_size(28)
+        camera.append(cam_img)
+        camera.set_visible(False)
+        overlay.add_overlay(camera)
+        self._avatar_camera = camera
+
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("enter", lambda *_a: self._avatar_camera.set_visible(True))
+        motion.connect("leave", lambda *_a: self._avatar_camera.set_visible(False))
+        overlay.add_controller(motion)
+
+        avatar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        avatar_box.set_valign(Gtk.Align.CENTER)
+        avatar_box.append(overlay)
         inner.append(avatar_box)
 
-        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
         text.set_valign(Gtk.Align.CENTER)
         text.set_hexpand(True)
 
-        name_lbl = Gtk.Label(label=self._user)
-        name_lbl.add_css_class("title-1")
-        name_lbl.set_halign(Gtk.Align.START)
-        text.append(name_lbl)
+        hostname = socket.gethostname()
+        accent_hex = "#ee1a1a1a"
+        ok, rgba = avatar_btn.get_style_context().lookup_color("accent_color")
+        if ok:
+            accent_hex = "#{:02x}{:02x}{:02x}".format(
+                round(rgba.red * 255), round(rgba.green * 255), round(rgba.blue * 255)
+            )
+        user_host = Gtk.Label()
+        user_host.set_markup(
+            f'<span size="28000" weight="bold">{self._user}</span>'
+            f'<span size="28000" weight="bold" foreground="{accent_hex}">@{hostname}</span>'
+        )
+        user_host.set_halign(Gtk.Align.START)
+        user_host.set_xalign(0)
+        user_host.set_wrap(True)
+        text.append(user_host)
 
-        host_lbl = Gtk.Label(label=socket.gethostname())
-        host_lbl.add_css_class("dim-label")
-        host_lbl.set_halign(Gtk.Align.START)
-        text.append(host_lbl)
+        device = self._device_name()
+        device_lbl = Gtk.Label(label=device)
+        device_lbl.add_css_class("dim-label")
+        device_lbl.add_css_class("heading")
+        device_lbl.set_halign(Gtk.Align.START)
+        device_lbl.set_xalign(0)
+        device_lbl.set_wrap(True)
+        device_lbl.set_lines(2)
+        text.append(device_lbl)
 
         inner.append(text)
+
+        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        info.set_valign(Gtk.Align.CENTER)
+        info.set_halign(Gtk.Align.END)
+
+        version_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        version_box.set_halign(Gtk.Align.CENTER)
+
+        version = Gtk.Label(label=self._os_version())
+        version.add_css_class("pill")
+        version.add_css_class("success")
+        version.set_halign(Gtk.Align.CENTER)
+        version_box.append(version)
+
+        uptime = Gtk.Label(label=f"up {self._uptime()}")
+        uptime.add_css_class("dim-label")
+        uptime.add_css_class("caption")
+        uptime.set_halign(Gtk.Align.CENTER)
+        version_box.append(uptime)
+
+        info.append(version_box)
+
+        update_btn = Gtk.Button(label="Check Updates")
+        update_btn.add_css_class("suggested-action")
+        update_btn.set_halign(Gtk.Align.CENTER)
+        update_btn.connect("clicked", lambda _b: self._window.navigate("about"))
+        info.append(update_btn)
+
+        inner.append(info)
         return card
+
+    @staticmethod
+    def _device_name() -> str:
+        def read(path: str) -> str:
+            try:
+                with open(path) as f:
+                    return f.read().strip()
+            except OSError:
+                return ""
+
+        vendor = read("/sys/class/dmi/id/sys_vendor")
+        product = read("/sys/class/dmi/id/product_name")
+        if product:
+            return f"{vendor} {product}".strip() if vendor and vendor not in product else product
+        return socket.gethostname()
+
+    @staticmethod
+    def _os_version() -> str:
+        from settings.core.system_info import _os_version, display_version
+        version = display_version(_os_version())
+        return version[:1].upper() + version[1:] if version else version
+
+    @staticmethod
+    def _uptime() -> str:
+        try:
+            with open("/proc/uptime") as f:
+                seconds = float(f.read().split()[0])
+        except (OSError, ValueError, IndexError):
+            return ""
+        minutes = int(seconds // 60)
+        hours, minutes = divmod(minutes, 60)
+        days, hours = divmod(hours, 24)
+        parts = []
+        if days:
+            parts.append(f"{days}d")
+        if hours:
+            parts.append(f"{hours}h")
+        if minutes:
+            parts.append(f"{minutes}m")
+        return " ".join(parts) or "just started"
 
     def _on_change_picture(self) -> None:
         dialog = Gtk.FileDialog.new()
