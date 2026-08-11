@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from settings.pages.battery import BatteryPage
     from settings.pages.binds import BindsPage
     from settings.pages.bluetooth import BluetoothPage
+    from settings.pages.changelog import ChangelogPage
     from settings.pages.daemon import DaemonPage
     from settings.pages.disk import DiskPage
     from settings.pages.env_vars import EnvVarsPage
@@ -53,6 +54,7 @@ if TYPE_CHECKING:
     from settings.pages.shell_sidebar import ShellSidebarPage
     from settings.pages.shell_theme import ShellThemePage
     from settings.pages.shell_workspaces import ShellWorkspacesPage
+    from settings.pages.settings import SettingsPage
     from settings.pages.themes import ThemesPage
     from settings.pages.users import UsersPage
     from settings.pages.wallpapers import WallpapersPage
@@ -272,6 +274,11 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         about_action.connect("activate", self._on_show_about)
         self.add_action(about_action)
 
+        # Changelog action (referenced by the Check Updates dropdown)
+        changelog_action = Gio.SimpleAction.new("show-changelog", None)
+        changelog_action.connect("activate", self._on_show_changelog)
+        self.add_action(changelog_action)
+
         # Report-a-bug action: opens a prefilled GitHub issue in the browser.
         report_action = Gio.SimpleAction.new("report-bug", None)
         report_action.connect("activate", self._on_report_bug)
@@ -448,6 +455,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.battery import BatteryPage
         from settings.pages.binds import BindsPage
         from settings.pages.bluetooth import BluetoothPage
+        from settings.pages.changelog import ChangelogPage
         from settings.pages.daemon import DaemonPage
         from settings.pages.disk import DiskPage
         from settings.pages.driver import DriverPage
@@ -559,6 +567,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         standalone_page_specs: list[tuple[type, str, str, str]] = [
             (HomePage, "_home_page", "home", "Home"),
             (AboutPage, "_about_page", "about", "About"),
+            (ChangelogPage, "_changelog_page", "changelog", "Changelog"),
             (AppsPage, "_apps_page", "apps", "Applications"),
             (AudioPage, "_audio_page", "audio", "Audio"),
             (BluetoothPage, "_bluetooth_page", "bluetooth", "Bluetooth"),
@@ -1113,6 +1122,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         """Show the About dialog."""
         build_about_dialog(running_hyprland_version=self.hypr.version).present(self)
 
+    def _on_show_changelog(self, *_args):
+        """Navigate to the Changelog page."""
+        self.show_page("changelog")
+
     def _on_report_bug(self, *_args):
         """Open a prefilled GitHub issue in the browser (Help → Report a bug)."""
 
@@ -1236,6 +1249,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.audio import AudioPage
         from settings.pages.battery import BatteryPage
         from settings.pages.bluetooth import BluetoothPage
+        from settings.pages.changelog import ChangelogPage
         from settings.pages.daemon import DaemonPage
         from settings.pages.disk import DiskPage
         from settings.pages.driver import DriverPage
@@ -1257,6 +1271,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.shell_sidebar import ShellSidebarPage
         from settings.pages.shell_theme import ShellThemePage
         from settings.pages.shell_workspaces import ShellWorkspacesPage
+        from settings.pages.settings import SettingsPage
         from settings.pages.themes import ThemesPage
         from settings.pages.users import UsersPage
         from settings.pages.wallpapers import WallpapersPage
@@ -1374,6 +1389,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is UsersPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is SettingsPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

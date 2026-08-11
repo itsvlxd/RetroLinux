@@ -160,6 +160,12 @@ class Sidebar:
         self._pinned_list.append(about_row)
         self._rows_by_id["about"] = about_row
 
+        changelog_row = SidebarRow(group_id="changelog", title="Changelog")
+        changelog_row.set_activatable(True)
+        changelog_row.add_prefix(Gtk.Image.new_from_icon_name(LOGS_ICON))
+        self._pinned_list.append(changelog_row)
+        self._rows_by_id["changelog"] = changelog_row
+
         settings_row = SidebarRow(group_id="settings", title="Settings")
         settings_row.set_activatable(True)
         settings_row.add_prefix(Gtk.Image.new_from_icon_name(SETTINGS_ICON))

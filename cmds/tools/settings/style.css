@@ -53,6 +53,13 @@ row:hover .reset-button,
     letter-spacing: 0.02em;
 }
 
+/* Avatar hover camera hint */
+.avatar-hover-icon {
+    border-radius: 9999px;
+    background-color: alpha(@window_bg_color, 0.65);
+    padding: 8px;
+} 
+
 /* Error flash: red tint */
 .option-error {
     background-color: alpha(@error_bg_color, 0.18);
@@ -231,6 +238,19 @@ row.spin spinbutton > text {
     color: @warning_color;
     background-color: alpha(@warning_bg_color, 0.18);
 }
+
+/* Changelog type badges */
+.badge.changelog-feat { color: #4d9fff; background-color: alpha(#4d9fff, 0.15); }
+.badge.changelog-fix { color: @error_color; background-color: alpha(@error_bg_color, 0.15); }
+.badge.changelog-refactor { color: @warning_color; background-color: alpha(@warning_bg_color, 0.15); }
+.badge.changelog-style { color: #c59bff; background-color: alpha(#c59bff, 0.15); }
+.badge.changelog-docs { color: #4d9fff; background-color: alpha(#4d9fff, 0.15); }
+.badge.changelog-chore { color: @success_color; background-color: alpha(@success_bg_color, 0.15); }
+.badge.changelog-perf { color: #f2c744; background-color: alpha(#f2c744, 0.15); }
+.badge.changelog-build { color: #f29a4d; background-color: alpha(#f29a4d, 0.15); }
+.badge.changelog-ci { color: #f29a4d; background-color: alpha(#f29a4d, 0.15); }
+.badge.changelog-test { color: #4d9fff; background-color: alpha(#4d9fff, 0.15); }
+.badge.changelog-other { color: @success_color; background-color: alpha(@success_bg_color, 0.15); }
 
 /* Wallpaper collection tag — static (image), blue */
 .badge.tag-static {
