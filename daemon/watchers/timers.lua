@@ -14,9 +14,9 @@ return {
 		while true do
 			local now = Watcher.time()
 
-			local pkg_min = tonumber(Watcher.get_var("RETRO_PKG_UPDATE_MIN", "20")) or 20
+			local pkg_min = tonumber(Watcher.get_var("RETRO_PKG_UPDATE_MIN", "120")) or 120
 			local pkg_interval = pkg_min * 60
-			local retro_min = tonumber(Watcher.get_var("RETRO_UPDATE_CHECK_MIN", "30")) or 30
+			local retro_min = tonumber(Watcher.get_var("RETRO_UPDATE_CHECK_MIN", "1")) or 1
 			local retro_interval = retro_min * 60
 
 			if last_pkg_check == 0 then
@@ -39,8 +39,8 @@ return {
 
 				local total = pac_count + aur_count
 
-			local raw_thresh = Watcher.get_var("RETRO_PKG_UPDATE_THRESH", "20")
-			local thresh = tonumber((raw_thresh:gsub("%D", ""))) or 20
+			local raw_thresh = Watcher.get_var("RETRO_PKG_UPDATE_THRESH", "120")
+			local thresh = tonumber((raw_thresh:gsub("%D", ""))) or 120
 
 				if total > 0 and total >= thresh then
 					local sample_names = {}
