@@ -258,11 +258,25 @@ FocusScope {
                             anchors.fill: parent
 
                             // 1. Icono centrado en el área base del botón (siempre fijo a la izquierda)
+                            Image {
+                                width: root.buttonSize
+                                height: root.iconSize
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                source: modelData.image || ""
+                                visible: !!modelData.image
+                                sourceSize.width: root.iconSize * 2
+                                sourceSize.height: root.iconSize * 2
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                            }
+
                             Text {
                                 width: root.buttonSize
                                 height: parent.height
                                 anchors.left: parent.left
                                 text: modelData.icon || ""
+                                visible: !modelData.image
                                 textFormat: Text.RichText
                                 font.family: Icons.font
                                 font.pixelSize: root.iconSize

@@ -22,6 +22,17 @@ ActionGrid {
         property string type: "button"
     }
 
+    QtObject {
+        id: shazamAction
+        property string icon: Shazam.isListening ? Icons.stop : Icons.equalizer
+        property var image: Shazam.isListening ? "" : Qt.resolvedUrl("../../../assets/Shazam_icon.svg")
+        property string text: Shazam.isListening ? "Listening" : ""
+        property string tooltip: Shazam.isListening ? "Stop Shazam" : "Shazam"
+        property string command: ""
+        property string variant: Shazam.isListening ? "error" : "primary"
+        property string type: "button"
+    }
+
     layout: "row"
     buttonSize: 48
     iconSize: 20
@@ -70,6 +81,7 @@ ActionGrid {
             tooltip: "Google Lens",
             command: ""
         },
+        shazamAction,
         {
             icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
             tooltip: "Webcam Overlay",
@@ -177,6 +189,12 @@ ActionGrid {
             Screenshot.captureMode = "lens";
             root.itemSelected();
             screenshotDelay.start();
+        } else if (action.tooltip === "Shazam") {
+            Shazam.startListening();
+            root.itemSelected();
+        } else if (action.tooltip === "Stop Shazam") {
+            Shazam.stopListening();
+            root.itemSelected();
         } else if (action.tooltip === "Webcam Overlay") {
             GlobalStates.webcamOverlayVisible = !GlobalStates.webcamOverlayVisible;
         }

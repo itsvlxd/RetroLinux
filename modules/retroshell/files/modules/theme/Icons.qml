@@ -94,6 +94,7 @@ QtObject {
     // Toolbox
     readonly property string toolbox: ""
     readonly property string wrench: "\ue5d4"
+    readonly property string equalizer: "\uebbc"
     readonly property string regionScreenshot: ""
     readonly property string windowScreenshot: ""
     readonly property string fullScreenshot: ""

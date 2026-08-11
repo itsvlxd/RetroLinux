@@ -40,11 +40,24 @@ Item {
             radius: root.radius
             visible: (root.image == "" && root.appIcon == "") || (appIconLoader.active && appIconLoader.item && appIconLoader.item.status === Image.Error)
 
+            Image {
+                anchors.centerIn: parent
+                width: root.size * 0.5
+                height: root.size * 0.5
+                source: (root.summary === "Shazam" || String(root.summary).indexOf("Song Detected") === 0) ? Qt.resolvedUrl("../../assets/Shazam_icon.svg") : ""
+                visible: source !== ""
+                sourceSize.width: root.size
+                sourceSize.height: root.size
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
+
             Text {
                 anchors.centerIn: parent
                 text: {
                     if (root.urgency == NotificationUrgency.Critical) return Icons.alert;
                     if (root.summary === "Pomodoro") return Icons.timer;
+                    if (root.summary === "Shazam" || String(root.summary).indexOf("Song Detected") === 0) return "";
                     if (root.appName === "RetroLinux") {
                         if (String(root.summary).indexOf("Recording") === 0) return Icons.recordScreen;
                         if (String(root.summary).indexOf("Screenshot") === 0) return Icons.screenshots;
