@@ -360,6 +360,14 @@ _docker_build() {
             "$PROFILE_DIR/grub/themes/"
     fi
 
+    rx_log "info" "Copying Plymouth themes from modules..."
+    if [[ -d "$RETRO_DIR/modules/plymouth/files" ]]; then
+        mkdir -p "$PROFILE_DIR/airootfs/usr/share/plymouth/themes"
+        rsync -av --delete \
+            "$RETRO_DIR/modules/plymouth/files/" \
+            "$PROFILE_DIR/airootfs/usr/share/plymouth/themes/"
+    fi
+
     rx_log "info" "Copying RetroLinux to airootfs..."
     sudo mkdir -p "$PROFILE_DIR/airootfs/opt/retrolinux"
     sudo rsync -av --delete \
