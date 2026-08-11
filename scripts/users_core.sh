@@ -211,6 +211,71 @@ _run_install() {
     return $rc
 }
 
+_run_post_setup() {
+    local target_user="$1"
+    local target_home
+    target_home="$(_real_home "$target_user")"
+
+    rx_log_file "info" "Running wallpaper/theme setup for $target_user"
+
+    env HOME="$target_home" \
+        RETRO_CONFIG="$target_home/.config/retro" \
+        RETRO_DIR="$RETRO_DIR" \
+        RETRO_SETUP=true \
+        RETRO_SECONDARY_INSTALL=true \
+        USER="$target_user" \
+        LOGNAME="$target_user" \
+        "$RETRO_DIR/retro.sh" wallpaper static true
+
+    env HOME="$target_home" \
+        RETRO_CONFIG="$target_home/.config/retro" \
+        RETRO_DIR="$RETRO_DIR" \
+        RETRO_SETUP=true \
+        RETRO_SECONDARY_INSTALL=true \
+        USER="$target_user" \
+        LOGNAME="$target_user" \
+        "$RETRO_DIR/retro.sh" wallpaper set "Retrowave Gtr Wallpaper"
+
+    env HOME="$target_home" \
+        RETRO_CONFIG="$target_home/.config/retro" \
+        RETRO_DIR="$RETRO_DIR" \
+        RETRO_SETUP=true \
+        RETRO_SECONDARY_INSTALL=true \
+        USER="$target_user" \
+        LOGNAME="$target_user" \
+        "$RETRO_DIR/retro.sh" wallpaper setup --needed -y -o "theme=retro"
+
+    env HOME="$target_home" \
+        RETRO_CONFIG="$target_home/.config/retro" \
+        RETRO_DIR="$RETRO_DIR" \
+        RETRO_SETUP=true \
+        RETRO_SECONDARY_INSTALL=true \
+        USER="$target_user" \
+        LOGNAME="$target_user" \
+        "$RETRO_DIR/retro.sh" theme setup --needed -y
+
+    env HOME="$target_home" \
+        RETRO_CONFIG="$target_home/.config/retro" \
+        RETRO_DIR="$RETRO_DIR" \
+        RETRO_SETUP=true \
+        RETRO_SECONDARY_INSTALL=true \
+        USER="$target_user" \
+        LOGNAME="$target_user" \
+        "$RETRO_DIR/retro.sh" theme mode dark
+
+    env HOME="$target_home" \
+        RETRO_CONFIG="$target_home/.config/retro" \
+        RETRO_DIR="$RETRO_DIR" \
+        RETRO_SETUP=true \
+        RETRO_SECONDARY_INSTALL=true \
+        USER="$target_user" \
+        LOGNAME="$target_user" \
+        "$RETRO_DIR/retro.sh" shell start
+
+    _fix_ownership "$target_user"
+    rx_log_file "success" "Wallpaper/theme setup complete for $target_user"
+}
+
 _validate_user() {
     local user="$1"
     [[ -z $user ]] && return 1
@@ -303,6 +368,7 @@ users_create() {
     _gen_face "$user"
 
     _run_install "$user"
+    _run_post_setup "$user"
     return 0
 }
 
@@ -319,6 +385,7 @@ users_resync() {
     }
 
     _run_install "$user"
+    _run_post_setup "$user"
     return 0
 }
 
