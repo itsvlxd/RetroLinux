@@ -455,7 +455,7 @@ list_remote_collections() {
         return 1
     fi
 
-    jq -r '.collections[] | [.name,.branch,.count,.size_human,.sha,.description] | @tsv' "$cache"
+    jq -r '.collections[] | [.name,.branch,.count,.size_human,.sha,.description,(.tags // [] | join(","))] | @tsv' "$cache"
     rm -f "$cache" 2>/dev/null
     return 0
 }
@@ -487,17 +487,34 @@ pull_wallpapers() {
 
     local installed_sha
     installed_sha=$(_wallpaper_state_sha "$collection")
-    if [[ $sha == "$installed_sha" && $force != "true" ]]; then
+    local installed_ok=false
+    if [[ -d "$WALL_DIR/$collection" ]] && \
+        find "$WALL_DIR/$collection" -maxdepth 1 -type f 2>/dev/null | grep -qiE '\.(png|jpg|jpeg|webp|gif|mp4|mkv|webm)$'; then
+        installed_ok=true
+    fi
+
+    if [[ $sha == "$installed_sha" && $force != "true" && $installed_ok == true ]]; then
         echo "result=ok|status=up_to_date|collection=$collection|sha=$sha"
         return 0
     fi
 
     local tmpdir
     tmpdir=$(mktemp -d /tmp/retro_wall_pull.XXXXXX)
-    if ! git clone --depth 1 --branch "$branch" --single-branch "$WALLPAPER_REPO_URL" "$tmpdir" >/dev/null 2>&1; then
-        rm -rf "$tmpdir" 2>/dev/null
-        echo "result=error|reason=clone_failed|collection=$collection"
-        return 1
+    # Run the clone under a pseudo-TTY (script -qec) so git streams progress
+    # in real time instead of block-buffering it into one burst at EOF.
+    # The live progress goes to stderr (GUI parses it); git's stdout is dropped.
+    if command -v script >/dev/null 2>&1; then
+        if ! script -qec "git clone --depth 1 --progress --branch \"$branch\" --single-branch \"$WALLPAPER_REPO_URL\" \"$tmpdir\"" /dev/null 1>&2; then
+            rm -rf "$tmpdir" 2>/dev/null
+            echo "result=error|reason=clone_failed|collection=$collection"
+            return 1
+        fi
+    else
+        if ! git clone --depth 1 --progress --branch "$branch" --single-branch "$WALLPAPER_REPO_URL" "$tmpdir" 1>/dev/null; then
+            rm -rf "$tmpdir" 2>/dev/null
+            echo "result=error|reason=clone_failed|collection=$collection"
+            return 1
+        fi
     fi
 
     local dest="$WALL_DIR/$collection"

@@ -1214,7 +1214,6 @@ class AddWallpapersDialog(Adw.Dialog):
         self._progress_bar.set_show_text(True)
         self._progress_bar.set_visible(False)
         self._progress_bar.set_valign(Gtk.Align.CENTER)
-        self._progress_bar.set_margin_top(4)
         box.append(self._progress_bar)
 
         self._collection_list = Gtk.ListBox()
@@ -1384,7 +1383,8 @@ class AddWallpapersDialog(Adw.Dialog):
         self._status_label.set_label(f"Downloading {col.get('display', col['name'])}\u2026")
         self._progress_bar.set_visible(True)
         self._progress_bar.set_fraction(0.0)
-        self._progress_bar.set_text("Connecting\u2026")
+        self._progress_bar.set_text("")
+        col["_btn"] = btn
         if btn is not None:
             btn.set_sensitive(False)
             btn.set_label("Installing\u2026")
@@ -1468,7 +1468,10 @@ class AddWallpapersDialog(Adw.Dialog):
         self, col: dict, pct: int, received: str = "", speed: str = "", total: str = "",
     ) -> None:
         self._progress_bar.set_fraction(pct / 100.0)
-        parts = [f"{pct}%"]
+        btn = col.get("_btn")
+        if btn is not None:
+            btn.set_label(f"Installing {pct}%\u2026")
+        parts = []
         if received:
             parts.append(f"{received} / {total or received}")
         if speed:
@@ -1486,6 +1489,7 @@ class AddWallpapersDialog(Adw.Dialog):
             else:
                 btn.set_label("Download")
                 btn.set_icon_name("")
+        col.pop("_btn", None)
         badge = col.get("_badge")
         if badge is not None:
             badge.set_label("Installed")
