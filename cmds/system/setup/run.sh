@@ -67,7 +67,11 @@ run_postinstall() {
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${xdg_browser},filemanager=${FILEMANAGER_CHOICE:-nemo},image=loupe,video=mpv"
 
     retro wallpaper setup --needed -y -o "theme=retro"
-    retro wallpaper pull retro
+    if rx_confirm "Download the retro wallpaper collection?" "Y"; then
+        retro wallpaper pull retro
+    else
+        rx_log "info" "Skipping wallpaper collection download."
+    fi
     retro theme setup --needed -y
     retro theme mode dark
 
