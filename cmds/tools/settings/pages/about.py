@@ -23,7 +23,7 @@ import threading
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
-from gi.repository import Adw, GdkPixbuf, GLib, Gtk
+from gi.repository import Adw, GdkPixbuf, Gio, GLib, Gtk
 
 from settings.core.pending import PendingChange
 from settings.core.system_info import (
@@ -85,6 +85,8 @@ class AboutPage:
         self._mem_lbl: Gtk.Label | None = None
         self._stor_bar: Gtk.LevelBar | None = None
         self._stor_lbl: Gtk.Label | None = None
+        self._updates_count = -1
+        self._auto_checked = False
 
     # ── Build ──
 
@@ -112,6 +114,10 @@ class AboutPage:
             self._on_info_loaded(info)
         else:
             self._load_info_async()
+
+        if not self._auto_checked:
+            self._auto_checked = True
+            self._check_updates(interactive=False)
         return toolbar
 
     def _build_branding(self) -> Gtk.Widget:
@@ -431,62 +437,81 @@ class AboutPage:
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
 
-    def _check_updates(self) -> None:
+    def _check_updates(self, interactive: bool = True) -> None:
         if self._check_btn is None:
             return
-        self._check_btn.set_label("Checking…")
-        self._check_btn.set_sensitive(False)
+        if interactive:
+            self._check_btn.set_label("Checking…")
+            self._check_btn.set_sensitive(False)
 
         def worker():
             count = self._count_updates()
-            GLib.idle_add(self._on_updates_checked, count)
+            GLib.idle_add(self._on_updates_checked, count, interactive)
         threading.Thread(target=worker, daemon=True).start()
 
     @staticmethod
     def _count_updates() -> int:
-        from lib.python.variable import get_var as _g
+        """Count Retro Linux updates = commits behind the remote branch."""
+        repo = os.environ.get("RETRO_DIR", "/opt/retrolinux")
+        try:
+            branch = subprocess.run(
+                ["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=5,
+                stdin=subprocess.DEVNULL,
+            ).stdout.strip()
+        except Exception:
+            branch = ""
+        if not branch:
+            return -1
+        try:
+            r = subprocess.run(
+                ["git", "-C", repo, "fetch", "origin"],
+                capture_output=True, text=True, timeout=60,
+                stdin=subprocess.DEVNULL,
+            )
+        except Exception:
+            return -1
+        try:
+            out = subprocess.run(
+                ["git", "-C", repo, "rev-list", "--count", f"HEAD..origin/{branch}"],
+                capture_output=True, text=True, timeout=15,
+                stdin=subprocess.DEVNULL,
+            ).stdout.strip()
+            return int(out) if out.isdigit() else 0
+        except Exception:
+            return -1
 
-        helper = _g("PKG_HELPER", "yay")
-        for cmd in (
-            ["checkupdates"],
-            [helper, "-Qu"],
-        ):
-            try:
-                r = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=60,
-                    stdin=subprocess.DEVNULL,
-                )
-            except Exception:
-                continue
-            lines = [l for l in r.stdout.splitlines() if l.strip()]
-            if lines or r.returncode in (0, 1):
-                return len(lines)
-        return -1
-
-    def _on_updates_checked(self, count: int) -> None:
+    def _on_updates_checked(self, count: int, interactive: bool) -> None:
+        self._updates_count = count
         if self._check_btn is None:
             return
-        self._check_btn.set_label("Check Updates")
-        self._check_btn.set_sensitive(True)
-        if count < 0:
-            self._window.show_toast("Update check failed", timeout=5)
-            return
-        if count == 0:
-            self._window.show_toast("System is up to date")
-            return
-        self._window.show_toast(f"{count} update{'s' if count != 1 else ''} available")
+        if interactive:
+            self._check_btn.set_label("Check Updates")
+            self._check_btn.set_sensitive(True)
+            if count < 0:
+                self._window.show_toast("Update check failed", timeout=5)
+                return
+            if count == 0:
+                self._window.show_toast("System is up to date")
+                return
+            self._window.show_toast(f"{count} update{'s' if count != 1 else ''} available")
 
-        def run_update():
-            self._run_terminal("retro --update")
+            def run_update():
+                self._run_terminal("retro --update")
 
-        confirm(
-            self._window,
-            heading=f"{count} update{'s' if count != 1 else ''} available",
-            body="Would you like to update your system?",
-            label="Update",
-            on_confirm=run_update,
-            appearance=Adw.ResponseAppearance.SUGGESTED,
-        )
+            confirm(
+                self._window,
+                heading=f"{count} update{'s' if count != 1 else ''} available",
+                body="Would you like to update your system?",
+                label="Update",
+                on_confirm=run_update,
+                appearance=Adw.ResponseAppearance.SUGGESTED,
+            )
+        else:
+            if count > 0:
+                self._check_btn.set_label(
+                    f"{count} retro update{'s' if count != 1 else ''} available"
+                )
 
     @staticmethod
     def _run_terminal(command: str) -> None:
