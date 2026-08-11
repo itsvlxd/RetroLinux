@@ -39,11 +39,7 @@
 
 ## 🌴 What is RetroLinux
 
-RetroLinux is a **full Arch Linux distribution** with a curated retro-neon identity — but under the hood it's a modular framework you drive entirely from one command:
-
-```bash
-retro
-```
+RetroLinux is a **full Arch Linux distribution** with a curated retro-neon identity — but under the hood it's a modular framework you drive entirely from one command: retro
 
 One CLI to rule the desktop: **30+ tools** for audio, network, power, themes, wallpapers, GRUB, drivers, fonts, firewall, fingerprint, SSH, timeshift and more. A **GTK4 desktop GUI** (`retro settings`) for point-and-click config. A **QML shell** (RetroShell) that *is* your desktop. A **Lua event daemon** that reacts to battery, power, bluetooth, USB, audio, SSH and updates — live.
 
@@ -107,13 +103,6 @@ A look at the RetroLinux experience — the **RetroShell** desktop, the **Retro 
 
 Switch your entire look in one shot. Pick a palette, apply it, done.
 
-```bash
-retro theme list                     # browse 40+ curated themes
-retro theme set tokyo-night          # apply a palette everywhere
-retro wallpaper list                 # noir / retro / sunset packs
-retro wallpaper set "Retrowave Gtr Wallpaper"
-```
-
 <p align="center">
   <img alt="Retro" src="https://img.shields.io/badge/Retro-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nI2IyNGJmMycvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
   <img alt="Tokyo Night" src="https://img.shields.io/badge/Tokyo%20Night-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nIzdhYTJmNycvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
@@ -170,7 +159,7 @@ RetroLinux detects your hardware during install and picks the right drivers auto
 
 RetroLinux is installed from the **live ISO** — no manual Arch setup required.
 
-> **PLACEHOLDER:** Link to the latest ISO release + checksum. Boot it, and the installer runs automatically.
+Grab the latest ISO from the **[Releases page](https://github.com/itsvlxd/RetroLinux/releases)** — boot it, and the installer runs automatically.
 
 <details>
 <summary><b>📦 The install in 3 stages</b></summary>
