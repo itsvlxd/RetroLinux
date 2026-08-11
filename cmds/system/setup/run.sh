@@ -67,9 +67,12 @@ run_postinstall() {
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${xdg_browser},filemanager=${FILEMANAGER_CHOICE:-nemo},image=loupe,video=mpv"
 
     retro wallpaper setup --needed -y -o "theme=retro"
-    retro wallpaper sync
+    retro wallpaper pull retro
     retro theme setup --needed -y
     retro theme mode dark
+
+    bash "$RETRO_DIR/scripts/users_core.sh" --gen-face "$USER"
+    bash "$RETRO_DIR/scripts/theme_core.sh" --sddm-refresh
 
     sudo mkdir -p /root/.config
     for _dir in gtk-3.0 gtk-4.0 Kvantum qt5ct qt6ct; do

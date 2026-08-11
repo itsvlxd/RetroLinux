@@ -405,6 +405,7 @@ class UsersPage:
                 ["--set-face", username, path],
                 success=f"Profile picture set for {username}",
                 error=f"Failed to set profile picture for {username}",
+                reload_on_success=True,
             )
         self._window.show_toast("Select a picture to set as the avatar", timeout=3)
 
@@ -536,7 +537,8 @@ class UsersPage:
 
     def _run_privileged(self, args: list[str], *, success: str, error: str,
                         username: str | None = None,
-                        expect_present: bool | None = None) -> None:
+                        expect_present: bool | None = None,
+                        reload_on_success: bool = False) -> None:
         """Run a users_core action via pkexec in the background.
 
         No terminal is opened: pkexec shows a native password prompt, output
@@ -573,6 +575,8 @@ class UsersPage:
                             username, expect_present=expect_present
                         )
                     )
+                elif reload_on_success:
+                    GLib.idle_add(self._reload)
             else:
                 tail = "\n".join(out.strip().splitlines()[-8:])
                 GLib.idle_add(
