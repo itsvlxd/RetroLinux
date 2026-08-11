@@ -65,18 +65,18 @@ A look at the RetroLinux experience — the **RetroShell** desktop, the **Retro 
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-sddm-login.png" width="400" alt="SDDM login">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-settings.png" width="400" alt="Retro Settings">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-sddm-login.png" width="410" alt="SDDM login">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-settings.png" width="410" alt="Retro Settings">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-cli.png" width="400" alt="retro CLI">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-installer-iso.png" width="400" alt="Installer">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-cli.png" width="410" alt="retro CLI">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-installer-iso.png" width="410" alt="Installer">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retrolink-theme.png" width="400" alt="Retrolink GRUB theme">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retropunk-theme.png" width="400" alt="Retropunk GRUB theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retrolink-theme.png" width="410" alt="Retrolink GRUB theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retropunk-theme.png" width="410" alt="Retropunk GRUB theme">
 </p>
 
 <!-- SCREENSHOT PLAN:
@@ -124,18 +124,18 @@ retro wallpaper set "Retrowave Gtr Wallpaper"
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-theme-desktop.png" width="400" alt="Retro theme">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/tokyonight-theme-desktop.png" width="400" alt="Tokyo Night">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-theme-desktop.png" width="410" alt="Retro theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/tokyonight-theme-desktop.png" width="410" alt="Tokyo Night">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/gruvbox-theme-desktop.png" width="400" alt="Gruvbox">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/dracula-theme-desktop.png" width="400" alt="Dracula">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/gruvbox-theme-desktop.png" width="410" alt="Gruvbox">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/dracula-theme-desktop.png" width="410" alt="Dracula">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/nordic-theme-desktop.png" width="400" alt="Nordic">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/catppuccinmocha-theme-desktop.png" width="400" alt="Catppuccin Mocha">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/nordic-theme-desktop.png" width="410" alt="Nordic">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/catppuccinmocha-theme-desktop.png" width="410" alt="Catppuccin Mocha">
 </p>
 
 <sub>Palettes live in `themes/` as JSON — 43 and counting. Themes cascade across your terminal, shell, SDDM, GRUB and wallpapers.</sub>
