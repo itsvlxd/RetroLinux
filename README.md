@@ -2,7 +2,7 @@
 
 <p align="center" style="vertical-align: middle">
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="120" style="margin-right: 2px; vertical-align: middle">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-main-transparent-bg.png" alt="Logo" width="660" style="margin-right: 2px; vertical-align: middle">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-main-transparent-bg.png" alt="Logo" width="500" style="margin-right: 2px; vertical-align: middle">
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="120" style="vertical-align: middle">
 </p> 
 
@@ -65,18 +65,18 @@ A look at the RetroLinux experience — the **RetroShell** desktop, the **Retro 
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-sddm-login.png" width="320" alt="SDDM login">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-settings.png" width="320" alt="Retro Settings">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-sddm-login.png" width="340" alt="SDDM login">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-settings.png" width="340" alt="Retro Settings">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-cli.png" width="320" alt="retro CLI">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-installer-iso.png" width="320" alt="Installer">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-cli.png" width="340" alt="retro CLI">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-installer-iso.png" width="340" alt="Installer">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retrolink-theme.png" width="320" alt="Retrolink GRUB theme">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retropunk-theme.png" width="320" alt="Retropunk GRUB theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retrolink-theme.png" width="340" alt="Retrolink GRUB theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retropunk-theme.png" width="340" alt="Retropunk GRUB theme">
 </p>
 
 <!-- SCREENSHOT PLAN:
@@ -124,18 +124,18 @@ retro wallpaper set "Retrowave Gtr Wallpaper"
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-theme-desktop.png" width="320" alt="Retro theme">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/tokyonight-theme-desktop.png" width="320" alt="Tokyo Night">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-theme-desktop.png" width="340" alt="Retro theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/tokyonight-theme-desktop.png" width="340" alt="Tokyo Night">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/gruvbox-theme-desktop.png" width="320" alt="Gruvbox">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/dracula-theme-desktop.png" width="320" alt="Dracula">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/gruvbox-theme-desktop.png" width="340" alt="Gruvbox">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/dracula-theme-desktop.png" width="340" alt="Dracula">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/nordic-theme-desktop.png" width="320" alt="Nordic">
-  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/catppuccinmocha-theme-desktop.png" width="320" alt="Catppuccin Mocha">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/nordic-theme-desktop.png" width="340" alt="Nordic">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/catppuccinmocha-theme-desktop.png" width="340" alt="Catppuccin Mocha">
 </p>
 
 <sub>Palettes live in `themes/` as JSON — 43 and counting. Themes cascade across your terminal, shell, SDDM, GRUB and wallpapers.</sub>
