@@ -57,39 +57,34 @@ Built on a strict two-layer architecture (`cmds/` UI → `scripts/*_core.sh` log
 
 ## ⚡ Showcase
 
-<details>
-<summary><b>📸 Adding your own screenshots</b></summary>
-<br>
-Drop captures into <code>assets/screenshots/</code> and link them via
-<code>https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/&lt;name&gt;.png</code>.
-Keep grid images at a consistent width and crop to the same aspect ratio so rows line up.
-<br><br>
-Round the corners to match the existing shots (32px radius, transparent corners):
-<br>
-<code>magick shot.png \( -size 1920x1080 xc:black -fill white -draw "roundrectangle 0,0,1920,1080,32,32" \) -alpha off -compose CopyOpacity -composite assets/screenshots/shot.png</code>
-</details>
+A look at the RetroLinux experience — the **RetroShell** desktop, the **Retro Settings** GUI, the **retro CLI**, the **installer**, and the **GRUB** boot themes.
 
-<br>
-
-<!-- SCREENSHOT: assets/screenshots/desktop.png — full desktop (Hyprland + RetroShell), 16:9, width="1000" -->
+<!-- SCREENSHOT: assets/screenshots/retro-desktop.png — full desktop (Hyprland + RetroShell), width="980" -->
 <p align="center">
-  <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/desktop.png" width="1000" alt="RetroLinux desktop"></kbd>
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-desktop.png" width="980" alt="RetroLinux desktop">
 </p>
 
-| | | | |
-|:---:|:---:|:---:|:---:|
-| <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/sddm.png" width="420" alt="SDDM login"></kbd><br><sub>SDDM login</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/settings.png" width="420" alt="Retro Settings"></kbd><br><sub>Retro Settings</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/cli.png" width="420" alt="retro CLI"></kbd><br><sub>retro CLI</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/installer.png" width="420" alt="Installer"></kbd><br><sub>Installer TUI</sub> |
+<p align="center">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-sddm-login.png" width="420" alt="SDDM login">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-settings.png" width="420" alt="Retro Settings">
+</p>
 
-| | |
-|:---:|:---:|
-| <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retrolink-theme.png" width="420" alt="Retrolink GRUB theme"></kbd><br><sub>Retrolink</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retropunk-theme.png" width="420" alt="Retropunk GRUB theme"></kbd><br><sub>Retropunk</sub> |
+<p align="center">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-cli.png" width="420" alt="retro CLI">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-installer-iso.png" width="420" alt="Installer">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retrolink-theme.png" width="420" alt="Retrolink GRUB theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/grub-retropunk-theme.png" width="420" alt="Retropunk GRUB theme">
+</p>
 
 <!-- SCREENSHOT PLAN:
-1. desktop.png  — full Hyprland desktop with RetroShell bar + a theme/wallpaper applied (hero shot)
-2. sddm.png     — the SDDM login screen with the RetroLinux theme
-3. settings.png — the Retro Settings GUI (sidebar + a page open)
-4. cli.png      — a terminal running `retro` commands with the neon palette
-5. installer.png— the retroinstall TUI mid-install
+1. retro-desktop.png — full Hyprland desktop with RetroShell bar + a theme/wallpaper applied (hero shot)
+2. retro-sddm-login.png — the SDDM login screen with the RetroLinux theme
+3. retro-settings.png — the Retro Settings GUI (sidebar + a page open)
+4. retro-cli.png   — a terminal running `retro` commands with the neon palette
+5. retro-installer-iso.png — the retroinstall TUI (live ISO) mid-install
 6. grub-retrolink-theme.png  — the GRUB boot menu with the "Retrolink" theme applied
 7. grub-retropunk-theme.png — the GRUB boot menu with the "Retropunk" theme applied
 -->
@@ -108,16 +103,6 @@ Round the corners to match the existing shots (32px radius, transparent corners)
 
 ---
 
-## 🕹️ Control It Your Way
-
-| ⌨️ **retro CLI** | 🎛️ **Retro Settings GUI** | 🌴 **RetroShell** |
-|---|---|---|
-| 30+ commands from your terminal — themes, audio, network, power, GRUB, drivers and more. | A GTK4 + libadwaita desktop app with a page for every tool. Point, click, done. | The QML shell that *is* your desktop — bar, dock, launcher, notifications and a dashboard. |
-
-All three share the same config, so you can mix and match however you like.
-
----
-
 ## 🎨 Theming
 
 Switch your entire look in one shot. Pick a palette, apply it, done.
@@ -129,11 +114,26 @@ retro wallpaper list                 # noir / retro / sunset packs
 retro wallpaper set "Retrowave Gtr Wallpaper"
 ```
 
-| | | | |
-|:---:|:---:|:---:|:---:|
-| <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/theme-retro.png" width="330" alt="Retro theme"></kbd><br><sub>`retro`</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/theme-tokyo-night.png" width="330" alt="Tokyo Night"></kbd><br><sub>`tokyo-night`</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/theme-gruvbox.png" width="330" alt="Gruvbox"></kbd><br><sub>`gruvbox`</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/theme-dracula.png" width="330" alt="Dracula"></kbd><br><sub>`dracula`</sub> |
+<p align="center">
+  <img alt="Retro" src="https://img.shields.io/badge/Retro-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nI2IyNGJmMycvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
+  <img alt="Tokyo Night" src="https://img.shields.io/badge/Tokyo%20Night-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nIzdhYTJmNycvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
+  <img alt="Gruvbox" src="https://img.shields.io/badge/Gruvbox-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nI2Q3OTkyMScvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
+  <img alt="Dracula" src="https://img.shields.io/badge/Dracula-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nI2JkOTNmOScvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
+  <img alt="Nordic" src="https://img.shields.io/badge/Nordic-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nIzgxYTFjMScvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
+  <img alt="Catppuccin Mocha" src="https://img.shields.io/badge/Catppuccin%20Mocha-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nI2NiYTZmNycvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
+</p>
 
-<!-- SCREENSHOT: theme preview tiles — the palette applied to a terminal, width="330" -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/retro-theme-desktop.png" width="280" alt="Retro theme">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/tokyonight-theme-desktop.png" width="280" alt="Tokyo Night">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/gruvbox-theme-desktop.png" width="280" alt="Gruvbox">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/dracula-theme-desktop.png" width="280" alt="Dracula">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/nordic-theme-desktop.png" width="280" alt="Nordic">
+  <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/catppuccinmocha-theme-desktop.png" width="280" alt="Catppuccin Mocha">
+</p>
 
 <sub>Palettes live in `themes/` as JSON — 43 and counting. Themes cascade across your terminal, shell, SDDM, GRUB and wallpapers.</sub>
 
@@ -141,21 +141,7 @@ retro wallpaper set "Retrowave Gtr Wallpaper"
 
 ## 🖼️ Wallpapers
 
-Hand-tuned collections for every mood — swapped with one command, or left to auto-cycle through the daemon's slideshow.
-
-```bash
-retro wallpaper list              # noir · retro · sunset
-retro wallpaper set retro
-retro wallpaper slideshow on
-```
-
-| | | |
-|:---:|:---:|:---:|
-| <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/wallpaper-noir.png" width="330" alt="Noir collection"></kbd><br><sub>`noir`</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/wallpaper-retro.png" width="330" alt="Retro collection"></kbd><br><sub>`retro`</sub> | <kbd><img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/screenshots/wallpaper-sunset.png" width="330" alt="Sunset collection"></kbd><br><sub>`sunset`</sub> |
-
-<!-- SCREENSHOT: wallpaper pack tiles — one hero shot per collection (noir/retro/sunset), width="330" -->
-
-<sub>One hero shot per collection — drop them into `assets/screenshots/` and they'll show here.</sub>
+Wallpaper collections live in their own repo — check out **[github.com/itsvlxd/retrowallpapers](https://github.com/itsvlxd/retrowallpapers)**.
 
 ---
 
