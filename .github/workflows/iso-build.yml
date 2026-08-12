@@ -208,7 +208,8 @@ jobs:
           VERSION: ${{ steps.semantic.outputs.new_release_version }}
           KERNEL_VERSION: ${{ needs.build.outputs.kernel }}
         run: |
-          notes=$(gh release view "$VERSION" --repo "${{ github.repository }}" --json body -q .body)
+          RELEASE_TAG="v${VERSION}"
+          notes=$(gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json body -q .body)
           cat > stable_body.md << ENDOFFILE
           <p align="center">
             <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/main/assets/logo-main-transparent-bg.png" alt="RetroLinux" width="1200">
@@ -243,4 +244,4 @@ jobs:
 
           $notes
           ENDOFFILE
-          gh release edit "$VERSION" --repo "${{ github.repository }}" --notes-file stable_body.md
+          gh release edit "$RELEASE_TAG" --repo "${{ github.repository }}" --notes-file stable_body.md
