@@ -14,11 +14,14 @@
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
-    "@semantic-release/github",
-    {
-      "assets": [
-        { "path": "iso/out/*.iso", "label": "RetroLinux ISO" }
-      ]
-    }
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          { "path": "iso/out/*.iso", "label": "RetroLinux ISO" }
+        ],
+        "makeLatest": true
+      }
+    ]
   ]
 }

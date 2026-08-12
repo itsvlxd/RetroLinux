@@ -158,7 +158,7 @@ jobs:
           name: 'RetroLinux Nightly'
           body_path: release_body.md
           draft: false
-          prerelease: false
+          prerelease: true
           overwrite: true
           token: ${{ secrets.GH_TOKEN }}
         env:
