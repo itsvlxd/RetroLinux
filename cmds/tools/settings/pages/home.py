@@ -69,7 +69,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("fonts", "Fonts", "Interface and document fonts", FONTS_ICON),
     ("themes", "Themes", "GTK and application themes", THEMES_ICON),
     ("shell_theme", "Shell", "Shell styling and look", SHELL_THEME_ICON),
-    ("apps", "Applications", "Default applications", APPS_ICON),
+    ("apps", "Applications", "Customize app look (fonts, terminals) \u2014 not default apps", APPS_ICON),
     # Shell
     ("shell_bar", "Bar", "Top bar layout and modules", BAR_ICON),
     ("shell_notch", "Notch", "Notch look and behaviour", NOTCH_ICON),
@@ -107,6 +107,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("grub", "Bootloader", "Boot entries and kernel options", GRUB_ICON),
     ("driver", "Drivers", "Hardware drivers", DRIVER_ICON),
     ("daemon", "Daemon", "Retro background services", DAEMON_ICON),
+    ("xdg", "Default Apps", "Default apps, MIME types and directories", APPS_ICON),
     ("backups", "Backups", "Timeshift system snapshots", TIMESHIFT_ICON),
     # Advanced
     ("keyring", "Keyring", "Passwords and secrets", KEYRING_ICON),

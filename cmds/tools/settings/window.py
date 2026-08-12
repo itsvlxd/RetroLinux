@@ -60,6 +60,7 @@ if TYPE_CHECKING:
     from settings.pages.wallpapers import WallpapersPage
     from settings.pages.window_rules import WindowRulesPage
     from settings.pages.workspaces import WorkspacesPage
+    from settings.pages.xdg import XdgPage
 from settings.ui import (
     KeyboardLayoutsOptionRow,
     OptionRow,
@@ -488,6 +489,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.wallpapers import WallpapersPage
         from settings.pages.window_rules import WindowRulesPage
         from settings.pages.workspaces import WorkspacesPage
+        from settings.pages.xdg import XdgPage
         _bt0 = time.monotonic()
         self._page_titles: dict[str, str] = {}
         groups = schema.get_groups(self._schema)
@@ -597,6 +599,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
             (UsersPage, "_users_page", "users", "Users"),
             (SettingsPage, "_settings_page", "settings", "Settings"),
+            (XdgPage, "_xdg_page", "xdg", "Default Apps"),
         ]
         import os
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
@@ -1275,6 +1278,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.themes import ThemesPage
         from settings.pages.users import UsersPage
         from settings.pages.wallpapers import WallpapersPage
+        from settings.pages.xdg import XdgPage
         cls, attr, title = self._lazy_standalone_specs.pop(slug)
         page = cls(self)
         setattr(self, attr, page)
@@ -1393,6 +1397,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is SettingsPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is XdgPage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

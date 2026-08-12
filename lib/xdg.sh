@@ -162,13 +162,40 @@ rx_xdg_set_default() {
         echo "[Default Applications]" >"$XDG_MIMEAPPS_FILE"
     fi
 
-    if grep -q "^\[$mime\]" "$XDG_MIMEAPPS_FILE" 2>/dev/null; then
-        sed -i "s|^${mime}=.*|${mime}=${desktop_file}|" "$XDG_MIMEAPPS_FILE"
-    elif grep -q "^\[Default Applications\]" "$XDG_MIMEAPPS_FILE" 2>/dev/null; then
-        sed -i "/^\[Default Applications\]/a ${mime}=${desktop_file}" "$XDG_MIMEAPPS_FILE"
-    else
-        echo -e "\n[Default Applications]\n${mime}=${desktop_file}" >>"$XDG_MIMEAPPS_FILE"
+    if ! grep -q '^\[Default Applications\]' "$XDG_MIMEAPPS_FILE" 2>/dev/null; then
+        printf "\n[Default Applications]\n" >>"$XDG_MIMEAPPS_FILE"
     fi
+
+    # Rewrite the [Default Applications] section, replacing any existing
+    # entry for $mime (instead of appending a duplicate) or adding one if
+    # the mime isn't listed yet.
+    local tmp
+    tmp=$(mktemp)
+    local in_section=false replaced=false
+    while IFS= read -r line || [[ -n $line ]]; do
+        if [[ $line =~ ^\[ ]]; then
+            in_section=false
+            [[ $line == "[Default Applications]" ]] && in_section=true
+        fi
+        if $in_section && [[ $line == "$mime="* ]]; then
+            echo "${mime}=${desktop_file}"
+            replaced=true
+        else
+            echo "$line"
+        fi
+    done <"$XDG_MIMEAPPS_FILE" >"$tmp"
+
+    if [[ $replaced != true ]]; then
+        local tmp2
+        tmp2=$(mktemp)
+        awk -v entry="${mime}=${desktop_file}" '
+            /^\[Default Applications\]/ { print; print entry; in_section=1; inserted=1; next }
+            { print }
+        ' "$tmp" >"$tmp2"
+        mv "$tmp2" "$tmp"
+    fi
+
+    mv "$tmp" "$XDG_MIMEAPPS_FILE"
 
     update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
     rx_xdg_bridge_flatpak >/dev/null 2>&1
