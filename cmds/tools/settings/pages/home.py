@@ -69,7 +69,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("fonts", "Fonts", "Interface and document fonts", FONTS_ICON),
     ("themes", "Themes", "GTK and application themes", THEMES_ICON),
     ("shell_theme", "Shell", "Shell styling and look", SHELL_THEME_ICON),
-    ("apps", "Applications", "Customize app look (fonts, terminals) \u2014 not default apps", APPS_ICON),
+    ("apps", "Applications", "Customize app look", APPS_ICON),
     # Shell
     ("shell_bar", "Bar", "Top bar layout and modules", BAR_ICON),
     ("shell_notch", "Notch", "Notch look and behaviour", NOTCH_ICON),
