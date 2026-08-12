@@ -289,11 +289,46 @@ setup_smartctl_sudoers() {
     fi
 }
 
+patch_os_release() {
+    local src="$RETRO_DIR/iso/profile/airootfs/etc/os-release"
+    local dst="/etc/os-release"
+
+    if [[ ! -f $src ]]; then
+        rx_log "info" "os-release template not found; skipping"
+        return 0
+    fi
+
+    if sudo cp -f "$src" "$dst"; then
+        rx_log "success" "Applied Retro Linux os-release"
+    else
+        rx_log "warn" "Failed to write $dst — keeping existing os-release"
+    fi
+}
+
+setup_nopasswd_tools() {
+    # Any user can run these three tools passwordless. They're invoked
+    # non-interactively in the background (settings sysinfo, disk health,
+    # papirus theme recolor) — without NOPASSWD they trip pam_faillock.
+    local smartctl_path
+    smartctl_path="$(command -v smartctl 2>/dev/null || echo /usr/bin/smartctl)"
+
+    sudo rm -f /etc/sudoers.d/99-retro-tools
+    cat <<EOF | sudo tee /etc/sudoers.d/99-retro-tools >/dev/null
+ALL ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/system_core.sh
+ALL ALL=(ALL) NOPASSWD: ${smartctl_path}
+ALL ALL=(ALL) NOPASSWD: /usr/bin/papirus-folders
+EOF
+    sudo chmod 440 /etc/sudoers.d/99-retro-tools
+    rx_log "success" "Sudoers rule added for retro background tools"
+}
+
 if [[ $SECONDARY_INSTALL != "true" ]]; then
     install_settings_desktop
     setup_theme_sudoers
     setup_sddm_sudoers
     setup_smartctl_sudoers
+    setup_nopasswd_tools
+    patch_os_release
 
     SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"
     if [[ -f $SYSTEM_SCRIPT ]]; then
