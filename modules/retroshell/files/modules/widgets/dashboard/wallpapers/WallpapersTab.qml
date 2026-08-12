@@ -1184,31 +1184,71 @@ FocusScope {
         }
     }
 
-    // Componentes de imagen optimizados y reutilizables
+    // Componentes de imagen optimizados y reutilizables.
+    // Siempre muestra algo util por celda: thumbnail si existe, el original si
+    // falta/nunca se genero el frame, o un overlay LIVE/N/A para videos/faltantes.
     Component {
         id: staticImageComponent
         Image {
+            id: thumbImage
             mipmap: true
-            source: {
-                if (!parent.sourceFile || !GlobalStates.wallpaperManager)
-                    return "";
 
-                // Usar SOLAMENTE thumbnail, nunca el original (muy pesado)
-                var thumbnailPath = GlobalStates.wallpaperManager.getThumbnailPath(parent.sourceFile);
+            property string sourceFile: parent && parent.sourceFile ? parent.sourceFile : ""
+            property string fileType: sourceFile && GlobalStates.wallpaperManager ? GlobalStates.wallpaperManager.getFileType(sourceFile) : "image"
+            property bool usingOriginal: false
+
+            function thumbnailSource() {
+                if (!sourceFile || !GlobalStates.wallpaperManager)
+                    return "";
+                var thumbnailPath = GlobalStates.wallpaperManager.getThumbnailPath(sourceFile);
                 var version = GlobalStates.wallpaperManager.thumbnailsVersion;
                 return "file://" + thumbnailPath + "?v=" + version;
             }
+
+            source: usingOriginal && fileType !== "video" ? "file://" + sourceFile : thumbnailSource()
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             smooth: true
-            cache: false // Deshabilitar cache para reducir uso de RAM
-            sourceSize.width: wallpaperGridContainer.cellSize
-            sourceSize.height: wallpaperGridContainer.cellSize
+            cache: false // Disable caching to reduce memory usage
+            sourceSize.width: wallpaperGridContainer.cellSize * Screen.devicePixelRatio
+            sourceSize.height: wallpaperGridContainer.cellSize * Screen.devicePixelRatio
 
-            // No hay fallback al original para evitar carga excesiva
+            // Reset fallback when this (possibly reused) cell points at another file
+            onSourceFileChanged: usingOriginal = false
+
             onStatusChanged: {
-                if (status === Image.Error) {
-                    // console.log("Thumbnail not ready yet for:", parent.sourceFile);
+                if (status === Image.Error && !usingOriginal && fileType !== "video") {
+                    // Frame missing/broken -> show the original instead, never a blank cell
+                    usingOriginal = true;
+                }
+            }
+
+            // Overlay for cells with no usable frame (videos, missing originals)
+            Rectangle {
+                anchors.fill: parent
+                visible: thumbImage.status === Image.Error
+                color: Colors.surface
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: thumbImage.fileType === "video" ? Icons.play : Icons.image
+                        font.family: Icons.font
+                        font.pixelSize: 22
+                        color: Colors.overSurfaceVariant
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: thumbImage.fileType === "video" ? "LIVE" : "N/A"
+                        font.family: Config.theme.font
+                        font.pixelSize: Config.theme.fontSize
+                        font.weight: Font.Bold
+                        color: Colors.overSurfaceVariant
+                    }
                 }
             }
         }

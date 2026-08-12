@@ -10,7 +10,7 @@ Item {
     visible: false
 
     property string wallpaperDir: wallpaperConfig.adapter.wallPath
-    property string fallbackDir: Quickshell.env("HOME") + "/.config/retro/wallpapers/retro"
+    property string fallbackDir: Quickshell.env("HOME") + "/.config/retro/wallpapers"
     property var wallpaperPaths: []
     property var subfolderFilters: []
     property var allSubdirs: []
@@ -76,6 +76,20 @@ Item {
         if (activeColorPreset) {
             applyColorPreset();
         } else {
+        }
+    }
+
+    // Root the wallpaper scan at the collection root (~/.config/retro/wallpapers) so every
+    // collection is shown. Migrates persisted values that point into a single collection dir.
+    function ensureRootWallpath() {
+        var root = Quickshell.env("HOME") + "/.config/retro/wallpapers";
+        var storedPath = wallpaperConfig.adapter.wallPath;
+        if (!storedPath) {
+            console.log("Setting wallPath to wallpapers root:", fallbackDir);
+            wallpaperConfig.adapter.wallPath = fallbackDir;
+        } else if (storedPath !== root && storedPath.indexOf(root + "/") === 0) {
+            console.log("Migrating wallPath from collection dir to root:", storedPath);
+            wallpaperConfig.adapter.wallPath = root;
         }
     }
 
@@ -346,16 +360,12 @@ Item {
         watchChanges: true
 
         onLoaded: {
-            if (!wallpaperConfig.adapter.wallPath) {
-                console.log("Setting wallPath to retro collection:", fallbackDir);
-                wallpaperConfig.adapter.wallPath = fallbackDir;
-            }
+            ensureRootWallpath();
         }
 
         onFileChanged: reload()
         onAdapterUpdated: {
-            if (!wallpaperConfig.adapter.wallPath)
-                wallpaperConfig.adapter.wallPath = fallbackDir;
+            ensureRootWallpath();
             writeAdapter();
         }
 

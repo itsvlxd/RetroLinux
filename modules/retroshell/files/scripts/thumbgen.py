@@ -22,6 +22,9 @@ GIF_EXTENSIONS = {".gif"}
 # Default thumbnail size
 THUMBNAIL_SIZE = "140x140"
 
+# Frame/thumbnail cache directory, must match modules/retroshell Wallpaper.qml getThumbnailPath()
+FRAME_CACHE = Path.home() / ".config" / "retro" / "wallpaper_frames"
+
 
 class ThumbnailGenerator:
     def __init__(
@@ -66,8 +69,18 @@ class ThumbnailGenerator:
                 print(f"ERROR: Wallpaper directory not found: {self.wall_path}")
                 return False
 
-            # Setup thumbnails directory using provided cache base
-            self.thumbnails_dir = self.cache_base_path / "thumbnails"
+            # If the persisted wallPath points into a single collection dir (old
+            # config), scan the wallpapers root so every collection is covered.
+            # This mirrors the ensureRootWallpath() migration in Wallpaper.qml.
+            wp_root = Path.home() / ".config" / "retro" / "wallpapers"
+            if wp_root != self.wall_path and str(self.wall_path).startswith(str(wp_root) + "/"):
+                print(
+                    f"ℹ️  wallPath points into a collection dir, scanning root: {wp_root}"
+                )
+                self.wall_path = wp_root
+
+            # Setup thumbnails directory using the flat frame cache
+            self.thumbnails_dir = FRAME_CACHE
             self.thumbnails_dir.mkdir(parents=True, exist_ok=True)
 
             print(f"✓ Config loaded: {self.wall_path}")
@@ -114,23 +127,14 @@ class ThumbnailGenerator:
             return []
 
     def get_thumbnail_path(self, file_path: Path) -> Path:
-        """Get thumbnail path for a media file in the proxy structure."""
-        if self.wall_path is None or self.thumbnails_dir is None:
+        """Get thumbnail path matching the Wallpaper.qml getThumbnailPath() layout."""
+        if self.thumbnails_dir is None:
             raise RuntimeError("Paths not initialized")
 
-        # Get relative path from wall_path
-        try:
-            relative_path = file_path.relative_to(self.wall_path)
-        except ValueError:
-            raise ValueError(f"File {file_path} is not within {self.wall_path}")
+        # Flat cache keyed by full basename, with .png extension (same as wallpaper_frames)
+        thumbnail_name = file_path.name + ".png"
 
-        # Create thumbnail name with .jpg extension
-        thumbnail_name = file_path.name + ".jpg"
-
-        # Build the proxy path
-        thumbnail_path = self.thumbnails_dir / relative_path.parent / thumbnail_name
-
-        return thumbnail_path
+        return self.thumbnails_dir / thumbnail_name
 
     def needs_thumbnail(self, file_path: Path) -> bool:
         """Check if file needs thumbnail generation."""
@@ -148,13 +152,24 @@ class ThumbnailGenerator:
         except:
             return True
 
+    def _prepare_thumbnail(self, thumbnail_path: Path) -> None:
+        """Make sure a thumbnail file can be written safely.
+
+        lib/wallpaper.sh (rx_wallpaper_generate_cache) creates symlinks in the
+        same FRAME_CACHE dir for images/gifs. Writing through such a symlink
+        would follow it and overwrite the ORIGINAL wallpaper, so unlink it first.
+        """
+        if thumbnail_path.is_symlink():
+            thumbnail_path.unlink()
+        thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+
     def generate_video_thumbnail(self, video_path: Path) -> Tuple[bool, str]:
         """Generate thumbnail for a video file using FFmpeg."""
         thumbnail_path = self.get_thumbnail_path(video_path)
 
         try:
             # Ensure parent directory exists
-            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            self._prepare_thumbnail(thumbnail_path)
 
             # FFmpeg command for high-quality thumbnail
             cmd = [
@@ -200,7 +215,7 @@ class ThumbnailGenerator:
 
         try:
             # Ensure parent directory exists
-            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            self._prepare_thumbnail(thumbnail_path)
 
             # ImageMagick command for high-quality thumbnail
             cmd = [
@@ -242,7 +257,7 @@ class ThumbnailGenerator:
 
         try:
             # Ensure parent directory exists
-            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            self._prepare_thumbnail(thumbnail_path)
 
             # FFmpeg command to extract first frame from GIF
             cmd = [
