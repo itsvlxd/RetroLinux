@@ -115,7 +115,7 @@ jobs:
         run: |
           cat > release_body.md << ENDOFFILE
           <p align="center">
-            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/nightly-build-logo.png" alt="RetroLinux" width="1200">
+            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/retrolinux-simple-nightly-logo.png" alt="RetroLinux" width="1200">
           </p>
 
           <p align="center">
@@ -212,7 +212,7 @@ jobs:
           notes=$(gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json body -q .body)
           cat > stable_body.md << ENDOFFILE
           <p align="center">
-            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/main/assets/logo-main-transparent-bg.png" alt="RetroLinux" width="1200">
+            <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/main/assets/retrolinux-simple-logo.png" alt="RetroLinux" width="1200">
           </p>
 
           <p align="center">
