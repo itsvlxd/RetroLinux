@@ -146,6 +146,35 @@ row.spin spinbutton > text {
     margin: 4px 12px;
 }
 
+/* Sidebar navigation icons — theme accent color */
+.nav-icon {
+    color: @accent_color;
+}
+row:selected .nav-icon,
+.navigation-sidebar row:selected .nav-icon {
+    color: @accent_fg_color;
+}
+
+/* Selected sidebar row — accent background instead of the default gray */
+.navigation-sidebar row:selected {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+}
+.navigation-sidebar row:selected .title {
+    color: @accent_fg_color;
+}
+
+/* Sidebar row hover: tint the background, accent the icon + text foreground */
+.navigation-sidebar row:hover:not(:selected) {
+    background-color: alpha(@accent_bg_color, 0.08);
+}
+.navigation-sidebar row:hover:not(:selected) .title {
+    color: @accent_color;
+}
+.navigation-sidebar row:hover:not(:selected) .nav-icon {
+    color: @accent_color;
+}
+
 /* Sidebar pending-changes badge */
 .sidebar-badge {
     background-color: alpha(@warning_bg_color, 0.25);
@@ -156,6 +185,30 @@ row.spin spinbutton > text {
     font-weight: 700;
     min-height: 18px;
     min-width: 18px;
+}
+
+/* On a selected (accent-bg) row, keep the badge readable — black fill */
+.navigation-sidebar row:selected .sidebar-badge {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+/* Fonts-count badge on the sidebar row: on the selected (accent) row the
+   default translucent badge disappears — give it a solid dark fill. */
+.navigation-sidebar row:selected .badge {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+/* Disk / battery progress bars in the sidebar: on the selected (accent) row
+   the default colored fill disappears — recolor the filled blocks dark so
+   the level stays readable. */
+.navigation-sidebar row:selected levelbar > trough > block:not(.empty),
+.navigation-sidebar row:selected levelbar > trough > block.low,
+.navigation-sidebar row:selected levelbar > trough > block.high,
+.navigation-sidebar row:selected levelbar > trough > block.full {
+    background-color: #000000;
+    border-color: #000000;
 }
 
 /* Pending-changes chip in page headers — replaces the sidebar pending row.

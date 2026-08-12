@@ -70,6 +70,13 @@ class SidebarRow(Adw.ActionRow):
             self._badge.set_visible(False)
 
 
+def _nav_icon(name: str) -> Gtk.Image:
+    """Sidebar icon image — styled pink via the ``nav-icon`` CSS class."""
+    img = Gtk.Image.new_from_icon_name(name)
+    img.add_css_class("nav-icon")
+    return img
+
+
 class Sidebar:
     """Builds and manages the sidebar navigation pane.
 
@@ -150,25 +157,25 @@ class Sidebar:
 
         # Pinned utility below the scrolled area: Settings.
         self._pinned_list = Gtk.ListBox()
-        self._pinned_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._pinned_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self._pinned_list.add_css_class("navigation-sidebar")
-        self._pinned_list.connect("row-activated", self._on_row_activated)
+        self._pinned_list.connect("row-selected", self._on_row_selected)
 
         about_row = SidebarRow(group_id="about", title="About")
         about_row.set_activatable(True)
-        about_row.add_prefix(Gtk.Image.new_from_icon_name(ABOUT_ICON))
+        about_row.add_prefix(_nav_icon(ABOUT_ICON))
         self._pinned_list.append(about_row)
         self._rows_by_id["about"] = about_row
 
         changelog_row = SidebarRow(group_id="changelog", title="Changelog")
         changelog_row.set_activatable(True)
-        changelog_row.add_prefix(Gtk.Image.new_from_icon_name(LOGS_ICON))
+        changelog_row.add_prefix(_nav_icon(LOGS_ICON))
         self._pinned_list.append(changelog_row)
         self._rows_by_id["changelog"] = changelog_row
 
         settings_row = SidebarRow(group_id="settings", title="Settings")
         settings_row.set_activatable(True)
-        settings_row.add_prefix(Gtk.Image.new_from_icon_name(SETTINGS_ICON))
+        settings_row.add_prefix(_nav_icon(SETTINGS_ICON))
         self._pinned_list.append(settings_row)
         self._rows_by_id["settings"] = settings_row
 
@@ -210,7 +217,7 @@ class Sidebar:
             row = SidebarRow(group_id=group_id, title=label)
             row.set_activatable(True)
             if icon:
-                row.add_prefix(Gtk.Image.new_from_icon_name(icon))
+                row.add_prefix(_nav_icon(icon))
             listbox.append(row)
             self._rows_by_id[group_id] = row
 
@@ -293,6 +300,9 @@ class Sidebar:
         add_schema_row(advanced, "ecosystem")
         add_row(advanced, "misc", "Miscellaneous", MISC_ICON)
 
+    def _all_lists(self) -> list[Gtk.ListBox]:
+        return [*self._lists, self._pinned_list]
+
     def select_first(self) -> None:
         """Select the first row in the first list."""
         if self._lists:
@@ -310,12 +320,12 @@ class Sidebar:
 
     def deselect_all(self) -> None:
         """Deselect all rows in all sidebar lists."""
-        for sl in self._lists:
+        for sl in self._all_lists():
             sl.unselect_all()
 
     def get_selected_group_id(self) -> str | None:
         """Return the group_id of the currently selected row, if any."""
-        for sl in self._lists:
+        for sl in self._all_lists():
             row = sl.get_selected_row()
             if isinstance(row, SidebarRow):
                 return row.group_id
@@ -363,7 +373,7 @@ class Sidebar:
     def _on_row_selected(self, listbox, row):
         if isinstance(row, SidebarRow):
             self._on_page_selected(row.group_id)
-            for other in self._lists:
+            for other in self._all_lists():
                 if other is not listbox:
                     other.unselect_all()
 

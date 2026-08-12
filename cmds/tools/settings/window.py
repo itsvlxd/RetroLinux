@@ -94,6 +94,7 @@ CSS_PATH = settings_pkg_dir() / "style.css"
 class RetroSettingsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         self._target_page = kwargs.pop("target_page", None)
+        self._nav_ready = False
         super().__init__(**kwargs)
 
         self.set_title("Retro Settings")
@@ -351,11 +352,20 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         # sidebar entry; show it without highlighting any navigation row.
         self.show_page("home")
         self._sidebar.deselect_all()
+        # ListBoxes auto-select their first row when the window is realized
+        # (at present()); ignore those synthetic selections so the startup
+        # navigation to Home isn't overridden by whichever row GTK picks.
+        self._nav_ready = False
+        GLib.idle_add(self._set_nav_ready)
         _bt4 = time.monotonic()
         print(f'[TIMING]   finalize={_bt4-_bt3:.3f}s', file=__import__('sys').stderr)
 
         GLib.timeout_add(100, self._eager_all_sidebars)
         self._preload_about_info()
+
+    def _set_nav_ready(self) -> None:
+        self._nav_ready = True
+        return False
 
     def _preload_about_info(self):
         """Start collecting About-page specs in the background at startup."""
@@ -1470,6 +1480,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._layouts_page.focus_layout_for_option(option_key)
 
     def _on_sidebar_selected(self, group_id: str):
+        if not getattr(self, "_nav_ready", False):
+            return
         self.show_page(group_id)
 
     # -- Option changes --
