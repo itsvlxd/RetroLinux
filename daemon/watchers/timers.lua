@@ -16,7 +16,7 @@ return {
 
 			local pkg_min = tonumber(Watcher.get_var("RETRO_PKG_UPDATE_MIN", "120")) or 120
 			local pkg_interval = pkg_min * 60
-			local retro_min = tonumber(Watcher.get_var("RETRO_UPDATE_CHECK_MIN", "1")) or 1
+			local retro_min = tonumber(Watcher.get_var("RETRO_UPDATE_CHECK_MIN", "60")) or 60
 			local retro_interval = retro_min * 60
 
 			if last_pkg_check == 0 then
