@@ -18,7 +18,7 @@
       "@semantic-release/github",
       {
         "assets": [
-          { "path": "iso/out/*.iso", "label": "RetroLinux ISO" }
+          { "path": "iso/out/*.iso" }
         ],
         "makeLatest": true
       }
