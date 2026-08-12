@@ -680,7 +680,7 @@ remove_snapshot_entry() {
 
 _grub_ensure_kernel() {
     local kernel="$1"
-    [[ -z $kernel || $kernel == "linux" ]] && return 0
+    [[ -z $kernel ]] && return 0
 
     local img="/boot/vmlinuz-${kernel}"
     local initrd="/boot/initramfs-${kernel}.img"
