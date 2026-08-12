@@ -56,12 +56,12 @@ papirus-folders
 papirus-icon-theme
 
 # Auth
+songrec
 fprintd
 seahorse
 libsecret
 polkit-gnome
 gnome-keyring
-rbw
 
 # Disk
 smartmontools
