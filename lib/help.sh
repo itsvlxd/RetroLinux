@@ -158,7 +158,10 @@ rx_confirm() {
         rx_log "info" "${message} ${PINK}[y/N]${RESET}: "
     fi
 
-    read -r confirm
+    if ! read -r confirm; then
+        return 1
+    fi
+
     [[ -z $confirm ]] && confirm="$default"
 
     if [[ $confirm =~ ^[Yy]$ ]]; then
