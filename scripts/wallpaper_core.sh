@@ -613,6 +613,16 @@ case "$1" in
             fi
         done < <(rx_wallpaper_list_files)
         ;;
+    "--cache-collection")
+        col_name="$2"
+        [[ -z $col_name || $col_name == "all" ]] && { echo "result=error|missing_collection"; exit 1; }
+        mkdir -p "$FRAME_CACHE"
+        while IFS= read -r f; do
+            [[ -z $f ]] && continue
+            rx_wallpaper_generate_cache "$f" >/dev/null
+        done < <(rx_wallpaper_list_files "$col_name")
+        echo "result=ok"
+        ;;
     "--restore") restore_wallpaper "${2:-false}" ;;
     "--static") static_wallpaper "$2" ;;
     "--pause") pause_wallpaper ;;

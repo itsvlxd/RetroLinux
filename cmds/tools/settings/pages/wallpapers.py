@@ -1511,12 +1511,31 @@ class AddWallpapersDialog(Adw.Dialog):
                     f"Downloaded {n} wallpaper(s) into {col.get('display', col['name'])}"
                 )
                 self._window.show_toast(f"Downloaded collection: {col.get('display', col['name'])}", timeout=2)
+                self._build_collection_cache(col)
             self._load_installed()
             self._load_remote()
             self.emit("collections-changed")
         else:
             self._status_label.set_label(f"Failed to download {col.get('display', col['name'])}")
             self._window.show_toast(f"Failed to download {col.get('display', col['name'])}", timeout=3)
+
+    def _build_collection_cache(self, col: dict) -> None:
+        self._status_label.set_label(f"Building cache for {col.get('display', col['name'])}\u2026")
+
+        def worker():
+            subprocess.run(
+                ["bash", str(WALLPAPER_CORE), "--cache-collection", col["name"]],
+                capture_output=True, text=True, timeout=600,
+            )
+            GLib.idle_add(self._on_cache_built, col)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_cache_built(self, col: dict) -> None:
+        self._status_label.set_label(
+            f"Downloaded {col.get('display', col['name'])} \u2014 cache ready"
+        )
+        self._window.show_toast(f"Cache built for {col.get('display', col['name'])}", timeout=2)
 
     def _on_delete_local(self, col: dict) -> None:
         dialog = Adw.AlertDialog(
