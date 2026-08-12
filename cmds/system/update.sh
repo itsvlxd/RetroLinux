@@ -172,8 +172,9 @@ cmd_update() {
         $RETRO_DIR/retro.sh $install_mode $target -a root $type_filter -y
         $RETRO_DIR/retro.sh $install_mode $target -a user $type_filter -y
 
-        rx_log "info" "Syncing wallpapers from repository..."
-        $RETRO_DIR/retro.sh wallpaper sync >/dev/null 2>&1
+        rx_log "info" "Refreshing installed wallpaper collections..."
+        $RETRO_DIR/retro.sh wallpaper sync >/dev/null 2>&1 &
+        wait $! 2>/dev/null || true
 
         if [[ -n $commits ]]; then
             local -A setup_modules
