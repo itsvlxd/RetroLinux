@@ -159,11 +159,11 @@ RetroLinux detects your hardware during install and picks the right drivers auto
 
 RetroLinux is installed from the **live ISO** — no manual Arch setup required.
 
+### Download
+
 Grab the latest ISO from the **[Releases page](https://github.com/itsvlxd/RetroLinux/releases)** — boot it, and the installer runs automatically.
 
-<details>
-<summary><b>📦 The install in 3 stages</b></summary>
-<br>
+### The install in 3 stages
 
 | Stage | When | What |
 |-------|------|------|
@@ -171,25 +171,14 @@ Grab the latest ISO from the **[Releases page](https://github.com/itsvlxd/RetroL
 | **2 · Chroot** | Right after `archinstall` | Post-install hooks configure the repo, packages, network and AUR helper in the target system |
 | **3 · First boot** | Your first login | Post-install setup applies modules, wallpaper, drivers and keyring automatically |
 
-</details>
-
 ---
 
 ## 🧰 The `retro` Command
 
 ```bash
-retro help                    # every command, grouped
-retro audio status            # sinks, sources, volume
-retro network wifi on wlan0   # connect
-retro power profile balanced  # switch power profiles
-retro grub setup              # bootloader, theme, timeout, kernels
-retro shell run launcher      # pop the RetroShell launcher
-retro settings                # launch the Retro Settings GUI
-retro daemon status           # is the event engine running?
-retro log status              # what has been happening?
+retro help          # every command, grouped
+retro settings      # launch the Retro Settings GUI
 ```
-
-<sub>Frontends live in `cmds/`, backend logic in `scripts/*_core.sh` — see `CODING_GUIDELINES.md` for the full architecture.</sub>
 
 ---
 
