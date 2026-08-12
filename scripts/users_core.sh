@@ -66,8 +66,6 @@ _fix_ownership() {
 
     chown -R "$target_user:$(id -gn "$target_user")" "$target_home" 2>/dev/null
 
-    # Make the avatar and retro config readable by other users (e.g. the
-    # settings app running as the primary user), and the home traversable.
     chmod 644 "$target_home/.face" "$target_home/.face.icon" 2>/dev/null
     chmod o+x "$target_home" 2>/dev/null
     chmod 755 "$target_home/.config/retro" 2>/dev/null
@@ -223,8 +221,6 @@ _run_post_setup() {
         RETRO_DIR="$RETRO_DIR" \
         RETRO_SETUP=true \
         RETRO_SECONDARY_INSTALL=true \
-        USER="$target_user" \
-        LOGNAME="$target_user" \
         "$RETRO_DIR/retro.sh" wallpaper static true
 
     env HOME="$target_home" \
@@ -232,8 +228,6 @@ _run_post_setup() {
         RETRO_DIR="$RETRO_DIR" \
         RETRO_SETUP=true \
         RETRO_SECONDARY_INSTALL=true \
-        USER="$target_user" \
-        LOGNAME="$target_user" \
         "$RETRO_DIR/retro.sh" wallpaper set "Retrowave Gtr Wallpaper"
 
     env HOME="$target_home" \
@@ -241,8 +235,6 @@ _run_post_setup() {
         RETRO_DIR="$RETRO_DIR" \
         RETRO_SETUP=true \
         RETRO_SECONDARY_INSTALL=true \
-        USER="$target_user" \
-        LOGNAME="$target_user" \
         "$RETRO_DIR/retro.sh" wallpaper setup --needed -y -o "theme=retro"
 
     env HOME="$target_home" \
@@ -250,8 +242,6 @@ _run_post_setup() {
         RETRO_DIR="$RETRO_DIR" \
         RETRO_SETUP=true \
         RETRO_SECONDARY_INSTALL=true \
-        USER="$target_user" \
-        LOGNAME="$target_user" \
         "$RETRO_DIR/retro.sh" theme setup --needed -y
 
     env HOME="$target_home" \
@@ -259,8 +249,6 @@ _run_post_setup() {
         RETRO_DIR="$RETRO_DIR" \
         RETRO_SETUP=true \
         RETRO_SECONDARY_INSTALL=true \
-        USER="$target_user" \
-        LOGNAME="$target_user" \
         "$RETRO_DIR/retro.sh" theme mode dark
 
     env HOME="$target_home" \
@@ -268,8 +256,6 @@ _run_post_setup() {
         RETRO_DIR="$RETRO_DIR" \
         RETRO_SETUP=true \
         RETRO_SECONDARY_INSTALL=true \
-        USER="$target_user" \
-        LOGNAME="$target_user" \
         "$RETRO_DIR/retro.sh" shell start
 
     _fix_ownership "$target_user"

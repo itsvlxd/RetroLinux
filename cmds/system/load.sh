@@ -187,6 +187,17 @@ cmd_load() {
 
             faillock --user $USER --reset
 
+            local restart_marker="/tmp/retro_shell_restart_done"
+            if [[ ! -f $restart_marker ]]; then
+                touch "$restart_marker"
+                rx_log "info" "Scheduling RetroShell restart in 3s (first boot stabilization)..."
+                (
+                    sleep 3
+                    retro shell restart
+                ) >/dev/null 2>&1 &
+                disown
+            fi
+
             rx_log "success" "Startup sequence synchronized."
             ;;
         *)
