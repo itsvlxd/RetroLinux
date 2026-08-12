@@ -114,6 +114,12 @@ class _DeviceRow(Gtk.ListBoxRow):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         btn_box.set_valign(Gtk.Align.CENTER)
 
+        self._progress_bar = Gtk.ProgressBar()
+        self._progress_bar.set_show_text(True)
+        self._progress_bar.set_valign(Gtk.Align.CENTER)
+        self._progress_bar.set_visible(False)
+        btn_box.append(self._progress_bar)
+
         if is_nearby:
             if on_pair:
                 pair_btn = Gtk.Button(label="Pair")
@@ -192,6 +198,21 @@ class _DeviceRow(Gtk.ListBoxRow):
         else:
             self.add_css_class("option-default")
 
+    def set_send_progress(self, pct: float) -> None:
+        self._progress_bar.set_visible(True)
+        self._progress_bar.set_fraction(min(1.0, max(0.0, pct)))
+        self._progress_bar.set_text(f"{round(pct * 100)}%")
+
+    def show_send_waiting(self) -> None:
+        self._progress_bar.set_visible(True)
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text("Waiting for device\u2026")
+
+    def hide_send_progress(self) -> None:
+        self._progress_bar.set_visible(False)
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text("")
+
 
 class BluetoothPage:
     def __init__(self, window: "RetroSettingsWindow"):
@@ -209,6 +230,7 @@ class BluetoothPage:
         self._nearby_devices: list[dict] = []
         self._paired_listbox: Gtk.ListBox | None = None
         self._device_rows: dict[str, _DeviceRow] = {}
+        self._send_progress: dict[str, float] = {}
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -563,6 +585,13 @@ class BluetoothPage:
             self._paired_listbox.append(row)
             self._device_rows[mac] = row
 
+            send_state = self._send_progress.get(mac)
+            if send_state is not None:
+                if send_state <= 0:
+                    row.show_send_waiting()
+                else:
+                    row.set_send_progress(send_state)
+
         if not self._paired_devices:
             empty_lbl = Gtk.Label(label="No paired devices")
             empty_lbl.set_margin_top(16)
@@ -612,16 +641,60 @@ class BluetoothPage:
             if not file_path or not os.path.isfile(file_path):
                 return
 
+            row = self._device_rows.get(mac)
+            if row is not None:
+                row.show_send_waiting()
+            self._send_progress[mac] = 0.0
             self._window.show_toast(f"Sending to {name}...")
+
             def do_send():
-                res = _run(["--send", mac, file_path], timeout=180)
-                if "OK" in res:
-                    GLib.idle_add(lambda: self._window.show_toast(f"Sent to {name}"))
-                else:
-                    GLib.idle_add(lambda: self._window.show_toast(f"Send failed", timeout=5))
+                try:
+                    proc = subprocess.Popen(
+                        ["bash", _BT_CORE, "--send", mac, file_path],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    assert proc.stdout is not None
+                    for line in proc.stdout:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.startswith("WAITING"):
+                            self._send_progress[mac] = 0.0
+                            if row is not None:
+                                GLib.idle_add(row.show_send_waiting)
+                        elif line.startswith("PROGRESS|"):
+                            try:
+                                pct = int(line.split("|", 1)[1]) / 100.0
+                            except ValueError:
+                                continue
+                            self._send_progress[mac] = pct
+                            if row is not None:
+                                GLib.idle_add(row.set_send_progress, pct)
+                        elif line.startswith("OK|"):
+                            elapsed = line.split("|", 1)[1]
+                            GLib.idle_add(self._on_send_done, mac, name, True, elapsed)
+                        elif line.startswith("ERR|"):
+                            reason = line.split("|", 1)[1] if "|" in line else "failed"
+                            GLib.idle_add(self._on_send_done, mac, name, False, reason)
+                    proc.wait()
+                except Exception as e:
+                    GLib.idle_add(self._on_send_done, mac, name, False, str(e))
+
             threading.Thread(target=do_send, daemon=True).start()
 
         dialog.open(self._window, None, on_file_chosen)
+
+    def _on_send_done(self, mac: str, name: str, ok: bool, detail: str) -> None:
+        self._send_progress.pop(mac, None)
+        row = self._device_rows.get(mac)
+        if row is not None:
+            row.hide_send_progress()
+        if ok:
+            self._window.show_toast(f"Sent to {name}")
+        else:
+            self._window.show_toast(f"Send failed ({detail})", timeout=5)
+        self._full_refresh()
 
     def _toggle_trust(self, mac: str) -> None:
         is_trusted = subprocess.run(

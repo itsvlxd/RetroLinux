@@ -823,13 +823,10 @@ bt_send_file() {
 
     local file_name=$(basename "$file_path")
     local total_bytes=$(stat -c%s "$file_path")
-    local file_size=$(du -h "$file_path" | awk '{print $1}')
 
-    local device_name=$(bluetoothctl info "$mac" | grep "Name:" | cut -d' ' -f2-)
+    local device_name
+    device_name=$(bluetoothctl info "$mac" 2>/dev/null | grep "Name:" | cut -d' ' -f2-)
     [[ -z $device_name ]] && device_name="Unknown Device"
-
-    local icon_path=$(rx_get_icon "$device_name")
-    [[ $icon_path != /* ]] && icon_path="bluetooth-active-symbolic"
 
     local mac_clean=$(echo "$mac" | tr -d ':')
     local notif_id=$((0x$mac_clean % 1000000))
@@ -837,8 +834,7 @@ bt_send_file() {
 
     local log_file="/tmp/.bt_send_${notif_id}.log"
     local cancel_flag="/tmp/.bt_send_${notif_id}_cancel"
-    local result_file="/tmp/.bt_send_${notif_id}_result.txt"
-    rm -f "$log_file" "$cancel_flag" "$result_file"
+    rm -f "$log_file" "$cancel_flag"
 
     rx_log_file "info" "Sending $file_name to $device_name ($mac)"
 
@@ -850,97 +846,47 @@ bt_send_file() {
         export DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"
         export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
         export RETRO_DIR="$RETRO_DIR"
-        bash "$RETRO_DIR/scripts/bluetooth_core.sh" --obex-send-cancel-monitor "$mac" "$file_name" "$total_bytes" "$file_size" </dev/null >/dev/null 2>&1 &
+        bash "$RETRO_DIR/scripts/bluetooth_core.sh" --obex-send-cancel-monitor "$mac" "$file_name" "$total_bytes" "$(du -h "$file_path" | awk '{print $1}')" </dev/null >/dev/null 2>&1 &
     )
 
-    _format_bytes() {
-        local b=${1:-0}
-        if ((b < 1024)); then
-            echo "${b}B"
-        elif ((b < 1048576)); then
-            echo "$((b / 1024))K"
-        else
-            echo "$((b / 1048576))M"
-        fi
-    }
+    local last_pct=-1
+    local send_start=$(date +%s)
 
-    _send_notif_with_cancel() {
-        local pct="$1"
-        local status_msg="$2"
-        local ACTION
+    echo "WAITING"
+    while kill -0 "$obex_pid" 2>/dev/null; do
+        sleep 1
 
-        ACTION=$(notify-send -r "$notif_id" -a "RetroLinux" \
-            -i "$icon_path" \
-            -t 20000 \
-            -h "string:x-canonical-private-synchronous:bt-transfer" \
-            -h "int:value:$pct" \
-            -A "cancel=Cancel Transfer" \
-            "Sending: $file_name" \
-            "To: <b>$device_name</b> ($mac)\n$status_msg")
-
-        [[ $ACTION == "cancel" ]] && touch "$cancel_flag"
-    }
-
-    _send_notif_with_cancel 0 "Waiting for device to accept... ($file_size)" &
-
-    (
-        local result_file="/tmp/.bt_send_${notif_id}_result.txt"
-        local last_pct=-1
-        local send_start=$(date +%s)
-
-        while kill -0 "$obex_pid" 2>/dev/null; do
-            sleep 1
-
-            if [[ -f $cancel_flag ]]; then
-                kill "$obex_pid" 2>/dev/null
-                source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
-                bt_disconnect "$mac"
-
-                _bt_dismiss_notif "$notif_id"
-                notify-send -r "$notif_id" -a "RetroLinux" -i "$icon_path" -u normal \
-                    "Transfer Aborted" "Connection to <b>$device_name</b> severed."
-                echo "ERR|cancelled" >"$result_file"
-                rm -f "$log_file" "$cancel_flag"
-                return
-            fi
-
-            local pct=$(LC_ALL=C tr -dc '[:print:]\n' <"$log_file" 2>/dev/null | grep -oP '\d+(?=%$)' | tail -1)
-            pct=${pct:-0}
-
-            if ((pct > last_pct && pct > 0)); then
-                last_pct=$pct
-
-                local cur_bytes=$((total_bytes * pct / 100))
-                local cur_human=$(_format_bytes "$cur_bytes")
-
-                _send_notif_with_cancel "$pct" "Progress: <b>${pct}%</b> ($cur_human / $file_size)" &
-            fi
-        done
-
-        wait "$obex_pid"
-        local elapsed=$(($(date +%s) - send_start))
-
-        if grep -qi "Completed" "$log_file"; then
-            _bt_dismiss_notif "$notif_id"
-            notify-send -r "$notif_id" -a "RetroLinux" -u normal \
-                -i "$icon_path" \
-                "Transfer Complete" "<b>$file_name</b> sent to <b>$device_name</b> in ${elapsed} seconds."
-            echo "OK|$elapsed" >"$result_file"
-            source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
-            rx_log_file "success" "File $file_name sent to $device_name ($mac) in ${elapsed}s"
-        else
-            _bt_dismiss_notif "$notif_id"
-            notify-send -r "$notif_id" -a "RetroLinux" -u normal -i "$icon_path" \
-                "Transfer Failed" "<b>$device_name</b> rejected the request."
-            echo "ERR|rejected" >"$result_file"
-            source "$RETRO_DIR/scripts/bluetooth_core.sh" 2>/dev/null
-            rx_log_file "error" "Failed to send $file_name to $device_name ($mac) - rejected"
+        if [[ -f $cancel_flag ]]; then
+            kill "$obex_pid" 2>/dev/null
+            bt_disconnect "$mac"
+            rm -f "$log_file" "$cancel_flag"
+            rx_log_file "warn" "Send cancelled for $file_name to $device_name ($mac)"
+            echo "ERR|cancelled"
+            return 1
         fi
 
-        rm -f "$log_file" "$cancel_flag"
-    ) &
+        local pct
+        pct=$(LC_ALL=C tr -dc '[:print:]\n' <"$log_file" 2>/dev/null | grep -oP '\d+(?=%$)' | tail -1)
+        pct=${pct:-0}
 
-    echo "OK|$file_path"
+        if ((pct > last_pct && pct > 0)); then
+            last_pct=$pct
+            echo "PROGRESS|$pct"
+        fi
+    done
+
+    wait "$obex_pid"
+    local elapsed=$(( $(date +%s) - send_start ))
+
+    if grep -qi "Completed" "$log_file"; then
+        rx_log_file "success" "File $file_name sent to $device_name ($mac) in ${elapsed}s"
+        echo "OK|$elapsed"
+    else
+        rx_log_file "error" "Failed to send $file_name to $device_name ($mac) - rejected"
+        echo "ERR|rejected"
+    fi
+
+    rm -f "$log_file" "$cancel_flag"
 }
 
 bt_cancel_send() {

@@ -174,10 +174,11 @@ class ObexAgent(dbus.service.Object):
                 pct = int((t / total_size * 100) if total_size > 0 else 0)
                 if pct > last_pct[0]:
                     last_pct[0] = pct
-                    subprocess.run([
-                        self.shell_script, "--obex-notify-progress",
-                        source, filename, str(pct), str(t), str(total_size)
-                    ])
+                    if pct in (25, 50, 75, 100):
+                        subprocess.run([
+                            self.shell_script, "--obex-notify-progress",
+                            source, filename, str(pct), str(t), str(total_size)
+                        ])
                     if _check_cancel():
                         return
 
