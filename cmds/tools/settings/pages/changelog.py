@@ -45,11 +45,34 @@ def _type_rank(t: str) -> int:
         return len(_TYPE_ORDER)
 
 
-def _fetch_commits() -> list[dict]:
-    """Fetch all commits as parsed dicts (oldest first)."""
+def _fetch_date_counts(git_args: list[str]) -> dict[str, int]:
+    """Count commits per date (newest-first), using only dates — cheap."""
     try:
         r = subprocess.run(
-            ["git", "-C", _RETRO_DIR, "log", "--pretty=format:%H|%s|%ad|%an", "--date=short"],
+            ["git", "-C", _RETRO_DIR, "log", "--pretty=format:%ad", "--date=short", *git_args],
+            capture_output=True, text=True, timeout=30,
+            stdin=subprocess.DEVNULL,
+        )
+    except Exception:
+        return {}
+    counts: dict[str, int] = {}
+    for line in r.stdout.splitlines():
+        if line:
+            counts[line] = counts.get(line, 0) + 1
+    return counts
+
+
+def _fetch_page_commits(dates: list[str], git_args: list[str]) -> list[dict]:
+    """Fetch full commit data only for the given dates (newest first)."""
+    if not dates:
+        return []
+    since = _date_boundary(min(dates))
+    until = _date_boundary(_add_days_iso(max(dates), 1))
+    try:
+        r = subprocess.run(
+            ["git", "-C", _RETRO_DIR, "log",
+             "--pretty=format:%H|%s|%ad|%an", "--date=short",
+             "--since", since, "--until", until, *git_args],
             capture_output=True, text=True, timeout=30,
             stdin=subprocess.DEVNULL,
         )
@@ -78,14 +101,24 @@ def _fetch_commits() -> list[dict]:
             prefix = m.group(1)
             scope = m.group(2) or ""
             rest = m.group(3) or c["subject"]
-            if prefix in _COMMIT_TYPES:
-                c["type"] = prefix
-            else:
-                c["type"] = "other"
+            c["type"] = prefix if prefix in _COMMIT_TYPES else "other"
             c["scope"] = scope
             c["clean"] = rest
-    commits.reverse()  # oldest → newest
     return commits
+
+
+def _add_days_iso(date_str: str, days: int) -> str:
+    try:
+        y, m, d = (int(x) for x in date_str.split("-"))
+        return (_date(y, m, d) + timedelta(days=days)).isoformat()
+    except (ValueError, TypeError):
+        return date_str
+
+
+def _date_boundary(date_str: str) -> str:
+    """Git --since/--until boundary: a bare date is parsed unreliably by git,
+    so normalize to an explicit midnight timestamp."""
+    return f"{date_str}T00:00:00"
 
 
 def _git_exists() -> bool:
@@ -144,12 +177,12 @@ class ChangelogPage:
         self._content_box: Gtk.Box
         self._groups: list[tuple[str, Adw.PreferencesGroup]] = []
         self._group_rows: dict[str, list] = {}
-        self._commits: list[dict] = []
+        self._date_counts: dict[str, int] = {}
         self._by_date: dict[str, list[dict]] = {}
-        self._dates: list[str] = []
         self._pages: list[list[str]] = []
         self._page = 0
         self._commits_per_page = 100
+        self._filter_args: list[str] = []
         self._search_entry: Gtk.SearchEntry | None = None
         self._range_dd: Gtk.DropDown | None = None
         self._from_lbl: Gtk.Label | None = None
@@ -163,6 +196,7 @@ class ChangelogPage:
         self._nav_bar: Gtk.Box | None = None
         self._status_lbl: Gtk.Label | None = None
         self._on_dirty_changed = None
+        self._seq = 0
 
     # ── Build ──
 
@@ -269,8 +303,11 @@ class ChangelogPage:
         if self._page_size_dd is not None:
             val = int(self._page_size_dd.get_selected_item().get_string())
             self._commits_per_page = val
+        # Rebuild pages from the cached date-counts (no refetch needed).
+        self._pages = self._build_pages(self._date_counts)
         self._page = 0
-        self._apply_filter()
+        self._loaded_page = None
+        self._load_current_page()
 
     def _make_date_entry(self) -> Gtk.Entry:
         entry = Gtk.Entry()
@@ -290,24 +327,104 @@ class ChangelogPage:
 
     # ── Data ──
 
+    def _build_filter_args(self) -> list[str]:
+        """Translate search/range UI state into git log limiting args."""
+        args: list[str] = []
+        term = (self._search_entry.get_text() if self._search_entry else "").strip().lower()
+        from_d, to_d = self._range_bounds()
+        if from_d is not None:
+            args += ["--since", _date_boundary(from_d.isoformat())]
+        if to_d is not None:
+            args += ["--until", _date_boundary(_add_days_iso(to_d.isoformat(), 1))]
+        if term:
+            date_q = _parse_date(term)
+            if date_q is not None:
+                args += ["--since", _date_boundary(date_q.isoformat()),
+                         "--until", _date_boundary(_add_days_iso(date_q.isoformat(), 1))]
+            elif re.fullmatch(r"\d{4}", term):
+                args += ["--since", _date_boundary(f"{term}-01-01"),
+                         "--until", _date_boundary(f"{int(term) + 1}-01-01")]
+            else:
+                args += ["--grep", term, "--fixed-strings", "-i"]
+        return args
+
     def _reload(self) -> None:
+        """Phase 1: fetch per-date counts (dates only) to build the page index."""
+        self._seq += 1
+        seq = self._seq
+        self._filter_args = self._build_filter_args()
         if self._status_lbl is not None:
             self._status_lbl.set_label("Loading commits\u2026")
 
         def worker():
-            commits = _fetch_commits()
-            GLib.idle_add(self._on_loaded, commits)
+            counts = _fetch_date_counts(self._filter_args)
+            GLib.idle_add(self._on_counts_loaded, counts, seq)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_loaded(self, commits: list[dict]) -> None:
-        self._commits = commits
+    def _on_counts_loaded(self, counts: dict[str, int], seq: int) -> None:
+        if seq != self._seq:
+            return
+        self._date_counts = counts
+        self._loaded_page: int | None = None
+        self._pages = self._build_pages(counts)
+        self._page = 0
         if self._status_lbl is not None:
-            if not commits:
-                self._status_lbl.set_label("No commits found.")
-            else:
-                self._status_lbl.set_label(f"{len(commits)} commits")
-        self._apply_filter()
+            total = sum(counts.values())
+            self._status_lbl.set_label(
+                f"{total} commits" if total else "No commits found."
+            )
+        self._load_current_page()
+
+    def _build_pages(self, counts: dict[str, int]) -> list[list[str]]:
+        """Pages by commit count, never splitting a day across pages."""
+        pages: list[list[str]] = []
+        page_dates: list[str] = []
+        page_count = 0
+        for date in sorted(counts, reverse=True):
+            n = counts[date]
+            if page_dates and page_count + n > self._commits_per_page:
+                pages.append(page_dates)
+                page_dates = []
+                page_count = 0
+            page_dates.append(date)
+            page_count += n
+        if page_dates:
+            pages.append(page_dates)
+        return pages
+
+    def _load_current_page(self) -> None:
+        """Phase 2: fetch full commit data only for the current page's dates."""
+        if not self._pages:
+            self._by_date = {}
+            self._render_page()
+            return
+        dates = self._pages[self._page]
+        if self._loaded_page == self._page:
+            self._render_page()
+            return
+        self._seq += 1
+        seq = self._seq
+        args = self._filter_args
+
+        def worker():
+            commits = _fetch_page_commits(dates, args)
+            GLib.idle_add(self._on_page_loaded, commits, seq)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_page_loaded(self, commits: list[dict], seq: int) -> None:
+        if seq != self._seq:
+            return
+        by_date: dict[str, list[dict]] = {}
+        for c in commits:
+            by_date.setdefault(c["date"], []).append(c)
+        for date in by_date:
+            by_date[date].sort(key=lambda c: c["sha"], reverse=True)
+            by_date[date].sort(key=lambda c: _type_rank(c["type"]))
+        self._by_date = by_date
+        self._loaded_page = self._page
+        self._render_page()
 
     def _range_bounds(self) -> tuple[_date | None, _date | None]:
         """Return (from_date, to_date) from the preset or custom entries."""
@@ -327,63 +444,9 @@ class ChangelogPage:
             return _parse_date(from_txt), _parse_date(to_txt)
         return None, None
 
-    def _matches_term(self, c: dict, term: str) -> bool:
-        if not term:
-            return True
-        if term in c["subject"].lower() or term in c["scope"].lower():
-            return True
-        return term in c["date"]
-
     def _apply_filter(self) -> None:
-        term = (self._search_entry.get_text() if self._search_entry else "").strip().lower()
-        date_q = _parse_date(term)
-        from_d, to_d = self._range_bounds()
-
-        self._by_date = {}
-        self._dates = []
-        self._pages = []
-
-        if self._commits:
-            by_date: dict[str, list[dict]] = {}
-            for c in self._commits:
-                # Range check.
-                cd = _parse_date(c["date"])
-                if from_d is not None and (cd is None or cd < from_d):
-                    continue
-                if to_d is not None and (cd is None or cd > to_d):
-                    continue
-                # Search term check: explicit date query takes precedence over text.
-                if date_q is not None:
-                    if cd is None or cd != date_q:
-                        continue
-                elif not self._matches_term(c, term):
-                    continue
-                by_date.setdefault(c["date"], []).append(c)
-
-            # Features first (ascending rank), newest commit within each type first.
-            for date in by_date:
-                by_date[date].sort(key=lambda c: c["sha"], reverse=True)
-                by_date[date].sort(key=lambda c: _type_rank(c["type"]))
-
-            self._by_date = by_date
-            self._dates = sorted(by_date.keys(), reverse=True)
-
-            # Build pages by commit count, never splitting a day across pages.
-            page_dates: list[str] = []
-            page_count = 0
-            for date in self._dates:
-                n = len(by_date[date])
-                if page_dates and page_count + n > self._commits_per_page:
-                    self._pages.append(page_dates)
-                    page_dates = []
-                    page_count = 0
-                page_dates.append(date)
-                page_count += n
-            if page_dates:
-                self._pages.append(page_dates)
-
-        self._page = max(0, min(self._page, max(0, len(self._pages) - 1)))
-        self._render_page()
+        self._page = 0
+        self._reload()
 
     def _render_page(self) -> None:
         # Clear existing groups (nav bar is detached and re-appended at the end).
@@ -434,7 +497,7 @@ class ChangelogPage:
     def _goto_page(self, page: int) -> None:
         total_pages = len(self._pages)
         self._page = max(0, min(page, max(0, total_pages - 1)))
-        self._render_page()
+        self._load_current_page()
 
     # ── Rendering ──
 
