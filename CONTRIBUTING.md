@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="120" style="vertical-align: middle">
 </p>
 
-# Contributing to RetroLinux 🌴
+# 🌴Contributing to RetroLinux
 
 First off, thank you for wanting to contribute! RetroLinux is a community-driven project — whether you're fixing a typo, squashing a bug, or building a whole new tool, your help keeps the neon alive.
 

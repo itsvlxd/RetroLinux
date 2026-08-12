@@ -101,7 +101,7 @@ A look at the RetroLinux experience — the **RetroShell** desktop, the **Retro 
 
 ## 🎨 Theming
 
-Switch your entire look in one shot. Pick a palette, apply it, done.
+Switch your entire look in one shot. Pick a palette, apply it, done — or drop in your own JSON themes, nothing is locked down.
 
 <p align="center">
   <img alt="Retro" src="https://img.shields.io/badge/Retro-0a0a0a?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNScgZmlsbD0nI2IyNGJmMycvPjxjaXJjbGUgY3g9JzgnIGN5PSc4JyByPScyLjUnIGZpbGw9JyMwYTBhMGEnIGZpbGwtb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==&color=1a0d24">
@@ -147,7 +147,7 @@ RetroLinux detects your hardware during install and picks the right drivers auto
   <img alt="Intel" src="https://img.shields.io/badge/Intel-0a0a0a?style=for-the-badge&labelColor=0a0a0a&color=0071C5">
 </p>
 
-- **NVIDIA** — `nvidia-open` / `nvidia-dkms` with full lib32 support
+- **NVIDIA** — `nvidia-open-dkms` + `nvidia-utils` with full **lib32 + OpenCL** support, **Wayland-ready** (DRM modeset/fbdev enabled, GBM + NVD backends configured), the initramfs rebuilt with the NVIDIA modules, **Optimus** support for hybrid laptops, and **CUDA/cuDNN + NVIDIA container toolkit** for AI/ML.
 - **AMD** — open-source `amdgpu` + `mesa`, zero-fuss
 - **Intel** — `intel-media-driver`, i915/xe out of the box
 
@@ -195,7 +195,7 @@ retro log status              # what has been happening?
 
 ## ❓ FAQ
 
-<details>
+<details open>
 <summary><b>Do I need to know Arch Linux to use RetroLinux?</b></summary>
 <br>
 No. The live ISO installer walks you through everything in 25 guided steps — you never touch a partition table or a pacman flag during setup.
@@ -216,13 +216,13 @@ Yes — `nvidia-open` / `nvidia-dkms` with full lib32 support, configured for yo
 <details>
 <summary><b>How do updates and rollbacks work?</b></summary>
 <br>
-`retro update` syncs pacman and your AUR helper in one go. And because every install runs on BTRFS with Timeshift snapshots wired into GRUB, you can boot straight into a previous snapshot from the boot menu if anything ever breaks.
+`retro --update` syncs pacman and your AUR helper in one go. And because every install runs on BTRFS with Timeshift snapshots wired into GRUB, you can boot straight into a previous snapshot from the boot menu if anything ever breaks.
 </details>
 
 <details>
 <summary><b>Can I make it look how I want?</b></summary>
 <br>
-That's the whole point. 43 themes, wallpaper collections and 15 modules — symlink them for stability, or copy them for full custom freedom.
+**Yes.** RetroLinux ships with 40+ curated themes and ready-made shell presets — but those are just a starting point. If none of them fit your vibe, it's easy to make it your own: build your **own themes**, save your **own shell presets**, and assemble **custom wallpaper collections** — all from the Settings app or `retro`, no config files required.
 </details>
 
 ---
