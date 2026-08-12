@@ -7,6 +7,6 @@ ANSI_COLOR="38;2;245;194;231"
 HOME_URL="https://github.com/itsvlxd/RetroLinux"
 DOCUMENTATION_URL="https://github.com/itsvlxd/RetroLinux/wiki"
 SUPPORT_URL="https://github.com/itsvlxd/RetroLinux/issues"
-BUG_REPORT_URL="https://github.com/itsvlxd/RetroLinux/issues"
+BUG_REPORT_URL="https://github.com/itsvlxd/RetroLinux/issues/new?template=bug_report.md"
 PRIVACY_POLICY_URL="https://terms.archlinux.org/docs/privacy-policy/"
 LOGO=retrolinux-logo
