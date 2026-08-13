@@ -178,7 +178,6 @@ def _clear_decision(offer_id) -> None:
 def _write_state():
     now = time.time()
     with _STATE_LOCK:
-        # Apply pending "close this transfer" requests from the page.
         try:
             if os.path.isdir(_CLEAR_DIR):
                 for name in os.listdir(_CLEAR_DIR):
@@ -189,7 +188,6 @@ def _write_state():
                         pass
         except Exception:
             pass
-        # Completed transfers stay listed until the user closes them (X).
         payload = {
             "transfers": [
                 {
@@ -299,8 +297,6 @@ def _on_offer(file_metadata, pin, auto_accept):
     offer_id = file_metadata[0].payload_id if file_metadata else 0
     offer_files = [{"name": m.name, "size": m.size} for m in file_metadata]
 
-    # Publish the pending offer so the settings table can show an Accept
-    # button with the PIN, alongside the notification prompt.
     with _STATE_LOCK:
         _PENDING_OFFERS[offer_id] = {"id": offer_id, "files": offer_files, "pin": pin}
     _write_state()
@@ -344,8 +340,6 @@ def _on_offer(file_metadata, pin, auto_accept):
     _track_offer(file_metadata, accepted)
 
     if accepted:
-        # Only ask for the save folder until the user has picked one once;
-        # afterwards reuse it silently.
         if not _dir_configured():
             with _DIR_LOCK:
                 _PENDING_MOVE_DIR = _pick_download_dir()

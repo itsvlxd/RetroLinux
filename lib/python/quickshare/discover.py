@@ -134,9 +134,6 @@ def parse_discovered_service(instance_name: str, txt_records: dict[bytes, bytes 
     endpoint_info = _web_safe_base64_decode(txt_value_ascii)
     advertisement = parse_endpoint_info(endpoint_info)
 
-    # Android omits the device name from the advertisement when visibility is
-    # not "Everyone" (has_no_device_name=1). Fall back to the mDNS hostname so
-    # the device list never shows a useless "(unnamed device)".
     name = advertisement.device_name
     if not name and fallback_name:
         name = fallback_name

@@ -27,7 +27,6 @@ def main():
     local_name = os.uname().nodename.lower()
     devices = browse(args.duration, address)
     for d in devices:
-        # Never list our own receiver — you can't send a file to yourself.
         if address and d.address == address:
             continue
         if d.device_name.lower() == local_name:
