@@ -32,8 +32,8 @@ if TYPE_CHECKING:
 
 _RETRO_DIR = os.environ.get("RETRO_DIR", "/opt/retrolinux")
 _QS_CORE = os.path.join(_RETRO_DIR, "scripts", "quickshare_core.sh")
-_QS_LOG = "/tmp/retro_logs/quickshare.log"
 _QS_TRANSFERS = "/tmp/retro_logs/quickshare_transfers.json"
+_QS_SEND_TRANSFERS = "/tmp/retro_logs/quickshare_send_transfers.json"
 
 _DEVICE_ICONS = {
     "PHONE": "phone-symbolic",
@@ -70,17 +70,41 @@ def _qs(args: list[str], timeout: int = 10) -> str:
         return ""
 
 
-def _get_uptime(pid: str) -> str:
-    if not pid:
-        return "N/A"
+def _friendly_send_reason(reason: str) -> str:
+    return {
+        "receiver_canceled": "the receiving device stopped the transfer",
+        "canceled": "the transfer was canceled",
+        "bad_target": "the receiving device is no longer reachable",
+        "file_not_found": "the selected file was not found",
+    }.get(reason, reason or "unknown error")
+
+
+def _pid_alive(pid) -> bool:
     try:
-        r = subprocess.run(
-            ["ps", "-o", "etime=", "-p", pid],
-            capture_output=True, text=True, timeout=3,
-        )
-        return r.stdout.strip() or "N/A"
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ProcessLookupError, ValueError, TypeError):
+        return False
+
+
+def _is_stale_send(t: dict, now: float) -> bool:
+    if t.get("done"):
+        result = t.get("result")
+        if result and result != "ok":
+            return bool(t.get("finished_at")) and now - t["finished_at"] > 3
+        return False
+    return not _pid_alive(t.get("pid"))
+
+
+def _rewrite_send_transfers(entries: list[dict]) -> None:
+    try:
+        os.makedirs(os.path.dirname(_QS_SEND_TRANSFERS), exist_ok=True)
+        tmp = _QS_SEND_TRANSFERS + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"transfers": entries}, f)
+        os.replace(tmp, _QS_SEND_TRANSFERS)
     except Exception:
-        return "N/A"
+        pass
 
 
 class QuickSharePage:
@@ -116,11 +140,6 @@ class QuickSharePage:
         refresh_btn.connect("clicked", lambda _b: self._reload())
         header.pack_start(refresh_btn)
 
-        open_btn = Gtk.Button(icon_name="document-open-symbolic")
-        open_btn.set_tooltip_text("Open transfer log")
-        open_btn.connect("clicked", lambda _b: self._open_log())
-        header.pack_start(open_btn)
-
         self._content_box.append(self._build_status_group())
         self._content_box.append(self._build_transfers_group())
 
@@ -130,38 +149,21 @@ class QuickSharePage:
         return toolbar_view
 
     def _build_status_group(self) -> Adw.PreferencesGroup:
-        group = Adw.PreferencesGroup(title="Status")
+        group = Adw.PreferencesGroup(title="QuickShare Configuration")
 
-        # Daemon engine row — state badge + Start/Stop/Restart (mirrors daemon.py)
-        engine_row = Adw.ActionRow(title="Quick Share Engine", subtitle="Daemon is stopped")
+        self._enabled_sw = Adw.SwitchRow(
+            title="Enable QuickShare",
+            subtitle="Start Quick Share automatically and keep it running",
+        )
+        self._enabled_sw.connect("notify::active", self._on_enabled)
+        group.add(self._enabled_sw)
 
-        badge = Gtk.Label(label="INACTIVE")
-        badge.add_css_class("badge")
-        badge.set_valign(Gtk.Align.CENTER)
-        badge.set_opacity(0.6)
-        engine_row.add_suffix(badge)
-        self._state_badge = badge
-
-        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        btn_box.set_valign(Gtk.Align.CENTER)
-
-        start_btn = Gtk.Button(label="Start")
-        start_btn.connect("clicked", lambda _b: self._daemon_action("start"))
-        btn_box.append(start_btn)
-
-        stop_btn = Gtk.Button(label="Stop")
-        stop_btn.connect("clicked", lambda _b: self._daemon_action("stop"))
-        btn_box.append(stop_btn)
-
-        restart_btn = Gtk.Button(label="Restart")
-        restart_btn.connect("clicked", lambda _b: self._daemon_action("restart"))
-        btn_box.append(restart_btn)
-
-        engine_row.add_suffix(btn_box)
-        group.add(engine_row)
-        self._engine_row = engine_row
-        self._start_btn = start_btn
-        self._stop_btn = stop_btn
+        self._switch = Adw.SwitchRow(
+            title="Android Quick Share",
+            subtitle="Make this device discoverable to Android Quick Share",
+        )
+        self._switch.connect("notify::active", self._on_switch)
+        group.add(self._switch)
 
         self._dir_row = Adw.ActionRow(title="Download folder", subtitle="—")
         dir_btn = Gtk.Button(icon_name="folder-symbolic")
@@ -177,13 +179,6 @@ class QuickSharePage:
         )
         self._autoaccept_sw.connect("notify::active", self._on_autoaccept)
         group.add(self._autoaccept_sw)
-
-        self._autostart_sw = Adw.SwitchRow(
-            title="Start at login",
-            subtitle="Launch the Quick Share receiver on login",
-        )
-        self._autostart_sw.connect("notify::active", self._on_autostart)
-        group.add(self._autostart_sw)
 
         return group
 
@@ -205,22 +200,41 @@ class QuickSharePage:
     def _transfers_worker(self) -> None:
         raw: list[dict] = []
         offers: list[dict] = []
+        send_raw: list[dict] = []
         try:
             if os.path.isfile(_QS_TRANSFERS):
                 with open(_QS_TRANSFERS) as f:
                     data = json.load(f)
                 raw = data.get("transfers", [])
                 offers = data.get("offers", [])
+            if os.path.isfile(_QS_SEND_TRANSFERS):
+                with open(_QS_SEND_TRANSFERS) as f:
+                    sdata = json.load(f)
+                send_raw = sdata.get("transfers", [])
         except Exception:
             raw = []
-        GLib.idle_add(self._render_transfers, raw, offers)
+        now = time.time()
+        cleaned = [t for t in send_raw if not _is_stale_send(t, now)]
+        if len(cleaned) != len(send_raw):
+            _rewrite_send_transfers(cleaned)
+            send_raw = cleaned
+        if _qs(["--status"]).split("|", 1)[0] != "running":
+            raw = [t for t in raw if t.get("done")]
+        GLib.idle_add(self._render_transfers, raw, offers, send_raw)
 
-    def _render_transfers(self, daemon_transfers: list[dict], offers: list[dict] | None = None) -> None:
+    def _render_transfers(self, daemon_transfers: list[dict], offers: list[dict] | None = None,
+                          send_transfers: list[dict] | None = None) -> None:
         if self._transfers_listbox is None or self._transfers_group is None:
             return
         lb = self._transfers_listbox
 
         merged = list(daemon_transfers)
+        own_pids = {t.get("pid") for t in self._send_transfers.values() if t.get("pid")}
+        for t in (send_transfers or []):
+            if t.get("pid") in own_pids:
+                continue
+            if not t.get("done") or t.get("finished_at"):
+                merged.append(t)
         merged.extend(list(self._send_transfers.values()))
         offer_rows = offers or []
 
@@ -350,7 +364,6 @@ class QuickSharePage:
         box.append(text_box)
 
         if done:
-            # Finished transfer: Open (receive) + X to dismiss.
             if direction == "receive" and t.get("dest"):
                 open_btn = Gtk.Button(label="Open")
                 open_btn.set_valign(Gtk.Align.CENTER)
@@ -385,11 +398,14 @@ class QuickSharePage:
         direction = t.get("direction", "receive")
         if direction == "send":
             seq = int(t.get("seq") or 0)
+            spid = int(t.get("pid") or 0)
             self._send_cancelled.add(seq)
             proc = self._send_procs.pop(seq, None)
             if proc is not None and proc.poll() is None:
                 proc.terminate()
             self._send_transfers.pop(seq, None)
+            if spid:
+                _qs(["--clear-send", str(spid)])
         else:
             tid = t.get("id")
             if tid is not None:
@@ -399,30 +415,38 @@ class QuickSharePage:
         direction = t.get("direction", "receive")
         if direction == "send":
             seq = int(t.get("seq") or 0)
-            self._send_cancelled.add(seq)
-            proc = self._send_procs.get(seq)
-            if proc is not None and proc.poll() is None:
-                # Kill the whole process group so a wrapper can never survive
-                # and keep sending. SIGTERM first, then SIGKILL as a fallback.
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                except (OSError, ProcessLookupError):
+            if seq:
+                self._send_cancelled.add(seq)
+                proc = self._send_procs.get(seq)
+                if proc is not None and proc.poll() is None:
                     try:
-                        proc.terminate()
-                    except Exception:
-                        pass
+                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    except (OSError, ProcessLookupError):
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
 
-                def _force_kill():
-                    time.sleep(1.5)
+                    def _force_kill():
+                        time.sleep(1.5)
+                        try:
+                            if proc.poll() is None:
+                                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                        except (OSError, ProcessLookupError):
+                            pass
+
+                    threading.Thread(target=_force_kill, daemon=True).start()
+                self._send_transfers.pop(seq, None)
+                self._send_procs.pop(seq, None)
+            else:
+                spid = int(t.get("pid") or 0)
+                if spid:
+                    # Only signal the send process itself — it shares the
+                    # shell's process group, so killpg would nuke the shell.
                     try:
-                        if proc.poll() is None:
-                            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                        os.kill(spid, signal.SIGTERM)
                     except (OSError, ProcessLookupError):
                         pass
-
-                threading.Thread(target=_force_kill, daemon=True).start()
-            self._send_transfers.pop(seq, None)
-            self._send_procs.pop(seq, None)
             self._window.show_toast("Send canceled")
         else:
             tid = t.get("id")
@@ -449,28 +473,12 @@ class QuickSharePage:
 
     def _render_status(self) -> None:
         running = self._status.get("state") == "running"
-        pid = self._status.get("pid", "")
-
-        if hasattr(self, "_state_badge"):
-            self._state_badge.set_label("ACTIVE" if running else "INACTIVE")
-            if running:
-                self._state_badge.add_css_class("success")
-                self._state_badge.set_opacity(1.0)
-            else:
-                self._state_badge.remove_css_class("success")
-                self._state_badge.set_opacity(0.6)
-
-        if hasattr(self, "_engine_row"):
-            subtitle = f"PID: {pid}  |  Uptime: {_get_uptime(pid)}" if running else "Daemon is stopped"
-            self._engine_row.set_subtitle(subtitle)
-
-        if hasattr(self, "_start_btn"):
-            self._start_btn.set_sensitive(not running)
-            self._stop_btn.set_sensitive(running)
 
         self._setting_value = True
+        self._switch.set_active(running)
         self._autoaccept_sw.set_active(self._status.get("autoaccept") == "true")
-        self._autostart_sw.set_active(self._status.get("autostart") == "true")
+        if hasattr(self, "_enabled_sw"):
+            self._enabled_sw.set_active(_qs(["--enabled-status"]).strip() != "false")
         self._setting_value = False
         self._dir_row.set_subtitle(self._status.get("dir", "—") or "—")
 
@@ -497,24 +505,20 @@ class QuickSharePage:
 
     # ── Actions ──
 
-    def _daemon_action(self, action: str) -> None:
-        def worker():
-            res = _qs([f"--{action}"])
-            ok = res.startswith("OK")
-            msg = {
-                "start": "Quick Share started" if ok else f"Failed to start ({res or 'unknown'})",
-                "stop": "Quick Share stopped" if ok else f"Failed to stop ({res or 'unknown'})",
-                "restart": "Quick Share restarted" if ok else f"Failed to restart ({res or 'unknown'})",
-            }[action]
-            GLib.idle_add(lambda: self._window.show_toast(msg))
-            for _ in range(30):
-                time.sleep(0.5)
-                state = _qs(["--status"]).split("|", 1)[0]
-                if (action == "stop" and state != "running") or (action != "stop" and state == "running"):
-                    break
-            GLib.idle_add(self._reload)
-
-        threading.Thread(target=worker, daemon=True).start()
+    def _on_switch(self, sw: Adw.SwitchRow, _pspec) -> None:
+        if self._setting_value:
+            return
+        res = _qs(["--start"] if sw.get_active() else ["--stop"])
+        if res.startswith("OK"):
+            self._window.show_toast(
+                "Quick Share enabled" if sw.get_active() else "Quick Share disabled"
+            )
+        else:
+            self._window.show_bug_toast(
+                "Failed to toggle Quick Share", detail=res or "unknown error", timeout=5,
+            )
+            sw.set_active(not sw.get_active())
+        self._reload()
 
     def _on_autoaccept(self, sw: Adw.SwitchRow, _pspec) -> None:
         if self._setting_value:
@@ -532,18 +536,18 @@ class QuickSharePage:
             sw.set_active(not sw.get_active())
         self._reload()
 
-    def _on_autostart(self, sw: Adw.SwitchRow, _pspec) -> None:
+    def _on_enabled(self, sw: Adw.SwitchRow, _pspec) -> None:
         if self._setting_value:
             return
         state = "on" if sw.get_active() else "off"
-        res = _qs(["--autostart", state])
+        res = _qs(["--set-enabled", state])
         if res.startswith("OK"):
             self._window.show_toast(
-                f"Autostart {'enabled' if sw.get_active() else 'disabled'}"
+                f"Keep-alive {'enabled' if sw.get_active() else 'disabled'}"
             )
         else:
             self._window.show_bug_toast(
-                "Failed to set autostart", detail=res or "unknown error", timeout=5,
+                "Failed to set keep-alive", detail=res or "unknown error", timeout=5,
             )
             sw.set_active(not sw.get_active())
         self._reload()
@@ -748,6 +752,7 @@ class QuickSharePage:
                     text=True, start_new_session=True,
                 )
                 self._send_procs[seq] = proc
+                self._send_transfers[seq]["pid"] = proc.pid
                 assert proc.stdout is not None
                 last_pct = -1
                 for line in proc.stdout:
@@ -819,7 +824,7 @@ class QuickSharePage:
                         reason = line.split("|", 1)[1] if "|" in line else "failed"
                         GLib.idle_add(
                             lambda: self._window.show_toast(
-                                f"Send failed ({reason})", timeout=5
+                                f"Send failed \u2014 {_friendly_send_reason(reason)}", timeout=5
                             )
                         )
                 proc.wait()
@@ -842,15 +847,6 @@ class QuickSharePage:
                 self._send_cancelled.discard(seq)
 
         threading.Thread(target=do_send, daemon=True).start()
-
-    def _open_log(self) -> None:
-        if not os.path.isfile(_QS_LOG):
-            self._window.show_toast("No Quick Share activity logged yet")
-            return
-        subprocess.Popen(
-            ["xdg-open", _QS_LOG],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
 
     # ── Lifecycle (read-only) ──
 
@@ -881,8 +877,8 @@ class QuickSharePage:
             {"key": "quickshare:overview", "label": "Android Quick Share",
              "description": "Receive files from Android Quick Share (Nearby Share)",
              "_group_id": "quickshare", "_group_label": "System", "_section_label": "Overview"},
-            {"key": "quickshare:status", "label": "Quick Share Engine",
-             "description": "Daemon state, PID, uptime, start/stop/restart",
+            {"key": "quickshare:status", "label": "Quick Share",
+             "description": "Enable or disable the Quick Share receiver",
              "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
             {"key": "quickshare:transfers", "label": "Transfers",
              "description": "Current file transfers, progress and cancel",
@@ -892,6 +888,9 @@ class QuickSharePage:
              "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
             {"key": "quickshare:autoaccept", "label": "Auto-accept Transfers",
              "description": "Accept incoming Quick Share files without prompting",
+             "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
+            {"key": "quickshare:enabled", "label": "Quick Share Enabled",
+             "description": "Auto-restart the Quick Share receiver if it stops",
              "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
             {"key": "quickshare:send", "label": "Send a File",
              "description": "Send files to a nearby Android Quick Share device",

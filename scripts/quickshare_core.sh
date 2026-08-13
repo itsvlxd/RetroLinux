@@ -9,8 +9,6 @@ rx_log_register "quickshare"
 QS_PY="$RETRO_DIR/scripts/python/quickshare_receive.py"
 QS_PYTHON="${QS_PYTHON:-python3}"
 QS_SETTINGS="$HOME/.config/retro/quickshare.json"
-QS_AUTOSTART="$HOME/.config/autostart/quickshare.desktop"
-QS_LEGACY_AUTOSTART="$HOME/.config/autostart/rquickshare.desktop"
 QS_PIDFILE="/tmp/.quickshare.pid"
 QS_LEGACY_PIDFILE="/tmp/.rquickshare.pid"
 QS_DEFAULT_DIR="$HOME/Downloads"
@@ -54,7 +52,6 @@ qs_get_dir() {
     local dir
     dir=$(get_var "QUICKSHARE_DOWNLOAD_DIR" "")
     if [[ -z $dir ]]; then
-        # legacy: settings used to live in quickshare.json
         dir=$(qs_read_setting "download_path")
     fi
     [[ -z $dir || $dir == "null" ]] && dir="$QS_DEFAULT_DIR"
@@ -84,14 +81,11 @@ qs_dir_configured() {
 }
 
 qs_get_autostart() {
-    if [[ -f $QS_AUTOSTART || -f $QS_LEGACY_AUTOSTART ]]; then
-        echo "true"
-    else
-        echo "false"
-    fi
+    echo "true"
 }
 
 qs_start() {
+    set_var "QUICKSHARE_ENABLED" "true"
     if qs_running; then
         echo "OK|already_running|$(qs_pid)"
         return 0
@@ -127,16 +121,18 @@ qs_start() {
 }
 
 qs_stop() {
+    set_var "QUICKSHARE_ENABLED" "false"
     local pid
     pid=$(qs_pid)
-    if [[ -z $pid ]]; then
-        rm -f "$QS_PIDFILE" "$QS_LEGACY_PIDFILE"
-        echo "OK|already_stopped"
-        return 0
+    if [[ -n $pid ]]; then
+        kill "$pid" 2>/dev/null
+        for _ in $(seq 1 20); do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 0.1
+        done
+        kill -9 "$pid" 2>/dev/null
     fi
-    kill "$pid" 2>/dev/null
-    sleep 1
-    kill -9 "$pid" 2>/dev/null
+    pkill -f "quickshare_[s]end.py" 2>/dev/null
     rm -f "$QS_PIDFILE" "$QS_LEGACY_PIDFILE"
     rx_log_file "info" "Quick Share receiver stopped"
     echo "OK|stopped"
@@ -207,22 +203,36 @@ qs_pick_file() {
     return 0
 }
 
+_qs_hyprctl() {
+    if [[ -z $HYPRLAND_INSTANCE_SIGNATURE ]]; then
+        local sig
+        sig=$(ls -t "${XDG_RUNTIME_DIR:-/tmp}/hypr/" 2>/dev/null | head -1)
+        [[ -n $sig ]] && export HYPRLAND_INSTANCE_SIGNATURE="$sig"
+    fi
+    hyprctl "$@"
+}
+
 _qs_zenity_float() {
     local zenity_pid="$1"
     local tries=0
     local addr=""
-    # wait up to ~5s for the zenity/portal window to map
-    while [[ $tries -lt 100 && -z $addr ]]; do
+    while [[ $tries -lt 120 && -z $addr ]]; do
         sleep 0.05
-        addr=$(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class == "xdg-desktop-portal-gtk") | .address' | head -1)
+        addr=$(_qs_hyprctl clients -j 2>/dev/null | jq -r '.[] | select((.class == "xdg-desktop-portal-gtk") or (.class == "zenity") or (.title | test("Select a file|Quick Share"; "i"))) | .address' | head -1)
         ((tries++))
     done
     if [[ -n $addr ]]; then
-        # Hyprland 0.56+: dispatch is Lua (`hl.dsp.*`); target by window selector.
-        # Note: hyprctl prints "ok" — silence stdout so it never pollutes the
-        # picker's OK|/ERR| result line the caller parses.
-        hyprctl dispatch 'hl.dsp.window.float({ action = "enable", window = "address:'"$addr"'" })' >/dev/null 2>&1
-        hyprctl dispatch 'hl.dsp.window.center({ window = "address:'"$addr"'" })' >/dev/null 2>&1
+        _qs_hyprctl dispatch 'hl.dsp.window.float({ action = "enable", window = "address:'"$addr"'" })' >/dev/null 2>&1
+        _qs_hyprctl dispatch 'hl.dsp.window.center({ window = "address:'"$addr"'" })' >/dev/null 2>&1
+        local confirmed=0
+        while [[ $confirmed -lt 10 ]]; do
+            local fl
+            fl=$(_qs_hyprctl clients -j 2>/dev/null | jq -r --arg a "$addr" '.[] | select(.address == $a) | .floating' | head -1)
+            [[ $fl == "true" ]] && break
+            sleep 0.1
+            _qs_hyprctl dispatch 'hl.dsp.window.float({ action = "enable", window = "address:'"$addr"'" })' >/dev/null 2>&1
+            ((confirmed++))
+        done
     fi
 }
 
@@ -237,34 +247,6 @@ qs_set_auto_accept() {
     qs_write_settings "$(qs_get_dir)" "$state"
     rx_log_file "info" "Quick Share auto-accept set to $state"
     echo "OK|$state"
-}
-
-qs_set_autostart() {
-    local state="${1:-true}"
-    case "$state" in
-        on|true|enable|1) state="true" ;;
-        off|false|disable|0) state="false" ;;
-        *) { echo "ERR|invalid_state"; return 1; } ;;
-    esac
-    if [[ $state == "true" ]]; then
-        mkdir -p "$(dirname "$QS_AUTOSTART")"
-        cat >"$QS_AUTOSTART" <<EOF
-[Desktop Entry]
-Type=Application
-Name=Quick Share
-Comment=Android Quick Share receiver
-Exec=$QS_PY --start
-Terminal=false
-X-GNOME-Autostart-enabled=true
-EOF
-        rm -f "$QS_LEGACY_AUTOSTART"
-        rx_log_file "info" "Quick Share autostart enabled"
-        echo "OK|enabled"
-    else
-        rm -f "$QS_AUTOSTART" "$QS_LEGACY_AUTOSTART"
-        rx_log_file "info" "Quick Share autostart disabled"
-        echo "OK|disabled"
-    fi
 }
 
 qs_restart() {
@@ -282,6 +264,23 @@ qs_status() {
     echo "$state|$(qs_get_dir)|$(qs_get_autostart)|${pid}|$(qs_get_auto_accept)"
 }
 
+qs_enabled_status() {
+    local val
+    val=$(get_var "QUICKSHARE_ENABLED" "true")
+    [[ $val != "false" ]] && echo "true" || echo "false"
+}
+
+qs_set_enabled() {
+    local state="${1:-true}"
+    case "$state" in
+        on|true|enable|1) state="true" ;;
+        off|false|disable|0) state="false" ;;
+        *) { echo "ERR|invalid_state"; return 1; } ;;
+    esac
+    set_var "QUICKSHARE_ENABLED" "$state"
+    echo "OK|$state"
+}
+
 qs_scan() {
     python3 "$RETRO_DIR/scripts/python/quickshare_scan.py"
 }
@@ -293,8 +292,6 @@ qs_send() {
     [[ -z $ip || -z $port || -z $file_path ]] && { echo "ERR|missing_args"; return 1; }
     [[ ! -f $file_path ]] && { echo "ERR|file_not_found"; return 1; }
     rx_log_file "info" "Sending $file_path to $ip:$port"
-    # exec so the bash wrapper is replaced by the python sender -- the page's
-    # cancel (proc.terminate) then reaches the actual sender, not a wrapper.
     exec python3 "$RETRO_DIR/scripts/python/quickshare_send.py" "$file_path" --target "$ip:$port"
 }
 
@@ -315,6 +312,28 @@ qs_clear_transfer() {
     echo "OK|$payload_id"
 }
 
+qs_clear_send() {
+    local pid="$1"
+    [[ -z $pid ]] && { echo "ERR|missing_id"; return 1; }
+    python3 - "$pid" <<'PY'
+import json, os, sys
+path = "/tmp/retro_logs/quickshare_send_transfers.json"
+pid = sys.argv[1]
+try:
+    data = json.load(open(path))
+except Exception:
+    data = {"transfers": []}
+data["transfers"] = [e for e in data.get("transfers", []) if str(e.get("id")) != pid and str(e.get("pid")) != pid]
+try:
+    tmp = path + ".tmp"
+    json.dump(data, open(tmp, "w"))
+    os.replace(tmp, path)
+except Exception:
+    pass
+PY
+    echo "OK|$pid"
+}
+
 qs_accept_offer() {
     local offer_id="$1"
     local decision="$2"
@@ -332,6 +351,8 @@ case "$1" in
     --status) qs_status ;;
     --dir-configured) qs_dir_configured ;;
     --auto-accept-status) qs_get_auto_accept ;;
+    --enabled-status) qs_enabled_status ;;
+    --set-enabled) qs_set_enabled "$2" ;;
     --start) qs_start ;;
     --stop) qs_stop ;;
     --restart) qs_restart ;;
@@ -342,11 +363,11 @@ case "$1" in
     --send) qs_send "$2" "$3" "$4" ;;
     --cancel-receive) qs_cancel_receive "$2" ;;
     --clear-transfer) qs_clear_transfer "$2" ;;
+    --clear-send) qs_clear_send "$2" ;;
     --accept-offer) qs_accept_offer "$2" "$3" ;;
     --auto-accept) qs_set_auto_accept "${2:-false}" ;;
-    --autostart) qs_set_autostart "${2:-true}" ;;
     *)
-        echo "ERROR: Usage: quickshare_core.sh <--status|--start|--stop|--set-dir PATH|--auto-accept on|off|--autostart on|off>"
+        echo "ERROR: Usage: quickshare_core.sh <--status|--start|--stop|--set-dir PATH|--auto-accept on|off>"
         exit 1
         ;;
 esac
