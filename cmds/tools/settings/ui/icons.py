@@ -56,6 +56,7 @@ ABOUT_ICON = "help-about-symbolic"
 TIMESHIFT_ICON = "media-floppy-symbolic"
 HOME_ICON = "go-home-symbolic"
 USERS_ICON = "system-users-symbolic"
+QUICKSHARE_ICON = "network-transmit-receive-symbolic"
 
 # Used by pages/pending.py when a change can't be matched to a known
 # group_id (defensive — should not happen in practice).

@@ -74,6 +74,8 @@ python-hyprland-schema
 python-hyprland-socket
 python-hyprland-state
 python-pygobject-stubs
+python-protobuf
+python-zeroconf
 
 # Apps
 mpv
