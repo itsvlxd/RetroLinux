@@ -546,6 +546,18 @@ Item {
                             endRadius: root.innerRadius
                         }
 
+                        Bar.QuickPopupButton {
+                            iconName: Icons.quickshare
+                            tooltipText: "QuickShare"
+                            panelSource: "../widgets/dashboard/controls/QuickSharePanel.qml"
+                            visible: Config.bar.showQuickSharePopup
+                            isActive: QuickShareService.running
+                            bar: root
+                            layerEnabled: root.shadowsEnabled
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
                         ControlsButton {
                             id: controlsButton
                             bar: root
@@ -774,6 +786,19 @@ Item {
                             panelSource: "../widgets/dashboard/controls/BluetoothPanel.qml"
                             visible: Config.bar.showBluetoothPopup
                             isActive: BluetoothService.enabled
+                            bar: root
+                            vertical: true
+                            layerEnabled: root.shadowsEnabled
+                            startRadius: root.innerRadius
+                            endRadius: root.innerRadius
+                        }
+
+                        Bar.QuickPopupButton {
+                            iconName: Icons.quickshare
+                            tooltipText: "QuickShare"
+                            panelSource: "../widgets/dashboard/controls/QuickSharePanel.qml"
+                            visible: Config.bar.showQuickSharePopup
+                            isActive: QuickShareService.running
                             bar: root
                             vertical: true
                             layerEnabled: root.shadowsEnabled

@@ -25,5 +25,6 @@
     "showDayOfWeek": false,
     "batteryStyle": "arch",
     "showWifiPopup": true,
-    "showBluetoothPopup": true
+    "showBluetoothPopup": true,
+    "showQuickSharePopup": true
 }

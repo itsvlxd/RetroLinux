@@ -117,6 +117,7 @@ class ShellBarPage:
             ("showPresetsButton", "Show Presets Button", "Display the presets manager button in the bar"),
             ("showWifiPopup", "Show Wifi Button", "Show a Wi-Fi panel button in the bar"),
             ("showBluetoothPopup", "Show Bluetooth Button", "Show a Bluetooth panel button in the bar"),
+            ("showQuickSharePopup", "Show Quick Share Button", "Show a Quick Share panel button in the bar"),
         ):
             self._add_switch(group, key, label, subtitle=sub)
 
@@ -337,6 +338,7 @@ class ShellBarPage:
                     "showLayoutChanger": "Layout Changer",
                     "showWifiPopup": "Show Wifi Button",
                     "showBluetoothPopup": "Show Bluetooth Button",
+                    "showQuickSharePopup": "Show Quick Share Button",
                 }.get(key, "Bar setting")
                 changed.append(label)
         if changed:

@@ -7,5 +7,6 @@ var data = {
     "keepHidden": false,
     "noMediaDisplay": "userHost",
     "customText": "RetroLinux",
-    "disableHoverExpansion": true
+    "disableHoverExpansion": true,
+    "quickshareEnabled": true
 }

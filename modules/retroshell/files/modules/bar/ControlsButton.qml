@@ -482,13 +482,13 @@ Item {
                             id: appSlider
                             Layout.fillWidth: true
                             height: 14
-                            value: parent.parent.node.audio.volume
+                            value: parent.parent.node?.audio?.volume ?? 0
                             thickness: 2
                             handleSpacing: 0
                             wavy: true
-                            wavyAmplitude: parent.parent.node.audio.muted ? 0.5 : 1.5 * value
-                            wavyFrequency: parent.parent.node.audio.muted ? 1.0 : 8.0 * value
-                            progressColor: parent.parent.node.audio.muted ? Colors.outline : Styling.srItem("overprimary")
+                            wavyAmplitude: parent.parent.node?.audio?.muted ? 0.5 : 1.5 * value
+                            wavyFrequency: parent.parent.node?.audio?.muted ? 1.0 : 8.0 * value
+                            progressColor: parent.parent.node?.audio?.muted ? Colors.outline : Styling.srItem("overprimary")
                             backgroundColor: Qt.rgba(Colors.overBackground.r, Colors.overBackground.g, Colors.overBackground.b, 0.15)
 
                             onValueChanged: {
@@ -496,15 +496,15 @@ Item {
                             }
 
                             Connections {
-                                target: parent.parent.node.audio
+                                target: parent.parent.node?.audio
                                 ignoreUnknownSignals: true
                                 function onVolumeChanged() {
                                     if (!appSlider.isDragging)
-                                        appSlider.value = parent.parent.node.audio.volume;
+                                        appSlider.value = parent.parent.node?.audio?.volume ?? 0;
                                 }
                                 function onMutedChanged() {
                                     if (!appSlider.isDragging)
-                                        appSlider.value = parent.parent.node.audio.volume;
+                                        appSlider.value = parent.parent.node?.audio?.volume ?? 0;
                                 }
                             }
                         }

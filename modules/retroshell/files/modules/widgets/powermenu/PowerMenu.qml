@@ -20,6 +20,20 @@ ActionGrid {
         running: false
     }
 
+    property string defaultLogoutCmd: "hyprctl dispatch 'hl.dsp.exit()'"
+
+    Process {
+        id: logoutDefaultReader
+        running: true
+        command: ["bash", "-c", "sed -n 's/^export RETRO_LOGOUT_CMD=\"\\(.*\\)\"$/\\1/p' \"${RETRO_DIR:-/opt/retrolinux}/modules/retro/files/variables.sh\" | head -1"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var val = text.trim()
+                if (val) root.defaultLogoutCmd = val
+            }
+        }
+    }
+
     Component.onCompleted: {
         root.forceActiveFocus();
     }
@@ -43,7 +57,7 @@ ActionGrid {
         {
             icon: Icons.logout,
             tooltip: "Logout",
-            command: (Quickshell.env("RETRO_LOGOUT_CMD") || "hyprctl dispatch exit")
+            command: (Quickshell.env("RETRO_LOGOUT_CMD") || root.defaultLogoutCmd)
         },
         {
             icon: Icons.reboot,
