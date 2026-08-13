@@ -33,15 +33,16 @@ SETUP_SCRIPTS=(
     "user.sh"
     "root.sh"
     "hostname.sh"
-    "display.sh"
     "keyboard.sh"
     "locale.sh"
-    "mirrors.sh"
     "timezone.sh"
+    "display.sh"
     "disk.sh"
     "luks.sh"
     "kernel.sh"
     "boot.sh"
+    "mirrors.sh"
+    "network.sh"
     "bluetooth.sh"
     "fingerprint.sh"
     "print.sh"
@@ -50,7 +51,6 @@ SETUP_SCRIPTS=(
     "editor.sh"
     "filemanager.sh"
     "browser.sh"
-    "network.sh"
     "config.sh"
 )
 
@@ -144,7 +144,7 @@ rx_run_step() {
     CURRENT_SCRIPT=""
     rx_load_state
     if [[ $exit_code -eq 42 ]]; then
-        RX_SKIP_STEP=6
+        RX_SKIP_STEP=5
         rx_save_state
         exec /opt/retrolinux/bin/retroinstall
     elif [[ $exit_code -ne 0 ]]; then
