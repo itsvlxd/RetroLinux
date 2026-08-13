@@ -34,6 +34,7 @@ hl.window_rule({
 })
 
 hl.window_rule({
+	name = "float-gradia",
 	match = {
 		class = "^(be\\.alexandervanhee\\.gradia)$",
 	},
@@ -42,8 +43,23 @@ hl.window_rule({
 })
 
 hl.window_rule({
+	name = "float-gnome-calculator",
 	match = {
 		class = "^(org\\.gnome\\.Calculator)$",
 	},
 	float = true,
+})
+
+hl.window_rule({
+	name = "float-zenity-pickers",
+	match = { class = "xdg-desktop-portal-gtk" },
+	float = true,
+	center = true,
+})
+
+hl.window_rule({
+	name = "float-zenity-pickers-2",
+	match = { class = "zenity" },
+	float = true,
+	center = true,
 })
