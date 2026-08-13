@@ -9,6 +9,7 @@ RETRO_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 sys.path.insert(0, RETRO_DIR)
 sys.path.insert(0, os.path.join(RETRO_DIR, "lib", "python"))
 
+from quickshare import mdns  # pylint: disable=import-error
 from quickshare.discover import browse  # pylint: disable=import-error
 from quickshare.server import pick_ipv4_address  # pylint: disable=import-error
 
@@ -24,12 +25,12 @@ def main():
     except Exception:
         address = None
 
-    local_name = os.uname().nodename.lower()
+    local_endpoint = mdns.stable_endpoint_id()
     devices = browse(args.duration, address)
     for d in devices:
-        if address and d.address == address:
+        if d.endpoint_id == local_endpoint:
             continue
-        if d.device_name.lower() == local_name:
+        if address and d.address == address:
             continue
         print(f"{d.device_name}|{d.address}|{d.port}|{d.device_type.name}")
     return 0

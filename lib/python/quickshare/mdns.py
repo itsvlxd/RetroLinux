@@ -90,16 +90,39 @@ def _web_safe_base64_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
 
-def stable_endpoint_id() -> bytes:
-    """Deterministic endpoint ID derived from the hostname alone, so this
-    machine keeps the same identity across restarts instead of appearing as
-    a new device to the phone on every run.
+def _machine_unique_seed() -> str:
+    """A stable per-machine salt for endpoint-ID derivation.
 
-    Hashed rather than using the hostname directly, since it must fit the
-    same 4-character alphabet (connections/implementation/client_proxy.cc:
+    Hostname alone is not enough: two hosts cloned from the same image (or
+    otherwise sharing a hostname, e.g. via DHCP) produce the same endpoint ID
+    and therefore the same mDNS instance name. zeroconf then rejects the second
+    advertiser with NonUniqueNameException. Mixing in the MAC address keeps the
+    ID stable across restarts (the phone still recognizes this machine) while
+    making colliding hostnames diverge.
+    """
+    hostname = socket.gethostname()
+    try:
+        with open("/sys/class/net/wlan0/address", encoding="utf-8") as f:
+            mac = f.read().strip()
+    except OSError:
+        try:
+            import uuid
+            mac = uuid.getnode().to_bytes(6, "big").hex(":")
+        except Exception:
+            mac = "00:00:00:00:00:00"
+    return f"{hostname}|{mac}"
+
+
+def stable_endpoint_id() -> bytes:
+    """Deterministic endpoint ID derived from the machine (hostname + MAC), so
+    this machine keeps the same identity across restarts instead of appearing
+    as a new device to the phone on every run.
+
+    Hashed rather than using the seed directly, since it must fit the same
+    4-character alphabet (connections/implementation/client_proxy.cc:
     kEndpointIdChars, [A-Z1-9 0]) that a real endpoint ID uses.
     """
-    digest = hashlib.sha256(socket.gethostname().encode("utf-8")).digest()
+    digest = hashlib.sha256(_machine_unique_seed().encode("utf-8")).digest()
     alphabet_len = len(_ENDPOINT_ID_ALPHABET)
     return "".join(_ENDPOINT_ID_ALPHABET[b % alphabet_len] for b in digest[:_ENDPOINT_ID_LENGTH]).encode("ascii")
 
