@@ -136,6 +136,11 @@ Item {
 
     function getThumbnailPath(filePath) {
         var fileName = filePath.split('/').pop();
+        return Quickshell.env("HOME") + "/.config/retro/wallpaper_thumbs/" + fileName + ".png";
+    }
+
+    function getFramePath(filePath) {
+        var fileName = filePath.split('/').pop();
         return Quickshell.env("HOME") + "/.config/retro/wallpaper_frames/" + fileName + ".png";
     }
 
@@ -156,9 +161,9 @@ Item {
     function getColorSource(filePath) {
         var fileType = getFileType(filePath);
 
-        // Para generación de colores: solo videos usan thumbnails
+        // Para generación de colores: solo videos usan el frame full-res
         if (fileType === 'video') {
-            return getThumbnailPath(filePath);
+            return getFramePath(filePath);
         }
 
         // Imágenes y GIFs usan el archivo original para colores
@@ -177,9 +182,9 @@ Item {
             return filePath;
         }
 
-        // Para videos y GIFs, usar el frame cacheado de wallpaper_frames
+        // Para videos y GIFs, usar el frame full-res cacheado de wallpaper_frames
         if (fileType === 'video' || fileType === 'gif') {
-            return getThumbnailPath(filePath);
+            return getFramePath(filePath);
         }
 
         return filePath;

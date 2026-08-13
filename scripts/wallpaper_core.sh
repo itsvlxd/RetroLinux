@@ -80,6 +80,10 @@ optimize_wallpapers() {
     pkill -9 mpvpaper 2>/dev/null
     sleep 1
 
+    # Frames must match the new target resolution; rebuild them from scratch.
+    rm -rf "$FRAME_CACHE"
+    mkdir -p "$FRAME_CACHE"
+
     local optimized=0 skipped=0
 
     # Build file list, then process with ALL stderr suppressed
@@ -111,7 +115,7 @@ optimize_wallpapers() {
         local ext="${filename##*.}"
         if [[ ${ext,,} =~ ^(mp4|mkv|webm)$ ]]; then
             local tmp=$(mktemp --suffix=".$ext")
-            ffmpeg -y -i "$f" \
+            ffmpeg -nostdin -y -i "$f" \
                 -vf "scale='min($target_w,iw)':'min($target_h,ih)':force_original_aspect_ratio=decrease" \
                 -c:v libx264 -preset fast -crf 23 -an "$tmp" -loglevel error &&
                 mv "$tmp" "$f" || rm -f "$tmp"
@@ -619,6 +623,7 @@ case "$1" in
         mkdir -p "$FRAME_CACHE"
         while IFS= read -r f; do
             [[ -z $f ]] && continue
+            rm -f "$FRAME_CACHE/$(basename "$f").png"
             rx_wallpaper_generate_cache "$f" >/dev/null
         done < <(rx_wallpaper_list_files "$col_name")
         echo "result=ok"

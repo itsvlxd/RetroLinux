@@ -13,6 +13,7 @@ from settings.ui import make_page_layout
 from settings.ui.row_actions import RowActions
 
 FRAME_CACHE = Path.home() / ".config" / "retro" / "wallpaper_frames"
+THUMB_CACHE = Path.home() / ".config" / "retro" / "wallpaper_thumbs"
 WALLPAPER_CORE = Path(os.environ.get("RETRO_DIR", "")) / "scripts" / "wallpaper_core.sh"
 
 
@@ -95,6 +96,10 @@ def _rename_wallpaper(old_path: str, new_stem: str) -> bool:
     for c in FRAME_CACHE.glob(f"{old.name}.colors*"):
         new_c = FRAME_CACHE / c.name.replace(old.name, new_name)
         c.rename(new_c)
+
+    for t in THUMB_CACHE.glob(f"{old.name}.png"):
+        new_t = THUMB_CACHE / t.name.replace(old.name, new_name)
+        t.rename(new_t)
     return True
 
 
@@ -104,6 +109,8 @@ def _delete_wallpaper(path: str) -> bool:
         return False
     for f in FRAME_CACHE.glob(f"{p.name}*"):
         f.unlink()
+    for t in THUMB_CACHE.glob(f"{p.name}.png"):
+        t.unlink()
     p.unlink()
     return True
 
