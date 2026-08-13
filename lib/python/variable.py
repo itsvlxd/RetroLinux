@@ -25,6 +25,14 @@ def _get_mtime(path):
         return 0
 
 
+def _strip_quotes(val):
+    """Remove a single matching pair of surrounding quotes, preserving any
+    quote chars inside the value (e.g. ``hyprctl dispatch 'hl.dsp.exit()'``)."""
+    if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+        return val[1:-1]
+    return val
+
+
 def _parse_vars_file():
     global _VARS_MTIME, _VARS_CACHE
     path = _get_vars_file()
@@ -42,7 +50,7 @@ def _parse_vars_file():
                 if match:
                     key = match.group(1)
                     val = match.group(2)
-                    val = val.strip("\"'")
+                    val = _strip_quotes(val)
                     _VARS_CACHE[key] = val
     except FileNotFoundError:
         pass
@@ -100,7 +108,7 @@ def get_module_default(key: str, default: str = "") -> str:
                     line = line.strip()
                     match = re.match(r"^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$", line)
                     if match:
-                        val = match.group(2).strip("\"'")
+                        val = _strip_quotes(match.group(2))
                         _MODULE_VARS[match.group(1)] = val
         except FileNotFoundError:
             pass
