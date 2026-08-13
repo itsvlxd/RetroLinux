@@ -27,17 +27,15 @@ cmd_update() {
     local desired_branch=$($RETRO_DIR/retro.sh variable get RETRO_BRANCH 2>/dev/null || echo "")
     [[ $desired_branch == "null" ]] && desired_branch=""
 
-    if [[ $current_branch == "develop" || $desired_branch == "develop" ]]; then
-        rx_log "warn" "On the ${PINK}develop${RESET} branch, creating Timeshift backup before update"
-        if command -v timeshift >/dev/null 2>&1; then
-            if sudo timeshift --create --comments "Pre-update safety backup (develop)" --tags O >/dev/null 2>&1; then
-                rx_log "success" "Timeshift backup created"
-            else
-                rx_log "warn" "Timeshift backup failed, continuing anyway"
-            fi
+    if command -v timeshift >/dev/null 2>&1; then
+        rx_log "warn" "Creating Timeshift backup before update"
+        if sudo timeshift --create --comments "Pre-update safety backup" --tags O >/dev/null 2>&1; then
+            rx_log "success" "Timeshift backup created"
         else
-            rx_log "warn" "Timeshift not installed, skipping backup"
+            rx_log "warn" "Timeshift backup failed, continuing anyway"
         fi
+    else
+        rx_log "warn" "Timeshift not installed, skipping backup"
     fi
 
     local has_changes=$(git -C "$RETRO_DIR" status --porcelain 2>/dev/null)
