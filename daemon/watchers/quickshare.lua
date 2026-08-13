@@ -27,17 +27,20 @@ return {
 			return
 		end
 
-		local status = Watcher.run_cmd("bash '" .. core .. "' --status")
-		-- status format: state|dir|autostart|pid|autoaccept
-		local state, _, autostart = status:match("^([^|]*)|([^|]*)|([^|]*)")
+		if Watcher.get_var("QUICKSHARE_ENABLED", "true") ~= "true" then
+			return
+		end
 
-		if autostart == "true" and state ~= "running" then
-			Watcher.log("quickshare", "receiver not running (autostart enabled), restarting", "warn")
+		local status = Watcher.run_cmd("bash '" .. core .. "' --status")
+		local state = status:match("^([^|]*)")
+
+		if state ~= "running" then
+			Watcher.log("quickshare", "receiver not running, starting", "warn")
 			local result = Watcher.run_cmd("bash '" .. core .. "' --start &")
 			if result:find("^OK", 1) or result == "" then
-				Watcher.log("quickshare", "receiver restarted", "info")
+				Watcher.log("quickshare", "receiver started", "info")
 			else
-				Watcher.log("quickshare", "restart failed: " .. result, "error")
+				Watcher.log("quickshare", "start failed: " .. result, "error")
 			end
 		end
 	end,
