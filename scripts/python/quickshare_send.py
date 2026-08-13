@@ -2,9 +2,11 @@
 # pylint: disable=C0413
 
 import argparse
+import json
 import os
 import signal
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -26,6 +28,50 @@ from quickshare.send import (  # pylint: disable=import-error
     run_sender,
     send_files,
 )
+
+_SEND_STATE_FILE = "/tmp/retro_logs/quickshare_send_transfers.json"
+_SEND_LOCK = threading.Lock()
+_STATE_TTL = 15.0
+
+
+def _update_send_state(entry: dict) -> None:
+    """Merge *entry* (keyed by its id) into the shared send-state file that the
+    settings page polls, so sends started from the shell show up there too."""
+    now = time.time()
+    with _SEND_LOCK:
+        entries = []
+        try:
+            if os.path.isfile(_SEND_STATE_FILE):
+                with open(_SEND_STATE_FILE) as f:
+                    data = json.load(f)
+                entries = data.get("transfers", [])
+        except Exception:
+            entries = []
+        entries = [e for e in entries if not (e.get("done") and now - e.get("finished_at", 0) > _STATE_TTL)]
+        replaced = False
+        for i, e in enumerate(entries):
+            if e.get("id") == entry["id"]:
+                entries[i] = entry
+                replaced = True
+                break
+        if not replaced:
+            entries.append(entry)
+        payload = {"transfers": entries}
+        try:
+            os.makedirs(os.path.dirname(_SEND_STATE_FILE), exist_ok=True)
+            tmp = _SEND_STATE_FILE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(payload, f)
+            os.replace(tmp, _SEND_STATE_FILE)
+        except Exception:
+            pass
+
+
+def _finish_send(entry: dict, result: str) -> None:
+    entry["done"] = True
+    entry["finished_at"] = time.time()
+    entry["result"] = result
+    _update_send_state(entry)
 
 
 def _signal_handler(_signum, _frame):
@@ -53,6 +99,21 @@ def _send_direct(target: str, paths: list[str], device_name: str) -> int:
         return 1
 
     files = [Path(p) for p in paths]
+    total_size = sum(f.stat().st_size for f in files if f.is_file())
+    pid = os.getpid()
+    entry = {
+        "id": pid,
+        "pid": pid,
+        "file": os.path.basename(paths[0]),
+        "size": total_size,
+        "bytes": 0,
+        "pct": 0,
+        "direction": "send",
+        "done": False,
+        "finished_at": None,
+    }
+    _update_send_state(entry)
+
     endpoint_id = mdns.stable_endpoint_id()
     endpoint_info = mdns.build_endpoint_info(device_name, mdns.ShareTargetType.LAPTOP)
 
@@ -64,6 +125,9 @@ def _send_direct(target: str, paths: list[str], device_name: str) -> int:
 
     def on_progress(sp) -> None:
         pct = int(sp.bytes_sent * 100 / sp.total_bytes) if sp.total_bytes else 0
+        entry["bytes"] = sp.bytes_sent
+        entry["pct"] = pct
+        _update_send_state(entry)
         print(f"PROGRESS|{pct}|{sp.file_name}", flush=True)
 
     try:
@@ -72,19 +136,24 @@ def _send_direct(target: str, paths: list[str], device_name: str) -> int:
             files, on_pin=on_pin, on_progress=on_progress,
         )
     except KeyboardInterrupt:
+        _finish_send(entry, "canceled")
         print("ERR|canceled", flush=True)
         return 1
     except (OSError, SendError, ukey2.Ukey2Error) as exc:
+        _finish_send(entry, str(exc))
         print(f"ERR|{exc}", flush=True)
         return 1
 
     elapsed = int(time.monotonic() - started)
     if status == wf_pb2.ConnectionResponseFrame.Status.ACCEPT:
+        _finish_send(entry, "ok")
         print(f"OK|{elapsed}", flush=True)
         return 0
     if status in (USER_CANCELED, RECEIVER_CANCELED):
+        _finish_send(entry, "receiver_canceled")
         print("ERR|receiver_canceled", flush=True)
         return 1
+    _finish_send(entry, wf_pb2.ConnectionResponseFrame.Status.Name(status))
     print(f"ERR|{wf_pb2.ConnectionResponseFrame.Status.Name(status)}", flush=True)
     return 1
 
