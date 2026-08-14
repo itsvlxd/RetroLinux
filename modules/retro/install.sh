@@ -271,6 +271,26 @@ sync_missing_variables() {
 
 sync_missing_variables
 
+remember_last_stable() {
+    local current
+    current=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get RETRO_LAST_STABLE 2>/dev/null)
+    [[ -z $current || $current == "null" ]] || return 0
+
+    local tag
+    tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>/dev/null)
+    if [[ -z $tag ]]; then
+        git -C "$RETRO_DIR" fetch origin main >/dev/null 2>&1 || true
+        tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' origin/main 2>/dev/null)
+    fi
+    [[ -z $tag ]] && tag=$(git -C "$RETRO_DIR" tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | head -1)
+
+    if [[ -n $tag ]]; then
+        bash "$RETRO_DIR/scripts/variable_core.sh" --set RETRO_LAST_STABLE "$tag" >/dev/null 2>&1
+        rx_log "success" "Remembered last stable version: ${PINK}${tag}${RESET}"
+    fi
+}
+remember_last_stable
+
 HYPRIDLE_SRC="$RETRO_DIR/modules/hyprland/files/hypridle.conf"
 HYPRIDLE_DST="$RETRO_CONFIG/hypridle.conf"
 if [[ ! -f $HYPRIDLE_DST ]] || cmp -s "$HYPRIDLE_SRC" "$HYPRIDLE_DST"; then
