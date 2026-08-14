@@ -80,7 +80,6 @@ optimize_wallpapers() {
     pkill -9 mpvpaper 2>/dev/null
     sleep 1
 
-    # Frames must match the new target resolution; rebuild them from scratch.
     rm -rf "$FRAME_CACHE"
     mkdir -p "$FRAME_CACHE"
 
