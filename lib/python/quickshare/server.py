@@ -313,36 +313,39 @@ class _ReceiveProgressPrinter:
     def __init__(self) -> None:
         self._bar: Optional[tqdm] = None
         self._payload_id: Optional[int] = None
+        self._lock = threading.RLock()
 
     def __call__(self, incoming: IncomingFile) -> None:
-        if self._payload_id != incoming.payload_id:
-            if self._bar is not None:
-                self._bar.close()
-            self._bar = tqdm(
-                total=incoming.size,
-                desc=color.sanitize(incoming.name),
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-                file=sys.stderr,
-                leave=True,
-                dynamic_ncols=True,
-            )
-            self._payload_id = incoming.payload_id
-        self._bar.n = incoming.bytes_written
-        self._bar.refresh()
-        if incoming.complete:
-            self.reset()
+        with self._lock:
+            if self._payload_id != incoming.payload_id:
+                if self._bar is not None:
+                    self._bar.close()
+                self._bar = tqdm(
+                    total=incoming.size,
+                    desc=color.sanitize(incoming.name),
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    file=sys.stderr,
+                    leave=True,
+                    dynamic_ncols=True,
+                )
+                self._payload_id = incoming.payload_id
+            self._bar.n = incoming.bytes_written
+            self._bar.refresh()
+            if incoming.complete:
+                self.reset()
 
     def reset(self) -> None:
         """Close and drop any bar left open by a file that never reached
         incoming.complete -- a canceled or disconnected transfer. Call this
         after every connection, complete or not, so a stale bar never lingers
         into the next one."""
-        if self._bar is not None:
-            self._bar.close()
-            self._bar = None
-        self._payload_id = None
+        with self._lock:
+            if self._bar is not None:
+                self._bar.close()
+                self._bar = None
+            self._payload_id = None
 
 
 _print_progress = _ReceiveProgressPrinter()
@@ -406,47 +409,54 @@ def run_receiver(
     print(color.cyan(f"Advertising as {device_name!r} on {address}:{port}, saving to {output_path}"), file=sys.stderr)
     print(color.cyan("Waiting for an incoming transfer (Ctrl+C to stop)..."), file=sys.stderr)
 
-    try:
-        while True:
-            conn, peer_addr = listener.accept()
-            debug.log("server", f"accepted connection from {peer_addr[0]}:{peer_addr[1]}")
+    def serve(conn, peer_ip):
+        try:
             try:
-                outcome, completed = _handle_connection(conn, peer_addr[0], output_path, auto_accept, on_offer, on_progress)
-                debug.log("server", f"connection finished, outcome={outcome}")
-                if on_connection_end is not None:
-                    on_connection_end(outcome, completed)
-                if isinstance(on_progress, _ReceiveProgressPrinter):
-                    on_progress.reset()  # close any bar left open by a canceled/disconnected transfer
-                print(file=sys.stderr)  # end whatever progress line was mid-print
-                if outcome == TransferOutcome.COMPLETED:
-                    print(color.green("Transfer finished. Saved:"), file=sys.stderr)
-                    for path in completed:
-                        print(f"  {path}", file=sys.stderr)
-                elif outcome == TransferOutcome.DECLINED:
-                    print(color.yellow("Transfer declined."), file=sys.stderr)
-                elif outcome == TransferOutcome.CANCELED:
-                    print(color.yellow("Transfer canceled."), file=sys.stderr)
-                elif outcome == TransferOutcome.SENDER_DISCONNECTED:
-                    print(color.red("Sender stopped the transfer before it finished."), file=sys.stderr)
-                elif outcome == TransferOutcome.SENDER_CANCELED:
-                    print(color.yellow("Sender canceled the transfer."), file=sys.stderr)
+                outcome, completed = _handle_connection(conn, peer_ip, output_path, auto_accept, on_offer, on_progress)
             except framing.ConnectionClosedImmediately:
                 # Windows' Quick Share opens and instantly closes a connection
                 # to us purely to test reachability before it'll list this
                 # device -- see WifiLanMedium::IsConnectableIpAddress in
                 # google/nearby's Windows backend. Expected background noise,
-                # not a failed transfer: no error banner, and skip the
-                # "Waiting for the next transfer" reprint too, since nothing
-                # user-visible happened.
+                # not a failed transfer: no error banner, and no per-connection
+                # churn, since nothing user-visible happened.
                 debug.log("server", "peer closed immediately without sending data (Windows reachability probe)")
-                continue
-            except Exception as exc:
-                print(color.red(f"\nTransfer failed: {exc}"), file=sys.stderr)
-                # The message alone rarely says where a protocol failure came
-                # from; the traceback does, so surface it when debugging.
-                if debug.enabled():
-                    traceback.print_exc(file=sys.stderr)
-            print(color.cyan("\nWaiting for the next incoming transfer (Ctrl+C to stop)..."), file=sys.stderr)
+                return
+            debug.log("server", f"connection finished, outcome={outcome}")
+            if on_connection_end is not None:
+                on_connection_end(outcome, completed)
+            if isinstance(on_progress, _ReceiveProgressPrinter):
+                on_progress.reset()  # close any bar left open by a canceled/disconnected transfer
+            print(file=sys.stderr)  # end whatever progress line was mid-print
+            if outcome == TransferOutcome.COMPLETED:
+                print(color.green("Transfer finished. Saved:"), file=sys.stderr)
+                for path in completed:
+                    print(f"  {path}", file=sys.stderr)
+            elif outcome == TransferOutcome.DECLINED:
+                print(color.yellow("Transfer declined."), file=sys.stderr)
+            elif outcome == TransferOutcome.CANCELED:
+                print(color.yellow("Transfer canceled."), file=sys.stderr)
+            elif outcome == TransferOutcome.SENDER_DISCONNECTED:
+                print(color.red("Sender stopped the transfer before it finished."), file=sys.stderr)
+            elif outcome == TransferOutcome.SENDER_CANCELED:
+                print(color.yellow("Sender canceled the transfer."), file=sys.stderr)
+        except Exception as exc:
+            print(color.red(f"\nTransfer failed: {exc}"), file=sys.stderr)
+            # The message alone rarely says where a protocol failure came
+            # from; the traceback does, so surface it when debugging.
+            if debug.enabled():
+                traceback.print_exc(file=sys.stderr)
+
+    try:
+        while True:
+            conn, peer_addr = listener.accept()
+            debug.log("server", f"accepted connection from {peer_addr[0]}:{peer_addr[1]}")
+            # Each connection is handled on its own daemon thread so the accept
+            # loop never blocks on a slow peer. A pending offer waits up to
+            # 120s for a human decision; if connections were handled inline,
+            # a second (stacked) transfer would sit unhandled in the listen
+            # backlog the whole time and never raise its accept notification.
+            threading.Thread(target=serve, args=(conn, peer_addr[0]), daemon=True).start()
     except KeyboardInterrupt:
         print("\nStopping.", file=sys.stderr)
     finally:
