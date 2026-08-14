@@ -1,3 +1,11 @@
+## [1.1.1](https://github.com/itsvlxd/RetroLinux/compare/v1.1.0...v1.1.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **retroshell:** add missing syntax-hightlighting package ([7e1c8d2](https://github.com/itsvlxd/RetroLinux/commit/7e1c8d2abf84fe7fa13ca5de78d46bf259543aee))
+* **retroshell:** add missing syntax-hightlighting package ([#5](https://github.com/itsvlxd/RetroLinux/issues/5)) ([c661cbf](https://github.com/itsvlxd/RetroLinux/commit/c661cbf31e3f27f49c7d75ba9aaebb151f35b41c))
+
 # [1.1.0](https://github.com/itsvlxd/RetroLinux/compare/v1.0.0...v1.1.0) (2026-08-14)
 
 
