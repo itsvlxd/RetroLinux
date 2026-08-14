@@ -337,9 +337,17 @@ def _on_offer(file_metadata, pin, auto_accept):
                 timeout=120000,
                 wait=True,
             )
-            notif_result["action"] = r.stdout.strip()
-        except Exception:
-            notif_result["action"] = ""
+            action = r.stdout.strip() if r.returncode == 0 else ""
+            if action in ("accept", "deny"):
+                notif_result["action"] = action
+            elif r.returncode != 0:
+                rx_log_file(
+                    "warn",
+                    f"Accept notification not displayed (rc={r.returncode}): "
+                    f"{r.stderr.strip()[:200] or 'no stderr'}",
+                )
+        except Exception as exc:
+            rx_log_file("warn", f"Accept notification not displayed: {exc}")
 
     threading.Thread(target=notif_run, daemon=True).start()
 
@@ -466,6 +474,11 @@ def main():
         pass
 
     device_name = args.name or os.uname().nodename
+    if shutil.which("notify-send") is None:
+        rx_log_file(
+            "warn",
+            "notify-send not found — accept notifications unavailable; use Settings → Quick Share → Transfers to accept offers",
+        )
     rx_log_file("info", f"Quick Share receiver starting (device '{device_name}', dir {args.dir}, auto-accept {'on' if args.yes else 'off'})")
 
     signal.signal(signal.SIGTERM, _signal_handler)
