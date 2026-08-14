@@ -81,6 +81,7 @@ python-hyprland-state
 # Apps
 mpv
 loupe
+gradia
 bazaar
 resources
 
