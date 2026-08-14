@@ -744,6 +744,20 @@ rx_xdg_autostart_toggle() {
     esac
 }
 
+rx_xdg_autostart_delete() {
+    local name="$1"
+    [[ -z $name ]] && echo "result=error|reason=no_name" && return 1
+
+    local file="$HOME/.config/autostart/$name"
+    if [[ -f $file || -L $file ]]; then
+        rm -f "$file"
+        echo "OK|deleted"
+    else
+        echo "result=error|reason=not_found"
+        return 1
+    fi
+}
+
 rx_xdg_autostart_clean() {
     local user_autostart="$HOME/.config/autostart"
     [[ ! -d $user_autostart ]] && echo "cleaned=0" && return 0
