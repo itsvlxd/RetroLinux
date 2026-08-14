@@ -466,7 +466,7 @@ class DaemonPage:
                 power_sw = Gtk.Switch()
                 power_sw.set_valign(Gtk.Align.CENTER)
                 power_sw.set_active(not w["disabled"])
-                power_sw.connect("notify::active", lambda _sw, n=w["name"], d=w["disabled"]: self._toggle_watcher(n, _sw.get_active()))
+                power_sw.connect("notify::active", lambda _sw, _pspec, n=w["name"], d=w["disabled"]: self._toggle_watcher(n, _sw.get_active()))
 
                 if w["log"]:
                     expander = Adw.ExpanderRow()
