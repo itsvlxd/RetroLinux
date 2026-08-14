@@ -84,7 +84,7 @@ def _friendly_send_reason(reason: str) -> str:
     return {
         "receiver_canceled": "the receiving device stopped the transfer",
         "canceled": "the transfer was canceled",
-        "REJECT": "the device declined \u2014 accept the transfer on that device",
+        "REJECT": "the device declined, accept the transfer on that device",
         "bad_target": "the receiving device is no longer reachable",
         "file_not_found": "the selected file was not found",
     }.get(reason, reason or "unknown error")
@@ -263,7 +263,7 @@ class QuickSharePage:
         self._transfers_group.set_visible(True)
 
     def _build_offer_row(self, o: dict) -> Gtk.ListBoxRow:
-        pin = o.get("pin", "—")
+        pin = o.get("pin", "??")
         files = o.get("files", [])
         names = ", ".join(f.get("name", "?") for f in files)
         oid = o.get("id")
@@ -365,7 +365,7 @@ class QuickSharePage:
         text_box.append(prog)
 
         size_lbl = Gtk.Label(
-            label=f"{'Receiving' if direction == 'receive' else 'Sending'}  \u00b7  {_human_size(bytes_done)} / {_human_size(size)}"
+            label=f"{'Receiving' if direction == 'receive' else 'Sending'}, {_human_size(bytes_done)} / {_human_size(size)}"
         )
         size_lbl.set_halign(Gtk.Align.START)
         size_lbl.add_css_class("dim-label")
@@ -684,7 +684,7 @@ class QuickSharePage:
             info_lbl.set_label(
                 f"{count} device{'s' if count != 1 else ''} found"
                 if count
-                else "No devices found \u2014 check your phone's Quick Share visibility"
+                else "No devices found, check your phone's Quick Share visibility"
             )
             if not listbox.get_first_child():
                 empty_lbl = Gtk.Label(label="No nearby devices")
@@ -835,7 +835,7 @@ class QuickSharePage:
                         reason = line.split("|", 1)[1] if "|" in line else "failed"
                         GLib.idle_add(
                             lambda: self._window.show_toast(
-                                f"Send failed \u2014 {_friendly_send_reason(reason)}", timeout=5
+                                f"Send failed, {_friendly_send_reason(reason)}", timeout=5
                             )
                         )
                 proc.wait()

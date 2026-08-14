@@ -166,7 +166,7 @@ Singleton {
                         title = "Quick Share: Transfer canceled";
                         msg = "The transfer was canceled";
                     } else if (reason === "REJECT") {
-                        msg = "The device declined — open Quick Share on " + sendProc.targetName + " and accept";
+                        msg = "The device declined, open Quick Share on " + sendProc.targetName + " and accept";
                     } else if (reason.indexOf("not_a_file") === 0) {
                         msg = "The selected file is no longer available";
                     } else if (reason === "file_not_found") {
