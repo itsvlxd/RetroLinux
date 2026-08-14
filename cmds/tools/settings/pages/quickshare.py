@@ -84,6 +84,7 @@ def _friendly_send_reason(reason: str) -> str:
     return {
         "receiver_canceled": "the receiving device stopped the transfer",
         "canceled": "the transfer was canceled",
+        "REJECT": "the device declined \u2014 accept the transfer on that device",
         "bad_target": "the receiving device is no longer reachable",
         "file_not_found": "the selected file was not found",
     }.get(reason, reason or "unknown error")
@@ -657,7 +658,7 @@ class QuickSharePage:
                 n_lbl.set_halign(Gtk.Align.START)
                 n_lbl.set_ellipsize(Pango.EllipsizeMode.END)
                 text_box.append(n_lbl)
-                m_lbl = Gtk.Label(label=f"{addr}:{port}  \u00b7  {_device_type_label(dtype)}")
+                m_lbl = Gtk.Label(label=f"{addr}:{port}, {_device_type_label(dtype)}")
                 m_lbl.set_halign(Gtk.Align.START)
                 m_lbl.add_css_class("dim-label")
                 m_lbl.add_css_class("caption")

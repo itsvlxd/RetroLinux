@@ -65,7 +65,7 @@ Item {
                     var label = type === "PHONE" || type === "FOLDABLE" ? "Phone"
                         : type === "LAPTOP" ? "PC"
                         : type === "TABLET" ? "Tablet" : "Other";
-                    return root.device?.address ? (label + " \u00b7 " + root.device.address) : label;
+                    return root.device?.address ? (label + ", " + root.device.address) : label;
                 }
                 font.family: Config.theme.font
                 font.pixelSize: Styling.fontSize(-2)
