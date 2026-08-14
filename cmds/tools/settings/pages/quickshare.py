@@ -163,17 +163,10 @@ class QuickSharePage:
 
         self._enabled_sw = Adw.SwitchRow(
             title="Enable QuickShare",
-            subtitle="Start Quick Share automatically and keep it running",
+            subtitle="Make this device discoverable to Android Quick Share",
         )
         self._enabled_sw.connect("notify::active", self._on_enabled)
         group.add(self._enabled_sw)
-
-        self._switch = Adw.SwitchRow(
-            title="Android Quick Share",
-            subtitle="Make this device discoverable to Android Quick Share",
-        )
-        self._switch.connect("notify::active", self._on_switch)
-        group.add(self._switch)
 
         self._dir_row = Adw.ActionRow(title="Download folder", subtitle="—")
         dir_btn = Gtk.Button(icon_name="folder-symbolic")
@@ -485,7 +478,6 @@ class QuickSharePage:
         running = self._status.get("state") == "running"
 
         self._setting_value = True
-        self._switch.set_active(running)
         self._autoaccept_sw.set_active(self._status.get("autoaccept") == "true")
         if hasattr(self, "_enabled_sw"):
             self._enabled_sw.set_active(_qs(["--enabled-status"]).strip() != "false")
@@ -515,21 +507,6 @@ class QuickSharePage:
 
     # ── Actions ──
 
-    def _on_switch(self, sw: Adw.SwitchRow, _pspec) -> None:
-        if self._setting_value:
-            return
-        res = _qs(["--start"] if sw.get_active() else ["--stop"])
-        if res.startswith("OK"):
-            self._window.show_toast(
-                "Quick Share enabled" if sw.get_active() else "Quick Share disabled"
-            )
-        else:
-            self._window.show_bug_toast(
-                "Failed to toggle Quick Share", detail=res or "unknown error", timeout=5,
-            )
-            sw.set_active(not sw.get_active())
-        self._reload()
-
     def _on_autoaccept(self, sw: Adw.SwitchRow, _pspec) -> None:
         if self._setting_value:
             return
@@ -549,15 +526,14 @@ class QuickSharePage:
     def _on_enabled(self, sw: Adw.SwitchRow, _pspec) -> None:
         if self._setting_value:
             return
-        state = "on" if sw.get_active() else "off"
-        res = _qs(["--set-enabled", state])
+        res = _qs(["--start"] if sw.get_active() else ["--stop"])
         if res.startswith("OK"):
             self._window.show_toast(
-                f"Keep-alive {'enabled' if sw.get_active() else 'disabled'}"
+                "Quick Share enabled" if sw.get_active() else "Quick Share disabled"
             )
         else:
             self._window.show_bug_toast(
-                "Failed to set keep-alive", detail=res or "unknown error", timeout=5,
+                "Failed to toggle Quick Share", detail=res or "unknown error", timeout=5,
             )
             sw.set_active(not sw.get_active())
         self._reload()
@@ -895,9 +871,6 @@ class QuickSharePage:
              "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
             {"key": "quickshare:autoaccept", "label": "Auto-accept Transfers",
              "description": "Accept incoming Quick Share files without prompting",
-             "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
-            {"key": "quickshare:enabled", "label": "Quick Share Enabled",
-             "description": "Auto-restart the Quick Share receiver if it stops",
              "_group_id": "quickshare", "_group_label": "System", "_section_label": "Status"},
             {"key": "quickshare:send", "label": "Send a File",
              "description": "Send files to a nearby Android Quick Share device",

@@ -273,7 +273,7 @@ qs_status() {
 
 qs_enabled_status() {
     local val
-    val=$(get_var "QUICKSHARE_ENABLED" "true")
+    val=$(get_var "QUICKSHARE_ENABLED" "false")
     [[ $val != "false" ]] && echo "true" || echo "false"
 }
 
