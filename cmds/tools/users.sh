@@ -286,4 +286,4 @@ cmd_users() {
     esac
 }
 
-register_command "SYSTEM" "users" "Manage system users with Retro config" "cmd_users"
+register_command "TOOLS" "users" "Manage system users with Retro config" "cmd_users"
