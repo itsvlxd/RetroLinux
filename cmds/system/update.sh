@@ -218,6 +218,11 @@ cmd_update() {
 
         rx_log "success" "Update finished"
 
+        if [[ $(rx_git_branch) == "main" && -n $new_release_tag ]]; then
+            $RETRO_DIR/retro.sh variable set RETRO_LAST_STABLE "$new_release_tag" >/dev/null 2>&1 || true
+            rx_log "success" "Last stable version updated to ${PINK}${new_release_tag}${RESET}"
+        fi
+
         rx_log "info" "Restarting Retro daemon..."
         $RETRO_DIR/retro.sh daemon restart
 
