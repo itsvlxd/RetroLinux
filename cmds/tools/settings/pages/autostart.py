@@ -74,6 +74,8 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         self._scrolled: Gtk.ScrolledWindow
         self._retro_rows: list[Gtk.Widget] = []
         self._xdg_group: Adw.PreferencesGroup | None = None
+        self._spinner_box: Gtk.Box | None = None
+        self._pending_loads = 0
         self._reorder = RowReorderController(
             move=self._move_retro_item,
             iter_rows=lambda: self._retro_rows,
@@ -91,23 +93,50 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         self._retro_saved = list(items)
         self._system_tasks: list[tuple[str, str]] = []
         self._xdg_entries: list[XdgAutostartEntry] = []
+        self._pending_loads = 2
+        self._xdg_load_seq = getattr(self, "_xdg_load_seq", 0) + 1
         self._xdg_async(lambda: (get_system_tasks(),), self._on_system_tasks_loaded)
-        self._xdg_async(lambda: (list_xdg_autostart(),), self._on_xdg_list_loaded)
+        self._xdg_async(
+            lambda: (self._xdg_load_seq, list_xdg_autostart()), self._on_xdg_list_loaded
+        )
 
     def _on_system_tasks_loaded(self, tasks: list[tuple[str, str]]) -> None:
         self._system_tasks = tasks
+        self._load_step_done()
+
+    def _on_xdg_list_loaded(self, seq: int, entries: list[XdgAutostartEntry]) -> None:
+        if seq == self._xdg_load_seq:
+            self._xdg_entries = entries
+        self._load_step_done()
+
+    def _load_step_done(self) -> None:
+        self._pending_loads -= 1
+        if self._pending_loads > 0:
+            return
         if self._content_box is None:
             return
+        if self._spinner_box is not None:
+            try:
+                self._content_box.remove(self._spinner_box)
+            except Exception:
+                pass
+            self._spinner_box = None
         self._rebuild_list()
 
-    def _on_xdg_list_loaded(self, entries: list[XdgAutostartEntry]) -> None:
-        self._xdg_entries = entries
-        if self._content_box is None:
-            return
-        if self._xdg_group is None:
-            self._rebuild_list()
-        else:
-            self._refresh_xdg_group(entries)
+    def _build_spinner(self) -> Gtk.Box:
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner_box.set_margin_top(48)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(32, 32)
+        spinner.start()
+        spinner_box.append(spinner)
+        lbl = Gtk.Label(label="Loading autostart entries\u2026")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+        self._spinner_box = spinner_box
+        return spinner_box
 
     # ── Build ──
 
@@ -126,7 +155,10 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
 
         toolbar_view, _, self._content_box, self._scrolled = make_page_layout(header=page_header)
 
-        self._rebuild_list()
+        if self._pending_loads > 0:
+            self._content_box.append(self._build_spinner())
+        else:
+            self._rebuild_list()
         return toolbar_view
 
     # ── List rendering ──
@@ -174,9 +206,12 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
     def _build_xdg_group(self) -> list[Gtk.Widget]:
         if not self._xdg_entries:
             return []
+        self._xdg_group = self._make_xdg_group_widget(self._xdg_entries)
+        return [self._xdg_group]
 
+    def _make_xdg_group_widget(self, entries: list[XdgAutostartEntry]) -> Adw.PreferencesGroup:
         group = Adw.PreferencesGroup(title="Application Autostart")
-        n = len(self._xdg_entries)
+        n = len(entries)
         group.set_description(
             f"{n} app{'s' if n != 1 else ''} launching at login"
         )
@@ -188,10 +223,9 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         clean_btn.connect("clicked", lambda _b: self._on_clean_xdg())
         group.set_header_suffix(clean_btn)
 
-        self._xdg_group = group
-        for entry in self._xdg_entries:
+        for entry in entries:
             group.add(self._make_xdg_row(entry))
-        return [group]
+        return group
 
     def _make_xdg_row(self, entry: XdgAutostartEntry) -> Adw.SwitchRow:
         scope = "System" if entry.scope == "system" else "User"
@@ -201,7 +235,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
 
         row = Adw.SwitchRow(title=html_escape(entry.name), subtitle=subtitle)
         row.set_active(entry.enabled)
-        row.connect("notify::active", lambda r, e=entry: self._on_xdg_toggle(r, e))
+        row.connect("notify::active", lambda r, _pspec, e=entry: self._on_xdg_toggle(r, e))
         if not entry.binary_exists:
             row.add_css_class("option-default")
             row.set_opacity(0.7)
@@ -217,6 +251,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
     def _on_xdg_toggle(self, row: Adw.SwitchRow, entry: XdgAutostartEntry) -> None:
         action = "enable" if row.get_active() else "disable"
         desktop = os.path.basename(entry.path)
+        self._xdg_load_seq += 1
 
         def worker() -> tuple[bool, list[XdgAutostartEntry]]:
             return toggle_xdg_autostart(desktop, action), list_xdg_autostart()
@@ -230,6 +265,7 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
 
     def _on_delete_xdg(self, entry: XdgAutostartEntry) -> None:
         desktop = os.path.basename(entry.path)
+        self._xdg_load_seq += 1
 
         def worker() -> tuple[bool, list[XdgAutostartEntry]]:
             return delete_xdg_autostart(desktop), list_xdg_autostart()
@@ -244,6 +280,8 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         self._refresh_xdg_group(entries)
 
     def _on_clean_xdg(self) -> None:
+        self._xdg_load_seq += 1
+
         def worker() -> tuple[int, list[XdgAutostartEntry]]:
             return clean_xdg_autostart(), list_xdg_autostart()
 
@@ -273,17 +311,22 @@ class AutostartPage(SavedListSectionPage[RetroStartupData]):
         return False
 
     def _refresh_xdg_group(self, entries: list[XdgAutostartEntry] | None = None) -> None:
-        if self._xdg_group is None:
-            return
         if entries is None:
             entries = list_xdg_autostart()
-        n = len(entries)
-        self._xdg_group.set_description(
-            f"{n} app{'s' if n != 1 else ''} launching at login"
-        )
-        clear_children(self._xdg_group)
-        for entry in entries:
-            self._xdg_group.add(self._make_xdg_row(entry))
+        self._xdg_entries = entries
+
+        if self._xdg_group is None or self._content_box is None:
+            self._rebuild_list()
+            return
+
+        new_group = self._make_xdg_group_widget(entries)
+        prev = self._xdg_group.get_prev_sibling()
+        self._content_box.remove(self._xdg_group)
+        if prev is not None:
+            self._content_box.insert_child_after(new_group, prev)
+        else:
+            self._content_box.prepend(new_group)
+        self._xdg_group = new_group
 
     def _rebuild_list(self) -> None:
         clear_children(self._content_box)
