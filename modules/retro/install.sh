@@ -114,6 +114,42 @@ EOF
 }
 hide_nm_applet
 
+hide_bluetooth_applet() {
+    local found=""
+    local dir
+    for dir in /etc/xdg/autostart "$HOME/.config/autostart" /usr/share/autostart; do
+        if [[ -f "$dir/blueman.desktop" ]]; then
+            found="$dir/blueman.desktop"
+            break
+        fi
+    done
+
+    if [[ -z $found ]]; then
+        rx_log "info" "blueman.desktop not found; nothing to hide"
+        return 0
+    fi
+
+    if grep -q '^Hidden=true' "$found" 2>/dev/null; then
+        rx_log "success" "blueman.desktop already hidden ($found)"
+        return 0
+    fi
+
+    mkdir -p "$HOME/.config/autostart"
+    cat >"$HOME/.config/autostart/blueman.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Bluetooth Manager
+Hidden=true
+EOF
+    rx_log "success" "blueman applet hidden via user autostart override"
+
+    if pgrep -x blueman-applet >/dev/null 2>&1; then
+        pkill -x blueman-applet 2>/dev/null || true
+        rx_log "info" "Stopped running blueman-applet"
+    fi
+}
+hide_bluetooth_applet
+
 remove_conflicts
 
 if [[ $SECONDARY_INSTALL != "true" ]]; then
