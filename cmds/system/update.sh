@@ -200,6 +200,9 @@ cmd_update() {
         fi
 
         rx_log "success" "Update finished"
+
+        rx_log "info" "Restarting Retro daemon..."
+        $RETRO_DIR/retro.sh daemon restart
     else
         pull_failed="true"
 
