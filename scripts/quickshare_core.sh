@@ -55,6 +55,8 @@ qs_get_dir() {
         dir=$(qs_read_setting "download_path")
     fi
     [[ -z $dir || $dir == "null" ]] && dir="$QS_DEFAULT_DIR"
+    dir="${dir//\~/$HOME}"
+    dir="${dir//\$HOME/$HOME}"
     echo "$dir"
 }
 
@@ -141,10 +143,15 @@ qs_stop() {
 qs_set_dir() {
     local new_dir="${1:-$QS_DEFAULT_DIR}"
     [[ -z $new_dir ]] && { echo "ERR|empty_path"; return 1; }
+    new_dir="${new_dir//\~/$HOME}"
+    new_dir="${new_dir//\$HOME/$HOME}"
     mkdir -p "$new_dir" 2>/dev/null
     set_var "QUICKSHARE_DOWNLOAD_DIR" "$new_dir"
     qs_write_settings "$new_dir" "$(qs_get_auto_accept)"
     rx_log_file "info" "Quick Share download dir set to $new_dir"
+    if qs_running; then
+        qs_restart >/dev/null 2>&1
+    fi
     echo "OK|$new_dir"
 }
 
