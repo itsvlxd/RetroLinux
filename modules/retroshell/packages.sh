@@ -5,7 +5,7 @@ qt6-imageformats qt6-multimedia qt6-shadertools
 ttf-phosphor-icons ttf-league-gothic
 
 unzip curl
-brightnessctl networkmanager
+brightnessctl networkmanager syntax-highlighting
 wl-clipboard slurp hyprpicker upower gpu-screen-recorder
 
 go
