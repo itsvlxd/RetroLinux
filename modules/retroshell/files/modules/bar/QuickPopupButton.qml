@@ -97,6 +97,8 @@ Item {
             onLoaded: {
                 if (item && item.maxContentWidth !== undefined)
                     item.maxContentWidth = width;
+                if (item && item.requestClose !== undefined)
+                    item.requestClose.connect(() => { root.popup.close(); });
             }
         }
     }

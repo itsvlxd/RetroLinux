@@ -20,13 +20,16 @@ Singleton {
             }
             return true;
         });
-        return filtered;
+        const preferred = filtered.filter(player => root._isPreferred(player));
+        const others = filtered.filter(player => !root._isPreferred(player));
+        return preferred.concat(others);
     }
 
-    property var activePlayer: trackedPlayer ? trackedPlayer : (filteredPlayers.length > 0 ? filteredPlayers[0] : null)
+    property var activePlayer: trackedPlayer ? trackedPlayer : (filteredPlayers.length > 0 ? root._defaultPlayer(filteredPlayers) : null)
     
     property bool isInitializing: true
     property string cachedDbusName: ""
+    property bool _hasExplicitPick: false
 
     property bool isPlaying: activePlayer ? activePlayer.isPlaying : false
     property bool canTogglePlaying: activePlayer ? activePlayer.canTogglePlaying : false
@@ -40,14 +43,22 @@ Singleton {
 
     // --- Handlers ---
     onFilteredPlayersChanged: {
-        if (root.isInitializing && root.cachedDbusName && root.filteredPlayers.length > 0) {
-            for (let i = 0; i < root.filteredPlayers.length; i++) {
-                const player = root.filteredPlayers[i];
-                if (player.dbusName === root.cachedDbusName) {
-                    root.trackedPlayer = player;
-                    root.isInitializing = false;
-                    return;
+        if (root.isInitializing && root.filteredPlayers.length > 0) {
+            if (root.cachedDbusName) {
+                for (let i = 0; i < root.filteredPlayers.length; i++) {
+                    const player = root.filteredPlayers[i];
+                    if (player.dbusName === root.cachedDbusName) {
+                        root.trackedPlayer = player;
+                        root.isInitializing = false;
+                        root._hasExplicitPick = true;
+                        return;
+                    }
                 }
+                root.trackedPlayer = root._defaultPlayer(root.filteredPlayers);
+                root.isInitializing = false;
+            } else {
+                root.trackedPlayer = root._defaultPlayer(root.filteredPlayers);
+                root.isInitializing = false;
             }
         }
     }
@@ -68,8 +79,29 @@ Singleton {
     }
 
     // --- Functions ---
+    function _isPreferred(player) {
+        if (!player) return false;
+        const dbusName = (player.dbusName || "").toLowerCase();
+        const desktopEntry = (player.desktopEntry || "").toLowerCase();
+        const identity = (player.identity || "").toLowerCase();
+        return dbusName.includes("spotify") || desktopEntry.includes("spotify") || identity.includes("spotify");
+    }
+
+    function _hasPreferred() {
+        return root.filteredPlayers.some(player => root._isPreferred(player));
+    }
+
+    function _defaultPlayer(players) {
+        if (!players || players.length === 0) return null;
+        for (let i = 0; i < players.length; i++) {
+            if (root._isPreferred(players[i])) return players[i];
+        }
+        return players[0];
+    }
+
     function loadLastPlayer() {
         if (!root.cachedDbusName) {
+            root.trackedPlayer = root._defaultPlayer(root.filteredPlayers);
             root.isInitializing = false;
             return;
         }
@@ -79,6 +111,7 @@ Singleton {
             if (player.dbusName === root.cachedDbusName) {
                 root.trackedPlayer = player;
                 root.isInitializing = false;
+                root._hasExplicitPick = true;
                 return;
             }
         }
@@ -124,6 +157,7 @@ Singleton {
         const targetPlayer = player ? player : (root.filteredPlayers.length > 0 ? root.filteredPlayers[0] : null);
 
         root.trackedPlayer = targetPlayer;
+        root._hasExplicitPick = targetPlayer != null;
         root.saveLastPlayer();
     }
 
@@ -142,6 +176,7 @@ Singleton {
         }
 
         root.trackedPlayer = players[newIndex];
+        root._hasExplicitPick = true;
         root.saveLastPlayer();
     }
 
@@ -157,8 +192,10 @@ Singleton {
                 const dbusName = (modelData.dbusName || "").toLowerCase();
                 const shouldIgnore = !Config.bar.enableFirefoxPlayer && dbusName.includes("firefox");
 
-                if (!shouldIgnore && (root.trackedPlayer == null || modelData.isPlaying)) {
-                    root.trackedPlayer = modelData;
+                if (!shouldIgnore && !root._hasExplicitPick) {
+                    if (root._isPreferred(modelData) || root.trackedPlayer == null || (modelData.isPlaying && !root._hasPreferred())) {
+                        root.trackedPlayer = modelData;
+                    }
                 }
             }
 
@@ -173,8 +210,9 @@ Singleton {
                     }
 
                     if (root.trackedPlayer === modelData) {
-                        root.trackedPlayer = root.filteredPlayers.length > 0 ? root.filteredPlayers[0] : null;
+                        root.trackedPlayer = root._defaultPlayer(root.filteredPlayers);
                     }
+                    root._hasExplicitPick = false;
                 }
             }
 

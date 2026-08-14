@@ -31,7 +31,10 @@ from settings.ui.icons import POWER_ICON, SLEEP_ICON
 if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
 
+from lib.python.variable import get_module_default
+
 _PWR_CORE = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "power_core.sh")
+_DEFAULT_LOGOUT_CMD = get_module_default("RETRO_LOGOUT_CMD", "hyprctl dispatch exit")
 _SYS_CORE = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "system_core.sh")
 _DRIVER_CORE = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "driver_core.sh")
 _BRAND_DIR = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "assets", "brands")
@@ -384,7 +387,7 @@ class PowerPage:
             title="Logout Command",
             subtitle="Custom command executed when you log out from the power menu",
         )
-        logout_entry = Gtk.Entry(text=self._orig.get("logout_cmd") or "hyprctl dispatch exit")
+        logout_entry = Gtk.Entry(text=self._orig.get("logout_cmd") or _DEFAULT_LOGOUT_CMD)
         logout_entry.set_width_chars(32)
         logout_entry.set_valign(Gtk.Align.CENTER)
         logout_entry.connect("changed", self._on_logout_cmd_changed)
@@ -393,7 +396,7 @@ class PowerPage:
         reset_btn = Gtk.Button(icon_name="edit-undo-symbolic")
         reset_btn.set_valign(Gtk.Align.CENTER)
         reset_btn.set_tooltip_text("Reset to default")
-        reset_btn.connect("clicked", lambda _b: logout_entry.set_text("hyprctl dispatch exit"))
+        reset_btn.connect("clicked", lambda _b: logout_entry.set_text(_DEFAULT_LOGOUT_CMD))
 
         logout_row.add_suffix(logout_entry)
         logout_row.add_suffix(reset_btn)
@@ -874,7 +877,7 @@ class PowerPage:
                     idx = 0
                 row.set_selected(idx)
         if hasattr(self, "_logout_entry"):
-            self._logout_entry.set_text(self._orig.get("logout_cmd") or "hyprctl dispatch exit")
+            self._logout_entry.set_text(self._orig.get("logout_cmd") or _DEFAULT_LOGOUT_CMD)
 
         # Hypridle side
         self._general = IdleGeneral(

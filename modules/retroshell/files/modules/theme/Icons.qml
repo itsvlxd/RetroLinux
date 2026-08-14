@@ -90,6 +90,7 @@ QtObject {
     readonly property string nightLight: ""
     readonly property string caffeine: ""
     readonly property string gameMode: ""
+    readonly property string quickshare: ""
 
     // Toolbox
     readonly property string toolbox: ""
@@ -180,7 +181,9 @@ QtObject {
     readonly property string help: ""
     readonly property string sun: ""
     readonly property string sunDim: ""
-    readonly property string moon: ""
+    readonly property string moon: "\ue330"
+    readonly property string lightbulb: "\ue2dc"
+    readonly property string computer: "\ue560"
     readonly property string user: ""
     readonly property string spinnerGap: ""
     readonly property string circleNotch: ""

@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from settings.pages.network import NetworkPage
     from settings.pages.pending import PendingChangesPage
     from settings.pages.power import PowerPage
+    from settings.pages.quickshare import QuickSharePage
     from settings.pages.settings import SettingsPage
     from settings.pages.shell_bar import ShellBarPage
     from settings.pages.shell_desktop import ShellDesktopPage
@@ -482,6 +483,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
+        from settings.pages.quickshare import QuickSharePage
         from settings.pages.settings import SettingsPage
         from settings.pages.shell_bar import ShellBarPage
         from settings.pages.shell_desktop import ShellDesktopPage
@@ -592,6 +594,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (LogsPage, "_logs_page", "logs", "Logs"),
             (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
             (PowerPage, "_power_page", "power", "Power"),
+            (QuickSharePage, "_quickshare_page", "quickshare", "Quick Share"),
             (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
             (ShellBarPage, "_shell_bar_page", "shell_bar", "Bar"),
             (ShellDesktopPage, "_shell_desktop_page", "shell_desktop", "Desktop"),
@@ -1273,6 +1276,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         from settings.pages.network import NetworkPage
         from settings.pages.pending import PendingChangesPage
         from settings.pages.power import PowerPage
+        from settings.pages.quickshare import QuickSharePage
         from settings.pages.shell_bar import ShellBarPage
         from settings.pages.shell_desktop import ShellDesktopPage
         from settings.pages.shell_dock import ShellDockPage
@@ -1403,6 +1407,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls is UsersPage:
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls is QuickSharePage:
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

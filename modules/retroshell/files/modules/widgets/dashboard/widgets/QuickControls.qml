@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -16,7 +17,7 @@ StyledRect {
     implicitHeight: columnLayout.implicitHeight + 8
     radius: Styling.radius(4)
     
-    property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth
+    property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth, 2: quickshare, 3: caffeine
     property bool darkMode: true
     property bool dlLocked: false
 
@@ -40,6 +41,7 @@ StyledRect {
             root.expandedPanel = -1;
         } else {
             BluetoothService.initialize();
+            QuickShareService.refresh();
         }
     }
     
@@ -61,14 +63,25 @@ StyledRect {
             id: internalBgRect
             variant: "internalbg"
             Layout.alignment: Qt.AlignHCenter
-            implicitWidth: buttonRow.implicitWidth + 8
-            implicitHeight: buttonRow.implicitHeight + 8
+            implicitWidth: 5 * 48 + 4 * 4 + 8
+            implicitHeight: 48 + 8
             radius: Styling.radius(0)
 
-            RowLayout {
-                id: buttonRow
-                anchors.centerIn: parent
-                spacing: 4
+            ScrollView {
+                id: buttonScroll
+                anchors.fill: parent
+                anchors.margins: 4
+                clip: true
+                contentWidth: buttonRow.width
+                contentHeight: buttonRow.height
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+
+                RowLayout {
+                    id: buttonRow
+                    width: buttonRow.implicitWidth
+                    height: 48
+                    spacing: 4
 
                 ControlButton {
                     Layout.preferredWidth: 48
@@ -120,10 +133,13 @@ StyledRect {
                 ControlButton {
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
-                    iconName: Icons.nightLight
-                    isActive: NightLightService.active
-                    tooltipText: NightLightService.active ? "Night Light: On" : "Night Light: Off"
-                    onClicked: NightLightService.toggle()
+                    visible: Config.notch.quickshareEnabled
+                    iconName: Icons.quickshare
+                    isActive: QuickShareService.running
+                    tooltipText: QuickShareService.running ? "Quick Share: On" : "Quick Share: Off"
+                    onClicked: QuickShareService.toggle()
+                    onRightClicked: root.togglePanel(2)
+                    onLongPressed: root.togglePanel(2)
                 }
 
                 ControlButton {
@@ -135,8 +151,8 @@ StyledRect {
                     activeHoverVariant: CaffeineService.timedMinutes > 0 ? "focus" : "primaryfocus"
                     tooltipText: CaffeineService.inhibit ? "Caffeine: On" : "Caffeine: Off"
                     onClicked: CaffeineService.toggleInhibit()
-                    onRightClicked: root.togglePanel(2)
-                    onLongPressed: root.togglePanel(2)
+                    onRightClicked: root.togglePanel(3)
+                    onLongPressed: root.togglePanel(3)
 
                     Item {
                         anchors.fill: parent
@@ -195,6 +211,16 @@ StyledRect {
                         dlUnlock.start();
                     }
                 }
+
+                ControlButton {
+                    Layout.preferredWidth: 48
+                    Layout.preferredHeight: 48
+                    iconName: Icons.lightbulb
+                    isActive: NightLightService.active
+                    tooltipText: NightLightService.active ? "Night Light: On" : "Night Light: Off"
+                    onClicked: NightLightService.toggle()
+                }
+                }
             }
         }
         
@@ -203,8 +229,8 @@ StyledRect {
             Layout.fillWidth: true
             Layout.preferredHeight: {
                 if (root.expandedPanel === -1) return 0;
-                if (root.expandedPanel === 2) return 120;
-                return root.width - 8;
+                if (root.expandedPanel === 3) return 120;
+                return 280;
             }
             clip: true
             opacity: root.expandedPanel !== -1 ? 1 : 0
@@ -272,14 +298,35 @@ StyledRect {
                     }
 
                     Loader {
-                        id: caffeineLoader
+                        id: quickshareLoader
                         anchors.fill: parent
                         active: root.expandedPanel === 2
+                        source: "../controls/QuickSharePanel.qml"
+                        asynchronous: true
+                        
+                        opacity: root.expandedPanel === 2 ? 1 : 0
+                        x: root.expandedPanel === 2 ? 0 : (root.expandedPanel === 0 ? width : (root.expandedPanel === 1 ? -width : width))
+                        
+                        onLoaded: {
+                            if (item) {
+                                item.maxContentWidth = width;
+                                item.requestClose.connect(() => { root.expandedPanel = -1; });
+                            }
+                        }
+
+                        Behavior on opacity { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                        Behavior on x { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                    }
+
+                    Loader {
+                        id: caffeineLoader
+                        anchors.fill: parent
+                        active: root.expandedPanel === 3
                         source: "../controls/CaffeinePanel.qml"
                         asynchronous: true
 
-                        opacity: root.expandedPanel === 2 ? 1 : 0
-                        x: root.expandedPanel === 2 ? 0 : (root.expandedPanel === 0 ? -width : width)
+                        opacity: root.expandedPanel === 3 ? 1 : 0
+                        x: root.expandedPanel === 3 ? 0 : (root.expandedPanel === 0 ? -width : width)
 
                         onLoaded: {
                             if (item) {

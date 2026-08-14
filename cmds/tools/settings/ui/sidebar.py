@@ -36,6 +36,7 @@ from settings.ui.icons import (
     OVERVIEW_ICON,
     POWER_ICON,
     PRESETS_ICON,
+    QUICKSHARE_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -282,6 +283,7 @@ class Sidebar:
         add_row(system, "users", "Users", USERS_ICON)
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
+        add_row(system, "quickshare", "Quick Share", QUICKSHARE_ICON)
         add_row(system, "audio", "Audio", AUDIO_ICON)
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
             add_row(system, "battery", "Battery", BATTERY_ICON)

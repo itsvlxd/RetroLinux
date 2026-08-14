@@ -510,7 +510,7 @@ class AboutPage:
         else:
             if count > 0:
                 self._check_btn.set_label(
-                    f"{count} retro update{'s' if count != 1 else ''} available"
+                    f"{count} update{'s' if count != 1 else ''} available"
                 )
 
     @staticmethod

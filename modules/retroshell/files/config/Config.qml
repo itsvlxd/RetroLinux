@@ -557,6 +557,7 @@ Singleton {
             property string batteryStyle: "arch"
             property bool showWifiPopup: false
             property bool showBluetoothPopup: false
+            property bool showQuickSharePopup: false
         }
     }
 
@@ -687,6 +688,7 @@ Singleton {
             property string noMediaDisplay: "userHost"
             property string customText: "RetroLinux"
             property bool disableHoverExpansion: true
+            property bool quickshareEnabled: true
         }
     }
 

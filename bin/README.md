@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/itsvlxd/RetroLinux/develop/assets/logo-palm-transparent-bg.png" alt="Logo" width="120" style="vertical-align: middle">
 </p>
 
-The **RetroLinux Installer** (`retroinstall`) is a guided, interactive TUI installer that walks you through 24 setup steps to configure a complete Arch-based Linux system. It uses `gum` for the terminal interface and generates configuration files for `archinstall` under the hood.
+The **RetroLinux Installer** (`retroinstall`) is a guided, interactive TUI installer that walks you through 25 setup steps to configure a complete Arch-based Linux system. It uses `gum` for the terminal interface and generates configuration files for `archinstall` under the hood.
 
 **What you get:**
 - BTRFS filesystem with zstd compression and snapshots via Timeshift
@@ -51,7 +51,7 @@ The installation happens in 3 stages:
 
 | Stage | When | What |
 |-------|------|------|
-| **Stage 1: Live ISO Setup** | During live ISO booting | Runs `retroinstall` - 24 steps to configure system and run `archinstall` |
+| **Stage 1: Live ISO Setup** | During live ISO booting | Runs `retroinstall` - 25 steps to configure system and run `archinstall` |
 | **Stage 2: Live ISO Post-Install** | After archinstall completes | Runs automatically in chroot - configures boot, kernel modules, Plymouth |
 | **Stage 3: Post-Install Setup** | First login inside installed OS | Runs automatically - configures modules, wallpaper, drivers, etc. |
 
@@ -60,18 +60,21 @@ The installation happens in 3 stages:
 ```
 setup/
 ├── install.sh         # Installation type selection (minimal/complete)
+├── branch.sh          # Release branch (stable main / rolling develop)
+├── ricing.sh          # Ricing mode (managed symlinks / manual copy)
 ├── user.sh          # User account creation
 ├── root.sh          # Root password setup
 ├── hostname.sh      # Computer hostname
-├── display.sh      # Display server choice
 ├── keyboard.sh    # Keyboard layout
 ├── locale.sh     # System language
-├── mirrors.sh    # Mirror configuration
 ├── timezone.sh   # Timezone selection
+├── display.sh      # Display server choice
 ├── disk.sh       # Target disk selection
 ├── luks.sh       # LUKS encryption
 ├── kernel.sh    # Kernel selection
 ├── boot.sh      # Bootloader setup
+├── mirrors.sh    # Mirror configuration
+├── network.sh  # Network configuration
 ├── bluetooth.sh # Bluetooth service
 ├── fingerprint.sh # Fingerprint authentication
 ├── print.sh     # CUPS printing service
@@ -80,7 +83,6 @@ setup/
 ├── editor.sh    # Terminal editor choice
 ├── filemanager.sh  # File manager choice
 ├── browser.sh   # Browser choice
-├── network.sh  # Network configuration
 └── config.sh   # Final validation and config generation
 ```
 
@@ -124,34 +126,35 @@ setup/
 
 ## Installation Steps
 
-The installer guides you through 24 steps. State is saved after each step - if interrupted, running again resumes where you left off.
+The installer guides you through 25 steps. State is saved after each step - if interrupted, running again resumes where you left off.
 
 | # | Step | What It Asks |
 |---|------|--------------|
 | 1 | **Install** | Installation type: minimal or complete |
-| 2 | **Ricing** | Config mode: stable (symlinked, auto-updates) or advanced (copied, manual) |
-| 3 | **User Account** | Username, password, sudo access |
-| 4 | **Root Password** | Root password (tip: use a different one) |
-| 5 | **Hostname** | Computer name (default: "retrolinux") |
-| 6 | **Display** | Aspect ratio + resolution selection (auto-detect or custom) |
+| 2 | **Branch** | Release branch: stable (main) or rolling (develop) |
+| 3 | **Ricing** | Config mode: stable (symlinked, auto-updates) or advanced (copied, manual) |
+| 4 | **User Account** | Username, password, sudo access |
+| 5 | **Root Password** | Root password (tip: use a different one) |
+| 6 | **Hostname** | Computer name (default: "retrolinux") |
 | 7 | **Keyboard** | Layout selection (48 options: US, UK, Dvorak, FR, DE, ES, RU, JP, etc.) |
 | 8 | **Language** | System language (English, French, German, Chinese, etc.) |
-| 9 | **Mirrors** | Mirror regions to prioritize + optional custom URL |
-| 10 | **Timezone** | Timezone selection via timedatectl |
+| 9 | **Timezone** | Timezone selection via timedatectl |
+| 10 | **Display** | Aspect ratio + resolution selection (auto-detect or custom) |
 | 11 | **Disk** | Target disk selection (**erases all data**) |
 | 12 | **Encryption** | LUKS encryption: enable/disable, password, iteration time |
 | 13 | **Kernel** | Kernel choice: `linux`, `linux-lts`, `linux-zen`, `linux-hardened` |
 | 14 | **Boot** | Bootloader (GRUB/systemd-boot), GRUB theme, resolution, OS prober, snapshots, timeout |
-| 15 | **Bluetooth** | Enable/disable Bluetooth service |
-| 16 | **Fingerprint** | Enable/disable fingerprint authentication |
-| 17 | **Printing** | Enable/disable CUPS printing service |
-| 18 | **SSH** | Enable/disable, port, password login, key login, root login |
-| 19 | **AUR** | AUR helper: `yay` or `paru` |
-| 20 | **Editor** | Terminal editor: vim, nano, or helix |
-| 21 | **Filemanager** | File manager: yazi or vifm |
-| 22 | **Browser** | Browser: firefox, zen, or librewolf |
-| 23 | **Network** | Auto-check internet; WiFi or Ethernet |
-| 24 | **Config** | Validates settings and generates archinstall JSON |
+| 15 | **Mirrors** | Mirror regions to prioritize + optional custom URL |
+| 16 | **Network** | Auto-check internet; WiFi or Ethernet |
+| 17 | **Bluetooth** | Enable/disable Bluetooth service |
+| 18 | **Fingerprint** | Enable/disable fingerprint authentication |
+| 19 | **Printing** | Enable/disable CUPS printing service |
+| 20 | **SSH** | Enable/disable, port, password login, key login, root login |
+| 21 | **AUR** | AUR helper: `yay` or `paru` |
+| 22 | **Editor** | Terminal editor: vim, nano, or helix |
+| 23 | **Filemanager** | File manager: yazi or vifm |
+| 24 | **Browser** | Browser: firefox, zen, or librewolf |
+| 25 | **Config** | Validates settings and generates archinstall JSON |
 
 ---
 
@@ -183,7 +186,7 @@ bin/
 │   ├── handlers.sh
 │   ├── output.sh
 │   └── debug.sh
-├── setup/       # Individual step scripts (24 steps)
+├── setup/       # Individual step scripts (25 steps)
 ├── post/       # Post-installation scripts (Stage 2)
 └── logo.txt   # ASCII logo
 ```

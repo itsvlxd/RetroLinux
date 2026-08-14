@@ -68,16 +68,21 @@ smartmontools
 
 # Python
 python-gobject
+python-dbus
+python-protobuf
+python-zeroconf
+python-cryptography
+python-pygobject-stubs
 python-hyprland-config
 python-hyprland-monitors
 python-hyprland-schema
 python-hyprland-socket
 python-hyprland-state
-python-pygobject-stubs
 
 # Apps
 mpv
 loupe
+gradia
 bazaar
 resources
 

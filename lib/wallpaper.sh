@@ -5,9 +5,10 @@ source "$RETRO_DIR/lib/battery.sh"
 
 WALL_DIR="$RETRO_CONFIG/wallpapers"
 FRAME_CACHE="$RETRO_CONFIG/wallpaper_frames"
+THUMB_CACHE="$RETRO_CONFIG/wallpaper_thumbs"
 MPV_SOCKET="/tmp/mpvsocket"
 
-mkdir -p "$FRAME_CACHE" "$WALL_DIR"
+mkdir -p "$FRAME_CACHE" "$THUMB_CACHE" "$WALL_DIR"
 
 rx_wallpaper_generate_cache() {
     local target="$1"
@@ -16,12 +17,38 @@ rx_wallpaper_generate_cache() {
     local filename=$(basename "$target")
     local output="$FRAME_CACHE/${filename}.png"
 
-    if [[ ! -f $output ]]; then
-        if [[ $target =~ \.(mp4|mkv|webm)$ ]]; then
-            ffmpeg -i "$target" -frames:v 1 "$output" -y -loglevel quiet
-        else
-            ln -sf "$target" "$output"
+    local custom_res
+    custom_res=$(get_var "WALL_RESOLUTION")
+    [[ -z $custom_res || $custom_res == "null" || ! $custom_res =~ ^[0-9]+x[0-9]+$ ]] && custom_res=""
+
+    if [[ $target =~ \.(mp4|mkv|webm)$ ]]; then
+        # Regenerate stale frames: source changed, or the cached frame no
+        # longer matches the target resolution (e.g. after WALL_RESOLUTION
+        # changed or a thumbnail generator clobbered the frame).
+        if [[ -f $output ]]; then
+            local stale=false
+            [[ $target -nt $output ]] && stale=true
+            if [[ $stale == false && -n $custom_res ]]; then
+                local cur
+                cur=$(identify -format "%wx%h" "$output" 2>/dev/null)
+                [[ -n $cur && $cur != "$custom_res" ]] && stale=true
+            fi
+            [[ $stale == true ]] && rm -f "$output"
         fi
+
+        if [[ ! -f $output ]]; then
+            if [[ -n $custom_res ]]; then
+                local w="${custom_res%x*}"
+                local h="${custom_res#*x}"
+                ffmpeg -nostdin -i "$target" -frames:v 1 \
+                    -vf "scale=${w}:${h}:force_original_aspect_ratio=increase:force_divisible_by=2,crop=${w}:${h}" \
+                    "$output" -y -loglevel quiet
+            else
+                ffmpeg -nostdin -i "$target" -frames:v 1 "$output" -y -loglevel quiet
+            fi
+        fi
+    elif [[ ! -f $output ]]; then
+        ln -sf "$target" "$output"
     fi
     echo "$output"
 }

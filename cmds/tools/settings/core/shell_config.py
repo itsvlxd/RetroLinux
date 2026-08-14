@@ -106,6 +106,7 @@ BAR_DEFAULTS: dict = {
     "batteryStyle": "arch",
     "showWifiPopup": False,
     "showBluetoothPopup": False,
+    "showQuickSharePopup": False,
 }
 
 
@@ -313,6 +314,7 @@ NOTCH_DEFAULTS: dict = {
     "disableHoverExpansion": True,
     "noMediaDisplay": "userHost",
     "customText": "RetroLinux",
+    "quickshareEnabled": False,
 }
 
 

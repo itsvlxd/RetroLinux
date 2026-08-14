@@ -27,5 +27,6 @@ var data = {
     "showDayOfWeek": false,
     "batteryStyle": "arch",
     "showWifiPopup": false,
-    "showBluetoothPopup": false
+    "showBluetoothPopup": false,
+    "showQuickSharePopup": false
 }

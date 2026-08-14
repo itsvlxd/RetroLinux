@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import qs.modules.theme
 import qs.modules.components
@@ -8,7 +9,7 @@ StyledRect {
     id: root
 
     required property bool isActive
-    required property string iconName
+    property string iconName: ""
     required property string tooltipText
     signal clicked
     signal rightClicked
@@ -17,6 +18,7 @@ StyledRect {
     property bool isHovered: mouseArea.containsMouse
     property string activeVariant: "primary"
     property string activeHoverVariant: "primaryfocus"
+    property string iconSource: ""
 
     variant: {
         if (isActive && isHovered)
@@ -32,6 +34,7 @@ StyledRect {
 
     Text {
         anchors.centerIn: parent
+        visible: root.iconSource === ""
         text: root.iconName
         color: root.item
         font.family: Icons.font
@@ -46,6 +49,24 @@ StyledRect {
                 easing.type: Easing.OutQuart
             }
         }
+    }
+
+    Image {
+        id: iconImage
+        anchors.centerIn: parent
+        visible: root.iconSource !== ""
+        source: root.iconSource
+        sourceSize.width: 22
+        sourceSize.height: 22
+        fillMode: Image.PreserveAspectFit
+    }
+
+    MultiEffect {
+        anchors.fill: iconImage
+        source: iconImage
+        visible: root.iconSource !== ""
+        colorization: 1.0
+        colorizationColor: root.item
     }
 
     MouseArea {

@@ -73,41 +73,41 @@ function Notify.error(summary, body, opts)
 end
 
 function Notify.power_disconnect(cap)
-	Notify.send("Power Disconnected", "Now on battery power (" .. cap .. "%)", {
+	Notify.send("Power Disconnected", "Running on battery, " .. cap .. "% remaining.", {
 		icon = "battery-caution",
 		app_name = "RetroLinux",
 	})
 end
 
 function Notify.power_connect(cap)
-	local icon = cap == "100" and "battery-full-charging" or "battery-charging"
-	local msg = cap == "100" and "Running on AC (Battery bypassed)" or "Charging up (" .. cap .. "%)"
+	local icon = cap == "100" and "battery-full-charging" or "battery-050-charging"
+	local msg = cap == "100" and "Battery full, running on AC." or "Charging, " .. cap .. "%."
 	Notify.send("Power Connected", msg, { icon = icon, app_name = "RetroLinux" })
 end
 
 function Notify.battery_saver_enabled()
-	Notify.send("Battery Saver", "Power draw capped to extend runtime", {
-		icon = "power-profile-saver",
+	Notify.send("Battery Saver", "Battery saver enabled, power draw capped to extend runtime.", {
+		icon = "power-profile-power-saver-symbolic",
 		app_name = "RetroLinux",
 	})
 end
 
 function Notify.battery_saver_disabled()
-	Notify.send("Battery Saver", "Standard power limits restored", {
-		icon = "power-profile-balanced",
+	Notify.send("Battery Saver", "Battery saver disabled, standard power limits restored.", {
+		icon = "power-profile-balanced-symbolic",
 		app_name = "RetroLinux",
 	})
 end
 
 function Notify.battery_low(cap)
-	Notify.send("Battery Low", cap .. "% remaining — find a plug soon", {
+	Notify.send("Battery Low", cap .. "% remaining, plug in the charger soon.", {
 		icon = "battery-low",
 		app_name = "RetroLinux",
 	})
 end
 
 function Notify.battery_critical(cap)
-	Notify.send("Battery Critical", "Only " .. cap .. "% left. Connect power now.", {
+	Notify.send("Battery Critical", "Only " .. cap .. "% left, connect the charger now.", {
 		icon = "battery-empty",
 		urgency = "critical",
 		app_name = "RetroLinux",
