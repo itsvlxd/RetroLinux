@@ -22,19 +22,35 @@ return {
             Watcher.log("battery", "Using configured battery: " .. bat_path, "info")
         end
 
-        local last_notified_level = 0
         local saver_thresh = tonumber(Watcher.get_var("BAT_SAVER_THRESHOLD", "20")) or 20
-        local low_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_THRESHOLD", "20")) or 20
-        local crit_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_CRITICAL_THRESHOLD", "5")) or 5
+        local notify_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_THRESHOLD", "30")) or 30
+        local crit_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_CRITICAL_THRESHOLD", "15")) or 15
         local tick_counter = 0
 
-        Watcher.log("battery", string.format("Thresholds: saver=%d%%, low=%d%%, critical=%d%%", saver_thresh, low_thresh, crit_thresh), "info")
+        local function build_notify_levels()
+            local seen, out = {}, {}
+            for _, level in ipairs({ notify_thresh, 20, 15, 10, 5 }) do
+                if not seen[level] then
+                    seen[level] = true
+                    out[#out + 1] = level
+                end
+            end
+            table.sort(out, function(a, b) return a > b end)
+            return out
+        end
+
+        local notify_levels = build_notify_levels()
+        local notified_levels = {}
+        local cycle_start_capacity = nil
+
+        Watcher.log("battery", string.format("Thresholds: saver=%d%%, notify=%d%%, critical=%d%%", saver_thresh, notify_thresh, crit_thresh), "info")
 
         while true do
             if tick_counter % 10 == 0 then
                 saver_thresh = tonumber(Watcher.get_var("BAT_SAVER_THRESHOLD", "20")) or 20
-                low_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_THRESHOLD", "20")) or 20
-                crit_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_CRITICAL_THRESHOLD", "5")) or 5
+                notify_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_THRESHOLD", "30")) or 30
+                crit_thresh = tonumber(Watcher.get_var("BAT_NOTIFY_CRITICAL_THRESHOLD", "15")) or 15
+                notify_levels = build_notify_levels()
             end
 
             local capacity_str = Watcher.read_sys(bat_path .. "/capacity")
@@ -66,15 +82,29 @@ return {
             end
 
             if status == "discharging" then
-                if capacity <= crit_thresh and capacity ~= last_notified_level then
-                    Watcher.log("battery", "CRITICAL battery: " .. capacity .. "% (thresh: " .. crit_thresh .. "%)", "error")
-                    engine:emit("on_battery_critical", tostring(capacity))
-                    last_notified_level = capacity
-                elseif capacity <= low_thresh and capacity ~= last_notified_level then
-                    Watcher.log("battery", "LOW battery: " .. capacity .. "% (thresh: " .. low_thresh .. "%)", "warn")
-                    engine:emit("on_battery_low", tostring(capacity))
-                    last_notified_level = capacity
+                if cycle_start_capacity == nil then
+                    cycle_start_capacity = capacity
                 end
+
+                for _, level in ipairs(notify_levels) do
+                    if not notified_levels[level]
+                        and capacity <= level
+                        and level <= cycle_start_capacity
+                    then
+                        notified_levels[level] = true
+                        if level <= crit_thresh then
+                            Watcher.log("battery", "CRITICAL battery crossed " .. level .. "% (current " .. capacity .. "%)", "error")
+                            engine:emit("on_battery_critical", tostring(capacity))
+                        else
+                            Watcher.log("battery", "LOW battery crossed " .. level .. "% (current " .. capacity .. "%)", "warn")
+                            engine:emit("on_battery_low", tostring(capacity))
+                        end
+                        break
+                    end
+                end
+            elseif status == "charging" or status == "full" or status == "not charging" then
+                notified_levels = {}
+                cycle_start_capacity = nil
             end
 
             tick_counter = tick_counter + 1
