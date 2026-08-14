@@ -22,9 +22,6 @@ rx_wallpaper_generate_cache() {
     [[ -z $custom_res || $custom_res == "null" || ! $custom_res =~ ^[0-9]+x[0-9]+$ ]] && custom_res=""
 
     if [[ $target =~ \.(mp4|mkv|webm)$ ]]; then
-        # Regenerate stale frames: source changed, or the cached frame no
-        # longer matches the target resolution (e.g. after WALL_RESOLUTION
-        # changed or a thumbnail generator clobbered the frame).
         if [[ -f $output ]]; then
             local stale=false
             [[ $target -nt $output ]] && stale=true

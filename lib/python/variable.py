@@ -26,8 +26,6 @@ def _get_mtime(path):
 
 
 def _strip_quotes(val):
-    """Remove a single matching pair of surrounding quotes, preserving any
-    quote chars inside the value (e.g. ``hyprctl dispatch 'hl.dsp.exit()'``)."""
     if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
         return val[1:-1]
     return val
