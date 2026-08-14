@@ -10,6 +10,7 @@ sys.path.insert(0, RETRO_DIR)
 sys.path.insert(0, os.path.join(RETRO_DIR, "lib", "python"))
 
 from quickshare import mdns  # pylint: disable=import-error
+from quickshare import ble_nudge  # pylint: disable=import-error
 from quickshare.discover import browse  # pylint: disable=import-error
 from quickshare.server import pick_ipv4_address  # pylint: disable=import-error
 
@@ -25,8 +26,17 @@ def main():
     except Exception:
         address = None
 
+    # Broadcast the BLE nudge while scanning so hidden-mode Quick Share
+    # receivers wake up and advertise mDNS, making them visible to this scan.
+    # Degrades silently to mDNS-only when no Bluetooth adapter is present.
+    nudge = ble_nudge.NudgeManager(advertise=True, scan=False)
+    nudge.start()
+
     local_endpoint = mdns.stable_endpoint_id()
     devices = browse(args.duration, address)
+
+    nudge.stop()
+
     for d in devices:
         if d.endpoint_id == local_endpoint:
             continue

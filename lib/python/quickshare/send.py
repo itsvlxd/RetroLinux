@@ -43,6 +43,7 @@ from typing import Callable, Optional
 
 from tqdm import tqdm
 
+from quickshare import ble_nudge  # pylint: disable=import-error
 from quickshare import color, crypto, debug, discover, framing, mdns, ukey2
 from quickshare.proto import offline_wire_formats_pb2 as off_pb2
 from quickshare.proto import wire_format_pb2 as wf_pb2
@@ -579,8 +580,18 @@ def run_sender(
             except (ValueError, RuntimeError):
                 pass  # fall back to zeroconf's default (all-interfaces) browsing
 
+            # Broadcast the BLE nudge while browsing so hidden-mode Quick Share
+            # receivers (phone visibility set to "hidden") wake up and start
+            # advertising mDNS -- the only way they'd otherwise surface. Safe
+            # no-op when no Bluetooth adapter is present.
+            nudge = ble_nudge.NudgeManager(advertise=True, scan=False)
+            nudge.start()
+
             print(color.cyan(f"Looking for nearby devices ({_DISCOVERY_SECONDS:.0f}s)..."), file=sys.stderr)
             devices = discover.browse(_DISCOVERY_SECONDS, address_for_browse)
+
+            nudge.stop()
+
             debug.log("send", f"discovery finished, {len(devices)} device(s) found")
             if not devices:
                 print(color.yellow("No devices found."), file=sys.stderr)

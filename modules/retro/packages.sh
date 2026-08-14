@@ -68,6 +68,7 @@ smartmontools
 
 # Python
 python-gobject
+python-dbus
 python-protobuf
 python-zeroconf
 python-cryptography

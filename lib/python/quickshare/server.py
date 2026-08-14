@@ -2,14 +2,14 @@
 per mdns.py, accepts one connection at a time, drives the UKEY2 handshake,
 and hands off to receive.ReceiveSession for the application-level flow.
 
-There is no Bluetooth on this host (see project notes), so there is no BLE
-nudge to trigger a fresh mDNS announcement when a phone comes looking.
-google/nearby itself has no analog for this: every platform backend (Windows
-DNS-SD, Apple Bonjour, the generic WifiLanMedium) calls StartAdvertising
-exactly once per session, with no re-registration loop -- it relies on the
-BLE nudge instead. Since this host can't replicate that trigger, this
-project falls back to a blind periodic timer instead: a plain re-advertise
-on a fixed interval.
+Unlike real Quick Share devices, there is no BLE nudge in the bare protocol
+engine itself -- see ble_nudge.py. On hosts with a Bluetooth adapter (e.g.
+Intel AX211), run_receiver starts a BLE nudge broadcaster so this machine
+behaves like a "visible to everyone" Quick Share device, plus a nudge scanner
+that triggers an immediate mDNS re-announce when a sender starts looking.
+google/nearby's platform backends rely on the BLE nudge to trigger a fresh
+mDNS announcement when a phone comes looking; without BLE this project falls
+back to a blind periodic re-announce on a fixed interval instead.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from tqdm import tqdm
 from zeroconf import IPVersion, ServiceInfo, Zeroconf
 
 from quickshare import color, debug, framing, mdns, ukey2
+from quickshare import ble_nudge  # pylint: disable=import-error
 from quickshare.proto import offline_wire_formats_pb2 as off_pb2
 from quickshare.receive import SENDER_CANCELED, IncomingFile, ReceiveSession, TransferCancelled, build_connection_response_accept
 from quickshare.secure_frame import SecureChannel
@@ -292,6 +293,18 @@ class _Advertiser:
         self._stop_event.set()
         self._zeroconf.close()
 
+    def reannounce(self) -> None:
+        """Re-announce the mDNS service immediately (thread-safe).
+
+        Called by the BLE nudge scanner when a sender's FE2C nudge is heard, so
+        a hidden peer that just started looking for targets surfaces in this
+        machine's mDNS advertisement right away instead of waiting for the next
+        periodic re-announce."""
+        try:
+            self._zeroconf.update_service(self._build_service_info())
+        except Exception:
+            pass
+
 
 def format_size(num_bytes: int) -> str:
     size = float(num_bytes)
@@ -406,6 +419,17 @@ def run_receiver(
         f"re-announcing every {REANNOUNCE_INTERVAL_SECONDS:.0f}s",
     )
 
+    # BLE discovery nudge (best-effort): advertise the Nearby Share FE2C
+    # service so phones/Windows list this machine instantly, and scan for
+    # senders' nudges to re-announce mDNS the moment one starts looking. Both
+    # degrade silently to mDNS-only if the adapter/D-Bus is unavailable.
+    nudge = ble_nudge.NudgeManager(
+        advertise=True,
+        scan=True,
+        on_nudge=advertiser.reannounce,
+    )
+    nudge.start()
+
     print(color.cyan(f"Advertising as {device_name!r} on {address}:{port}, saving to {output_path}"), file=sys.stderr)
     print(color.cyan("Waiting for an incoming transfer (Ctrl+C to stop)..."), file=sys.stderr)
 
@@ -461,6 +485,7 @@ def run_receiver(
         print("\nStopping.", file=sys.stderr)
     finally:
         advertiser.stop()
+        nudge.stop()
         listener.close()
 
     return 0
