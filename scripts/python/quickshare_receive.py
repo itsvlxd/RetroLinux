@@ -31,6 +31,8 @@ _LAST_PCT: dict[int, int] = {}
 _STATE_FILE = "/tmp/retro_logs/quickshare_transfers.json"
 _STATE_LOCK = threading.Lock()
 _TRANSFERS: dict[int, dict] = {}
+_PAYLOAD_TO_UID: dict[int, int] = {}
+_UID = 0
 _PENDING_OFFERS: dict[int, dict] = {}
 _CANCEL_DIR = "/tmp/retro_logs/quickshare_cancel"
 _CLEAR_DIR = "/tmp/retro_logs/quickshare_clear"
@@ -175,6 +177,12 @@ def _clear_decision(offer_id) -> None:
         pass
 
 
+def _next_uid() -> int:
+    global _UID
+    _UID += 1
+    return _UID
+
+
 def _write_state():
     now = time.time()
     with _STATE_LOCK:
@@ -182,7 +190,9 @@ def _write_state():
             if os.path.isdir(_CLEAR_DIR):
                 for name in os.listdir(_CLEAR_DIR):
                     try:
-                        _TRANSFERS.pop(int(name), None)
+                        pid = int(name)
+                        uid = _PAYLOAD_TO_UID.pop(pid, None)
+                        _TRANSFERS.pop(uid if uid is not None else pid, None)
                         os.remove(os.path.join(_CLEAR_DIR, name))
                     except Exception:
                         pass
@@ -192,6 +202,7 @@ def _write_state():
             "transfers": [
                 {
                     "id": tid,
+                    "payload_id": x.get("payload_id", tid),
                     "file": x["file"],
                     "size": x["size"],
                     "bytes": x["bytes"],
@@ -223,7 +234,10 @@ def _track_offer(file_metadata, accepted):
     with _STATE_LOCK:
         for meta in file_metadata:
             pid = meta.payload_id
-            _TRANSFERS[pid] = {
+            uid = _next_uid()
+            _PAYLOAD_TO_UID[pid] = uid
+            _TRANSFERS[uid] = {
+                "payload_id": pid,
                 "file": meta.name,
                 "size": meta.size,
                 "bytes": 0,
@@ -235,10 +249,21 @@ def _track_offer(file_metadata, accepted):
 
 def _track_progress(incoming):
     with _STATE_LOCK:
-        cur = _TRANSFERS.get(incoming.payload_id)
+        uid = _PAYLOAD_TO_UID.get(incoming.payload_id)
+        if uid is None:
+            uid = _next_uid()
+            _PAYLOAD_TO_UID[incoming.payload_id] = uid
+        cur = _TRANSFERS.get(uid)
         if cur is None:
-            cur = {"file": incoming.name, "size": incoming.size, "bytes": 0, "done": False, "dest": None}
-            _TRANSFERS[incoming.payload_id] = cur
+            cur = {
+                "payload_id": incoming.payload_id,
+                "file": incoming.name,
+                "size": incoming.size,
+                "bytes": 0,
+                "done": False,
+                "dest": None,
+            }
+            _TRANSFERS[uid] = cur
         cur["bytes"] = incoming.bytes_written
         cur["dest"] = str(incoming.dest_path)
         if incoming.complete:
@@ -428,6 +453,7 @@ def main():
 
     with _STATE_LOCK:
         _TRANSFERS.clear()
+        _PAYLOAD_TO_UID.clear()
         _PENDING_OFFERS.clear()
     try:
         if os.path.isfile(_STATE_FILE):

@@ -417,7 +417,7 @@ class QuickSharePage:
             if spid:
                 _qs(["--clear-send", str(spid)])
         else:
-            tid = t.get("id")
+            tid = t.get("payload_id", t.get("id"))
             if tid is not None:
                 _qs(["--clear-transfer", str(tid)])
 
@@ -459,7 +459,7 @@ class QuickSharePage:
                         pass
             self._window.show_toast("Send canceled")
         else:
-            tid = t.get("id")
+            tid = t.get("payload_id", t.get("id"))
             if tid is not None:
                 _qs(["--cancel-receive", str(tid)])
             self._window.show_toast("Canceling transfer\u2026")
