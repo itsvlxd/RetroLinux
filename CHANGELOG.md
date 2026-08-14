@@ -1,3 +1,37 @@
+# [1.1.0](https://github.com/itsvlxd/RetroLinux/compare/v1.0.0...v1.1.0) (2026-08-14)
+
+
+### Bug Fixes
+
+* **quickshare:** fix mdns collision ([31660ae](https://github.com/itsvlxd/RetroLinux/commit/31660aeb6c79f6ad18a86f6d69d99f7b801eb05b))
+* **quickshare:** fix quickshare background pro unwanted restart ([360647b](https://github.com/itsvlxd/RetroLinux/commit/360647bc03a4baa20307d660c39a8dea9b8ed600))
+* **quickshare:** fix quickshare destination path ([b8352f2](https://github.com/itsvlxd/RetroLinux/commit/b8352f25c756f57eec2c6f448954e2cc15bd3148))
+* **quickshare:** make each of the connection run its own daemon ([37aa5a5](https://github.com/itsvlxd/RetroLinux/commit/37aa5a533709f16b416d7c975bf40d6bc6b847f1))
+* **quickshare:** make the transfers stackable ([eed6e32](https://github.com/itsvlxd/RetroLinux/commit/eed6e325e490acc71e597c62f70b3a63783a82b8))
+* **retro:** add python crypto missing package ([6bb8284](https://github.com/itsvlxd/RetroLinux/commit/6bb82845ca4d15fd7f90c5ae4507a56cd86fcbfb))
+* **settings:** fix power logout command ([7fa40b7](https://github.com/itsvlxd/RetroLinux/commit/7fa40b78f68e91ae9b7f0121af139508a8ddf8b7))
+* **wallpapers:** fix wallpapers frame being unified with wallpapers thumbs ([d74876f](https://github.com/itsvlxd/RetroLinux/commit/d74876f8ebd39cc35c311679f3291f6777372eb7))
+
+
+### Features
+
+* **daemon:** add enabled variable ([f2513f3](https://github.com/itsvlxd/RetroLinux/commit/f2513f3f590f339c73c4c20c960be8bb5c8440ec))
+* **lib:** add strip quotes function for variable.py lib ([f4f5e63](https://github.com/itsvlxd/RetroLinux/commit/f4f5e63ea11155182f4802f3ed10d7e37eeb0d7a))
+* **lib:** add thumb cache in wallpapers dir ([e40655e](https://github.com/itsvlxd/RetroLinux/commit/e40655e45893f41dc757f080a05d8c695a83a32e))
+* **quickshare:** add android implementation of quickshare ([ff65c58](https://github.com/itsvlxd/RetroLinux/commit/ff65c58835b2d4af30d60b78122be796b881cf19))
+* **quickshare:** add icon for computers ([9d7a465](https://github.com/itsvlxd/RetroLinux/commit/9d7a46512c8ef39d077953186c6086a2d3daf83c))
+* **quickshare:** add notification messages for pc reject ([e0df9bb](https://github.com/itsvlxd/RetroLinux/commit/e0df9bbcb61a66fe3d8f0859a534a919dc36f652))
+* **quickshare:** add quickshare file sharing & other minor bugs and fixes ([#4](https://github.com/itsvlxd/RetroLinux/issues/4)) ([9bc0249](https://github.com/itsvlxd/RetroLinux/commit/9bc02490e434e3dce2d66446252d599087b8a9eb))
+* **quickshare:** add quickshare menu in retroshell ([5b021ea](https://github.com/itsvlxd/RetroLinux/commit/5b021eac045811ba327b9243c3c10bc3a5787ebb))
+* **quickshare:** add support for BLE nudge discovery ([594ae61](https://github.com/itsvlxd/RetroLinux/commit/594ae61355b56d7c04a3e4fa1e2a7c6770236803))
+* **quickshare:** add transfer progress bar from ([6f459a5](https://github.com/itsvlxd/RetroLinux/commit/6f459a50b12bdc8c1c055f8d7c721c52b70fd08d))
+* **quickshare:** add transfers to globalstate ([827d57b](https://github.com/itsvlxd/RetroLinux/commit/827d57b710444572119523bd600a007b8f03b111))
+* **retro:** add gradia package ([729b816](https://github.com/itsvlxd/RetroLinux/commit/729b816cc4216785cb0dfd7b03171ab97f8c5723))
+* **retro:** add remmove confilcts step ([aee1204](https://github.com/itsvlxd/RetroLinux/commit/aee120431884536c5302b1897b5397f9560304ff))
+* **retro:** add zenity window rules ([f91e043](https://github.com/itsvlxd/RetroLinux/commit/f91e0434ca043e775abf355fceafc0168d438159))
+* **update:** add daemon restart after every update ([478cfd0](https://github.com/itsvlxd/RetroLinux/commit/478cfd073d73770a6525d7b9330a553c607c0667))
+* **update:** make backup before update on any branch ([75052b8](https://github.com/itsvlxd/RetroLinux/commit/75052b8c17975db5e01f3bed1e258c3a321b9df8))
+
 # 1.0.0 (2026-08-12)
 
 
