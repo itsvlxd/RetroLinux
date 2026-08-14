@@ -33,6 +33,45 @@ retro_fix_permissions() {
     rx_log "success" "Permissions and git safe.directory configured"
 }
 
+remove_conflicts() {
+    local -A conflicts=(
+        [dolphin]=""
+        [dunst]="dunst.service"
+    )
+
+    local pkg svc
+    for pkg in "${!conflicts[@]}"; do
+        if pacman -Qq "$pkg" >/dev/null 2>&1; then
+            rx_log "info" "Removing conflicting package: $pkg"
+            if [[ $EUID -eq 0 ]]; then
+                pacman -Rns --noconfirm "$pkg" >/dev/null 2>&1
+            else
+                sudo pacman -Rns --noconfirm "$pkg" >/dev/null 2>&1
+            fi
+        fi
+
+        if pgrep -x "$pkg" >/dev/null 2>&1; then
+            pkill -9 -x "$pkg" >/dev/null 2>&1
+        fi
+
+        svc="${conflicts[$pkg]}"
+        if [[ -n $svc ]]; then
+            systemctl --user stop "$svc" >/dev/null 2>&1
+            systemctl --user disable "$svc" >/dev/null 2>&1
+            systemctl --user mask "$svc" >/dev/null 2>&1
+            if [[ $EUID -eq 0 ]]; then
+                systemctl stop "$svc" >/dev/null 2>&1
+                systemctl disable "$svc" >/dev/null 2>&1
+                systemctl mask "$svc" >/dev/null 2>&1
+            else
+                sudo systemctl stop "$svc" >/dev/null 2>&1
+                sudo systemctl disable "$svc" >/dev/null 2>&1
+                sudo systemctl mask "$svc" >/dev/null 2>&1
+            fi
+        fi
+    done
+}
+
 if command -v gsettings >/dev/null 2>&1; then
     if [[ $(gsettings get org.blueman.general notification-daemon 2>/dev/null) == "true" ]]; then
         gsettings set org.blueman.general notification-daemon false
@@ -74,6 +113,8 @@ EOF
     fi
 }
 hide_nm_applet
+
+remove_conflicts
 
 if [[ $SECONDARY_INSTALL != "true" ]]; then
     setup_cronie
