@@ -12,6 +12,8 @@ Item {
 
     required property var device
 
+    signal sendClicked
+
     width: parent ? parent.width : 0
     height: 44
     implicitHeight: 44
@@ -80,6 +82,9 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: QuickShareService.sendTo(root.device)
+        onClicked: {
+            QuickShareService.sendTo(root.device);
+            root.sendClicked();
+        }
     }
 }

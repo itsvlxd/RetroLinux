@@ -12,6 +12,8 @@ import qs.config
 Item {
     id: root
 
+    signal requestClose
+
     property int maxContentWidth: 480
     readonly property int contentWidth: Math.min(width, maxContentWidth)
     readonly property real sideMargin: (width - contentWidth) / 2
@@ -80,6 +82,46 @@ Item {
         }
 
         StyledRect {
+            id: receiveRow
+            width: root.contentWidth
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredHeight: 26
+            visible: QuickShareService.receiving
+            variant: "internalbg"
+            radius: Styling.radius(0)
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: 8
+
+                Text {
+                    text: Icons.quickshare
+                    font.family: Icons.font
+                    font.pixelSize: 15
+                    color: Styling.srItem("overprimary")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "From: " + (QuickShareService.receivingFile || "")
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(-2)
+                    color: Colors.overBackground
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    text: QuickShareService.receiveProgress + "%"
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(-2)
+                    color: Colors.overSurfaceVariant
+                }
+            }
+        }
+
+        StyledRect {
             id: progressRow
             width: root.contentWidth
             Layout.alignment: Qt.AlignHCenter
@@ -124,7 +166,7 @@ Item {
             width: root.contentWidth
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredHeight: 6
-            visible: QuickShareService.sending
+            visible: QuickShareService.sending || QuickShareService.receiving
             variant: "internalbg"
             radius: Styling.radius(0)
             clip: true
@@ -133,7 +175,7 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
-                width: parent.width * (QuickShareService.sendProgress / 100)
+                width: parent.width * (QuickShareService.receiving ? QuickShareService.receiveProgress : QuickShareService.sendProgress) / 100
                 color: Colors.primary
 
                 Behavior on width {
@@ -168,6 +210,7 @@ Item {
                     height: 44
                     anchors.horizontalCenter: parent.horizontalCenter
                     device: parent.modelData
+                    onSendClicked: root.requestClose()
                 }
             }
 

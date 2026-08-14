@@ -270,6 +270,24 @@ qs_enabled_status() {
     [[ $val != "false" ]] && echo "true" || echo "false"
 }
 
+qs_active_receive() {
+    python3 - <<'PY'
+import json
+p = "/tmp/retro_logs/quickshare_transfers.json"
+try:
+    data = json.load(open(p))
+    for t in data.get("transfers", []):
+        if not t.get("done"):
+            size = t.get("size") or 0
+            by = t.get("bytes") or 0
+            pct = int(by * 100 / size) if size else 0
+            print(f"{t.get('file', '')}|{pct}")
+            break
+except Exception:
+    pass
+PY
+}
+
 qs_set_enabled() {
     local state="${1:-true}"
     case "$state" in
@@ -352,6 +370,7 @@ case "$1" in
     --dir-configured) qs_dir_configured ;;
     --auto-accept-status) qs_get_auto_accept ;;
     --enabled-status) qs_enabled_status ;;
+    --active-receive) qs_active_receive ;;
     --set-enabled) qs_set_enabled "$2" ;;
     --start) qs_start ;;
     --stop) qs_stop ;;

@@ -310,6 +310,7 @@ StyledRect {
                         onLoaded: {
                             if (item) {
                                 item.maxContentWidth = width;
+                                item.requestClose.connect(() => { root.expandedPanel = -1; });
                             }
                         }
 

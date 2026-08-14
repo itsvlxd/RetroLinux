@@ -16,6 +16,9 @@ Singleton {
     property bool sending: false
     property int sendProgress: 0
     property string sendingFile: ""
+    property bool receiving: false
+    property int receiveProgress: 0
+    property string receivingFile: ""
 
     property bool _pendingToggle: false
 
@@ -48,6 +51,11 @@ Singleton {
         root.scanning = true;
         scanProc.command = ["bash", root.corePath, "--scan"];
         scanProc.running = true;
+    }
+
+    function pollReceive() {
+        receiveProc.command = ["bash", root.corePath, "--active-receive"];
+        receiveProc.running = true;
     }
 
     function sendTo(device) {
@@ -111,6 +119,25 @@ Singleton {
                 }
                 root.deviceList = list;
                 root.scanning = false;
+            }
+        }
+    }
+
+    Process {
+        id: receiveProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var parts = text.trim().split("|");
+                if (parts.length >= 2 && parts[0].length > 0) {
+                    root.receiving = true;
+                    root.receivingFile = parts[0];
+                    root.receiveProgress = parseInt(parts[1]) || 0;
+                } else {
+                    root.receiving = false;
+                    root.receiveProgress = 0;
+                    root.receivingFile = "";
+                }
             }
         }
     }
@@ -202,7 +229,10 @@ Singleton {
         interval: 2000
         repeat: true
         running: true
-        onTriggered: root.refresh()
+        onTriggered: {
+            root.refresh();
+            root.pollReceive();
+        }
     }
 
     Component.onCompleted: {

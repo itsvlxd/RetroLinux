@@ -15,7 +15,6 @@ with toasts and logged to ``/tmp/retro_logs/quickshare.log``.
 import json
 import os
 import signal
-import socket
 import subprocess
 import threading
 import time
@@ -628,7 +627,6 @@ class QuickSharePage:
         def apply(raw: str) -> None:
             while child := listbox.get_first_child():
                 listbox.remove(child)
-            local_name = socket.gethostname().lower()
             count = 0
             for line in raw.splitlines():
                 p = line.split("|")
@@ -636,8 +634,6 @@ class QuickSharePage:
                     continue
                 name, addr, port, dtype = p[0], p[1], p[2], p[3]
                 if not name:
-                    continue
-                if name.lower() == local_name:
                     continue
                 count += 1
 
