@@ -183,6 +183,7 @@ QtObject {
     readonly property string sunDim: ""
     readonly property string moon: "\ue330"
     readonly property string lightbulb: "\ue2dc"
+    readonly property string computer: "\ue560"
     readonly property string user: ""
     readonly property string spinnerGap: ""
     readonly property string circleNotch: ""

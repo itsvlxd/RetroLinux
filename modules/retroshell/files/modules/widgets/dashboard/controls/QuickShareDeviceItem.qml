@@ -35,6 +35,8 @@ Item {
                 var type = (root.device?.type || "").toUpperCase();
                 if (type === "PHONE" || type === "FOLDABLE")
                     return Icons.phone;
+                if (type === "LAPTOP" || type === "TABLET")
+                    return Icons.computer;
                 return Icons.quickshare;
             }
             font.family: Icons.font
@@ -58,8 +60,13 @@ Item {
 
             Text {
                 Layout.fillWidth: true
-                visible: root.device?.address
-                text: root.device?.address ?? ""
+                text: {
+                    var type = (root.device?.type || "").toUpperCase();
+                    var label = type === "PHONE" || type === "FOLDABLE" ? "Phone"
+                        : type === "LAPTOP" ? "PC"
+                        : type === "TABLET" ? "Tablet" : "Other";
+                    return root.device?.address ? (label + " \u00b7 " + root.device.address) : label;
+                }
                 font.family: Config.theme.font
                 font.pixelSize: Styling.fontSize(-2)
                 color: Colors.overSurfaceVariant

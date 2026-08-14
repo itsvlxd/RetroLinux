@@ -37,6 +37,7 @@ _QS_SEND_TRANSFERS = "/tmp/retro_logs/quickshare_send_transfers.json"
 
 _DEVICE_ICONS = {
     "PHONE": "phone-symbolic",
+    "FOLDABLE": "phone-symbolic",
     "TABLET": "computer-symbolic",
     "LAPTOP": "computer-symbolic",
 }
@@ -44,6 +45,15 @@ _DEVICE_ICONS = {
 
 def _device_icon(dtype: str) -> str:
     return _DEVICE_ICONS.get(dtype.upper(), "network-transmit-receive-symbolic")
+
+
+def _device_type_label(dtype: str) -> str:
+    return {
+        "PHONE": "Phone",
+        "FOLDABLE": "Phone",
+        "TABLET": "Tablet",
+        "LAPTOP": "PC",
+    }.get(dtype.upper(), "Other")
 
 
 def _human_size(n) -> str:
@@ -647,7 +657,7 @@ class QuickSharePage:
                 n_lbl.set_halign(Gtk.Align.START)
                 n_lbl.set_ellipsize(Pango.EllipsizeMode.END)
                 text_box.append(n_lbl)
-                m_lbl = Gtk.Label(label=f"{addr}:{port}  \u00b7  {dtype.lower()}")
+                m_lbl = Gtk.Label(label=f"{addr}:{port}  \u00b7  {_device_type_label(dtype)}")
                 m_lbl.set_halign(Gtk.Align.START)
                 m_lbl.add_css_class("dim-label")
                 m_lbl.add_css_class("caption")
