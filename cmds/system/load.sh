@@ -185,7 +185,7 @@ cmd_load() {
                 disown
             done
 
-            faillock --user $USER --reset
+            faillock --user "$USER" --reset 2>/dev/null || true
 
             local restart_marker="/tmp/retro_shell_restart_done"
             if [[ ! -f $restart_marker ]]; then
