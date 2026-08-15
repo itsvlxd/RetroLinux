@@ -46,7 +46,7 @@ setup_network() {
         rx_log "info" "Connecting to WiFi: $WIFI_SSID"
 
         local conn_result
-        conn_result=$(sudo bash "$RETRO_DIR/scripts/network_core.sh" --wifi-connect "$WIFI_SSID" "$WIFI_PASSWORD" "$wifi_iface")
+        conn_result=$(sudo RETRO_DIR="$RETRO_DIR" bash "$RETRO_DIR/scripts/network_core.sh" --wifi-connect "$WIFI_SSID" "$WIFI_PASSWORD" "$wifi_iface")
 
         local status
         status=$(echo "$conn_result" | grep -oP "result=\K[^|]+")
@@ -69,7 +69,7 @@ setup_network() {
             sudo nmcli connection down "temp-connection" 2>&1 | tail -1
             sudo nmcli connection delete "temp-connection" 2>&1 | tail -1
 
-            conn_result=$(sudo bash "$RETRO_DIR/scripts/network_core.sh" --wifi-connect "$WIFI_SSID" "$WIFI_PASSWORD" "$wifi_iface")
+            conn_result=$(sudo RETRO_DIR="$RETRO_DIR" bash "$RETRO_DIR/scripts/network_core.sh" --wifi-connect "$WIFI_SSID" "$WIFI_PASSWORD" "$wifi_iface")
             status=$(echo "$conn_result" | grep -oP "result=\K[^|]+")
 
             if [[ $status == "success" ]]; then
@@ -88,11 +88,11 @@ setup_network() {
     if [[ -n $wifi_iface ]]; then
         rx_log "info" "No saved WiFi credentials, scanning for networks..."
 
-        sudo bash "$RETRO_DIR/scripts/network_core.sh" --wifi-on "$wifi_iface" >/dev/null
+        sudo RETRO_DIR="$RETRO_DIR" bash "$RETRO_DIR/scripts/network_core.sh" --wifi-on "$wifi_iface" >/dev/null
         sleep 2
 
         local scan_result
-        scan_result=$(sudo bash "$RETRO_DIR/scripts/network_core.sh" --wifi-list "$wifi_iface")
+        scan_result=$(sudo RETRO_DIR="$RETRO_DIR" bash "$RETRO_DIR/scripts/network_core.sh" --wifi-list "$wifi_iface")
 
         local ssid_list
         ssid_list=$(echo "$scan_result" | grep "^network|" | cut -d'|' -f2 | sort -u)
@@ -119,7 +119,7 @@ setup_network() {
 
                     if [[ -n $wifi_password ]]; then
                         local conn_result
-                        conn_result=$(sudo bash "$RETRO_DIR/scripts/network_core.sh" --wifi-connect "$selected_ssid" "$wifi_password" "$wifi_iface")
+                        conn_result=$(sudo RETRO_DIR="$RETRO_DIR" bash "$RETRO_DIR/scripts/network_core.sh" --wifi-connect "$selected_ssid" "$wifi_password" "$wifi_iface")
 
                         local status
                         status=$(echo "$conn_result" | grep -oP "result=\K[^|]+")
