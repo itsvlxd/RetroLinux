@@ -8,7 +8,7 @@ setup_hostname() {
 
     while true; do
         local hostname
-        hostname=$(gum input --placeholder "Please set the hostname for your computer" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Hostname> " --value "retrolinux" --padding "$GUM_INPUT_PADDING") || {
+        hostname=$(gum input --placeholder "Please set the hostname for your computer" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Hostname> " --value "${USER_HOSTNAME:-retrolinux}" --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Hostname input failed"
             rx_retry_or_exit "Hostname is required" || rx_abort
             return 1

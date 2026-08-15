@@ -15,7 +15,7 @@ setup_branch() {
     gum style --foreground 7 --padding "0 0 0 $PADDING_LEFT" "Latest development changes, updated continuously. Best for testing."
     gum style --foreground 7 --padding "0 0 1 $PADDING_LEFT" "Recommended while Retro Linux is still in development."
 
-    if gum confirm --affirmative "Stable (main)" --negative "Rolling (develop)" "Select release branch" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Stable (main)" --negative "Rolling (develop)" "Select release branch" --default="$([[ $RETRO_BRANCH == "main" ]] && echo true || echo false)" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         RETRO_BRANCH="main"
     else
         RETRO_BRANCH="develop"

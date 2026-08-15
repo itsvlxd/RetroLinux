@@ -15,7 +15,7 @@ setup_install() {
     gum style --foreground 7 --padding "0 0 0 $PADDING_LEFT" "Installs only core system modules: essential services, package"
     gum style --foreground 7 --padding "0 0 1 $PADDING_LEFT" "management, and basic desktop functionality. Lightweight setup."
 
-    if gum confirm --affirmative "Complete install" --negative "Minimal install" "Select Installation Type" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Complete install" --negative "Minimal install" "Select Installation Type" --default="$([[ $INSTALL_TYPE == "complete" ]] && echo true || echo false)" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         INSTALL_TYPE="complete"
     else
         INSTALL_TYPE="minimal"

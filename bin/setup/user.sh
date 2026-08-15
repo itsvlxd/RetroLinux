@@ -8,7 +8,7 @@ setup_user() {
 
     while true; do
         local username
-        username=$(gum input --placeholder "Pick a username" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Username> " --padding "$GUM_INPUT_PADDING") || {
+        username=$(gum input --placeholder "Pick a username" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Username> " --value "$USER_NAME" --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Username input failed"
             rx_retry_or_exit "Username is required" || rx_abort
             return 1
@@ -25,13 +25,13 @@ setup_user() {
 
     while true; do
         local password
-        password=$(gum input --placeholder "Create a password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Password> " --padding "$GUM_INPUT_PADDING") || {
+        password=$(gum input --placeholder "Create a password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Password> " --value "$USER_PASSWORD" --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Password input failed"
             rx_retry_or_exit "Password is required" || rx_abort
             return 1
         }
         local password_confirmation
-        password_confirmation=$(gum input --placeholder "Confirm your password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
+        password_confirmation=$(gum input --placeholder "Confirm your password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --value "$USER_PASSWORD" --padding "$GUM_INPUT_PADDING") || {
             rx_step_error "2" "Password confirmation failed"
             rx_retry_or_exit "Password confirmation is required" || rx_abort
             return 1
@@ -48,7 +48,7 @@ setup_user() {
         fi
     done
 
-    if gum confirm --affirmative "Yes, enable sudo" --negative "No, skip sudo" "User sudo access" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable sudo" --negative "No, skip sudo" "User sudo access" --default="${USER_SUDO:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         # shellcheck disable=SC2034
         USER_SUDO="true"
     else

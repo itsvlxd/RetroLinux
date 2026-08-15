@@ -7,16 +7,43 @@ setup_network() {
     rx_clear_logo
     rx_step "Configuring network..."
 
-    if gum confirm --affirmative "WiFi" --negative "Ethernet" "Select your network type" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    _setup_ethernet() {
+        local eth_iface
+        eth_iface=$(rx_get_ethernet_iface)
+        if [[ -n $eth_iface ]]; then
+            ip link set "$eth_iface" up 2>/dev/null
+        fi
+
+        if rx_check_internet || (rx_wait_for_ethernet "$eth_iface" && rx_check_internet); then
+            NETWORK_TYPE="Ethernet"
+            WIFI_SSID=""
+            WIFI_PASSWORD=""
+            rx_save_state
+            rx_clear_logo
+            echo
+            gum style --foreground 2 "Ethernet connected"
+            echo
+            return 0
+        fi
+
+        return 1
+    }
+
+    if gum confirm --affirmative "WiFi" --negative "Ethernet" "Select your network type" --default="$([[ $NETWORK_TYPE == "WiFi" ]] && echo true || echo false)" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         local wifi_iface
         wifi_iface=$(rx_get_wifi_iface)
 
         if [[ -z $wifi_iface ]]; then
+            gum style --foreground 3 "No WiFi adapter detected, trying Ethernet..."
+            echo
+            if _setup_ethernet; then
+                return 0
+            fi
             rx_clear_logo
             echo
-            gum style --foreground 1 "No WiFi adapter detected"
+            gum style --foreground 1 "Network unavailable"
             echo
-            rx_retry_or_exit "WiFi unavailable" || rx_abort
+            rx_retry_or_exit "No network connection available" || rx_abort
             return 1
         fi
 
@@ -56,28 +83,21 @@ setup_network() {
             fi
         done
 
+        gum style --foreground 3 "WiFi connection failed, trying Ethernet..."
+        echo
+        if _setup_ethernet; then
+            return 0
+        fi
+
         rx_clear_logo
         echo
         gum style --foreground 1 "Network unavailable"
         echo
+        rx_retry_or_exit "No network connection available" || rx_abort
         return 1
     fi
 
-    local eth_iface
-    eth_iface=$(rx_get_ethernet_iface)
-    if [[ -n $eth_iface ]]; then
-        ip link set "$eth_iface" up 2>/dev/null
-    fi
-
-    if rx_check_internet || (rx_wait_for_ethernet "$eth_iface" && rx_check_internet); then
-        NETWORK_TYPE="Ethernet"
-        WIFI_SSID=""
-        WIFI_PASSWORD=""
-        rx_save_state
-        rx_clear_logo
-        echo
-        gum style --foreground 2 "Ethernet connected"
-        echo
+    if _setup_ethernet; then
         return 0
     fi
 

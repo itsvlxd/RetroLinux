@@ -95,7 +95,7 @@ Custom (Enter manually)"
         rx_step "Let's configure your bootloader..."
 
         local custom_res
-        custom_res=$(gum input --placeholder "1920x1080" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Resolution (WxH)> " --padding "$GUM_INPUT_PADDING") || {
+        custom_res=$(gum input --placeholder "1920x1080" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Resolution (WxH)> " --value "$BOOT_VIDEO_GRUB" --padding "$GUM_INPUT_PADDING") || {
             selected_resolution="$BOOT_VIDEO_GRUB"
         }
         [[ -n $custom_res ]] && selected_resolution="$custom_res"
@@ -109,7 +109,7 @@ Custom (Enter manually)"
     gum style --foreground 7 "Detect and add other operating systems (Windows, other Linux distros)"
     echo
 
-    if gum confirm --affirmative "Yes, enable OS probing" --negative "No, skip OS probing" "OS Probing" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable OS probing" --negative "No, skip OS probing" "OS Probing" --default="${GRUB_OS_PROBER:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         GRUB_OS_PROBER="true"
     else
         GRUB_OS_PROBER="false"
@@ -121,7 +121,7 @@ Custom (Enter manually)"
     gum style --foreground 7 "Include BTRFS snapshots in GRUB boot menu for easy rollback"
     echo
 
-    if gum confirm --affirmative "Yes, enable snapshots" --negative "No, disable snapshots" "Snapshot Boot" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable snapshots" --negative "No, disable snapshots" "Snapshot Boot" --default="${GRUB_SNAPSHOTS_ENABLED:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         GRUB_SNAPSHOTS_ENABLED="true"
     else
         GRUB_SNAPSHOTS_ENABLED="false"

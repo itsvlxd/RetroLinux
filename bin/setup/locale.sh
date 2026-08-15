@@ -12,8 +12,19 @@ setup_locale() {
     done
     lang_list=$(echo "$lang_list" | sort | uniq)
 
+    local current_lang=""
+    if [[ -n $SYS_LANG ]]; then
+        local saved_code="${SYS_LANG%%.*}"
+        for code in "${!LOCALE_LANG_NAMES[@]}"; do
+            if [[ "$code" == "$saved_code" ]]; then
+                current_lang="${LOCALE_LANG_NAMES[$code]}"
+                break
+            fi
+        done
+    fi
+
     local choice
-    choice=$(echo "$lang_list" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --prompt "Language> " --placeholder "Please select your system language" --padding "$GUM_FILTER_PADDING") || {
+    choice=$(echo "$lang_list" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --value "$current_lang" --prompt "Language> " --placeholder "Please select your system language" --padding "$GUM_FILTER_PADDING") || {
         rx_step_error "1" "Language selection cancelled"
         rx_retry_or_exit "Language selection is required" || rx_abort
         return 1

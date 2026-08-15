@@ -57,7 +57,7 @@ Turkish
 Ukrainian'
 
     local choice
-    choice=$(printf '%s\n' "$keyboards" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --prompt "Keyboard> " --placeholder "Please select your keyboard layout" --padding "$GUM_FILTER_PADDING") || {
+    choice=$(printf '%s\n' "$keyboards" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --value "$(rx_keyboard_display_name "$KEYBOARD")" --prompt "Keyboard> " --placeholder "Please select your keyboard layout" --padding "$GUM_FILTER_PADDING") || {
         rx_step_error "1" "Keyboard selection cancelled"
         rx_retry_or_exit "Keyboard selection is required" || rx_abort
         return 1

@@ -7,7 +7,14 @@ rx_setup_browser() {
 
     local display_options=("Firefox" "Zen" "Chromium" "None (skip browser)")
     local pkg_options=("firefox" "zen-browser-bin" "chromium" "none")
-    local selection=$(gum choose --header "Select browser to install:" --padding "$GUM_CHOOSE_PADDING" "${display_options[@]}")
+    local current_browser="Firefox"
+    case "$BROWSER_CHOICE" in
+        firefox) current_browser="Firefox" ;;
+        zen-browser-bin) current_browser="Zen" ;;
+        chromium) current_browser="Chromium" ;;
+        none) current_browser="None (skip browser)" ;;
+    esac
+    local selection=$(gum choose --selected "$current_browser" --header "Select browser to install:" --padding "$GUM_CHOOSE_PADDING" "${display_options[@]}")
 
     if [[ -z "$selection" ]]; then
         gum style --foreground 3 "No browser selected, skipping"

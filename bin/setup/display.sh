@@ -79,7 +79,7 @@ Custom (Enter manually)"
         rx_step "Let's configure your display settings..."
 
         local custom_ratio
-        custom_ratio=$(gum input --placeholder "16:9, 16:10, 21:9, 32:9, etc." --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Aspect Ratio> " --padding "$GUM_INPUT_PADDING") || {
+        custom_ratio=$(gum input --placeholder "16:9, 16:10, 21:9, 32:9, etc." --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Aspect Ratio> " --value "$DISPLAY_ASPECT_RATIO" --padding "$GUM_INPUT_PADDING") || {
             DISPLAY_ASPECT_RATIO="16:9"
         }
         [[ -n $custom_ratio ]] && DISPLAY_ASPECT_RATIO="$custom_ratio"
@@ -151,7 +151,7 @@ $resolutions"
     [[ -n $BOOT_VIDEO_GRUB ]] && current_res="$BOOT_VIDEO_GRUB"
 
     local display_res
-    display_res=$(echo "$resolutions" | gum choose --height 10 --header "Select display resolution" --padding "$GUM_CHOOSE_PADDING") || {
+    display_res=$(echo "$resolutions" | gum choose --height 10 --selected "$current_res" --header "Select display resolution" --padding "$GUM_CHOOSE_PADDING") || {
         rx_step_error "2" "Resolution selection failed"
         rx_retry_or_exit "Display configuration required" || rx_abort
     }
@@ -170,7 +170,7 @@ $resolutions"
         rx_step "Let's configure your display settings..."
 
         local custom_res
-        custom_res=$(gum input --placeholder "1920x1080" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Resolution (WxH)> " --padding "$GUM_INPUT_PADDING") || {
+        custom_res=$(gum input --placeholder "1920x1080" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Resolution (WxH)> " --value "$BOOT_VIDEO_GRUB" --padding "$GUM_INPUT_PADDING") || {
             display_res="1920x1080"
         }
         [[ -n $custom_res ]] && display_res="$custom_res"

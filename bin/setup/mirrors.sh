@@ -83,7 +83,7 @@ United States'
     echo
 
     local custom_mirror
-    custom_mirror=$(gum input --placeholder 'https://mirror.example.com/$repo/os/$arch' --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Custom URL> " --padding "$GUM_INPUT_PADDING") || {
+    custom_mirror=$(gum input --placeholder 'https://mirror.example.com/$repo/os/$arch' --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Custom URL> " --value "$CUSTOM_MIRRORS" --padding "$GUM_INPUT_PADDING") || {
         rx_step_error "7" "Custom mirror input cancelled"
         rx_retry_or_exit "Custom mirror input" || rx_abort
         return 1
