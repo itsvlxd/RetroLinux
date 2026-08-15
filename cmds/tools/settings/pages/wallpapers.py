@@ -1,5 +1,6 @@
 """Wallpaper selection page — grid with thumbnails."""
 
+import math
 import os
 import re
 import subprocess
@@ -123,6 +124,14 @@ class WallpapersPage:
         self._search_entry = None
         self._all_wallpapers: list[dict] = []
         self._search_term = ""
+        self._page = 0
+        self._page_size = 8
+        self._columns = 2
+        self._pag_prev: Gtk.Button | None = None
+        self._pag_next: Gtk.Button | None = None
+        self._pag_label: Gtk.Label | None = None
+        self._pag_size_dd: Gtk.DropDown | None = None
+        self._pag_cols_dd: Gtk.DropDown | None = None
         self._dirty = False
         self._notify_dirty = lambda: None
         self._pending_static: bool | None = None
@@ -567,18 +576,14 @@ class WallpapersPage:
 
         content_box.append(pref_group)
 
-        search_entry = Gtk.SearchEntry()
-        search_entry.set_placeholder_text("Search wallpapers\u2026")
-        search_entry.set_margin_start(12)
-        search_entry.set_margin_end(12)
-        search_entry.set_margin_top(12)
-        search_entry.set_margin_bottom(4)
-        search_entry.connect("search-changed", self._on_search)
-        content_box.append(search_entry)
+        toolbar_row = self._build_toolbar_row()
+        content_box.append(toolbar_row)
 
         flow = Gtk.FlowBox()
-        flow.set_max_children_per_line(5)
-        flow.set_min_children_per_line(2)
+        flow.set_max_children_per_line(self._columns)
+        flow.set_min_children_per_line(self._columns)
+        flow.set_homogeneous(True)
+        flow.set_hexpand(True)
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_column_spacing(10)
         flow.set_row_spacing(10)
@@ -591,7 +596,7 @@ class WallpapersPage:
 
         self._content_box = content_box
         self._flow_box = flow
-        self._search_entry = search_entry
+        self._search_entry = self._toolbar_search_entry
 
         spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         spinner_box.set_valign(Gtk.Align.CENTER)
@@ -627,6 +632,7 @@ class WallpapersPage:
         if self._spinner_box is not None and self._content_box is not None:
             self._content_box.remove(self._spinner_box)
             self._spinner_box = None
+        self._page = 0
         self._rebuild()
         self._needs_opt = self._check_needs_optimization()
         self._refresh_opt_banner()
@@ -641,18 +647,22 @@ class WallpapersPage:
 
     def _on_refreshed(self, wallpapers: list[dict]) -> None:
         self._all_wallpapers = wallpapers
+        self._page = 0
         self._rebuild()
         self._refresh_opt_banner()
 
     def _on_search(self, _entry):
         term = self._search_entry.get_text().strip().lower()  # type: ignore[union-attr]
         self._search_term = term if len(term) >= 3 else ""
+        self._page = 0
         self._rebuild()
 
     def _make_flowbox(self) -> Gtk.FlowBox:
         flow = Gtk.FlowBox()
-        flow.set_max_children_per_line(5)
-        flow.set_min_children_per_line(2)
+        flow.set_max_children_per_line(self._columns)
+        flow.set_min_children_per_line(self._columns)
+        flow.set_homogeneous(True)
+        flow.set_hexpand(True)
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_column_spacing(10)
         flow.set_row_spacing(10)
@@ -662,6 +672,117 @@ class WallpapersPage:
         flow.set_margin_bottom(12)
         flow.set_vexpand(True)
         return flow
+
+    def _build_toolbar_row(self) -> Gtk.Widget:
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar.set_margin_start(12)
+        bar.set_margin_end(12)
+        bar.set_margin_top(12)
+        bar.set_margin_bottom(4)
+
+        search_entry = Gtk.SearchEntry()
+        search_entry.set_placeholder_text("Search wallpapers\u2026")
+        search_entry.set_hexpand(True)
+        search_entry.connect("search-changed", self._on_search)
+        bar.append(search_entry)
+        self._toolbar_search_entry = search_entry
+
+        cols_label = Gtk.Label(label="Columns")
+        cols_label.add_css_class("dim-label")
+        bar.append(cols_label)
+        cols_model = Gtk.StringList.new(["2", "3"])
+        cols_dd = Gtk.DropDown(model=cols_model)
+        cols_dd.set_selected(0 if self._columns == 2 else 1)
+        cols_dd.connect("notify::selected", self._on_columns_changed)
+        bar.append(cols_dd)
+        self._pag_cols_dd = cols_dd
+
+        size_label = Gtk.Label(label="Per page")
+        size_label.add_css_class("dim-label")
+        bar.append(size_label)
+        size_model = Gtk.StringList.new(["8", "12", "24", "48", "All"])
+        size_dd = Gtk.DropDown(model=size_model)
+        size_dd.set_selected(self._page_size_index())
+        size_dd.connect("notify::selected", self._on_page_size_changed)
+        bar.append(size_dd)
+        self._pag_size_dd = size_dd
+
+        bar.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+
+        prev_btn = Gtk.Button(icon_name="go-previous-symbolic")
+        prev_btn.set_tooltip_text("Previous page")
+        prev_btn.add_css_class("flat")
+        prev_btn.connect("clicked", self._on_prev_page)
+        bar.append(prev_btn)
+        self._pag_prev = prev_btn
+
+        page_label = Gtk.Label(label="1 / 1")
+        page_label.add_css_class("dim-label")
+        bar.append(page_label)
+        self._pag_label = page_label
+
+        next_btn = Gtk.Button(icon_name="go-next-symbolic")
+        next_btn.set_tooltip_text("Next page")
+        next_btn.add_css_class("flat")
+        next_btn.connect("clicked", self._on_next_page)
+        bar.append(next_btn)
+        self._pag_next = next_btn
+
+        return bar
+
+    def _page_size_index(self) -> int:
+        options = [8, 12, 24, 48, 0]
+        try:
+            return options.index(self._page_size)
+        except ValueError:
+            return 1
+
+    def _page_size_value(self, index: int) -> int:
+        return {0: 8, 1: 12, 2: 24, 3: 48, 4: 0}.get(index, 8)
+
+    def _on_columns_changed(self, dd: Gtk.DropDown, _pspec) -> None:
+        self._columns = 2 if dd.get_selected() == 0 else 3
+        self._rebuild()
+
+    def _on_page_size_changed(self, dd: Gtk.DropDown, _pspec) -> None:
+        if dd is None:
+            return
+        self._page_size = self._page_size_value(dd.get_selected())
+        self._page = 0
+        self._rebuild()
+
+    def _on_prev_page(self, _btn) -> None:
+        if self._page > 0:
+            self._page -= 1
+            self._rebuild()
+
+    def _on_next_page(self, _btn) -> None:
+        total = self._total_pages()
+        if self._page < total - 1:
+            self._page += 1
+            self._rebuild()
+
+    def _total_pages(self) -> int:
+        matching = self._filtered_wallpapers()
+        if self._page_size == 0:
+            return 1
+        return max(1, math.ceil(len(matching) / self._page_size))
+
+    def _filtered_wallpapers(self) -> list[dict]:
+        if not self._search_term:
+            return list(self._all_wallpapers)
+        return [w for w in self._all_wallpapers if self._search_term in w.get("_search_tags", "")]
+
+    def _update_pagination_bar(self) -> None:
+        total = self._total_pages()
+        if self._page >= total:
+            self._page = total - 1
+        if self._pag_label is not None:
+            self._pag_label.set_label(f"{self._page + 1} / {total}")
+        if self._pag_prev is not None:
+            self._pag_prev.set_sensitive(self._page > 0)
+        if self._pag_next is not None:
+            self._pag_next.set_sensitive(self._page < total - 1)
 
     def get_search_entries(self) -> list[dict]:
         return [
@@ -918,14 +1039,25 @@ class WallpapersPage:
     def _rebuild(self):
         if self._content_box is None:
             return
-        # Build cards for matching wallpapers only
-        matching = self._all_wallpapers
-        if self._search_term:
-            matching = [w for w in matching if self._search_term in w.get("_search_tags", "")]
+        matching = self._filtered_wallpapers()
+        total = len(matching)
+        self._update_pagination_bar()
         new_flow = self._make_flowbox()
-        for wp in matching:
+        if self._page_size == 0:
+            page_items = matching
+        else:
+            lo = self._page * self._page_size
+            page_items = matching[lo:lo + self._page_size]
+        for wp in page_items:
             card = self._make_card(wp)
             new_flow.append(card)
+        if not page_items:
+            empty = Gtk.Label(label="No wallpapers found")
+            empty.add_css_class("dim-label")
+            empty.set_margin_top(24)
+            empty.set_margin_bottom(24)
+            empty.set_halign(Gtk.Align.CENTER)
+            new_flow.append(empty)
         # Replace old FlowBox
         if self._flow_box is not None:
             self._content_box.remove(self._flow_box)
@@ -933,9 +1065,14 @@ class WallpapersPage:
         self._content_box.append(self._flow_box)
         self._flow_box.show()
 
+    def _thumb_hover(self, pic: Gtk.Widget, icon: Gtk.Widget, hovering: bool) -> None:
+        icon.set_visible(hovering)
+        pic.set_opacity(0.5 if hovering else 1.0)
+
     def _make_card(self, wp: dict) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        box.set_halign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.FILL)
+        box.set_hexpand(True)
 
         thumb_path = wp.get("thumb", "")
         try:
@@ -944,16 +1081,36 @@ class WallpapersPage:
             pic.set_content_fit(Gtk.ContentFit.COVER)
             pic.add_css_class("wallpaper-thumb")
             pic.set_can_shrink(True)
-            pic.set_size_request(260, 146)
+            pic.set_hexpand(True)
+            pic.set_vexpand(True)
+            pic.set_size_request(0, 146)
         except Exception:
             pic = Gtk.Picture.new_for_filename("")
-            pic.set_size_request(260, 146)
+            pic.set_hexpand(True)
+            pic.set_vexpand(True)
+            pic.set_size_request(0, 146)
+
+        thumb_overlay = Gtk.Overlay()
+        thumb_overlay.set_child(pic)
+        thumb_overlay.set_hexpand(True)
+
+        preview_icon = Gtk.Image.new_from_icon_name("view-reveal-symbolic")
+        preview_icon.set_pixel_size(22)
+        preview_icon.set_halign(Gtk.Align.CENTER)
+        preview_icon.set_valign(Gtk.Align.CENTER)
+        preview_icon.set_visible(False)
+        thumb_overlay.add_overlay(preview_icon)
+
+        thumb_motion = Gtk.EventControllerMotion.new()
+        thumb_motion.connect("enter", lambda *_a: self._thumb_hover(pic, preview_icon, True))
+        thumb_motion.connect("leave", lambda *_a: self._thumb_hover(pic, preview_icon, False))
+        thumb_overlay.add_controller(thumb_motion)
 
         name_label = Gtk.Label(label=wp.get("name", ""))
         name_label.set_ellipsize(3)  # type: ignore[arg-type]
         name_label.set_max_width_chars(24)
 
-        box.append(pic)
+        box.append(thumb_overlay)
 
         name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         name_box.set_halign(Gtk.Align.CENTER)
@@ -997,6 +1154,12 @@ class WallpapersPage:
         actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         actions_box.set_halign(Gtk.Align.CENTER)
 
+        apply_btn = Gtk.Button(label="Apply")
+        apply_btn.add_css_class("suggested-action")
+        apply_btn.set_tooltip_text("Set this wallpaper")
+        apply_btn.set_sensitive(not wp.get("active", False))
+        apply_btn.connect("clicked", self._on_apply, wp)
+
         edit_btn = Gtk.Button(icon_name="document-edit-symbolic")
         edit_btn.set_tooltip_text("Rename")
         edit_btn.add_css_class("flat")
@@ -1007,13 +1170,14 @@ class WallpapersPage:
         trash_btn.add_css_class("flat")
         trash_btn.connect("clicked", self._on_delete, wp)
 
+        actions_box.append(apply_btn)
         actions_box.append(edit_btn)
         actions_box.append(trash_btn)
         box.append(actions_box)
 
         gesture = Gtk.GestureClick()
-        gesture.connect("pressed", self._on_click, wp.get("path", ""), wp.get("name", ""))
-        pic.add_controller(gesture)
+        gesture.connect("pressed", self._on_preview, wp.get("path", ""), wp.get("name", ""))
+        thumb_overlay.add_controller(gesture)
         return box
 
     def _on_rename(self, _btn, wp: dict):
@@ -1154,7 +1318,9 @@ class WallpapersPage:
                 return self._collections[idx]
         return get_var("RETRO_WALL_COLLECTION", "retro")
 
-    def _on_click(self, _gesture, _n_press, _x, _y, path: str, display: str):
+    def _on_apply(self, _btn, wp: dict):
+        path = wp.get("path", "")
+        display = wp.get("name", "")
         if not path or not Path(path).exists():
             self._window.show_toast(f"Wallpaper not found: {display}", timeout=3)
             return
@@ -1164,6 +1330,75 @@ class WallpapersPage:
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         GLib.child_watch_add(proc.pid, self._on_set_done, display)
+
+    def _on_preview(self, _gesture, _n_press, _x, _y, path: str, display: str):
+        if not path or not Path(path).exists():
+            self._window.show_toast(f"Wallpaper not found: {display}", timeout=3)
+            return
+
+        thumb = self._thumb_for(path)
+        dialog = Adw.Dialog()
+        dialog.set_title(display)
+        dialog.set_content_width(960)
+        dialog.set_content_height(600)
+
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+
+        apply_btn = Gtk.Button(label="Apply")
+        apply_btn.add_css_class("suggested-action")
+        apply_btn.set_tooltip_text("Set this wallpaper")
+        apply_btn.connect(
+            "clicked",
+            lambda _b: (self._apply_path(path, display), dialog.close()),
+        )
+        header.pack_start(apply_btn)
+
+        close_btn = Gtk.Button(label="Close")
+        close_btn.connect("clicked", lambda _b: dialog.close())
+        header.pack_end(close_btn)
+
+        toolbar.add_top_bar(header)
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(960)
+        clamp.set_tightening_threshold(700)
+
+        try:
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb, 1920, 1080, True)
+            pic = Gtk.Picture.new_for_pixbuf(pb)
+        except Exception:
+            pic = Gtk.Picture.new_for_filename("")
+        pic.set_content_fit(Gtk.ContentFit.CONTAIN)
+        pic.set_can_shrink(True)
+        pic.set_hexpand(True)
+        pic.set_vexpand(True)
+        pic.set_margin_top(16)
+        pic.set_margin_bottom(16)
+        pic.set_margin_start(16)
+        pic.set_margin_end(16)
+
+        clamp.set_child(pic)
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(clamp)
+        scrolled.set_vexpand(True)
+        toolbar.set_content(scrolled)
+        dialog.set_child(toolbar)
+        dialog.present(self._window)
+
+    def _apply_path(self, path: str, display: str) -> None:
+        proc = subprocess.Popen(
+            ["bash", str(WALLPAPER_CORE), "--set", path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        GLib.child_watch_add(proc.pid, self._on_set_done, display)
+
+    def _thumb_for(self, path: str) -> str:
+        name = os.path.basename(path)
+        thumb = FRAME_CACHE / f"{name}.png"
+        if thumb.is_file():
+            return str(thumb)
+        return ""
 
     def _on_set_done(self, pid: int, status: int, display: str) -> None:
         if status == 0:

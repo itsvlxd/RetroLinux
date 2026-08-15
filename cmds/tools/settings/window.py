@@ -459,49 +459,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
 
     def _build_pages(self) -> tuple[list[dict], dict[str, dict]]:
         """Build the default schema page eagerly, defer the rest."""
-        # Lazy page imports — deferred to avoid pulling in 20+ page modules at startup
-        from settings.pages.about import AboutPage
-        from settings.pages.apps import AppsPage
-        from settings.pages.audio import AudioPage
-        from settings.pages.autostart import AutostartPage
-        from settings.pages.battery import BatteryPage
-        from settings.pages.binds import BindsPage
-        from settings.pages.bluetooth import BluetoothPage
-        from settings.pages.changelog import ChangelogPage
-        from settings.pages.daemon import DaemonPage
-        from settings.pages.disk import DiskPage
-        from settings.pages.driver import DriverPage
-        from settings.pages.env_vars import EnvVarsPage
-        from settings.pages.fonts import FontsPage
-        from settings.pages.grub import GrubPage
-        from settings.pages.home import HomePage, PAGE_REGISTRY
-        from settings.pages.layer_rules import LayerRulesPage
-        from settings.pages.layouts import LayoutsPage
-        from settings.pages.logs import LogsPage
-        from settings.pages.misc import MiscPage
-        from settings.pages.monitors import MonitorsPage
-        from settings.pages.network import NetworkPage
-        from settings.pages.pending import PendingChangesPage
-        from settings.pages.power import PowerPage
-        from settings.pages.quickshare import QuickSharePage
-        from settings.pages.settings import SettingsPage
-        from settings.pages.shell_bar import ShellBarPage
-        from settings.pages.shell_desktop import ShellDesktopPage
-        from settings.pages.shell_dock import ShellDockPage
-        from settings.pages.shell_frame import ShellFramePage
-        from settings.pages.shell_lock import ShellLockPage
-        from settings.pages.shell_notch import ShellNotchPage
-        from settings.pages.shell_overview import ShellOverviewPage
-        from settings.pages.shell_presets import ShellPresetsPage
-        from settings.pages.shell_sidebar import ShellSidebarPage
-        from settings.pages.shell_theme import ShellThemePage
-        from settings.pages.shell_workspaces import ShellWorkspacesPage
-        from settings.pages.themes import ThemesPage
-        from settings.pages.users import UsersPage
-        from settings.pages.wallpapers import WallpapersPage
-        from settings.pages.window_rules import WindowRulesPage
-        from settings.pages.workspaces import WorkspacesPage
-        from settings.pages.xdg import XdgPage
         _bt0 = time.monotonic()
         self._page_titles: dict[str, str] = {}
         groups = schema.get_groups(self._schema)
@@ -531,32 +488,23 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         _bt1 = time.monotonic()
         print(f'[TIMING]    schema_groups={_bt1-_bt0:.3f}s', file=__import__('sys').stderr)
 
-        # Store section page specs for lazy building.
-        section_page_specs: list[tuple[type, str, str, str]] = [
-            (BindsPage, "_binds_page", "binds", "Keybinds"),
-            (MonitorsPage, "_monitors_page", "monitors", "Monitors"),
-            (WorkspacesPage, "_workspaces_page", "workspaces", "Workspaces"),
-            (EnvVarsPage, "_env_vars_page", "env_vars", "Env Variables"),
+        section_page_specs: list[tuple[str, str, str, str, str]] = [
+            ("settings.pages.binds", "BindsPage", "_binds_page", "binds", "Keybinds"),
+            ("settings.pages.monitors", "MonitorsPage", "_monitors_page", "monitors", "Monitors"),
+            ("settings.pages.workspaces", "WorkspacesPage", "_workspaces_page", "workspaces", "Workspaces"),
+            ("settings.pages.env_vars", "EnvVarsPage", "_env_vars_page", "env_vars", "Env Variables"),
+            ("settings.pages.window_rules", "WindowRulesPage", "_window_rules_page", "window_rules", "Window Rules"),
+            ("settings.pages.layer_rules", "LayerRulesPage", "_layer_rules_page", "layer_rules", "Layer Rules"),
+            ("settings.pages.autostart", "AutostartPage", "_autostart_page", "autostart", "Autostart"),
         ]
-        for cls, attr, slug, title in section_page_specs:
-            self._lazy_section_specs[slug] = (cls, attr, title)
-
-        for cls, attr, slug, title in [
-            (WindowRulesPage, "_window_rules_page", "window_rules", "Window Rules"),
-            (LayerRulesPage, "_layer_rules_page", "layer_rules", "Layer Rules"),
-            (AutostartPage, "_autostart_page", "autostart", "Autostart"),
-        ]:
-            page = cls(self, on_dirty_changed=self._on_section_dirty, push_undo=self._undo.push, saved_sections=self.saved_sections)
-            setattr(self, attr, page)
-            widget = page.build(header=self._make_page_header(title))
-            self._page_stack.add_named(widget, slug)
-            self._page_titles[slug] = title
-            self._section_pages.append(page)
+        for module, cls_name, attr, slug, title in section_page_specs:
+            self._lazy_section_specs[slug] = (module, cls_name, attr, title)
 
         from settings.pages.cursor import CursorPage as _CursorPage
         self._search_page_builder.add_entries(_CursorPage.get_search_entries())
         # Pages are searchable too: every registered page gets a result row
         # that navigates straight to it (see SearchPage.build_results_widget).
+        from settings.pages.home import PAGE_REGISTRY
         self._search_page_builder.add_entries(
             [
                 {
@@ -575,48 +523,48 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         print(f'[TIMING]    section_pages={_bt2-_bt1:.3f}s', file=__import__('sys').stderr)
 
         # Store standalone page specs for lazy building
-        standalone_page_specs: list[tuple[type, str, str, str]] = [
-            (HomePage, "_home_page", "home", "Home"),
-            (AboutPage, "_about_page", "about", "About"),
-            (ChangelogPage, "_changelog_page", "changelog", "Changelog"),
-            (AppsPage, "_apps_page", "apps", "Applications"),
-            (AudioPage, "_audio_page", "audio", "Audio"),
-            (BluetoothPage, "_bluetooth_page", "bluetooth", "Bluetooth"),
-            (NetworkPage, "_network_page", "network", "Network"),
-            (DaemonPage, "_daemon_page", "daemon", "Daemon"),
-            (DiskPage, "_disk_page", "disks", "Disks"),
-            (DriverPage, "_driver_page", "driver", "Drivers"),
-            (FontsPage, "_fonts_page", "fonts", "Fonts"),
-            (GrubPage, "_grub_page", "grub", "Bootloader"),
-            (LogsPage, "_logs_page", "logs", "Logs"),
-            (LayoutsPage, "_layouts_page", "layouts", "Layouts"),
-            (PowerPage, "_power_page", "power", "Power"),
-            (QuickSharePage, "_quickshare_page", "quickshare", "Quick Share"),
-            (PendingChangesPage, "_pending_page", "pending", "Pending Changes"),
-            (ShellBarPage, "_shell_bar_page", "shell_bar", "Bar"),
-            (ShellDesktopPage, "_shell_desktop_page", "shell_desktop", "Desktop"),
-            (ShellDockPage, "_shell_dock_page", "shell_dock", "Dock"),
-            (ShellThemePage, "_shell_theme_page", "shell_theme", "Theme"),
-            (ShellNotchPage, "_shell_notch_page", "shell_notch", "Notch"),
-            (ShellSidebarPage, "_shell_sidebar_page", "shell_sidebar", "Sidebar"),
-            (ShellFramePage, "_shell_frame_page", "shell_frame", "Frame"),
-            (ShellLockPage, "_shell_lock_page", "shell_lock", "Lockscreen"),
-            (ShellWorkspacesPage, "_shell_workspaces_page", "shell_workspaces", "Workspaces"),
-            (ShellOverviewPage, "_shell_overview_page", "shell_overview", "Overview"),
-            (MiscPage, "_misc_page", "misc", "Miscellaneous"),
-            (ShellPresetsPage, "_shell_presets_page", "shell_presets", "Presets"),
-            (ThemesPage, "_themes_page", "themes", "Themes"),
-            (WallpapersPage, "_wallpapers_page", "wallpapers", "Wallpapers"),
-            (UsersPage, "_users_page", "users", "Users"),
-            (SettingsPage, "_settings_page", "settings", "Settings"),
-            (XdgPage, "_xdg_page", "xdg", "Default Apps"),
+        standalone_page_specs: list[tuple[str, str, str, str]] = [
+            ("settings.pages.home", "HomePage", "_home_page", "home", "Home"),
+            ("settings.pages.about", "AboutPage", "_about_page", "about", "About"),
+            ("settings.pages.changelog", "ChangelogPage", "_changelog_page", "changelog", "Changelog"),
+            ("settings.pages.apps", "AppsPage", "_apps_page", "apps", "Applications"),
+            ("settings.pages.audio", "AudioPage", "_audio_page", "audio", "Audio"),
+            ("settings.pages.bluetooth", "BluetoothPage", "_bluetooth_page", "bluetooth", "Bluetooth"),
+            ("settings.pages.network", "NetworkPage", "_network_page", "network", "Network"),
+            ("settings.pages.daemon", "DaemonPage", "_daemon_page", "daemon", "Daemon"),
+            ("settings.pages.disk", "DiskPage", "_disk_page", "disks", "Disks"),
+            ("settings.pages.driver", "DriverPage", "_driver_page", "driver", "Drivers"),
+            ("settings.pages.fonts", "FontsPage", "_fonts_page", "fonts", "Fonts"),
+            ("settings.pages.grub", "GrubPage", "_grub_page", "grub", "Bootloader"),
+            ("settings.pages.logs", "LogsPage", "_logs_page", "logs", "Logs"),
+            ("settings.pages.layouts", "LayoutsPage", "_layouts_page", "layouts", "Layouts"),
+            ("settings.pages.power", "PowerPage", "_power_page", "power", "Power"),
+            ("settings.pages.quickshare", "QuickSharePage", "_quickshare_page", "quickshare", "Quick Share"),
+            ("settings.pages.pending", "PendingChangesPage", "_pending_page", "pending", "Pending Changes"),
+            ("settings.pages.shell_bar", "ShellBarPage", "_shell_bar_page", "shell_bar", "Bar"),
+            ("settings.pages.shell_desktop", "ShellDesktopPage", "_shell_desktop_page", "shell_desktop", "Desktop"),
+            ("settings.pages.shell_dock", "ShellDockPage", "_shell_dock_page", "shell_dock", "Dock"),
+            ("settings.pages.shell_theme", "ShellThemePage", "_shell_theme_page", "shell_theme", "Theme"),
+            ("settings.pages.shell_notch", "ShellNotchPage", "_shell_notch_page", "shell_notch", "Notch"),
+            ("settings.pages.shell_sidebar", "ShellSidebarPage", "_shell_sidebar_page", "shell_sidebar", "Sidebar"),
+            ("settings.pages.shell_frame", "ShellFramePage", "_shell_frame_page", "shell_frame", "Frame"),
+            ("settings.pages.shell_lock", "ShellLockPage", "_shell_lock_page", "shell_lock", "Lockscreen"),
+            ("settings.pages.shell_workspaces", "ShellWorkspacesPage", "_shell_workspaces_page", "shell_workspaces", "Workspaces"),
+            ("settings.pages.shell_overview", "ShellOverviewPage", "_shell_overview_page", "shell_overview", "Overview"),
+            ("settings.pages.misc", "MiscPage", "_misc_page", "misc", "Miscellaneous"),
+            ("settings.pages.shell_presets", "ShellPresetsPage", "_shell_presets_page", "shell_presets", "Presets"),
+            ("settings.pages.themes", "ThemesPage", "_themes_page", "themes", "Themes"),
+            ("settings.pages.wallpapers", "WallpapersPage", "_wallpapers_page", "wallpapers", "Wallpapers"),
+            ("settings.pages.users", "UsersPage", "_users_page", "users", "Users"),
+            ("settings.pages.settings", "SettingsPage", "_settings_page", "settings", "Settings"),
+            ("settings.pages.xdg", "XdgPage", "_xdg_page", "xdg", "Default Apps"),
         ]
         import os
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
-            standalone_page_specs.insert(5, (BatteryPage, "_battery_page", "battery", "Battery"))
+            standalone_page_specs.insert(5, ("settings.pages.battery", "BatteryPage", "_battery_page", "battery", "Battery"))
 
-        for cls, attr, slug, title in standalone_page_specs:
-            self._lazy_standalone_specs[slug] = (cls, attr, title)
+        for module, cls_name, attr, slug, title in standalone_page_specs:
+            self._lazy_standalone_specs[slug] = (module, cls_name, attr, title)
 
         _bt3 = time.monotonic()
         print(f'[TIMING]    standalone_pages={_bt3-_bt2:.3f}s', file=__import__('sys').stderr)
@@ -1240,182 +1188,157 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(self._animations_page)
         self._refresh_all_modified_indicators()
 
+    @staticmethod
+    def _resolve_page_class(module: str, cls_name: str) -> type:
+        """Import a page class on demand from a ``module`` + class name."""
+        import importlib
+        mod = importlib.import_module(module)
+        return getattr(mod, cls_name)
+
     def _build_lazy_section_page(self, slug: str):
         """Build a deferred section page (binds, monitors, etc.)."""
-        cls, attr, title = self._lazy_section_specs.pop(slug)
+        module, cls_name, attr, title = self._lazy_section_specs.pop(slug)
+        cls = self._resolve_page_class(module, cls_name)
         page = cls(self, on_dirty_changed=self._on_section_dirty, push_undo=self._undo.push, saved_sections=self.saved_sections)
         setattr(self, attr, page)
         widget = page.build(header=self._make_page_header(title))
         self._page_stack.add_named(widget, slug)
         self._page_titles[slug] = title
         self._section_pages.append(page)
-        from settings.pages.monitors import MonitorsPage
-        if cls is MonitorsPage:
+        if cls_name == "MonitorsPage":
             self._search_page_builder.add_entries(page.get_search_entries())
         for key in self._option_rows:
             self._sync_option_row(key)
 
     def _build_lazy_standalone_page(self, slug: str):
         """Build a deferred standalone page (layouts, pending, wallpapers, settings)."""
-        from settings.pages.about import AboutPage
-        from settings.pages.apps import AppsPage
-        from settings.pages.audio import AudioPage
-        from settings.pages.battery import BatteryPage
-        from settings.pages.bluetooth import BluetoothPage
-        from settings.pages.changelog import ChangelogPage
-        from settings.pages.daemon import DaemonPage
-        from settings.pages.disk import DiskPage
-        from settings.pages.driver import DriverPage
-        from settings.pages.fonts import FontsPage
-        from settings.pages.grub import GrubPage
-        from settings.pages.logs import LogsPage
-        from settings.pages.misc import MiscPage
-        from settings.pages.network import NetworkPage
-        from settings.pages.pending import PendingChangesPage
-        from settings.pages.power import PowerPage
-        from settings.pages.quickshare import QuickSharePage
-        from settings.pages.shell_bar import ShellBarPage
-        from settings.pages.shell_desktop import ShellDesktopPage
-        from settings.pages.shell_dock import ShellDockPage
-        from settings.pages.shell_frame import ShellFramePage
-        from settings.pages.shell_lock import ShellLockPage
-        from settings.pages.shell_notch import ShellNotchPage
-        from settings.pages.shell_overview import ShellOverviewPage
-        from settings.pages.shell_presets import ShellPresetsPage
-        from settings.pages.shell_sidebar import ShellSidebarPage
-        from settings.pages.shell_theme import ShellThemePage
-        from settings.pages.shell_workspaces import ShellWorkspacesPage
-        from settings.pages.settings import SettingsPage
-        from settings.pages.themes import ThemesPage
-        from settings.pages.users import UsersPage
-        from settings.pages.wallpapers import WallpapersPage
-        from settings.pages.xdg import XdgPage
-        cls, attr, title = self._lazy_standalone_specs.pop(slug)
+        module, cls_name, attr, title = self._lazy_standalone_specs.pop(slug)
+        cls = self._resolve_page_class(module, cls_name)
         page = cls(self)
         setattr(self, attr, page)
-        with_chip = cls is not PendingChangesPage
+        with_chip = cls_name != "PendingChangesPage"
         header = self._make_page_header(title, with_pending_chip=with_chip)
         widget = page.build(header=header)
         self._page_stack.add_named(widget, slug)
         self._page_titles[slug] = title
-        if cls is AppsPage:
+        if cls_name == "AppsPage":
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is WallpapersPage:
+        elif cls_name == "WallpapersPage":
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ThemesPage:
+        elif cls_name == "ThemesPage":
             page._notify_dirty = self._on_section_dirty  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is DiskPage:
+        elif cls_name == "DiskPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is DriverPage:
+        elif cls_name == "DriverPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is FontsPage:
+        elif cls_name == "FontsPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is GrubPage:
+        elif cls_name == "GrubPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is PowerPage:
+        elif cls_name == "PowerPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is BatteryPage:
+        elif cls_name == "BatteryPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is BluetoothPage:
+        elif cls_name == "BluetoothPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is NetworkPage:
+        elif cls_name == "NetworkPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is DaemonPage:
+        elif cls_name == "DaemonPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is LogsPage:
+        elif cls_name == "LogsPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is AudioPage:
+        elif cls_name == "AudioPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellBarPage:
+        elif cls_name == "ShellBarPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellDesktopPage:
+        elif cls_name == "ShellDesktopPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellDockPage:
+        elif cls_name == "ShellDockPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellThemePage:
+        elif cls_name == "ShellThemePage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellSidebarPage:
+        elif cls_name == "ShellSidebarPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellNotchPage:
+        elif cls_name == "ShellNotchPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellFramePage:
+        elif cls_name == "ShellFramePage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellLockPage:
+        elif cls_name == "ShellLockPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellWorkspacesPage:
+        elif cls_name == "ShellWorkspacesPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellOverviewPage:
+        elif cls_name == "ShellOverviewPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is MiscPage:
+        elif cls_name == "MiscPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is ShellPresetsPage:
+        elif cls_name == "ShellPresetsPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is AboutPage:
+        elif cls_name == "AboutPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is UsersPage:
+        elif cls_name == "UsersPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is QuickSharePage:
+        elif cls_name == "QuickSharePage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is SettingsPage:
+        elif cls_name == "SettingsPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
-        elif cls is XdgPage:
+        elif cls_name == "XdgPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
