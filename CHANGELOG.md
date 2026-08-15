@@ -1,3 +1,29 @@
+# [1.2.0](https://github.com/itsvlxd/RetroLinux/compare/v1.1.1...v1.2.0) (2026-08-15)
+
+
+### Bug Fixes
+
+* **bin:** fix retroinstall not load previous states ([4d76226](https://github.com/itsvlxd/RetroLinux/commit/4d762269de713dd22bcdcc1427922cccb8d84e3d))
+* **daemon:** fix battery notification spam ([cef0c79](https://github.com/itsvlxd/RetroLinux/commit/cef0c79554cb0fb116f57936fbbc5ccaf21a41ed))
+* **quickshare:** fix instant offer declined ([b4674b5](https://github.com/itsvlxd/RetroLinux/commit/b4674b5b2ace0120399b7112e4374209877a95ba))
+* **settings:** small fix for daemon and logs pages ([e487202](https://github.com/itsvlxd/RetroLinux/commit/e4872020a7106572de89b63d02370e186326f261))
+* **tools:** move quickshare & users to tools category ([27fabab](https://github.com/itsvlxd/RetroLinux/commit/27fabab39c2616e5b390327bbb32dbf7579830f3))
+
+
+### Features
+
+* **bin:** add retro select verion on post ([4fa4b94](https://github.com/itsvlxd/RetroLinux/commit/4fa4b948fcf41d1684bb5288600d353ea0de4f5e))
+* **branch:** add a branch management tool ([b59c5a9](https://github.com/itsvlxd/RetroLinux/commit/b59c5a92044393e7e7de7afc1906e4029644eda4))
+* **branch:** add branch tool, automated backups & small bug fixes ([#6](https://github.com/itsvlxd/RetroLinux/issues/6)) ([eb6e2c2](https://github.com/itsvlxd/RetroLinux/commit/eb6e2c27b6b8862e638b7a45e2a67f020eb83e6d))
+* **retro:** add hide bluetooth applet on install ([6be7ddf](https://github.com/itsvlxd/RetroLinux/commit/6be7ddfe72c4dd145758fac88406e10897445866))
+* **retro:** add zenity package ([783ab99](https://github.com/itsvlxd/RetroLinux/commit/783ab99169ef4be3be7d7c2c7f049e4b2f74bedf))
+* **retro:** save last stable version ([ec8a2f8](https://github.com/itsvlxd/RetroLinux/commit/ec8a2f8e29ab457826fe815367d860756024b641))
+* **settings:** add lazy loading for xdg autostart apps ([ed4bf0b](https://github.com/itsvlxd/RetroLinux/commit/ed4bf0b93bef999c152efd95804d1d7cafe95aac))
+* **settings:** add timeshift backup on branch switch ([58f8501](https://github.com/itsvlxd/RetroLinux/commit/58f85017b97ea08e6a518dad7169526f387c136a))
+* **settings:** add xdg autostart management support ([8370df3](https://github.com/itsvlxd/RetroLinux/commit/8370df3b681403bc5598c9b0219118365e3c9c43))
+* **update:** force stable updates to check for release tags only ([b7db10a](https://github.com/itsvlxd/RetroLinux/commit/b7db10a183e944b2dd312e4efa742e82682d36cf))
+* **update:** make update save last stable branch ([70cb8e0](https://github.com/itsvlxd/RetroLinux/commit/70cb8e044f00615ff13d3db07d4f7cac4038076f))
+
 ## [1.1.1](https://github.com/itsvlxd/RetroLinux/compare/v1.1.0...v1.1.1) (2026-08-14)
 
 
