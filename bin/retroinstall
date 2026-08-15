@@ -42,7 +42,6 @@ SETUP_SCRIPTS=(
     "kernel.sh"
     "boot.sh"
     "mirrors.sh"
-    "network.sh"
     "bluetooth.sh"
     "fingerprint.sh"
     "print.sh"
@@ -51,6 +50,7 @@ SETUP_SCRIPTS=(
     "editor.sh"
     "filemanager.sh"
     "browser.sh"
+    "network.sh"
     "config.sh"
 )
 

@@ -175,6 +175,19 @@ autostart_clean() {
     echo "$result"
 }
 
+autostart_delete() {
+    local name="$1"
+    [[ -z $name ]] && echo "result=error|reason=no_name" && return 1
+    local result=$(rx_xdg_autostart_delete "$name")
+    if [[ $result == OK* ]]; then
+        rx_log_file "INFO" "Autostart entry deleted: $name"
+        echo "$result"
+    else
+        echo "$result"
+        return 1
+    fi
+}
+
 health_check() {
     rx_xdg_health
 }
@@ -208,6 +221,7 @@ case "$1" in
     "--query") query_file "$2" ;;
     "--autostart-list") autostart_list ;;
     "--autostart-toggle") autostart_toggle "$2" "$3" ;;
+    "--autostart-delete") autostart_delete "$2" ;;
     "--autostart-clean") autostart_clean ;;
     "--health") health_check ;;
     "--status") full_status ;;

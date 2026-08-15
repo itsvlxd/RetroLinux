@@ -6,13 +6,13 @@ setup_luks() {
     rx_load_state
     rx_step "Let's setup disk encryption..."
 
-    if gum confirm --affirmative "Yes, enable encryption" --negative "No, skip encryption" "LUKS Encryption" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable encryption" --negative "No, skip encryption" "LUKS Encryption" --default="${LUKS_ENABLED:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         LUKS_ENABLED="true"
 
         local use_same_password="false"
 
         if [[ -n $USER_PASSWORD ]]; then
-            if gum confirm --affirmative "Yes, use same password" --negative "No, enter different password" "Would you like to configure LUKS with the same password used for ${USER_NAME}?" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+            if gum confirm --affirmative "Yes, use same password" --negative "No, enter different password" "Would you like to configure LUKS with the same password used for ${USER_NAME}?" --default="$([[ -n $LUKS_PASSWORD && $LUKS_PASSWORD == "$USER_PASSWORD" ]] && echo true || echo false)" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
                 LUKS_PASSWORD="$USER_PASSWORD"
                 use_same_password="true"
             fi
@@ -21,13 +21,13 @@ setup_luks() {
         if [[ $use_same_password != "true" ]]; then
             while true; do
                 local password
-                password=$(gum input --placeholder "Create a LUKS encryption password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "LUKS Password> " --padding "$GUM_INPUT_PADDING") || {
+                password=$(gum input --placeholder "Create a LUKS encryption password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "LUKS Password> " --value "$LUKS_PASSWORD" --padding "$GUM_INPUT_PADDING") || {
                     rx_step_error "2" "LUKS password input failed"
                     rx_retry_or_exit "LUKS password is required" || rx_abort
                     return 1
                 }
                 local password_confirmation
-                password_confirmation=$(gum input --placeholder "Confirm LUKS password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --padding "$GUM_INPUT_PADDING") || {
+                password_confirmation=$(gum input --placeholder "Confirm LUKS password" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --password --prompt "Confirm> " --value "$LUKS_PASSWORD" --padding "$GUM_INPUT_PADDING") || {
                     rx_step_error "2" "LUKS password confirmation failed"
                     rx_retry_or_exit "Password confirmation is required" || rx_abort
                     return 1
@@ -74,7 +74,7 @@ setup_luks() {
         esac
 
         local iter_choice
-        iter_choice=$(echo "$iter_time_options" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --prompt "Iteration> " --placeholder "Select iteration time" --padding "$GUM_FILTER_PADDING") || {
+        iter_choice=$(echo "$iter_time_options" | gum filter --height "$GUM_FILTER_HEIGHT" "${GUM_FILTER_STYLE[@]}" --value "$current_iter" --prompt "Iteration> " --placeholder "Select iteration time" --padding "$GUM_FILTER_PADDING") || {
             rx_step_error "2" "Iteration time selection cancelled"
             rx_retry_or_exit "Iteration time is required" || rx_abort
             return 1

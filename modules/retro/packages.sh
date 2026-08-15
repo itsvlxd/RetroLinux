@@ -7,6 +7,7 @@ sed
 grep
 rsync
 unzip
+zenity
 expect
 notify
 udisks2

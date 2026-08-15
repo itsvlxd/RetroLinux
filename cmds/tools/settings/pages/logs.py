@@ -272,7 +272,7 @@ class LogsPage:
         power_sw = Gtk.Switch()
         power_sw.set_valign(Gtk.Align.CENTER)
         power_sw.set_active(not log["disabled"])
-        power_sw.connect("notify::active", lambda sw, n=log["name"]: self._toggle_log(n, sw.get_active()))
+        power_sw.connect("notify::active", lambda sw, _pspec, n=log["name"]: self._toggle_log(n, sw.get_active()))
         expander.add_suffix(power_sw)
 
         clear_btn = Gtk.Button(icon_name="user-trash-symbolic")

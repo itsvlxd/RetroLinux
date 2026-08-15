@@ -62,11 +62,28 @@ cmd_update() {
 
     rx_log "info" "Syncing repository with $(rx_git_branch)"
 
+    local old_release_tag=""
+    local new_release_tag=""
+    if [[ $(rx_git_branch) == "main" ]]; then
+        old_release_tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' "$old_head" 2>/dev/null || true)
+        git -C "$RETRO_DIR" fetch origin >/dev/null 2>&1 || true
+        new_release_tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' origin/main 2>/dev/null || true)
+        if [[ -z $new_release_tag || $new_release_tag == "$old_release_tag" ]]; then
+            rx_log "warn" "No new release published on main yet (current: ${old_release_tag:-none})."
+            rx_log "warn" "Stable updates only ship with a new release tag. Skipping update."
+            return 0
+        fi
+    fi
+
     if git -C "$RETRO_DIR" pull 2>&1; then
         local new_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
 
         if [[ $old_head != $new_head ]]; then
-            commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
+            if [[ $(rx_git_branch) == "main" && -n $old_release_tag && -n $new_release_tag ]]; then
+                commits=$(git -C "$RETRO_DIR" log "$old_release_tag..$new_release_tag" --pretty=format:"%s" --no-merges 2>/dev/null)
+            else
+                commits=$(git -C "$RETRO_DIR" log "$old_head..$new_head" --pretty=format:"%s" --no-merges 2>/dev/null)
+            fi
 
             if [[ -n $commits ]]; then
                 rx_table_header "󰜘" "Changelog"
@@ -201,8 +218,18 @@ cmd_update() {
 
         rx_log "success" "Update finished"
 
+        if [[ $(rx_git_branch) == "main" && -n $new_release_tag ]]; then
+            $RETRO_DIR/retro.sh variable set RETRO_LAST_STABLE "$new_release_tag" >/dev/null 2>&1 || true
+            rx_log "success" "Last stable version updated to ${PINK}${new_release_tag}${RESET}"
+        fi
+
         rx_log "info" "Restarting Retro daemon..."
         $RETRO_DIR/retro.sh daemon restart
+
+        if [[ -n $commits ]] && grep -qi "retroshell" <<<"$commits"; then
+            rx_log "info" "RetroShell changed in this update, restarting it..."
+            $RETRO_DIR/retro.sh shell restart
+        fi
     else
         pull_failed="true"
 

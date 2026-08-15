@@ -355,40 +355,69 @@ class AboutPage:
         )
 
     def _switch_branch(self, target: str) -> None:
+        backup_ok, _backup_msg = self._create_backup(target)
+        if backup_ok:
+            self._finish_branch_switch(target)
+        else:
+            GLib.idle_add(self._ask_continue_without_backup, target)
+
+    def _create_backup(self, target: str) -> tuple[bool, str]:
+        try:
+            r = subprocess.run(
+                ["retro", "timeshift", "create", f"Pre-branch-switch: {target}"],
+                capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            return False, str(e)
+        return "CREATED" in (r.stdout + r.stderr), (r.stdout or r.stderr).strip()
+
+    def _ask_continue_without_backup(self, target: str) -> None:
+        dialog = Adw.AlertDialog(
+            heading="Backup failed",
+            body="Timeshift failed, no system backup was able to be made. "
+                 "Do you want to continue switching branches anyway?",
+        )
+        dialog.add_response("cancel", "Abort")
+        dialog.add_response("confirm", "Continue")
+        dialog.set_response_appearance("confirm", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+
+        def on_response(_dialog, response):
+            if response == "confirm":
+                threading.Thread(
+                    target=self._finish_branch_switch, args=(target,), daemon=True
+                ).start()
+            else:
+                self._branch_switching = False
+                if self._branch_dd is not None:
+                    self._branch_dd.set_sensitive(True)
+                    self._branch_dd.set_selected(self._branch_index(self._current_branch()))
+
+        dialog.connect("response", on_response)
+        dialog.present(self._window)
+
+    def _finish_branch_switch(self, target: str) -> None:
         ok, msg = self._git_switch(target)
         GLib.idle_add(self._on_branch_switched, ok, msg)
 
     def _git_switch(self, target: str) -> tuple[bool, str]:
-        repo = os.environ.get("RETRO_DIR", "/opt/retrolinux")
-
-        def git(*args):
-            return subprocess.run(
-                ["git", "-C", repo, *args],
+        """Delegate the switch to ``retro -b switch`` (single source of truth)."""
+        try:
+            r = subprocess.run(
+                ["retro", "-b", "switch", target],
                 capture_output=True, text=True, timeout=120,
                 stdin=subprocess.DEVNULL,
             )
-
-        try:
-            if git("status", "--porcelain").stdout.strip():
-                git("reset", "--hard")
-            r = git("fetch", "origin")
-            if r.returncode != 0:
-                return False, r.stderr.strip() or f"Failed to fetch origin"
-            r = git("rev-parse", "--verify", f"origin/{target}")
-            if r.returncode != 0:
-                return False, f"Branch '{target}' does not exist on the remote"
-            r = git("checkout", "-B", target, f"origin/{target}")
-            if r.returncode != 0:
-                return False, r.stderr.strip() or f"Failed to switch to {target}"
         except Exception as e:
             return False, str(e)
-
-        try:
-            from lib.python.variable import set_var
-            set_var("RETRO_BRANCH", target)
-        except Exception:
-            pass
-        return True, target
+        out = (r.stdout or "").strip()
+        if out.startswith("OK|"):
+            return True, out[3:]
+        reason = out
+        if "reason=" in out:
+            reason = out.split("reason=", 1)[-1]
+        return False, reason or "Switch failed"
 
     def _on_branch_switched(self, ok: bool, msg: str) -> None:
         self._branch_switching = False
@@ -397,6 +426,8 @@ class AboutPage:
         if ok:
             self._window.show_toast(f"Switched to {msg}")
             self._refresh_version_display()
+            if msg == "develop":
+                self._run_terminal(self._reinstall_command())
         else:
             if self._branch_dd is not None:
                 self._branch_dd.set_selected(self._branch_index(self._current_branch()))
@@ -451,35 +482,20 @@ class AboutPage:
 
     @staticmethod
     def _count_updates() -> int:
-        """Count Retro Linux updates = commits behind the remote branch."""
-        repo = os.environ.get("RETRO_DIR", "/opt/retrolinux")
-        try:
-            branch = subprocess.run(
-                ["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True, text=True, timeout=5,
-                stdin=subprocess.DEVNULL,
-            ).stdout.strip()
-        except Exception:
-            branch = ""
-        if not branch:
-            return -1
+        """Count updates via ``retro -b updates`` (single source of truth)."""
         try:
             r = subprocess.run(
-                ["git", "-C", repo, "fetch", "origin"],
+                ["retro", "-b", "updates"],
                 capture_output=True, text=True, timeout=60,
                 stdin=subprocess.DEVNULL,
             )
         except Exception:
             return -1
-        try:
-            out = subprocess.run(
-                ["git", "-C", repo, "rev-list", "--count", f"HEAD..origin/{branch}"],
-                capture_output=True, text=True, timeout=15,
-                stdin=subprocess.DEVNULL,
-            ).stdout.strip()
-            return int(out) if out.isdigit() else 0
-        except Exception:
-            return -1
+        for line in (r.stdout or "").splitlines():
+            if line.startswith("count="):
+                val = line[len("count="):]
+                return int(val) if val.lstrip("-").isdigit() else -1
+        return -1
 
     def _on_updates_checked(self, count: int, interactive: bool) -> None:
         self._updates_count = count
@@ -521,6 +537,18 @@ class AboutPage:
         subprocess.Popen(
             ["hyprctl", "dispatch", lua],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+    @staticmethod
+    def _reinstall_command() -> str:
+        from lib.python.variable import get_var
+        install_type = get_var("RETRO_INSTALL", "complete")
+        ricing = get_var("RETRO_RICING", "false")
+        type_filter = "-t core" if install_type == "minimal" else "-t all"
+        mode = "-m" if ricing == "true" else "-i"
+        return (
+            f"retro {mode} existing -a root {type_filter} -y && "
+            f"retro {mode} existing -a user {type_filter} -y"
         )
 
     # ── Lifecycle (read-only) ──

@@ -17,7 +17,7 @@ setup_ricing() {
     gum style --foreground 7 --padding "0 0 0 $PADDING_LEFT" "Edit configs freely — updates will never overwrite your changes."
     gum style --foreground 7 --padding "0 0 1 $PADDING_LEFT" "Note: You manage your own customizations after installation."
 
-    if gum confirm --affirmative "Managed (recommended)" --negative "Manual (copy configs)" "Ricing Mode" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Managed (recommended)" --negative "Manual (copy configs)" "Ricing Mode" --default="$([[ $RICE_MODE == "stable" ]] && echo true || echo false)" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         RICE_MODE="stable"
     else
         RICE_MODE="advanced"

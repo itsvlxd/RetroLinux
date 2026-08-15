@@ -7,7 +7,7 @@ setup_ssh() {
     rx_clear_logo
     rx_step "Let's setup SSH access..."
 
-    if ! gum confirm --affirmative "Yes, enable SSH" --negative "No, skip SSH" "SSH Service" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if ! gum confirm --affirmative "Yes, enable SSH" --negative "No, skip SSH" "SSH Service" --default="${SSH_ENABLED:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_ENABLED="false"
         rx_save_state
         return 0
@@ -19,7 +19,7 @@ setup_ssh() {
     rx_step "Let's setup SSH access..."
 
     local ssh_port
-    ssh_port=$(gum input --placeholder "SSH port (default: 22)" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Port> " --value "22" --padding "$GUM_INPUT_PADDING") || {
+    ssh_port=$(gum input --placeholder "SSH port (default: 22)" --placeholder.foreground 8 --prompt.foreground "#ff79c6" --prompt "Port> " --value "${SSH_PORT:-22}" --padding "$GUM_INPUT_PADDING") || {
         rx_step_error "2" "SSH port input failed"
         rx_retry_or_exit "SSH port is required" || rx_abort
         return 1
@@ -39,7 +39,7 @@ setup_ssh() {
     rx_clear_logo
     rx_step "Let's setup SSH access..."
 
-    if gum confirm --affirmative "Yes, enable password login" --negative "No, disable password" "Password Authentication" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable password login" --negative "No, disable password" "Password Authentication" --default="${SSH_PASSWORD_LOGIN:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_PASSWORD_LOGIN="true"
     else
         SSH_PASSWORD_LOGIN="false"
@@ -48,7 +48,7 @@ setup_ssh() {
     rx_clear_logo
     rx_step "Let's setup SSH access..."
 
-    if gum confirm --affirmative "Yes, enable SSH keys" --negative "No, disable keys" "Public Key Authentication" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable SSH keys" --negative "No, disable keys" "Public Key Authentication" --default="${SSH_KEY_LOGIN:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_KEY_LOGIN="true"
     else
         SSH_KEY_LOGIN="false"
@@ -57,7 +57,7 @@ setup_ssh() {
     rx_clear_logo
     rx_step "Let's setup SSH access..."
 
-    if gum confirm --affirmative "Yes, allow root login" --negative "No, disable root" "Root Login" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, allow root login" --negative "No, disable root" "Root Login" --default="${SSH_ROOT_LOGIN:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         SSH_ROOT_LOGIN="true"
     else
         SSH_ROOT_LOGIN="false"

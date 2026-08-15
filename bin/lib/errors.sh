@@ -7,9 +7,10 @@ rx_retry_or_exit() {
     gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "$message"
     echo
     if gum confirm --negative "Exit" --affirmative "Retry" "Retry?" --padding "$GUM_CONFIRM_PADDING"; then
-        return 0
+        exec "${RETRO_INSTALL:-/opt/retrolinux/bin}/retroinstall"
     fi
-    return 1
+    gum style "Run 'retroinstall' to try again"
+    exit 1
 }
 
 rx_step_error() {

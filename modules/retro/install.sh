@@ -114,6 +114,42 @@ EOF
 }
 hide_nm_applet
 
+hide_bluetooth_applet() {
+    local found=""
+    local dir
+    for dir in /etc/xdg/autostart "$HOME/.config/autostart" /usr/share/autostart; do
+        if [[ -f "$dir/blueman.desktop" ]]; then
+            found="$dir/blueman.desktop"
+            break
+        fi
+    done
+
+    if [[ -z $found ]]; then
+        rx_log "info" "blueman.desktop not found; nothing to hide"
+        return 0
+    fi
+
+    if grep -q '^Hidden=true' "$found" 2>/dev/null; then
+        rx_log "success" "blueman.desktop already hidden ($found)"
+        return 0
+    fi
+
+    mkdir -p "$HOME/.config/autostart"
+    cat >"$HOME/.config/autostart/blueman.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Bluetooth Manager
+Hidden=true
+EOF
+    rx_log "success" "blueman applet hidden via user autostart override"
+
+    if pgrep -x blueman-applet >/dev/null 2>&1; then
+        pkill -x blueman-applet 2>/dev/null || true
+        rx_log "info" "Stopped running blueman-applet"
+    fi
+}
+hide_bluetooth_applet
+
 remove_conflicts
 
 if [[ $SECONDARY_INSTALL != "true" ]]; then
@@ -234,6 +270,26 @@ sync_missing_variables() {
 }
 
 sync_missing_variables
+
+remember_last_stable() {
+    local current
+    current=$(bash "$RETRO_DIR/scripts/variable_core.sh" --get RETRO_LAST_STABLE 2>/dev/null)
+    [[ -z $current || $current == "null" ]] || return 0
+
+    local tag
+    tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>/dev/null)
+    if [[ -z $tag ]]; then
+        git -C "$RETRO_DIR" fetch origin main >/dev/null 2>&1 || true
+        tag=$(git -C "$RETRO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' origin/main 2>/dev/null)
+    fi
+    [[ -z $tag ]] && tag=$(git -C "$RETRO_DIR" tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | head -1)
+
+    if [[ -n $tag ]]; then
+        bash "$RETRO_DIR/scripts/variable_core.sh" --set RETRO_LAST_STABLE "$tag" >/dev/null 2>&1
+        rx_log "success" "Remembered last stable version: ${PINK}${tag}${RESET}"
+    fi
+}
+remember_last_stable
 
 HYPRIDLE_SRC="$RETRO_DIR/modules/hyprland/files/hypridle.conf"
 HYPRIDLE_DST="$RETRO_CONFIG/hypridle.conf"

@@ -22,9 +22,6 @@ GIF_EXTENSIONS = {".gif"}
 # Default thumbnail size
 THUMBNAIL_SIZE = "140x140"
 
-# Thumbnail cache directory, must match modules/retroshell Wallpaper.qml getThumbnailPath().
-# Kept separate from the full-resolution frame cache (wallpaper_frames) so widget
-# thumbnails never clobber the frames used for static/lockscreen/colors display.
 FRAME_CACHE = Path.home() / ".config" / "retro" / "wallpaper_thumbs"
 
 
@@ -155,12 +152,6 @@ class ThumbnailGenerator:
             return True
 
     def _prepare_thumbnail(self, thumbnail_path: Path) -> None:
-        """Make sure a thumbnail file can be written safely.
-
-        This cache dir is dedicated to small thumbnails, but unlink any
-        pre-existing file/symlink so we never write through a link or into a
-        stale entry left over from a previous layout.
-        """
         if thumbnail_path.is_symlink():
             thumbnail_path.unlink()
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)

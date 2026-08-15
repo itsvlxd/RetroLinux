@@ -174,4 +174,4 @@ cmd_quickshare() {
     esac
 }
 
-register_command "SYSTEM" "quickshare" "Native Android Quick Share receiver (no rquickshare)" "cmd_quickshare"
+register_command "TOOLS" "quickshare" "Native Android Quick Share receiver (no rquickshare)" "cmd_quickshare"

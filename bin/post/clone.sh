@@ -43,23 +43,85 @@ rx_post_clone_repo() {
             return 1
         fi
 
-        if git ls-remote --exit-code --heads "$RETRO_REPO_URL" "refs/heads/$RETRO_BRANCH" >/dev/null 2>&1; then
-            if git clone --branch "$RETRO_BRANCH" "$RETRO_REPO_URL" "$target_dir"; then
-                find "$target_dir" -type f -name "*.sh" -exec chmod 755 {} \;
-                gum style --foreground 2 "Successfully cloned ${RETRO_BRANCH} from GitHub"
-                return 0
-            fi
+        local branch_args=()
+        if timeout 30 git ls-remote --exit-code --heads "$RETRO_REPO_URL" "refs/heads/$RETRO_BRANCH" >/dev/null 2>&1; then
+            branch_args=(--branch "$RETRO_BRANCH")
         else
             gum style --foreground 3 "Branch ${RETRO_BRANCH} not found, cloning default branch..."
-            if git clone "$RETRO_REPO_URL" "$target_dir"; then
-                find "$target_dir" -type f -name "*.sh" -exec chmod 755 {} \;
-                gum style --foreground 2 "Successfully cloned default branch from GitHub"
-                return 0
+        fi
+
+        local clone_ok=false
+        if [[ "$RETRO_BRANCH" == "develop" ]]; then
+            if timeout 600 git clone --single-branch --depth 1 "${branch_args[@]}" "$RETRO_REPO_URL" "$target_dir"; then
+                clone_ok=true
             fi
+        else
+            if timeout 600 git clone --single-branch "${branch_args[@]}" "$RETRO_REPO_URL" "$target_dir"; then
+                clone_ok=true
+            fi
+        fi
+
+        if [[ $clone_ok == true ]]; then
+            find "$target_dir" -type f -name "*.sh" -exec chmod 755 {} \;
+            local actual_branch
+            actual_branch=$(git -C "$target_dir" branch --show-current 2>/dev/null)
+            rx_select_retro_version "$target_dir" "${actual_branch:-$RETRO_BRANCH}"
+            gum style --foreground 2 "Successfully cloned from GitHub (${actual_branch:-${RETRO_BRANCH:-default}})"
+            return 0
         fi
 
         gum style --foreground 1 "ERROR: Failed to clone repository."
         return 1
+    fi
+}
+
+rx_select_retro_version() {
+    local target_dir="$1"
+    local branch="${2:-develop}"
+
+    if [[ "$branch" == "develop" ]]; then
+        return 0
+    fi
+
+    local versions
+    versions=$(git -C "$target_dir" tag -l 2>/dev/null \
+        | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sed 's/^v//' \
+        | awk -F. '
+            /^[0-9]+\.[0-9]+\.[0-9]+$/ {
+                key = $1 "." $2
+                if (!(key in max) || $3 > max[key]) { max[key] = $3; ver[key] = "v" $0 }
+            }
+            END { for (k in ver) print ver[k] }
+        ' \
+        | sort -Vr)
+
+    if [[ -z $versions ]]; then
+        gum style --foreground 3 "No release versions found, staying on ${branch}"
+        return 0
+    fi
+
+    local -a options=()
+    local v
+    while IFS= read -r v; do
+        [[ -n $v ]] && options+=("$v")
+    done <<< "$versions"
+
+    local choice=""
+    if [[ -t 0 ]]; then
+        rx_clear_logo
+        choice=$(gum choose --header "Select RetroLinux version (${branch})" "${options[@]}")
+    fi
+
+    if [[ -z $choice ]]; then
+        gum style --foreground 3 "No version selected, staying on ${branch}"
+        return 0
+    fi
+
+    if git -C "$target_dir" checkout "$choice" 2>/dev/null; then
+        gum style --foreground 2 "Checked out ${choice}"
+    else
+        gum style --foreground 1 "Failed to checkout ${choice}, staying on ${branch}"
     fi
 }
 
@@ -72,13 +134,13 @@ rx_install_retro_bootstrap() {
         return 0
     fi
 
-    local username=$(arch-chroot /mnt getent passwd 1000 2>/dev/null | cut -d: -f1)
+    local username=$(timeout 30 arch-chroot /mnt getent passwd 1000 2>/dev/null | cut -d: -f1)
     local home_dir=""
-    [[ -n $username ]] && home_dir=$(arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
+    [[ -n $username ]] && home_dir=$(timeout 30 arch-chroot /mnt getent passwd "$username" 2>/dev/null | cut -d: -f6)
 
     if [[ -n $username && -n $home_dir ]]; then
         gum style --foreground 7 "Creating first-boot autostart script..."
-        arch-chroot /mnt bash -c "
+        timeout 60 arch-chroot /mnt bash -c "
             mkdir -p '$home_dir/.config/hypr'
             autostart_file='$home_dir/.config/hypr/autostart.sh'
             cat > \$autostart_file <<'EOF'

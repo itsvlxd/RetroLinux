@@ -536,18 +536,15 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             (BindsPage, "_binds_page", "binds", "Keybinds"),
             (MonitorsPage, "_monitors_page", "monitors", "Monitors"),
             (WorkspacesPage, "_workspaces_page", "workspaces", "Workspaces"),
-            (AutostartPage, "_autostart_page", "autostart", "Autostart"),
             (EnvVarsPage, "_env_vars_page", "env_vars", "Env Variables"),
         ]
         for cls, attr, slug, title in section_page_specs:
             self._lazy_section_specs[slug] = (cls, attr, title)
 
-        # Window rules and layer rules are eagerly built at startup so their
-        # state (parsed config, external rules) is always loaded — lazy
-        # construction would discard already-tracked rules on page navigation.
         for cls, attr, slug, title in [
             (WindowRulesPage, "_window_rules_page", "window_rules", "Window Rules"),
             (LayerRulesPage, "_layer_rules_page", "layer_rules", "Layer Rules"),
+            (AutostartPage, "_autostart_page", "autostart", "Autostart"),
         ]:
             page = cls(self, on_dirty_changed=self._on_section_dirty, push_undo=self._undo.push, saved_sections=self.saved_sections)
             setattr(self, attr, page)

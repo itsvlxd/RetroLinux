@@ -6,7 +6,7 @@ setup_bluetooth() {
     rx_load_state
     rx_step "Let's setup Bluetooth..."
 
-    if gum confirm --affirmative "Yes, enable Bluetooth" --negative "No, skip Bluetooth" "Bluetooth Service" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
+    if gum confirm --affirmative "Yes, enable Bluetooth" --negative "No, skip Bluetooth" "Bluetooth Service" --default="${BLUETOOTH_ENABLED:-true}" $GUM_CONFIRM_STYLE --padding "$GUM_CONFIRM_PADDING"; then
         # shellcheck disable=SC2034
         BLUETOOTH_ENABLED="true"
     else
