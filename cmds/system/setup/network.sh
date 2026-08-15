@@ -26,8 +26,26 @@ setup_network() {
     fi
 
     local eth_iface wifi_iface
-    eth_iface=$(ip link show 2>/dev/null | grep -E "^[0-9]+: eth[0-9]+|^[0-9]+: en[a-z0-9]+" | grep -v "^lo" | awk -F': ' '{print $2}' | head -1)
-    wifi_iface=$(ip link show 2>/dev/null | grep -E "^[0-9]+: w(l|lo|lp)[a-z0-9]+" | awk -F': ' '{print $2}' | head -1)
+    local iface_try=0
+    local nm_restarted=false
+    while (( iface_try < 3 )); do
+        eth_iface=$(ip link show 2>/dev/null | grep -E "^[0-9]+: eth[0-9]+|^[0-9]+: en[a-z0-9]+" | grep -v "^lo" | awk -F': ' '{print $2}' | head -1)
+        wifi_iface=$(ip link show 2>/dev/null | grep -E "^[0-9]+: w(l|lo|lp)[a-z0-9]+" | awk -F': ' '{print $2}' | head -1)
+
+        if [[ -n $eth_iface || -n $wifi_iface ]]; then
+            break
+        fi
+
+        if [[ $nm_restarted == false ]]; then
+            rx_log "info" "No network interface detected, restarting NetworkManager..."
+            sudo systemctl restart NetworkManager.service 2>/dev/null
+            nm_restarted=true
+        else
+            rx_log "info" "No network interface detected yet, waiting... ($((iface_try + 1))/3)"
+        fi
+        sleep 3
+        ((iface_try++))
+    done
 
     rx_log "info" "Detected interfaces: eth=${eth_iface:-none} wifi=${wifi_iface:-none}"
 
@@ -36,10 +54,15 @@ setup_network() {
         sudo ip link set "$eth_iface" up 2>&1
         sleep 2
 
-        if ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
-            rx_log "success" "Ethernet connected: $eth_iface"
-            return 0
-        fi
+        local ping_try=0
+        while (( ping_try < 5 )); do
+            if ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+                rx_log "success" "Ethernet connected: $eth_iface"
+                return 0
+            fi
+            sleep 2
+            ((ping_try++))
+        done
     fi
 
     if [[ -n $wifi_iface && -n $WIFI_SSID && -n $WIFI_PASSWORD ]]; then
