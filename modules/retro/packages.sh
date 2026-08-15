@@ -68,8 +68,8 @@ gnome-keyring
 smartmontools
 
 # Python
-python-gobject
 python-dbus
+python-gobject
 python-protobuf
 python-zeroconf
 python-cryptography
