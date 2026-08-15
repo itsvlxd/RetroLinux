@@ -93,15 +93,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          if gh release view nightly --repo ${{ github.repository }} 2>/dev/null; then
-            gh release delete nightly --repo ${{ github.repository }} --yes
+          if gh release view nightly-build --repo ${{ github.repository }} 2>/dev/null; then
+            gh release delete nightly-build --repo ${{ github.repository }} --yes
           fi
-          gh tag delete nightly --force 2>/dev/null || true
+          gh tag delete nightly-build --force 2>/dev/null || true
 
       - name: Create nightly tag
         run: |
-          git tag -fa nightly -m "RetroLinux Nightly Build"
-          git push origin nightly --force
+          git tag -fa nightly-build -m "RetroLinux Nightly Build"
+          git push origin nightly-build --force
 
       - name: Download ISO
         uses: actions/download-artifact@v4
@@ -154,7 +154,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: iso/out/*.iso
-          tag_name: nightly
+          tag_name: nightly-build
           name: 'RetroLinux Nightly'
           body_path: release_body.md
           draft: false
@@ -234,7 +234,7 @@ jobs:
 
           If you encounter any issues, please report them on the [issue tracker](https://github.com/itsvlxd/RetroLinux/issues). Your feedback helps improve RetroLinux for everyone.
 
-          Want the latest features and fixes? Try the [nightly release](https://github.com/itsvlxd/RetroLinux/releases/tag/nightly).
+          Want the latest features and fixes? Try the [nightly release](https://github.com/itsvlxd/RetroLinux/releases/tag/nightly-build).
 
           [🐛 Report a Bug](https://github.com/itsvlxd/RetroLinux/issues/new?labels=bug) · [✨ Request a Feature](https://github.com/itsvlxd/RetroLinux/issues/new?labels=enhancement) · [📖 Documentation](https://github.com/itsvlxd/RetroLinux/wiki)
 
