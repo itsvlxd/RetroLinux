@@ -69,7 +69,7 @@ def _issue_url() -> str:
 
 
 def _retro_linux_version() -> str:
-    """Retro Linux version (git tag), e.g. ``nightly``."""
+    """Retro Linux version (git tag), e.g. ``nightly-build``."""
     return display_version(_os_version())
 
 

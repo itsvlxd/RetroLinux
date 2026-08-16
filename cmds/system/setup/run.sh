@@ -27,7 +27,7 @@ run_postinstall() {
     rx_logo
     rx_log "info" "Running post-install setup..."
     rx_log "info" "Setup log written to: $SETUP_LOG"
-    faillock --user $USER --reset
+    faillock --user "$USER" --reset 2>/dev/null || true
 
     rx_git_fix_owner
     sudo chown -R "$USER:$USER" "$HOME/.config" 2>/dev/null || true
@@ -89,12 +89,10 @@ run_postinstall() {
     retro font setup --needed -y
     retro input setup --needed -y
 
-    retro audio setup
     retro audio eq download JackHack96
 
     retro polkit setup --needed -y
     retro firewall setup --needed -o "default=drop"
-    retro fans setup --needed -y -o "engine=lm-sensors,profile=balanced"
 
     [[ $FINGERPRINT_ENABLED == true ]] && retro fingerprint setup --needed
     [[ $SSH_ENABLED == true ]] && retro ssh setup --needed -o "port=${SSH_PORT:-22},password=${SSH_PASSWORD_LOGIN:-false},pubkey=${SSH_KEY_LOGIN:-true},root=${SSH_ROOT_LOGIN:-false}"
@@ -114,6 +112,6 @@ run_postinstall() {
 
     sleep 5
 
-    faillock --user $USER --reset
+    faillock --user "$USER" --reset 2>/dev/null || true
     systemctl reboot
 }

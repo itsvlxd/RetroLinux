@@ -15,7 +15,7 @@ cmd_update() {
         return 1
     fi
 
-    faillock --user $USER --reset
+    faillock --user "$USER" --reset 2>/dev/null || true
 
     local old_head=$(git -C "$RETRO_DIR" rev-parse HEAD 2>/dev/null)
     local old_version=$(rx_git_version)
