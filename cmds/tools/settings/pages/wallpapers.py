@@ -7,9 +7,10 @@ import subprocess
 import threading
 from pathlib import Path
 
-from gi.repository import Adw, GdkPixbuf, GLib, GObject, Gtk
+from gi.repository import Adw, Gdk, GdkPixbuf, GLib, GObject, Gtk
 
 from lib.python.variable import get_var, get_module_default
+from settings.core.shell_config import load_tools, save_tools
 from settings.ui import make_page_layout
 from settings.ui.row_actions import RowActions
 
@@ -49,14 +50,17 @@ def _list_wallpapers(collection: str | None = None) -> list[dict]:
         is_video = orig_name.endswith((".mp4", ".mkv", ".webm"))
         display = Path(orig_name).stem.replace("-", " ").title()
         tags = f'{display.lower()} {"live" if is_video else "static"} {res}'
+        gif_path = FRAME_CACHE / f"{orig_name}.gif" if is_video else None
         wallpapers.append({
             "name": display,
             "path": full_path,
             "orig_name": orig_name,
             "thumb": str(f),
+            "gif": str(gif_path) if gif_path and gif_path.is_file() else "",
             "active": orig_name == os.path.basename(current),
             "type": "live" if is_video else "static",
             "resolution": res,
+            "subfolder": str(Path(full_path).parent.name),
             "_search_tags": tags,
         })
     wallpapers.sort(key=lambda w: (0 if w["active"] else 1, w["name"]))
@@ -125,8 +129,18 @@ class WallpapersPage:
         self._all_wallpapers: list[dict] = []
         self._search_term = ""
         self._page = 0
-        self._page_size = 8
-        self._columns = 2
+        try:
+            self._page_size = int(get_var("WALL_SETTINGS_PAGE_SIZE", "8"))
+            if self._page_size not in (8, 12, 24, 48, 0):
+                self._page_size = 8
+        except (ValueError, TypeError):
+            self._page_size = 8
+        try:
+            self._columns = int(get_var("WALL_SETTINGS_COLUMNS", "2"))
+            if self._columns not in (2, 3):
+                self._columns = 2
+        except (ValueError, TypeError):
+            self._columns = 2
         self._pag_prev: Gtk.Button | None = None
         self._pag_next: Gtk.Button | None = None
         self._pag_label: Gtk.Label | None = None
@@ -159,7 +173,10 @@ class WallpapersPage:
         self._gpu_row: Gtk.Widget | None = None
         self._pending_gpu: str | None = None
         self._gpu_modes: list[str] = []
+        self._filters: list[str] = []
+        self._filter_row: Gtk.Widget | None = None
         self._setting_value = False
+        self._wall_anim_preview: bool = bool(load_tools().get("wallpaperAnimatedPreview", True))
         self._static_actions: RowActions | None = None
         self._bat_actions: RowActions | None = None
         self._col_actions: RowActions | None = None
@@ -574,10 +591,22 @@ class WallpapersPage:
         pref_group.add(gpu_row)
         self._gpu_row = gpu_row
 
+        anim_preview_row = Adw.SwitchRow(
+            title="Enable Animated Previews",
+            subtitle="Show animated GIF previews for video wallpapers in the shell",
+        )
+        _tools = load_tools()
+        anim_preview_row.set_active(bool(_tools.get("wallpaperAnimatedPreview", True)))
+        anim_preview_row.connect("notify::active", self._on_anim_preview_toggled)
+        pref_group.add(anim_preview_row)
+        self._wall_anim_row = anim_preview_row
+
         content_box.append(pref_group)
 
         toolbar_row = self._build_toolbar_row()
         content_box.append(toolbar_row)
+
+        content_box.append(self._build_filter_row())
 
         flow = Gtk.FlowBox()
         flow.set_max_children_per_line(self._columns)
@@ -730,6 +759,55 @@ class WallpapersPage:
 
         return bar
 
+    def _build_filter_row(self) -> Gtk.Widget:
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.set_margin_start(12)
+        row.set_margin_end(12)
+        row.set_margin_top(4)
+        row.set_margin_bottom(8)
+        row.set_halign(Gtk.Align.CENTER)
+        self._filter_row = row
+        self._refresh_filter_row()
+        return row
+
+    def _refresh_filter_row(self) -> None:
+        if self._filter_row is None:
+            return
+        row = self._filter_row
+        while child := row.get_first_child():
+            row.remove(child)
+
+        valid_subs = {c for c in self._collections if c and c != "all"}
+        self._filters = [
+            f for f in self._filters
+            if not (f.startswith("subfolder_") and f[10:] not in valid_subs)
+        ]
+
+        for fid, label in (("static", "Static"), ("video", "Live")):
+            btn = Gtk.ToggleButton(label=label)
+            btn.set_active(fid in self._filters)
+            btn.add_css_class("wallpaper-filter-chip")
+            btn.connect("toggled", self._on_filter_toggled, fid)
+            row.append(btn)
+
+        for col in self._collections:
+            if not col or col == "all":
+                continue
+            fid = f"subfolder_{col}"
+            btn = Gtk.ToggleButton(label=col[0].upper() + col[1:])
+            btn.set_active(fid in self._filters)
+            btn.add_css_class("wallpaper-filter-chip")
+            btn.connect("toggled", self._on_filter_toggled, fid)
+            row.append(btn)
+
+    def _on_filter_toggled(self, btn: Gtk.ToggleButton, fid: str) -> None:
+        if fid in self._filters:
+            self._filters.remove(fid)
+        else:
+            self._filters.append(fid)
+        self._page = 0
+        self._rebuild()
+
     def _page_size_index(self) -> int:
         options = [8, 12, 24, 48, 0]
         try:
@@ -742,12 +820,16 @@ class WallpapersPage:
 
     def _on_columns_changed(self, dd: Gtk.DropDown, _pspec) -> None:
         self._columns = 2 if dd.get_selected() == 0 else 3
+        from lib.python.variable import set_var
+        set_var("WALL_SETTINGS_COLUMNS", str(self._columns))
         self._rebuild()
 
     def _on_page_size_changed(self, dd: Gtk.DropDown, _pspec) -> None:
         if dd is None:
             return
         self._page_size = self._page_size_value(dd.get_selected())
+        from lib.python.variable import set_var
+        set_var("WALL_SETTINGS_PAGE_SIZE", str(self._page_size))
         self._page = 0
         self._rebuild()
 
@@ -769,9 +851,27 @@ class WallpapersPage:
         return max(1, math.ceil(len(matching) / self._page_size))
 
     def _filtered_wallpapers(self) -> list[dict]:
-        if not self._search_term:
-            return list(self._all_wallpapers)
-        return [w for w in self._all_wallpapers if self._search_term in w.get("_search_tags", "")]
+        result = self._all_wallpapers
+        if self._search_term:
+            result = [w for w in result if self._search_term in w.get("_search_tags", "")]
+        if self._filters:
+            sub_f = {f[10:] for f in self._filters if f.startswith("subfolder_")}
+            type_f = [f for f in self._filters if not f.startswith("subfolder_")]
+
+            def matches(w: dict) -> bool:
+                if sub_f and w.get("subfolder", "") not in sub_f:
+                    return False
+                if type_f:
+                    wtype = w.get("type", "")
+                    if not any(
+                        (f == "static" and wtype == "static") or (f == "video" and wtype == "live")
+                        for f in type_f
+                    ):
+                        return False
+                return True
+
+            result = [w for w in result if matches(w)]
+        return result
 
     def _update_pagination_bar(self) -> None:
         total = self._total_pages()
@@ -900,6 +1000,8 @@ class WallpapersPage:
         from lib.python.variable import set_var
         set_var("RETRO_WALL_COLLECTION", name)
         self._pending_collection = name
+        self._filters = [f for f in self._filters if not f.startswith("subfolder_")]
+        self._refresh_filter_row()
         self._dirty = True
         self._notify_dirty()
         self._refresh_managed()
@@ -965,6 +1067,15 @@ class WallpapersPage:
         self._dirty = True
         self._notify_dirty()
         self._refresh_managed()
+
+    def _on_anim_preview_toggled(self, switch, _pspec):
+        if self._setting_value:
+            return
+        self._wall_anim_preview = bool(switch.get_active())
+        tools = load_tools()
+        tools["wallpaperAnimatedPreview"] = self._wall_anim_preview
+        save_tools(tools)
+        self._rebuild()
 
     def is_dirty(self) -> bool:
         return self._dirty
@@ -1069,26 +1180,60 @@ class WallpapersPage:
         icon.set_visible(hovering)
         pic.set_opacity(0.5 if hovering else 1.0)
 
+    def _make_gif_picture(self, gif_path: str) -> Gtk.Widget:
+        pic = Gtk.Picture()
+        pic.set_content_fit(Gtk.ContentFit.COVER)
+        pic.set_can_shrink(True)
+        pic.add_css_class("wallpaper-thumb")
+        pic.set_hexpand(True)
+        pic.set_vexpand(True)
+        pic.set_size_request(0, 146)
+        try:
+            anim = GdkPixbuf.PixbufAnimation.new_from_file(gif_path)
+            iterator = anim.get_iter()
+
+            def tick():
+                iterator.advance()
+                frame = iterator.get_pixbuf()
+                if frame is not None:
+                    pic.set_paintable(Gdk.Texture.new_for_pixbuf(frame))
+                return True
+
+            delay = max(iterator.get_delay_time(), 40)
+            source_id = GLib.timeout_add(delay, tick)
+            pic.connect("destroy", lambda *_a: GLib.source_remove(source_id))
+
+            first = iterator.get_pixbuf()
+            if first is not None:
+                pic.set_paintable(Gdk.Texture.new_for_pixbuf(first))
+        except Exception:
+            pass
+        return pic
+
     def _make_card(self, wp: dict) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_halign(Gtk.Align.FILL)
         box.set_hexpand(True)
 
         thumb_path = wp.get("thumb", "")
-        try:
-            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb_path, 520, 292, True)
-            pic = Gtk.Picture.new_for_pixbuf(pb)
-            pic.set_content_fit(Gtk.ContentFit.COVER)
-            pic.add_css_class("wallpaper-thumb")
-            pic.set_can_shrink(True)
-            pic.set_hexpand(True)
-            pic.set_vexpand(True)
-            pic.set_size_request(0, 146)
-        except Exception:
-            pic = Gtk.Picture.new_for_filename("")
-            pic.set_hexpand(True)
-            pic.set_vexpand(True)
-            pic.set_size_request(0, 146)
+        gif_path = wp.get("gif", "")
+        if gif_path and os.path.isfile(gif_path) and self._wall_anim_preview:
+            pic = self._make_gif_picture(gif_path)
+        else:
+            try:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb_path, 520, 292, True)
+                pic = Gtk.Picture.new_for_pixbuf(pb)
+                pic.set_content_fit(Gtk.ContentFit.COVER)
+                pic.add_css_class("wallpaper-thumb")
+                pic.set_can_shrink(True)
+                pic.set_hexpand(True)
+                pic.set_vexpand(True)
+                pic.set_size_request(0, 146)
+            except Exception:
+                pic = Gtk.Picture.new_for_filename("")
+                pic.set_hexpand(True)
+                pic.set_vexpand(True)
+                pic.set_size_request(0, 146)
 
         thumb_overlay = Gtk.Overlay()
         thumb_overlay.set_child(pic)
@@ -1305,6 +1450,7 @@ class WallpapersPage:
         self._col_row.set_selected(idx)
         self._setting_value = False
         self._update_col_delete_visibility()
+        self._refresh_filter_row()
 
     def _on_add(self, _btn):
         dialog = AddWallpapersDialog(self._window)
@@ -1364,21 +1510,27 @@ class WallpapersPage:
         clamp.set_maximum_size(960)
         clamp.set_tightening_threshold(700)
 
-        try:
-            pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb, 1920, 1080, True)
-            pic = Gtk.Picture.new_for_pixbuf(pb)
-        except Exception:
-            pic = Gtk.Picture.new_for_filename("")
-        pic.set_content_fit(Gtk.ContentFit.CONTAIN)
-        pic.set_can_shrink(True)
-        pic.set_hexpand(True)
-        pic.set_vexpand(True)
-        pic.set_margin_top(16)
-        pic.set_margin_bottom(16)
-        pic.set_margin_start(16)
-        pic.set_margin_end(16)
+        is_video = os.path.splitext(path)[1].lower() in (".mp4", ".mkv", ".webm")
+        if is_video and os.path.isfile(path):
+            content = Gtk.Video.new_for_filename(path)
+            content.set_loop(True)
+            content.set_autoplay(True)
+        else:
+            try:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb, 1920, 1080, True)
+                content = Gtk.Picture.new_for_pixbuf(pb)
+                content.set_content_fit(Gtk.ContentFit.CONTAIN)
+                content.set_can_shrink(True)
+            except Exception:
+                content = Gtk.Picture.new_for_filename("")
+        content.set_hexpand(True)
+        content.set_vexpand(True)
+        content.set_margin_top(16)
+        content.set_margin_bottom(16)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
 
-        clamp.set_child(pic)
+        clamp.set_child(content)
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_child(clamp)
         scrolled.set_vexpand(True)

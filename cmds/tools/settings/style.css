@@ -99,6 +99,11 @@ row:hover .reset-button,
     color: @accent_color;
 }
 
+/* Module picker rows — accent-colored category icon */
+.module-picker-row image {
+    color: @accent_color;
+}
+
 /* Active profile card — accent border + subtle tint */
 .profile-active {
     border-left: 3px solid @accent_bg_color;
@@ -531,5 +536,16 @@ colorchooserwidget {
 
 .battery-low {
     color: @error_color;
+}
+
+/* Wallpaper filter chips (under the search bar) */
+.wallpaper-filter-chip {
+    border-radius: 9999px;
+}
+.wallpaper-filter-chip:checked {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    font-weight: 700;
+    border: 1px solid @accent_bg_color;
 }
 

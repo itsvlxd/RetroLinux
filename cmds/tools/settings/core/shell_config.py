@@ -741,6 +741,7 @@ TOOLS_DEFAULTS: dict = {
     "recordingFps": 60,
     "recordingPortalEnabled": False,
     "emojiShowRecent": True,
+    "wallpaperAnimatedPreview": True,
 }
 
 
