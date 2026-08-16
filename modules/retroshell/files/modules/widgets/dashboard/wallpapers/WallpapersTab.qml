@@ -239,18 +239,24 @@ FocusScope {
                     if (!matchesSubfolder) return false;
                 }
 
-                // Must match type filter (if any active)
-                if (typeFilters.length > 0) {
-                    var matchesType = false;
-                    for (var j = 0; j < typeFilters.length; j++) {
-                        var f = typeFilters[j];
-                        if (f === "static" || f === fileType) {
-                            matchesType = true;
-                            break;
+                        // Must match type filter (if any active)
+                        if (typeFilters.length > 0) {
+                            var matchesType = false;
+                            for (var j = 0; j < typeFilters.length; j++) {
+                                var f = typeFilters[j];
+                                if (f === "static") {
+                                    // Static = non-video (images / GIFs)
+                                    if (fileType !== "video") {
+                                        matchesType = true;
+                                        break;
+                                    }
+                                } else if (f === fileType) {
+                                    matchesType = true;
+                                    break;
+                                }
+                            }
+                            if (!matchesType) return false;
                         }
-                    }
-                    if (!matchesType) return false;
-                }
 
                 return true;
             });
@@ -1189,13 +1195,15 @@ FocusScope {
     // falta/nunca se genero el frame, o un overlay LIVE/N/A para videos/faltantes.
     Component {
         id: staticImageComponent
-        Image {
-            id: thumbImage
-            mipmap: true
+        Item {
+            id: thumbRoot
+            clip: true
 
             property string sourceFile: parent && parent.sourceFile ? parent.sourceFile : ""
             property string fileType: sourceFile && GlobalStates.wallpaperManager ? GlobalStates.wallpaperManager.getFileType(sourceFile) : "image"
             property bool usingOriginal: false
+            property bool gifTried: false
+            property bool animatedPreviews: Config.tools && Config.tools.wallpaperAnimatedPreview !== false
 
             function thumbnailSource() {
                 if (!sourceFile || !GlobalStates.wallpaperManager)
@@ -1205,28 +1213,85 @@ FocusScope {
                 return "file://" + thumbnailPath + "?v=" + version;
             }
 
-            source: usingOriginal && fileType !== "video" ? "file://" + sourceFile : thumbnailSource()
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            smooth: true
-            cache: false // Disable caching to reduce memory usage
-            sourceSize.width: wallpaperGridContainer.cellSize * Screen.devicePixelRatio
-            sourceSize.height: wallpaperGridContainer.cellSize * Screen.devicePixelRatio
+            function gifSource() {
+                if (!sourceFile || !GlobalStates.wallpaperManager)
+                    return "";
+                var gifPath = GlobalStates.wallpaperManager.getGifPreviewPath(sourceFile);
+                var version = GlobalStates.wallpaperManager.thumbnailsVersion;
+                return "file://" + gifPath + "?v=" + version;
+            }
 
             // Reset fallback when this (possibly reused) cell points at another file
-            onSourceFileChanged: usingOriginal = false
+            onSourceFileChanged: {
+                usingOriginal = false;
+                gifTried = false;
+            }
 
-            onStatusChanged: {
-                if (status === Image.Error && !usingOriginal && fileType !== "video") {
-                    // Frame missing/broken -> show the original instead, never a blank cell
-                    usingOriginal = true;
+            // Animated GIF preview for video wallpapers.
+            // Fits the cell height, centers horizontally, and lets the width
+            // overflow (clipped by thumbRoot) instead of stretching to a square.
+            AnimatedImage {
+                id: thumbGif
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                height: parent.height
+                width: {
+                    var sw = sourceSize.width;
+                    var sh = sourceSize.height;
+                    if (sw > 0 && sh > 0) {
+                        return Math.round(height * sw / sh);
+                    }
+                    return parent.width;
+                }
+                visible: thumbRoot.animatedPreviews && thumbRoot.fileType === "video" && !thumbRoot.gifTried && status !== Image.Error
+                source: thumbRoot.animatedPreviews && thumbRoot.fileType === "video" && !thumbRoot.gifTried ? thumbRoot.gifSource() : ""
+                smooth: true
+                cache: false
+                playing: visible
+
+                onStatusChanged: {
+                    if (status === Image.Error && thumbRoot.animatedPreviews && thumbRoot.fileType === "video" && !thumbRoot.gifTried) {
+                        thumbRoot.gifTried = true;
+                    }
+                }
+            }
+
+            // Static frame: thumbnails for images, fallback thumbnail for videos
+            Image {
+                id: thumbImage
+                anchors.fill: parent
+                visible: !thumbGif.visible
+                mipmap: true
+
+                source: {
+                    if (thumbGif.visible) {
+                        return "";
+                    }
+                    if (thumbRoot.usingOriginal && thumbRoot.fileType !== "video") {
+                        return "file://" + thumbRoot.sourceFile;
+                    }
+                    return thumbRoot.thumbnailSource();
+                }
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                smooth: true
+                cache: false // Disable caching to reduce memory usage
+                sourceSize.width: wallpaperGridContainer.cellSize * Screen.devicePixelRatio
+                sourceSize.height: wallpaperGridContainer.cellSize * Screen.devicePixelRatio
+
+                onStatusChanged: {
+                    if (status === Image.Error && !thumbRoot.usingOriginal && thumbRoot.fileType !== "video") {
+                        // Frame missing/broken -> show the original instead, never a blank cell
+                        thumbRoot.usingOriginal = true;
+                    }
                 }
             }
 
             // Overlay for cells with no usable frame (videos, missing originals)
             Rectangle {
                 anchors.fill: parent
-                visible: thumbImage.status === Image.Error
+                visible: (thumbRoot.fileType === "video" && thumbRoot.gifTried && thumbImage.status === Image.Error) ||
+                         (thumbRoot.fileType !== "video" && thumbImage.status === Image.Error)
                 color: Colors.surface
 
                 Column {
@@ -1235,7 +1300,7 @@ FocusScope {
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: thumbImage.fileType === "video" ? Icons.play : Icons.image
+                        text: thumbRoot.fileType === "video" ? Icons.play : Icons.image
                         font.family: Icons.font
                         font.pixelSize: 22
                         color: Colors.overSurfaceVariant
@@ -1243,7 +1308,7 @@ FocusScope {
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: thumbImage.fileType === "video" ? "LIVE" : "N/A"
+                        text: thumbRoot.fileType === "video" ? "LIVE" : "N/A"
                         font.family: Config.theme.font
                         font.pixelSize: Config.theme.fontSize
                         font.weight: Font.Bold
