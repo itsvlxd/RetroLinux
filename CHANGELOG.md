@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/itsvlxd/RetroLinux/compare/v1.2.0...v1.3.0) (2026-08-16)
+
+
+### Bug Fixes
+
+* **setup:** fix netwrk missing env RETRO_DIR ([3ebfc3c](https://github.com/itsvlxd/RetroLinux/commit/3ebfc3c93e9b39609e0035d88766a64e6d251598))
+
+
+### Features
+
+* **network:** add network retry system with fallback ([4b13031](https://github.com/itsvlxd/RetroLinux/commit/4b1303148be71e84193a3a6255e5cf74dd392072))
+* **network:** add network retry system with fallback & system setup fixes ([#7](https://github.com/itsvlxd/RetroLinux/issues/7)) ([b54c97d](https://github.com/itsvlxd/RetroLinux/commit/b54c97d9d0e3f243425427e4306b187774580f4e))
+
 # [1.2.0](https://github.com/itsvlxd/RetroLinux/compare/v1.1.1...v1.2.0) (2026-08-15)
 
 
