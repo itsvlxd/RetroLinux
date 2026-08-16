@@ -1612,6 +1612,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             lambda _p: bool(config.collect_bind_section(saved_sections)),
             lambda p: p.get_bind_lines(),
         )
+        saved_gestures = config.collect_section(saved_sections, config.KEYWORD_GESTURE)
+        if saved_gestures:
+            sections.gestures = saved_gestures
         sections.monitors = emit_if(
             self._monitors_page,
             lambda _p: bool(config.collect_section(saved_sections, config.KEYWORD_MONITOR)),

@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import threading
+import time
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -73,6 +74,9 @@ class DriverPage:
         self._module_states: dict[str, str] = {}
         self._all_modules: list[dict] = []
         self._module_desc_cache: dict[str, dict] = {}
+        self._extra_missing: str = ""
+        self._extra_installed: str = ""
+        self._load_gen = 0
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -100,6 +104,9 @@ class DriverPage:
         return toolbar_view
 
     def _load_data(self) -> None:
+        self._load_gen += 1
+        gen = self._load_gen
+
         def worker():
             scan = _run(["--scan"])
             pkgs = _run(["--packages"])
@@ -115,10 +122,14 @@ class DriverPage:
             modules_load = _run(["--modules-load-list"])
             modprobe_files = _run(["--modprobe-files"])
             module_list = _run(["--module-list"])
-            GLib.idle_add(self._on_data_loaded, scan, pkgs, conflicts, specs, env, temps, updates, current, mem, gpu_mem, blacklisted, modules_load, modprobe_files, module_list)
+            extra = _run(["--extra-list"])
+            extra_installed = _run(["--extra-installed"])
+            GLib.idle_add(self._on_data_loaded, gen, scan, pkgs, conflicts, specs, env, temps, updates, current, mem, gpu_mem, blacklisted, modules_load, modprobe_files, module_list, extra, extra_installed)
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_data_loaded(self, scan: str, pkgs: str, conflicts: str, specs: str, env: str, temps: str, updates: str, current: str, mem: str, gpu_mem: str, blacklisted: str = "", modules_load: str = "", modprobe_files: str = "", module_list: str = "") -> None:
+    def _on_data_loaded(self, gen: int, scan: str, pkgs: str, conflicts: str, specs: str, env: str, temps: str, updates: str, current: str, mem: str, gpu_mem: str, blacklisted: str = "", modules_load: str = "", modprobe_files: str = "", module_list: str = "", extra: str = "", extra_installed: str = "") -> None:
+        if gen != self._load_gen:
+            return
         self._parse_scan(scan)
         self._parse_packages(pkgs)
         self._conflicts = [c for c in conflicts.splitlines() if c.strip()]
@@ -165,6 +176,14 @@ class DriverPage:
                 self._updates = parts[2].strip().split()
 
         self._current_driver = current.strip() if current else ""
+
+        self._extra_missing = ""
+        if extra.strip() and extra.strip() != "NONE":
+            self._extra_missing = extra.strip()
+
+        self._extra_installed = ""
+        if extra_installed.strip() and extra_installed.strip() != "NONE":
+            self._extra_installed = extra_installed.strip()
 
         self._missing_pkgs = []
         for comp in self._scan_data:
@@ -245,10 +264,10 @@ class DriverPage:
             if len(parts) == 2 and parts[1].isdigit():
                 self._temps[parts[0]] = int(parts[1])
 
-    def _make_warning_row(self, title: str, subtitle: str, btn_label: str, on_click) -> Adw.ActionRow:
+    def _make_warning_row(self, title: str, subtitle: str, btn_label: str, on_click, icon_name: str = "dialog-warning-symbolic", css_class: str = "warning-row") -> Adw.ActionRow:
         row = Adw.ActionRow(title=title, subtitle=subtitle)
-        row.add_css_class("warning-row")
-        icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+        row.add_css_class(css_class)
+        icon = Gtk.Image.new_from_icon_name(icon_name)
         icon.set_valign(Gtk.Align.CENTER)
         row.add_prefix(icon)
         btn = Gtk.Button(label=btn_label)
@@ -312,6 +331,31 @@ class DriverPage:
             group.add(self._make_warning_row(
                 f"{len(self._updates)} driver update{'s' if len(self._updates) > 1 else ''} available",
                 sub, "Update All", lambda _b: self._run_terminal("retro driver update"),
+            ))
+            any_warning = True
+
+        if self._extra_missing:
+            extra_count = len(self._extra_missing.split())
+            extra_names = ", ".join(self._extra_missing.split()[:5])
+            if extra_count > 5:
+                extra_names += f" and {extra_count - 5} more"
+            group.add(self._make_warning_row(
+                "Optional extra drivers available",
+                f"Optional extra drivers not installed by default \u2014 {extra_names}",
+                "Install Extras", lambda _b: self._install_extra(),
+                icon_name="dialog-information-symbolic", css_class="info-row",
+            ))
+            any_warning = True
+        elif self._extra_installed:
+            extra_count = len(self._extra_installed.split())
+            extra_names = ", ".join(self._extra_installed.split()[:5])
+            if extra_count > 5:
+                extra_names += f" and {extra_count - 5} more"
+            group.add(self._make_warning_row(
+                "Optional extra drivers installed",
+                f"Optional extra drivers \u2014 {extra_names}",
+                "Uninstall Extras", lambda _b: self._uninstall_extra(),
+                icon_name="dialog-information-symbolic", css_class="info-row",
             ))
             any_warning = True
 
@@ -551,6 +595,11 @@ class DriverPage:
         if comp.get("type") == "NET" and comp.get("driver") == "none":
             badge = Gtk.Label(label="No driver")
             badge.add_css_class("error")
+            badge.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(badge)
+        elif comp.get("type") == "NPU":
+            badge = Gtk.Label(label="Optional")
+            badge.add_css_class("dim-label")
             badge.set_valign(Gtk.Align.CENTER)
             row.add_suffix(badge)
         elif missing:
@@ -937,9 +986,9 @@ class DriverPage:
                     info[k.lower()] = v
             self._module_desc_cache[m["name"]] = info
         lines = []
-        lines.append(f"<b>{m['name']}</b>")
+        lines.append(f"<b>{GLib.markup_escape_text(m['name'])}</b>")
         if info.get("desc"):
-            lines.append(f"{info['desc']}")
+            lines.append(GLib.markup_escape_text(info["desc"]))
         fields = [
             ("Author", "author"), ("License", "license"), ("Version", "version"),
             ("Depends", "depends"), ("Firmware", "firmware"), ("Built-in", "builtin"),
@@ -948,7 +997,7 @@ class DriverPage:
         for label, key in fields:
             val = info.get(key)
             if val:
-                lines.append(f"<b>{label}:</b> {val}")
+                lines.append(f"<b>{GLib.markup_escape_text(label)}:</b> {GLib.markup_escape_text(val)}")
         body = "\n".join(lines)
         pop = Gtk.Popover()
         pop.set_parent(anchor)
@@ -1021,7 +1070,71 @@ class DriverPage:
             self._window.show_toast("No missing drivers to install")
             return
         self._run_terminal("retro driver install")
-        GLib.timeout_add(2000, self._delayed_refresh)
+        self._poll_main_install()
+
+    def _install_extra(self) -> None:
+        if not self._extra_missing:
+            self._window.show_toast("No extra drivers to install")
+            return
+        self._run_terminal("retro driver install extra")
+        self._poll_extra_installed()
+
+    def _uninstall_extra(self) -> None:
+        if not self._extra_installed:
+            self._window.show_toast("No extra drivers installed")
+            return
+        self._run_terminal("retro driver uninstall extra")
+        self._poll_extra_uninstalled()
+
+    def _poll_extra_installed(self, timeout_s: int = 45) -> None:
+        """Refresh once the extra install finishes (extras no longer missing)."""
+        deadline = time.time() + timeout_s
+
+        def check():
+            if time.time() > deadline:
+                GLib.idle_add(self._delayed_refresh)
+                return
+            missing = _run(["--extra-list"])
+            if not missing or missing == "NONE":
+                GLib.idle_add(self._delayed_refresh)
+                return
+            GLib.timeout_add(2000, check)
+        GLib.timeout_add(1500, check)
+
+    def _poll_extra_uninstalled(self, timeout_s: int = 45) -> None:
+        """Refresh once the extra uninstall finishes (extras no longer installed)."""
+        deadline = time.time() + timeout_s
+
+        def check():
+            if time.time() > deadline:
+                GLib.idle_add(self._delayed_refresh)
+                return
+            installed = _run(["--extra-installed"])
+            if not installed or installed == "NONE":
+                GLib.idle_add(self._delayed_refresh)
+                return
+            GLib.timeout_add(2000, check)
+        GLib.timeout_add(1500, check)
+
+    def _poll_main_install(self, timeout_s: int = 120) -> None:
+        """Refresh once the main install finishes (no missing drivers remain)."""
+        deadline = time.time() + timeout_s
+
+        def check():
+            if time.time() > deadline:
+                GLib.idle_add(self._delayed_refresh)
+                return
+            scan = _run(["--scan"])
+            still_missing = False
+            for line in scan.splitlines():
+                if "|" in line and line.split("|", 6)[-1].strip():
+                    still_missing = True
+                    break
+            if not still_missing:
+                GLib.idle_add(self._delayed_refresh)
+                return
+            GLib.timeout_add(3000, check)
+        GLib.timeout_add(1500, check)
 
     def _full_refresh(self) -> None:
         self._load_data()

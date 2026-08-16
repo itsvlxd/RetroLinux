@@ -252,6 +252,16 @@ row:selected .nav-icon,
     color: @warning_color;
 }
 
+/* Informational row (e.g. optional extra drivers) */
+.info-row {
+    background-color: alpha(@accent_bg_color, 0.10);
+    border-radius: 8px;
+    margin: 4px 0;
+}
+.info-row image {
+    color: @accent_color;
+}
+
 /* Unoptimized badge — wallpaper exceeds target resolution */
 .badge.unoptimized-badge {
     color: @warning_color;
