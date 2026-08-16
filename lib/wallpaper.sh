@@ -44,6 +44,37 @@ rx_wallpaper_generate_cache() {
                 ffmpeg -nostdin -i "$target" -frames:v 1 "$output" -y -loglevel quiet
             fi
         fi
+
+        local gif_out="$FRAME_CACHE/${filename}.gif"
+        local gif_res="$custom_res"
+        if [[ -z $gif_res ]]; then
+            gif_res=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$target" 2>/dev/null)
+        fi
+        local gw gh
+        if [[ $gif_res =~ ^[0-9]+x[0-9]+$ ]]; then
+            gw=$(( ${gif_res%x*} / 4 ))
+            gh=$(( ${gif_res#*x} / 4 ))
+        else
+            gw=480; gh=270
+        fi
+        [[ $gw -lt 80 ]] && gw=80
+        [[ $gh -lt 45 ]] && gh=45
+
+        local gif_needs=false
+        if [[ ! -f $gif_out ]]; then
+            gif_needs=true
+        elif [[ $target -nt $gif_out ]]; then
+            gif_needs=true
+        elif [[ -n $custom_res ]]; then
+            local gcur
+            gcur=$(identify -format "%wx%h" "$gif_out" 2>/dev/null)
+            [[ -n $gcur && $gcur != "${gw}x${gh}" ]] && gif_needs=true
+        fi
+        if [[ $gif_needs == true ]]; then
+            ffmpeg -nostdin -i "$target" -t 2 \
+                -vf "fps=12,scale=${gw}:${gh}:force_original_aspect_ratio=decrease" \
+                -loop 0 "$gif_out" -y -loglevel quiet
+        fi
     elif [[ ! -f $output ]]; then
         ln -sf "$target" "$output"
     fi
