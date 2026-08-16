@@ -280,6 +280,37 @@ detect_other() {
     done
 }
 
+_gpu_generation() {
+    # Heuristic from the model string: returns "turing_plus" for GPUs that
+    # work with nvidia-open-dkms, "legacy" otherwise.
+    local model="$1"
+    if echo "$model" | grep -qiE "RTX (20[0-9]{2}|30[0-9]{2}|40[0-9]{2}|50[0-9]{2}|16[0-9]{2})|GTX 16|Turing|Ampere|Ada|Blackwell"; then
+        echo "turing_plus"
+    else
+        echo "legacy"
+    fi
+}
+
+_nvidia_dkms_pkg() {
+    # Prefer the proprietary dkms for legacy GPUs when available, else fall
+    # back to the open driver so the list stays installable.
+    if pacman -Si nvidia-dkms >/dev/null 2>&1; then
+        echo "nvidia-dkms"
+    else
+        echo "nvidia-open-dkms"
+    fi
+}
+
+get_gpu_ai_packages() {
+    local vendor="$1"
+    case "$vendor" in
+        intel) echo "intel-compute-runtime level-zero-loader" ;;
+        nvidia) echo "cuda cudnn nvidia-container-toolkit" ;;
+        amd) echo "rocm-hip-sdk" ;;
+        *) echo "" ;;
+    esac
+}
+
 get_gpu_packages() {
     local vendor="$1"
     local model="$2"
@@ -287,25 +318,24 @@ get_gpu_packages() {
     case "$vendor" in
         intel)
             local pkgs="vulkan-intel lib32-vulkan-intel intel-media-driver libva-intel-driver intel-gpu-tools libva-utils"
-            if _kernel_version_ge 6 8; then
-                if echo "$model" | grep -qiE "arc|meteor|lunar|battlemage"; then
-                    pkgs+=" level-zero-loader intel-compute-runtime"
-                fi
-            fi
             if echo "$model" | grep -qiE "HD Graphics [2-5]|UHD Graphics 6[0-2]"; then
                 pkgs+=" xf86-video-intel"
             fi
             echo "$pkgs"
             ;;
         nvidia)
-            local pkgs="nvidia-open-dkms nvidia-utils lib32-nvidia-utils nvidia-settings lib32-opencl-nvidia"
-            pkgs+=" cuda cudnn nvidia-container-toolkit"
-            pkgs+=" libva-utils vdpauinfo"
+            local gen=$(_gpu_generation "$model")
+            local pkgs=""
+            if [[ $gen == "turing_plus" ]]; then
+                pkgs="nvidia-open-dkms"
+            else
+                pkgs=$(_nvidia_dkms_pkg)
+            fi
+            pkgs+=" nvidia-utils lib32-nvidia-utils nvidia-settings nvidia-prime lib32-opencl-nvidia libva-utils vdpauinfo"
             echo "$pkgs"
             ;;
         amd)
             local pkgs="mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon xf86-video-amdgpu libva-utils vdpauinfo radeontop"
-            pkgs+=" rocm-hip-sdk"
             echo "$pkgs"
             ;;
         *)
@@ -333,25 +363,20 @@ get_network_packages() {
                 intel) echo "linux-firmware iwd" ;;
                 realtek)
                     case "$device_id" in
-                        8852be) echo "8852be-dkms-git linux-firmware" ;;
-                        8852ce) echo "8852be-dkms-git linux-firmware" ;;
-                        8851be) echo "8852be-dkms-git linux-firmware" ;;
-                        8821ce) echo "rtl8821ce-dkms-git linux-firmware" ;;
-                        8821cu) echo "rtl8821cu-dkms-git linux-firmware" ;;
-                        8822ce) echo "rtl88x2ce-dkms-git linux-firmware" ;;
-                        8822cu) echo "rtl8822cu-dkms-git linux-firmware" ;;
-                        8822bu) echo "rtl88x2bu-dkms-git linux-firmware" ;;
-                        8852au|8832au) echo "rtl8852au-dkms-git linux-firmware" ;;
-                        8852bu|8832bu) echo "rtl8852bu-dkms-git linux-firmware" ;;
-                        8852cu) echo "rtl8852cu-dkms-git linux-firmware" ;;
-                        8812au|8814au|8821au|8811au) echo "rtl8812au-openhd-dkms-git linux-firmware" ;;
+                        b852|c852|b851|8852be) echo "8852be-dkms-git linux-firmware" ;;
+                        c821) echo "rtl8821ce-dkms-git linux-firmware" ;;
+                        c822|b822) echo "rtl88x2ce-dkms-git linux-firmware" ;;
+                        b82c|c82c) echo "rtl88x2bu-dkms-git linux-firmware" ;;
+                        b885|c885) echo "rtl8852au-dkms-git linux-firmware" ;;
+                        8812|8814|881a|881b|8821|8811) echo "rtl8812au-openhd-dkms-git linux-firmware" ;;
+                        8188|8189|818a|818b|818c) echo "rtl8188eu-dkms-git linux-firmware" ;;
                         *) echo "linux-firmware" ;;
                     esac
                     ;;
                 broadcom) echo "broadcom-wl-dkms linux-firmware" ;;
                 mediatek) echo "linux-firmware linux-firmware-mediatek" ;;
                 atheros) echo "linux-firmware ath9k-htc-firmware" ;;
-                qualcomm) echo "linux-firmware" ;;
+                qualcomm) echo "linux-firmware linux-firmware-qcom" ;;
                 *) echo "linux-firmware iwd" ;;
             esac
             ;;
@@ -360,7 +385,7 @@ get_network_packages() {
                 realtek)
                     case "$device_id" in
                         8125) echo "r8125-dkms linux-firmware" ;;
-                        8168|8111|8169|8101) echo "r8168-dkms linux-firmware" ;;
+                        8168|8167|8169|8101|8111) echo "r8168-dkms linux-firmware" ;;
                         *) echo "linux-firmware" ;;
                     esac
                     ;;
@@ -391,15 +416,13 @@ get_network_driver_candidates() {
             case "$vendor" in
                 realtek)
                     case "$device_id" in
-                        8852be|8852ce|8851be) echo "8852be-dkms-git" ;;
-                        8821ce) echo "rtl8821ce-dkms-git" ;;
-                        8821cu) echo "rtl8821cu-dkms-git" ;;
-                        8822ce) echo "rtl88x2ce-dkms-git" ;;
-                        8822bu) echo "rtl88x2bu-dkms-git" ;;
-                        8852au|8832au) echo "rtl8852au-dkms-git" ;;
-                        8852bu|8832bu) echo "rtl8852bu-dkms-git" ;;
-                        8852cu) echo "rtl8852cu-dkms-git" ;;
-                        8812au|8814au|8821au|8811au) echo "rtl8812au-openhd-dkms-git" ;;
+                        b852|c852|b851|8852be) echo "8852be-dkms-git" ;;
+                        c821) echo "rtl8821ce-dkms-git" ;;
+                        c822|b822) echo "rtl88x2ce-dkms-git" ;;
+                        b82c|c82c) echo "rtl88x2bu-dkms-git" ;;
+                        b885|c885) echo "rtl8852au-dkms-git" ;;
+                        8812|8814|881a|881b|8821|8811) echo "rtl8812au-openhd-dkms-git" ;;
+                        8188|8189|818a|818b|818c) echo "rtl8188eu-dkms-git" ;;
                         *) echo "" ;;
                     esac
                     ;;
@@ -429,15 +452,35 @@ _aur_fetch_network_driver() {
     command -v paru >/dev/null 2>&1 && helper="paru"
     command -v "$helper" >/dev/null 2>&1 || return 1
     local terms=()
-    [[ -n $device_id ]] && terms+=("rtl${device_id}" "mt${device_id}" "${device_id}-dkms")
-    local chip=$(echo "$model" | grep -oiE "RTL[0-9a-z]+|MT[0-9]+|AX[0-9]+" | head -1)
-    [[ -n $chip ]] && terms+=("${chip,,}-dkms")
+    # Prefer searching by chip name from the model string (RTL8852BE -> rtl8852be-dkms).
+    local chip=$(echo "$model" | grep -oiE "RTL[0-9]+[A-Z]*|MT[0-9]+|MT792[0-9]|AX[0-9]+" | head -1 | tr '[:upper:]' '[:lower:]')
+    [[ -n $chip ]] && terms+=("${chip}-dkms" "${chip}")
+    # Fall back to mapping known hex device ids to their package names.
+    if [[ -n $device_id ]]; then
+        local known=$(_realtek_wifi_pkg_by_id "$device_id")
+        [[ -n $known ]] && terms+=("$known")
+    fi
     local found=""
     for t in "${terms[@]}"; do
-        found=$($helper -Ss "$t" 2>/dev/null | grep -iE "dkms" | awk '{print $1}' | grep -viE "firmware|bluetooth" | head -1)
+        found=$($helper -Ss "$t" 2>/dev/null | grep -iE "dkms" | awk '{print $1}' | grep -viE "firmware|bluetooth|openhd" | head -1)
         [[ -n $found ]] && break
     done
     echo "$found"
+}
+
+_realtek_wifi_pkg_by_id() {
+    local device_id="$1"
+    case "$device_id" in
+        b852|c852|b851) echo "8852be-dkms-git" ;;
+        c821) echo "rtl8821ce-dkms-git" ;;
+        c82c) echo "rtl8821cu-dkms-git" ;;
+        c822|b822) echo "rtl88x2ce-dkms-git" ;;
+        b82c) echo "rtl88x2bu-dkms-git" ;;
+        b885|c885) echo "rtl8852au-dkms-git" ;;
+        8812|8814|881a|881b) echo "rtl8812au-openhd-dkms-git" ;;
+        8188|8189|818a) echo "rtl8188eu-dkms-git" ;;
+        *) echo "" ;;
+    esac
 }
 
 get_other_packages() {
@@ -452,7 +495,20 @@ get_other_packages() {
 }
 
 get_firmware_packages() {
-    echo "linux-firmware sof-firmware"
+    local pkgs="linux-firmware sof-firmware"
+    # Vendor-specific firmware subpackages when matching hardware is present.
+    local gpus=$(detect_gpus)
+    if echo "$gpus" | grep -qE "^\S+\|\S+\|intel\|"; then
+        pkgs+=" linux-firmware-intel"
+    fi
+    local nets=$(detect_network)
+    if echo "$nets" | grep -qE "\|mediatek\|"; then
+        pkgs+=" linux-firmware-mediatek"
+    fi
+    if echo "$nets" | grep -qE "\|qualcomm\||\|atheros\|"; then
+        pkgs+=" linux-firmware-qcom"
+    fi
+    echo "$pkgs"
 }
 
 get_profile_packages() {
@@ -585,9 +641,9 @@ run_full_scan() {
     if [[ $npus != "NONE" && -n $npus ]]; then
         while IFS= read -r npu; do
             IFS='|' read -r vendor model driver <<<"$npu"
-            local pkgs=$(get_npu_packages "$vendor")
-            local missing=$(_get_missing "$pkgs")
-            results+="NPU|${vendor}|${model}|${driver}|${pkgs}|${missing}\n"
+            # NPU drivers are optional extras; keep the row for display but
+            # never count them among missing MAIN driver packages.
+            results+="NPU|${vendor}|${model}|${driver}||\n"
         done <<<"$npus"
     fi
     local networks=$(detect_network)
@@ -704,45 +760,178 @@ run_full_install_confirmed() {
         echo "ALL_DRIVERS_INSTALLED"
         return 0
     fi
-    echo "MISSING:$unique_missing"
+    rx_log_file "info" "MISSING: $unique_missing"
     install_packages "$unique_missing"
     local install_status=$?
     if [[ $install_status -eq 0 ]]; then
         for vendor in "${gpu_vendors_found[@]}"; do
             case "$vendor" in
                 nvidia)
-                    configure_nvidia_drm
-                    configure_ai_env "nvidia"
+                    configure_nvidia_drm >/dev/null
+                    configure_ai_env "nvidia" >/dev/null
                     ;;
                 intel)
-                    configure_ai_env "intel"
+                    configure_ai_env "intel" >/dev/null
                     ;;
                 amd)
-                    configure_ai_env "amd"
+                    configure_ai_env "amd" >/dev/null
                     ;;
             esac
         done
 
-        generate_hypr_env
+        generate_hypr_env >/dev/null
 
         if echo "$unique_missing" | grep -qE "nvidia-open-dkms|nvidia"; then
-            configure_mkinitcpio_nvidia
+            configure_mkinitcpio_nvidia >/dev/null
         fi
 
         if [[ -n $net_dkms ]]; then
-            configure_network_driver "$net_dkms" "$unique_missing"
+            configure_network_driver "$net_dkms" "$unique_missing" >/dev/null
         fi
 
         if [[ -n $aur_extra ]]; then
-            echo "AUR_INSTALLED:$aur_extra"
+            rx_log_file "info" "AUR_INSTALLED: $aur_extra"
         fi
 
         if echo "$unique_missing" | grep -qE "dkms|nvidia|cuda|rocm"; then
-            echo "INITRAMFS_UPDATE_NEEDED"
+            rx_log_file "info" "INITRAMFS_UPDATE_NEEDED"
         fi
-        echo "INSTALL_COMPLETE"
+        rx_log_file "info" "INSTALL_COMPLETE"
+        return 0
     else
-        echo "INSTALL_FAILED"
+        rx_log_file "error" "INSTALL_FAILED"
+        return 1
+    fi
+}
+
+_extra_driver_set() {
+    # All optional/AI packages relevant to the detected hardware: per-GPU
+    # compute stacks plus NPU accelerators. Prints space-separated names.
+    local scan_data=$(run_full_scan)
+    local extra_pkgs=""
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
+        if [[ $type == "GPU" ]]; then
+            local ai_pkgs=$(get_gpu_ai_packages "$vendor")
+            [[ -n $ai_pkgs ]] && extra_pkgs+=" $ai_pkgs"
+        fi
+    done <<<"$scan_data"
+    local npus=$(detect_npu)
+    if [[ $npus != "NONE" && -n $npus ]]; then
+        while IFS= read -r npu; do
+            IFS='|' read -r vendor model driver <<<"$npu"
+            local npu_pkgs=$(get_npu_packages "$vendor")
+            [[ -n $npu_pkgs ]] && extra_pkgs+=" $npu_pkgs"
+        done <<<"$npus"
+    fi
+    echo "$extra_pkgs" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' '
+}
+
+run_extra_install() {
+    # Optional/AI drivers only: CUDA/ROCm/oneAPI stacks plus other extras.
+    # The base install (--install) never touches these.
+    local scan_data=$(run_full_scan)
+    local extra_pkgs=$(_extra_driver_set)
+    local gpu_vendors_found=()
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
+        [[ $type == "GPU" ]] && gpu_vendors_found+=("$vendor")
+    done <<<"$scan_data"
+
+    if [[ -z "$(echo "$extra_pkgs" | xargs)" ]]; then
+        echo "NO_EXTRA_DRIVERS"
+        return 0
+    fi
+    echo "EXTRA_MISSING:$extra_pkgs"
+    install_packages "$extra_pkgs"
+    local install_status=$?
+    if [[ $install_status -eq 0 ]]; then
+        for vendor in "${gpu_vendors_found[@]}"; do
+            configure_ai_env "$vendor" >/dev/null
+        done
+        generate_hypr_env >/dev/null
+        if echo "$extra_pkgs" | grep -qE "rocm|intel-compute-runtime|level-zero"; then
+            rx_log_file "info" "INITRAMFS_UPDATE_NEEDED"
+        fi
+        echo "EXTRA_INSTALL_COMPLETE"
+    else
+        echo "EXTRA_INSTALL_FAILED"
+        return 1
+    fi
+}
+
+list_extra_drivers() {
+    # Report which optional/AI packages are missing (no install).
+    local unique_extra=$(_extra_driver_set)
+    if [[ -z "$(echo "$unique_extra" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    local missing=""
+    for p in $unique_extra; do
+        _is_pkg_installed "$p" || missing+=" $p"
+    done
+    missing=$(echo "$missing" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$missing" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    echo "$missing"
+}
+
+list_installed_extra_drivers() {
+    # Report which optional/AI packages are installed (no changes).
+    local unique_extra=$(_extra_driver_set)
+    if [[ -z "$(echo "$unique_extra" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    local installed=""
+    for p in $unique_extra; do
+        _is_pkg_installed "$p" && installed+=" $p"
+    done
+    installed=$(echo "$installed" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$installed" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    echo "$installed"
+}
+
+run_extra_uninstall() {
+    # Remove installed optional/AI drivers, with an interactive prompt.
+    local installed=$(_extra_driver_set)
+    local to_remove=""
+    for p in $installed; do
+        _is_pkg_installed "$p" && to_remove+=" $p"
+    done
+    to_remove=$(echo "$to_remove" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$to_remove" | xargs)" ]]; then
+        echo "NO_EXTRA_DRIVERS_INSTALLED"
+        return 0
+    fi
+    echo "EXTRA_UNINSTALL_PKGS:$to_remove"
+    printf "Remove optional extra drivers? [y/N]: " >&2
+    read -r confirm
+    if [[ ! $confirm =~ ^[Yy]$ ]]; then
+        echo "EXTRA_UNINSTALL_CANCELLED"
+        return 0
+    fi
+    local helper="yay"
+    command -v paru >/dev/null 2>&1 && helper="paru"
+    if command -v "$helper" >/dev/null 2>&1; then
+        $helper -Rns --noconfirm $to_remove 2>&1
+    else
+        sudo pacman -Rns --noconfirm $to_remove 2>&1
+    fi
+    local rm_status=$?
+    if [[ $rm_status -eq 0 ]]; then
+        generate_hypr_env >/dev/null
+        echo "EXTRA_UNINSTALL_COMPLETE"
+    else
+        echo "EXTRA_UNINSTALL_FAILED"
         return 1
     fi
 }
@@ -1803,6 +1992,10 @@ case "$1" in
     "--scan") run_full_scan ;;
     "--install") run_full_install ;;
     "--install-confirmed") run_full_install_confirmed ;;
+    "--install-extra") run_extra_install ;;
+    "--extra-list") list_extra_drivers ;;
+    "--extra-installed") list_installed_extra_drivers ;;
+    "--extra-uninstall") run_extra_uninstall ;;
     "--verify") verify_install "$2" ;;
     "--info") show_device_info "$2" ;;
     "--services") get_service_hints ;;

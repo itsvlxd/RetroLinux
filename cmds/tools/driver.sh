@@ -77,7 +77,7 @@ cmd_driver() {
 
             while IFS= read -r line; do
                 [[ -z $line ]] && continue
-                IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
+                IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
 
                 case "$type" in
                     GPU)
@@ -254,6 +254,27 @@ cmd_driver() {
                 export SKIP_PROMPT=true
             fi
 
+            if [[ $flag == "extra" ]]; then
+                local extra_out
+                extra_out=$(bash "$driver_script" --install-extra)
+                local extra_exit=$?
+                if echo "$extra_out" | grep -q "NO_EXTRA_DRIVERS"; then
+                    rx_log "info" "No extra optional drivers available for this system"
+                    return 0
+                fi
+                if echo "$extra_out" | grep -q "EXTRA_MISSING:"; then
+                    local extra_list
+                    extra_list=$(echo "$extra_out" | sed -n 's/^EXTRA_MISSING://p' | awk '{print $1}')
+                    rx_log "info" "Installing optional extra drivers: ${PINK}${extra_list}${RESET}"
+                fi
+                if echo "$extra_out" | grep -q "EXTRA_INSTALL_COMPLETE"; then
+                    rx_log "success" "Extra optional drivers installed"
+                    return 0
+                fi
+                rx_log "error" "Extra driver install failed or nothing to install"
+                return $extra_exit
+            fi
+
             local first_pass
             first_pass=$(bash "$driver_script" --install)
             [[ -z $first_pass ]] && rx_log "error" "Failed to scan for missing drivers" && return 1
@@ -300,6 +321,33 @@ cmd_driver() {
                 fi
             else
                 rx_log "error" "Installation failed"
+            fi
+            ;;
+
+        "uninstall")
+            if [[ $flag != "extra" ]]; then
+                rx_log "error" "Usage: retro driver uninstall extra"
+                return 1
+            fi
+            local uni_out
+            uni_out=$(bash "$driver_script" --extra-uninstall)
+            if echo "$uni_out" | grep -q "EXTRA_UNINSTALL_PKGS:"; then
+                local uni_list
+                uni_list=$(echo "$uni_out" | sed -n 's/^EXTRA_UNINSTALL_PKGS://p' | awk '{print $1}')
+                rx_log "info" "Removing optional extra drivers: ${PINK}${uni_list}${RESET}"
+            fi
+            if echo "$uni_out" | grep -q "EXTRA_UNINSTALL_COMPLETE"; then
+                rx_log "success" "Extra optional drivers removed"
+                return 0
+            elif echo "$uni_out" | grep -q "EXTRA_UNINSTALL_CANCELLED"; then
+                rx_log "info" "Extra driver removal cancelled"
+                return 0
+            elif echo "$uni_out" | grep -q "NO_EXTRA_DRIVERS_INSTALLED"; then
+                rx_log "info" "No extra optional drivers installed"
+                return 0
+            else
+                rx_log "error" "Extra driver removal failed"
+                return 1
             fi
             ;;
 
