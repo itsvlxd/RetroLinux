@@ -139,6 +139,11 @@ Item {
         return Quickshell.env("HOME") + "/.config/retro/wallpaper_thumbs/" + fileName + ".png";
     }
 
+    function getGifPreviewPath(filePath) {
+        var fileName = filePath.split('/').pop();
+        return Quickshell.env("HOME") + "/.config/retro/wallpaper_frames/" + fileName + ".gif";
+    }
+
     function getFramePath(filePath) {
         var fileName = filePath.split('/').pop();
         return Quickshell.env("HOME") + "/.config/retro/wallpaper_frames/" + fileName + ".png";

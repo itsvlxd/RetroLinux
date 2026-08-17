@@ -126,6 +126,25 @@ class MiscPage:
             self._add_perf_switch(perf_group, key, label, subtitle=sub)
         content_box.append(perf_group)
 
+        wall_group = Adw.PreferencesGroup(
+            title="Wallpapers",
+            description="Wallpaper-related shell options.",
+        )
+        wall_anim_row = Adw.SwitchRow(
+            title="Animated Wallpaper Previews",
+            subtitle="Show animated GIF previews for video wallpapers in the shell",
+        )
+        wall_anim_row.set_active(bool(self._tools.get("wallpaperAnimatedPreview", TOOLS_DEFAULTS["wallpaperAnimatedPreview"])))
+        wall_group.add(wall_anim_row)
+        self._wall_anim_row = wall_anim_row
+
+        def _wall_anim_changed(*_args):
+            self._tools["wallpaperAnimatedPreview"] = wall_anim_row.get_active()
+            self._notify_dirty()
+        wall_anim_row.connect("notify::active", _wall_anim_changed)
+
+        content_box.append(wall_group)
+
         # ── Screenshot & Recording ──
         tools_group = Adw.PreferencesGroup(
             title="Screenshot and Recording",
@@ -560,6 +579,7 @@ class MiscPage:
         self._timer_enabled_row.set_active(self._tools.get("screenshotTimerEnabled", TOOLS_DEFAULTS["screenshotTimerEnabled"]))
         self._portal_row.set_active(self._tools.get("recordingPortalEnabled", TOOLS_DEFAULTS["recordingPortalEnabled"]))
         self._skin_tone_row.set_active(self._tools.get("emojiShowRecent", TOOLS_DEFAULTS["emojiShowRecent"]))
+        self._wall_anim_row.set_active(self._tools.get("wallpaperAnimatedPreview", TOOLS_DEFAULTS["wallpaperAnimatedPreview"]))
         if hasattr(self, "_dir_entries"):
             for key, entry in self._dir_entries.items():
                 entry.set_text(self._tools.get(key, TOOLS_DEFAULTS[key]))
@@ -607,6 +627,9 @@ class MiscPage:
             {"key": "misc:tools", "label": "Screenshot & Recording",
              "description": "Capture settings, save locations, and timed countdown",
              "_group_id": "misc", "_group_label": "Miscellaneous", "_section_label": "Screenshot & Recording"},
+            {"key": "misc:wallpapers", "label": "Animated Wallpaper Previews",
+             "description": "Show animated GIF previews for video wallpapers in the shell",
+             "_group_id": "misc", "_group_label": "Miscellaneous", "_section_label": "Wallpapers"},
         ]
 
 

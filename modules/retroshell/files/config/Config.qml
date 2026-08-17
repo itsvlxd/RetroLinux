@@ -860,6 +860,7 @@ Singleton {
             property int recordingFps: 60
             property bool recordingPortalEnabled: false
             property bool emojiShowRecent: true
+            property bool wallpaperAnimatedPreview: true
         }
     }
 

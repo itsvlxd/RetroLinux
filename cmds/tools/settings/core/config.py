@@ -231,6 +231,7 @@ class ConfigSections:
     layer_rules: list[str] | None = None
     window_rules_nodes: list["Rule"] | None = None
     layer_rules_nodes: list["Rule"] | None = None
+    gestures: list[str] | None = None
 
 
 RETRO_SETTINGS_DIR = Path.home() / ".config" / "retro"
@@ -467,6 +468,7 @@ KEYWORD_WINDOWRULE = "windowrule"
 # never emitted (``migrate()`` rewrites every v2 line to v3 in-memory).
 KEYWORD_WINDOWRULEV2 = "windowrulev2"
 KEYWORD_LAYERRULE = "layerrule"
+KEYWORD_GESTURE = "gesture"
 
 # Non-bind Hyprland keywords settings actively manages a page for. Bind
 # variants (``bind``, ``binde``, ``bindm``, …) are checked separately via
@@ -485,6 +487,7 @@ _MANAGED_NON_BIND_KEYWORDS = frozenset(
         KEYWORD_WINDOWRULE,
         KEYWORD_WINDOWRULEV2,
         KEYWORD_LAYERRULE,
+        KEYWORD_GESTURE,
     )
 )
 
@@ -674,6 +677,8 @@ def _build_document(values: dict[str, str], sections: ConfigSections) -> Documen
         _add_section(doc, "Workspaces", sections.workspaces)
     if sections.binds:
         _add_section(doc, "Keybinds", sections.binds)
+    if sections.gestures:
+        _add_section(doc, "Gestures", sections.gestures)
     # Window rules sit before autostart so any rule overrides are in effect
     # before exec'd processes spawn matching windows on reload.
     # Use pre-built Rule nodes when available (bypasses migrate's broken

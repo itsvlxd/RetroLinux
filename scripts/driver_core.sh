@@ -136,41 +136,67 @@ detect_npu() {
     done
 }
 
+_net_vendor_name() {
+    local vendor_id="$1"
+    case "$vendor_id" in
+        8086) echo "intel" ;;
+        10ec) echo "realtek" ;;
+        14e4) echo "broadcom" ;;
+        14c3) echo "mediatek" ;;
+        1814) echo "mediatek" ;;
+        168c) echo "atheros" ;;
+        17cb) echo "qualcomm" ;;
+        1969) echo "atheros" ;;
+        1d6a) echo "qualcomm" ;;
+        0bda) echo "realtek" ;;
+        10df) echo "unknown" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
 detect_network() {
     local networks=()
-    local wifi=$(lspci 2>/dev/null | grep -iE "Network controller|Wireless" | grep -vi "Neural" | head -1)
-    if [[ -n $wifi ]]; then
-        local pci_id=$(echo "$wifi" | awk '{print $1}')
-        local nn_line=$(lspci -nn -s "$pci_id" 2>/dev/null)
-        local vd_pair=$(echo "$nn_line" | grep -oP '\[([0-9a-f]{4}):([0-9a-f]{4})\]' | tr -d '[]')
-        local vendor_id="${vd_pair%%:*}"
-        local model=$(echo "$nn_line" | sed 's/.*\]://;s/\s*\[[0-9a-f]*:[0-9a-f]*\].*//' | xargs)
-        local driver=$(lspci -k -s "$pci_id" 2>/dev/null | grep "Kernel driver in use:" | awk -F': ' '{print $2}')
-        local vendor="unknown"
-        case "$vendor_id" in
-            8086) vendor="intel" ;;
-            10ec) vendor="realtek" ;;
-            14e4) vendor="broadcom" ;;
-            1814) vendor="mediatek" ;;
-            168c) vendor="atheros" ;;
-        esac
-        networks+=("wifi|${vendor}|${model}|${driver}")
+    if ! command -v lspci >/dev/null 2>&1; then
+        return 1
     fi
-    local eth=$(lspci 2>/dev/null | grep -i "ethernet" | head -1)
-    if [[ -n $eth ]]; then
-        local pci_id=$(echo "$eth" | awk '{print $1}')
+    while IFS= read -r line; do
+        local pci_id=$(echo "$line" | awk '{print $1}')
         local nn_line=$(lspci -nn -s "$pci_id" 2>/dev/null)
         local vd_pair=$(echo "$nn_line" | grep -oP '\[([0-9a-f]{4}):([0-9a-f]{4})\]' | tr -d '[]')
         local vendor_id="${vd_pair%%:*}"
+        local device_id="${vd_pair##*:}"
+        [[ -z $device_id ]] && continue
         local model=$(echo "$nn_line" | sed 's/.*\]://;s/\s*\[[0-9a-f]*:[0-9a-f]*\].*//' | xargs)
         local driver=$(lspci -k -s "$pci_id" 2>/dev/null | grep "Kernel driver in use:" | awk -F': ' '{print $2}')
-        local vendor="unknown"
-        case "$vendor_id" in
-            8086) vendor="intel" ;;
-            10ec) vendor="realtek" ;;
-            14e4) vendor="broadcom" ;;
-        esac
-        networks+=("ethernet|${vendor}|${model}|${driver}")
+        [[ -z $driver ]] && driver="none"
+        local vendor=$(_net_vendor_name "$vendor_id")
+        networks+=("wifi|${vendor}|${model}|${driver}|${device_id}")
+    done < <(lspci 2>/dev/null | grep -iE "Network controller|Wireless" | grep -vi "Neural")
+    while IFS= read -r line; do
+        local pci_id=$(echo "$line" | awk '{print $1}')
+        local nn_line=$(lspci -nn -s "$pci_id" 2>/dev/null)
+        local vd_pair=$(echo "$nn_line" | grep -oP '\[([0-9a-f]{4}):([0-9a-f]{4})\]' | tr -d '[]')
+        local vendor_id="${vd_pair%%:*}"
+        local device_id="${vd_pair##*:}"
+        [[ -z $device_id ]] && continue
+        local model=$(echo "$nn_line" | sed 's/.*\]://;s/\s*\[[0-9a-f]*:[0-9a-f]*\].*//' | xargs)
+        local driver=$(lspci -k -s "$pci_id" 2>/dev/null | grep "Kernel driver in use:" | awk -F': ' '{print $2}')
+        [[ -z $driver ]] && driver="none"
+        local vendor=$(_net_vendor_name "$vendor_id")
+        networks+=("ethernet|${vendor}|${model}|${driver}|${device_id}")
+    done < <(lspci 2>/dev/null | grep -i "ethernet")
+    if command -v lsusb >/dev/null 2>&1; then
+        while IFS= read -r line; do
+            local vid=$(echo "$line" | grep -oP 'ID [0-9a-f]{4}:[0-9a-f]{4}' | awk '{print $2}' | cut -d: -f1)
+            local did=$(echo "$line" | grep -oP 'ID [0-9a-f]{4}:[0-9a-f]{4}' | awk '{print $2}' | cut -d: -f2)
+            [[ -z $vid || -z $did ]] && continue
+            local model=$(echo "$line" | sed 's/^.*ID [0-9a-f:]* //' | xargs)
+            local vendor=$(_net_vendor_name "$vid")
+            local driver="none"
+            local ifname=$(ip -o link 2>/dev/null | grep -i "$vid" | head -1 | awk -F': ' '{print $2}')
+            [[ -n $ifname ]] && driver="$ifname"
+            networks+=("ethernet|${vendor}|${model}|${driver}|${did}")
+        done < <(lsusb 2>/dev/null | grep -iE "RTL815[0-9]|RTL816[0-9]|AX8817[0-9]|AX88[12][0-9]|USB.*[Ee]thernet|[Ee]thernet.*USB|Network adapter|LAN adapter|2.5GbE|2\.5G" | grep -viE "bluetooth|hub|wireless")
     fi
     if [[ ${#networks[@]} -eq 0 ]]; then
         echo "NONE"
@@ -254,6 +280,37 @@ detect_other() {
     done
 }
 
+_gpu_generation() {
+    # Heuristic from the model string: returns "turing_plus" for GPUs that
+    # work with nvidia-open-dkms, "legacy" otherwise.
+    local model="$1"
+    if echo "$model" | grep -qiE "RTX (20[0-9]{2}|30[0-9]{2}|40[0-9]{2}|50[0-9]{2}|16[0-9]{2})|GTX 16|Turing|Ampere|Ada|Blackwell"; then
+        echo "turing_plus"
+    else
+        echo "legacy"
+    fi
+}
+
+_nvidia_dkms_pkg() {
+    # Prefer the proprietary dkms for legacy GPUs when available, else fall
+    # back to the open driver so the list stays installable.
+    if pacman -Si nvidia-dkms >/dev/null 2>&1; then
+        echo "nvidia-dkms"
+    else
+        echo "nvidia-open-dkms"
+    fi
+}
+
+get_gpu_ai_packages() {
+    local vendor="$1"
+    case "$vendor" in
+        intel) echo "intel-compute-runtime level-zero-loader" ;;
+        nvidia) echo "cuda cudnn nvidia-container-toolkit" ;;
+        amd) echo "rocm-hip-sdk" ;;
+        *) echo "" ;;
+    esac
+}
+
 get_gpu_packages() {
     local vendor="$1"
     local model="$2"
@@ -261,25 +318,24 @@ get_gpu_packages() {
     case "$vendor" in
         intel)
             local pkgs="vulkan-intel lib32-vulkan-intel intel-media-driver libva-intel-driver intel-gpu-tools libva-utils"
-            if _kernel_version_ge 6 8; then
-                if echo "$model" | grep -qiE "arc|meteor|lunar|battlemage"; then
-                    pkgs+=" level-zero-loader intel-compute-runtime"
-                fi
-            fi
             if echo "$model" | grep -qiE "HD Graphics [2-5]|UHD Graphics 6[0-2]"; then
                 pkgs+=" xf86-video-intel"
             fi
             echo "$pkgs"
             ;;
         nvidia)
-            local pkgs="nvidia-open-dkms nvidia-utils lib32-nvidia-utils nvidia-settings lib32-opencl-nvidia"
-            pkgs+=" cuda cudnn nvidia-container-toolkit"
-            pkgs+=" libva-utils vdpauinfo"
+            local gen=$(_gpu_generation "$model")
+            local pkgs=""
+            if [[ $gen == "turing_plus" ]]; then
+                pkgs="nvidia-open-dkms"
+            else
+                pkgs=$(_nvidia_dkms_pkg)
+            fi
+            pkgs+=" nvidia-utils lib32-nvidia-utils nvidia-settings nvidia-prime lib32-opencl-nvidia libva-utils vdpauinfo"
             echo "$pkgs"
             ;;
         amd)
             local pkgs="mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon xf86-video-amdgpu libva-utils vdpauinfo radeontop"
-            pkgs+=" rocm-hip-sdk"
             echo "$pkgs"
             ;;
         *)
@@ -300,23 +356,130 @@ get_npu_packages() {
 get_network_packages() {
     local type="$1"
     local vendor="$2"
+    local device_id="$3"
     case "$type" in
         wifi)
             case "$vendor" in
-                intel) echo "iwd linux-firmware" ;;
-                realtek) echo "linux-firmware rtl88xxau-aircrack-dkms-git" ;;
+                intel) echo "linux-firmware iwd" ;;
+                realtek)
+                    case "$device_id" in
+                        b852|c852|b851|8852be) echo "8852be-dkms-git linux-firmware" ;;
+                        c821) echo "rtl8821ce-dkms-git linux-firmware" ;;
+                        c822|b822) echo "rtl88x2ce-dkms-git linux-firmware" ;;
+                        b82c|c82c) echo "rtl88x2bu-dkms-git linux-firmware" ;;
+                        b885|c885) echo "rtl8852au-dkms-git linux-firmware" ;;
+                        8812|8814|881a|881b|8821|8811) echo "rtl8812au-openhd-dkms-git linux-firmware" ;;
+                        8188|8189|818a|818b|818c) echo "rtl8188eu-dkms-git linux-firmware" ;;
+                        *) echo "linux-firmware" ;;
+                    esac
+                    ;;
                 broadcom) echo "broadcom-wl-dkms linux-firmware" ;;
-                mediatek) echo "linux-firmware" ;;
+                mediatek) echo "linux-firmware linux-firmware-mediatek" ;;
                 atheros) echo "linux-firmware ath9k-htc-firmware" ;;
+                qualcomm) echo "linux-firmware linux-firmware-qcom" ;;
                 *) echo "linux-firmware iwd" ;;
             esac
             ;;
         ethernet)
             case "$vendor" in
-                realtek) echo "r8168-dkms" ;;
+                realtek)
+                    case "$device_id" in
+                        8125) echo "r8125-dkms linux-firmware" ;;
+                        8168|8167|8169|8101|8111) echo "r8168-dkms linux-firmware" ;;
+                        *) echo "linux-firmware" ;;
+                    esac
+                    ;;
+                mediatek) echo "linux-firmware" ;;
                 *) echo "" ;;
             esac
             ;;
+    esac
+}
+
+get_network_driver_candidates() {
+    local type="$1"
+    local vendor="$2"
+    local device_id="$3"
+    case "$type" in
+        ethernet)
+            case "$vendor" in
+                realtek)
+                    case "$device_id" in
+                        8125) echo "r8125-dkms|r8168-dkms" ;;
+                        *) echo "r8168-dkms|r8125-dkms" ;;
+                    esac
+                    ;;
+                *) echo "" ;;
+            esac
+            ;;
+        wifi)
+            case "$vendor" in
+                realtek)
+                    case "$device_id" in
+                        b852|c852|b851|8852be) echo "8852be-dkms-git" ;;
+                        c821) echo "rtl8821ce-dkms-git" ;;
+                        c822|b822) echo "rtl88x2ce-dkms-git" ;;
+                        b82c|c82c) echo "rtl88x2bu-dkms-git" ;;
+                        b885|c885) echo "rtl8852au-dkms-git" ;;
+                        8812|8814|881a|881b|8821|8811) echo "rtl8812au-openhd-dkms-git" ;;
+                        8188|8189|818a|818b|818c) echo "rtl8188eu-dkms-git" ;;
+                        *) echo "" ;;
+                    esac
+                    ;;
+                broadcom) echo "broadcom-wl-dkms" ;;
+                *) echo "" ;;
+            esac
+            ;;
+    esac
+}
+
+aur_search_driver() {
+    local term="$1"
+    if ! command -v yay >/dev/null 2>&1 && ! command -v paru >/dev/null 2>&1; then
+        return 1
+    fi
+    local helper="yay"
+    command -v paru >/dev/null 2>&1 && helper="paru"
+    local out
+    out=$($helper -Ss "$term" 2>/dev/null | grep -iE "dkms|driver" | awk '{print $1}' | head -3)
+    echo "$out"
+}
+
+_aur_fetch_network_driver() {
+    local model="$1"
+    local device_id="$2"
+    local helper="yay"
+    command -v paru >/dev/null 2>&1 && helper="paru"
+    command -v "$helper" >/dev/null 2>&1 || return 1
+    local terms=()
+    # Prefer searching by chip name from the model string (RTL8852BE -> rtl8852be-dkms).
+    local chip=$(echo "$model" | grep -oiE "RTL[0-9]+[A-Z]*|MT[0-9]+|MT792[0-9]|AX[0-9]+" | head -1 | tr '[:upper:]' '[:lower:]')
+    [[ -n $chip ]] && terms+=("${chip}-dkms" "${chip}")
+    # Fall back to mapping known hex device ids to their package names.
+    if [[ -n $device_id ]]; then
+        local known=$(_realtek_wifi_pkg_by_id "$device_id")
+        [[ -n $known ]] && terms+=("$known")
+    fi
+    local found=""
+    for t in "${terms[@]}"; do
+        found=$($helper -Ss "$t" 2>/dev/null | grep -iE "dkms" | awk '{print $1}' | grep -viE "firmware|bluetooth|openhd" | head -1)
+        [[ -n $found ]] && break
+    done
+    echo "$found"
+}
+
+_realtek_wifi_pkg_by_id() {
+    local device_id="$1"
+    case "$device_id" in
+        b852|c852|b851) echo "8852be-dkms-git" ;;
+        c821) echo "rtl8821ce-dkms-git" ;;
+        c82c) echo "rtl8821cu-dkms-git" ;;
+        c822|b822) echo "rtl88x2ce-dkms-git" ;;
+        b82c) echo "rtl88x2bu-dkms-git" ;;
+        b885|c885) echo "rtl8852au-dkms-git" ;;
+        8812|8814|881a|881b) echo "rtl8812au-openhd-dkms-git" ;;
+        8188|8189|818a) echo "rtl8188eu-dkms-git" ;;
+        *) echo "" ;;
     esac
 }
 
@@ -332,7 +495,20 @@ get_other_packages() {
 }
 
 get_firmware_packages() {
-    echo "linux-firmware sof-firmware"
+    local pkgs="linux-firmware sof-firmware"
+    # Vendor-specific firmware subpackages when matching hardware is present.
+    local gpus=$(detect_gpus)
+    if echo "$gpus" | grep -qE "^\S+\|\S+\|intel\|"; then
+        pkgs+=" linux-firmware-intel"
+    fi
+    local nets=$(detect_network)
+    if echo "$nets" | grep -qE "\|mediatek\|"; then
+        pkgs+=" linux-firmware-mediatek"
+    fi
+    if echo "$nets" | grep -qE "\|qualcomm\||\|atheros\|"; then
+        pkgs+=" linux-firmware-qcom"
+    fi
+    echo "$pkgs"
 }
 
 get_profile_packages() {
@@ -465,19 +641,25 @@ run_full_scan() {
     if [[ $npus != "NONE" && -n $npus ]]; then
         while IFS= read -r npu; do
             IFS='|' read -r vendor model driver <<<"$npu"
-            local pkgs=$(get_npu_packages "$vendor")
-            local missing=$(_get_missing "$pkgs")
-            results+="NPU|${vendor}|${model}|${driver}|${pkgs}|${missing}\n"
+            # NPU drivers are optional extras; keep the row for display but
+            # never count them among missing MAIN driver packages.
+            results+="NPU|${vendor}|${model}|${driver}||\n"
         done <<<"$npus"
     fi
     local networks=$(detect_network)
     if [[ $networks != "NONE" && -n $networks ]]; then
         while IFS= read -r net; do
-            IFS='|' read -r type vendor model driver <<<"$net"
-            local pkgs=$(get_network_packages "$type" "$vendor")
+            IFS='|' read -r type vendor model driver device_id <<<"$net"
+            local pkgs=$(get_network_packages "$type" "$vendor" "$device_id")
             local missing=""
             [[ -n $pkgs ]] && missing=$(_get_missing "$pkgs")
-            results+="NET|${vendor}|${model}|${driver}|${pkgs}|${missing}\n"
+            results+="NET|${vendor}|${model}|${driver}|${pkgs}|${missing}|${device_id}\n"
+            if [[ $driver == "none" ]]; then
+                local hint=$(get_network_driver_candidates "$type" "$vendor" "$device_id")
+                if [[ -n $hint ]]; then
+                    results+="WARN|No driver bound for ${model} — install ${hint%%|*}||${hint}||\n"
+                fi
+            fi
         done <<<"$networks"
     fi
     local audio=$(detect_audio)
@@ -527,7 +709,7 @@ run_full_install() {
     local missing_pkgs=""
     while IFS= read -r line; do
         [[ -z $line ]] && continue
-        IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
         case "$type" in
             GPU | CPU | NPU | NET | BT | FW | OTHER)
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
@@ -546,9 +728,11 @@ run_full_install_confirmed() {
     local scan_data=$(run_full_scan)
     local missing_pkgs=""
     local gpu_vendors_found=()
+    local net_dkms=""
+    local aur_extra=""
     while IFS= read -r line; do
         [[ -z $line ]] && continue
-        IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
         case "$type" in
             GPU)
                 gpu_vendors_found+=("$vendor")
@@ -558,43 +742,196 @@ run_full_install_confirmed() {
                 [[ -n $missing ]] && missing_pkgs+=" $missing"
                 ;;
         esac
+        if [[ $type == "NET" && $driver == "none" && -z $missing ]]; then
+            local aur_pkg
+            aur_pkg=$(_aur_fetch_network_driver "$model" "$device_id")
+            if [[ -n $aur_pkg ]]; then
+                missing_pkgs+=" $aur_pkg"
+                aur_extra+=" $aur_pkg"
+                net_dkms="$vendor"
+            fi
+        fi
+        if [[ $type == "NET" && $missing == *"dkms"* ]]; then
+            net_dkms="$vendor"
+        fi
     done <<<"$scan_data"
     local unique_missing=$(echo "$missing_pkgs" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
     if [[ -z "$(echo "$unique_missing" | xargs)" ]]; then
         echo "ALL_DRIVERS_INSTALLED"
         return 0
     fi
-    echo "MISSING:$unique_missing"
+    rx_log_file "info" "MISSING: $unique_missing"
     install_packages "$unique_missing"
     local install_status=$?
     if [[ $install_status -eq 0 ]]; then
         for vendor in "${gpu_vendors_found[@]}"; do
             case "$vendor" in
                 nvidia)
-                    configure_nvidia_drm
-                    configure_ai_env "nvidia"
+                    configure_nvidia_drm >/dev/null
+                    configure_ai_env "nvidia" >/dev/null
                     ;;
                 intel)
-                    configure_ai_env "intel"
+                    configure_ai_env "intel" >/dev/null
                     ;;
                 amd)
-                    configure_ai_env "amd"
+                    configure_ai_env "amd" >/dev/null
                     ;;
             esac
         done
 
-        generate_hypr_env
+        generate_hypr_env >/dev/null
 
         if echo "$unique_missing" | grep -qE "nvidia-open-dkms|nvidia"; then
-            configure_mkinitcpio_nvidia
+            configure_mkinitcpio_nvidia >/dev/null
+        fi
+
+        if [[ -n $net_dkms ]]; then
+            configure_network_driver "$net_dkms" "$unique_missing" >/dev/null
+        fi
+
+        if [[ -n $aur_extra ]]; then
+            rx_log_file "info" "AUR_INSTALLED: $aur_extra"
         fi
 
         if echo "$unique_missing" | grep -qE "dkms|nvidia|cuda|rocm"; then
-            echo "INITRAMFS_UPDATE_NEEDED"
+            rx_log_file "info" "INITRAMFS_UPDATE_NEEDED"
         fi
-        echo "INSTALL_COMPLETE"
+        rx_log_file "info" "INSTALL_COMPLETE"
+        return 0
     else
-        echo "INSTALL_FAILED"
+        rx_log_file "error" "INSTALL_FAILED"
+        return 1
+    fi
+}
+
+_extra_driver_set() {
+    # All optional/AI packages relevant to the detected hardware: per-GPU
+    # compute stacks plus NPU accelerators. Prints space-separated names.
+    local scan_data=$(run_full_scan)
+    local extra_pkgs=""
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
+        if [[ $type == "GPU" ]]; then
+            local ai_pkgs=$(get_gpu_ai_packages "$vendor")
+            [[ -n $ai_pkgs ]] && extra_pkgs+=" $ai_pkgs"
+        fi
+    done <<<"$scan_data"
+    local npus=$(detect_npu)
+    if [[ $npus != "NONE" && -n $npus ]]; then
+        while IFS= read -r npu; do
+            IFS='|' read -r vendor model driver <<<"$npu"
+            local npu_pkgs=$(get_npu_packages "$vendor")
+            [[ -n $npu_pkgs ]] && extra_pkgs+=" $npu_pkgs"
+        done <<<"$npus"
+    fi
+    echo "$extra_pkgs" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' '
+}
+
+run_extra_install() {
+    # Optional/AI drivers only: CUDA/ROCm/oneAPI stacks plus other extras.
+    # The base install (--install) never touches these.
+    local scan_data=$(run_full_scan)
+    local extra_pkgs=$(_extra_driver_set)
+    local gpu_vendors_found=()
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
+        [[ $type == "GPU" ]] && gpu_vendors_found+=("$vendor")
+    done <<<"$scan_data"
+
+    if [[ -z "$(echo "$extra_pkgs" | xargs)" ]]; then
+        echo "NO_EXTRA_DRIVERS"
+        return 0
+    fi
+    echo "EXTRA_MISSING:$extra_pkgs"
+    install_packages "$extra_pkgs"
+    local install_status=$?
+    if [[ $install_status -eq 0 ]]; then
+        for vendor in "${gpu_vendors_found[@]}"; do
+            configure_ai_env "$vendor" >/dev/null
+        done
+        generate_hypr_env >/dev/null
+        if echo "$extra_pkgs" | grep -qE "rocm|intel-compute-runtime|level-zero"; then
+            rx_log_file "info" "INITRAMFS_UPDATE_NEEDED"
+        fi
+        echo "EXTRA_INSTALL_COMPLETE"
+    else
+        echo "EXTRA_INSTALL_FAILED"
+        return 1
+    fi
+}
+
+list_extra_drivers() {
+    # Report which optional/AI packages are missing (no install).
+    local unique_extra=$(_extra_driver_set)
+    if [[ -z "$(echo "$unique_extra" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    local missing=""
+    for p in $unique_extra; do
+        _is_pkg_installed "$p" || missing+=" $p"
+    done
+    missing=$(echo "$missing" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$missing" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    echo "$missing"
+}
+
+list_installed_extra_drivers() {
+    # Report which optional/AI packages are installed (no changes).
+    local unique_extra=$(_extra_driver_set)
+    if [[ -z "$(echo "$unique_extra" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    local installed=""
+    for p in $unique_extra; do
+        _is_pkg_installed "$p" && installed+=" $p"
+    done
+    installed=$(echo "$installed" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$installed" | xargs)" ]]; then
+        echo "NONE"
+        return 0
+    fi
+    echo "$installed"
+}
+
+run_extra_uninstall() {
+    # Remove installed optional/AI drivers, with an interactive prompt.
+    local installed=$(_extra_driver_set)
+    local to_remove=""
+    for p in $installed; do
+        _is_pkg_installed "$p" && to_remove+=" $p"
+    done
+    to_remove=$(echo "$to_remove" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$to_remove" | xargs)" ]]; then
+        echo "NO_EXTRA_DRIVERS_INSTALLED"
+        return 0
+    fi
+    echo "EXTRA_UNINSTALL_PKGS:$to_remove"
+    printf "Remove optional extra drivers? [y/N]: " >&2
+    read -r confirm
+    if [[ ! $confirm =~ ^[Yy]$ ]]; then
+        echo "EXTRA_UNINSTALL_CANCELLED"
+        return 0
+    fi
+    local helper="yay"
+    command -v paru >/dev/null 2>&1 && helper="paru"
+    if command -v "$helper" >/dev/null 2>&1; then
+        $helper -Rns --noconfirm $to_remove 2>&1
+    else
+        sudo pacman -Rns --noconfirm $to_remove 2>&1
+    fi
+    local rm_status=$?
+    if [[ $rm_status -eq 0 ]]; then
+        generate_hypr_env >/dev/null
+        echo "EXTRA_UNINSTALL_COMPLETE"
+    else
+        echo "EXTRA_UNINSTALL_FAILED"
         return 1
     fi
 }
@@ -722,6 +1059,290 @@ _set_module_param() {
         echo "options ${module} ${param}=${value}" | sudo tee "$conf_file" >/dev/null
     fi
     echo "SET|${module}|${param}=${value}"
+}
+
+MODPROBE_DIR="/etc/modprobe.d"
+MODULES_LOAD_DIR="/etc/modules-load.d"
+
+_module_category() {
+    local mod="$1"
+    local kver=$(uname -r)
+    local path=""
+    if [[ -f /lib/modules/${kver}/modules.dep ]]; then
+        path=$(awk -v m="$mod" '{t=$0; sub(/:.*$/, "", t); split(t, a, "/"); n=a[length(a)]; sub(/\.ko(\.(gz|xz|zst))?$/, "", n); if(n==m){print t; exit}}' /lib/modules/${kver}/modules.dep)
+    fi
+    [[ -z $path ]] && path=$(grep -E "(^|/)${mod}(\.ko(\.(gz|xz|zst))?)?$" /lib/modules/${kver}/modules.builtin 2>/dev/null | head -1)
+    case "$path" in
+        *drivers/net/*|*drivers/net/wireless/*) echo "network" ;;
+        *drivers/net/ethernet/*) echo "network" ;;
+        *drivers/gpu/*|*drivers/video/*|*drivers/gpu/drm/*) echo "display" ;;
+        *drivers/media/*|*drivers/media/usb/*|*drivers/media/pci/*) echo "media" ;;
+        *drivers/input/*) echo "input" ;;
+        *drivers/audio/*|*sound/*) echo "audio" ;;
+        *drivers/bluetooth/*|*net/bluetooth/*) echo "bluetooth" ;;
+        *drivers/staging/*) echo "staging" ;;
+        *drivers/usb/*|*drivers/usb/serial/*) echo "usb" ;;
+        *drivers/char/*|*drivers/tty/*) echo "serial" ;;
+        *drivers/md/*|*drivers/scsi/*|*drivers/ata/*|*drivers/nvme/*) echo "storage" ;;
+        *drivers/mmc/*|*drivers/mtd/*) echo "storage" ;;
+        *drivers/hid/*|*drivers/hid/usbhid/*) echo "hid" ;;
+        *drivers/thermal/*) echo "thermal" ;;
+        *arch/*|*kernel/arch/*) echo "arch" ;;
+        *kernel/crypto/*|*crypto/*) echo "crypto" ;;
+        *kernel/fs/*|*fs/*) echo "filesystem" ;;
+        *updates/dkms/*|*extra/*) echo "dkms" ;;
+        *) echo "other" ;;
+    esac
+}
+
+_list_all_modules() {
+    local kver=$(uname -r)
+    local mod_dir="/lib/modules/${kver}"
+    if [[ ! -f ${mod_dir}/modules.dep && ! -f ${mod_dir}/modules.builtin ]]; then
+        return 0
+    fi
+    # Build a name -> full path map in a single awk pass (fast: one parse of
+    # modules.dep) instead of grepping the file per module.
+    local tmp
+    tmp=$(mktemp)
+    {
+        [[ -f ${mod_dir}/modules.dep ]] && awk '{p=$0; sub(/:.*$/, "", p); split(p, a, "/"); n=a[length(a)]; sub(/\.ko(\.(gz|xz|zst))?$/, "", n); if(n!="") print n "\t" p}' "${mod_dir}/modules.dep"
+        [[ -f ${mod_dir}/modules.builtin ]] && awk '{split($0, a, "/"); n=a[length(a)]; sub(/\.ko(\.(gz|xz|zst))?$/, "", n); if(n!="") print n "\t" $0}' "${mod_dir}/modules.builtin"
+    } | sort -u >"$tmp"
+
+    while IFS=$'\t' read -r mod path; do
+        [[ -z $mod || $mod == *" "* ]] && continue
+        local cat="other"
+        case "$path" in
+            *drivers/net/*|*drivers/net/wireless/*) cat="network" ;;
+            *drivers/gpu/*|*drivers/video/*|*drivers/gpu/drm/*) cat="display" ;;
+            *drivers/media/*) cat="media" ;;
+            *drivers/input/*) cat="input" ;;
+            *drivers/audio/*|*sound/*) cat="audio" ;;
+            *drivers/bluetooth/*|*net/bluetooth/*) cat="bluetooth" ;;
+            *drivers/staging/*) cat="staging" ;;
+            *drivers/usb/*) cat="usb" ;;
+            *drivers/char/*|*drivers/tty/*) cat="serial" ;;
+            *drivers/md/*|*drivers/scsi/*|*drivers/ata/*|*drivers/nvme/*|*drivers/mmc/*|*drivers/mtd/*) cat="storage" ;;
+            *drivers/hid/*) cat="hid" ;;
+            *drivers/thermal/*) cat="thermal" ;;
+            *arch/*|*kernel/arch/*) cat="arch" ;;
+            *crypto/*) cat="crypto" ;;
+            *fs/*) cat="filesystem" ;;
+            *updates/dkms/*|*extra/*) cat="dkms" ;;
+        esac
+        echo "MODULE|${mod}|${cat}"
+    done <"$tmp"
+    rm -f "$tmp"
+}
+
+_module_descs() {
+    # Batch descriptions for many modules in ONE subprocess invocation.
+    # Reads all module names from argv and prints DESC|<name>|<description>
+    # for each, reusing the builtin modinfo blob where possible.
+    local kver=$(uname -r)
+    local mod_dir="/lib/modules/${kver}"
+    local blob=""
+    if [[ -f ${mod_dir}/modules.builtin.modinfo ]]; then
+        blob=$(tr '\0' '\n' < "${mod_dir}/modules.builtin.modinfo" 2>/dev/null | grep -E "\.description=" | sed -E 's/\.description=/\t/')
+    fi
+    local mod
+    for mod in "$@"; do
+        [[ -z $mod ]] && continue
+        if [[ -n $blob ]]; then
+            local desc=""
+            desc=$(echo "$blob" | awk -F'\t' -v m="$mod" '$1==m{print $2; exit}')
+            if [[ -n $desc ]]; then
+                echo "DESC|${mod}|${desc}"
+                continue
+            fi
+        fi
+        local d=""
+        d=$(modinfo -F description "$mod" 2>/dev/null)
+        echo "DESC|${mod}|${d}"
+    done
+}
+
+_module_info() {
+    local mod="$1"
+    [[ -z $mod ]] && { echo "ERROR|missing_module"; return 1; }
+    if [[ ! $mod =~ ^[A-Za-z0-9_-]+$ ]]; then        echo "ERROR|invalid_module|${mod}"
+        return 1
+    fi
+    local kver=$(uname -r)
+    local desc=""
+    if [[ -f /lib/modules/${kver}/modules.builtin.modinfo ]]; then
+        desc=$(tr '\0' '\n' < /lib/modules/${kver}/modules.builtin.modinfo 2>/dev/null | grep -E "^${mod}\.description=" | head -1 | cut -d= -f2-)
+    fi
+    [[ -z $desc ]] && desc=$(modinfo -F description "$mod" 2>/dev/null)
+    local author=$(modinfo -F author "$mod" 2>/dev/null)
+    local license=$(modinfo -F license "$mod" 2>/dev/null)
+    local version=$(modinfo -F version "$mod" 2>/dev/null)
+    local depends=$(modinfo -F depends "$mod" 2>/dev/null)
+    local firmware=$(modinfo -F firmware "$mod" 2>/dev/null | head -1)
+    local builtin="no"
+    if grep -qE "(^|/)${mod}(\.ko(\.(gz|xz|zst))?)?$" /lib/modules/${kver}/modules.builtin 2>/dev/null; then
+        builtin="yes"
+    fi
+    echo "DESC|${desc}"
+    echo "AUTHOR|${author}"
+    echo "LICENSE|${license}"
+    echo "VERSION|${version}"
+    echo "DEPENDS|${depends}"
+    echo "FIRMWARE|${firmware}"
+    echo "BUILTIN|${builtin}"
+    echo "CATEGORY|$(_module_category "$mod")"
+}
+
+_list_modprobe_files() {
+    if [[ ! -d $MODPROBE_DIR ]]; then
+        return 0
+    fi
+    for f in "$MODPROBE_DIR"/*.conf; do
+        [[ -f $f ]] || continue
+        echo "FILE|$(basename "$f")"
+        while IFS= read -r line; do
+            echo "CONTENT|${line}"
+        done <"$f"
+    done
+}
+
+_list_blacklisted() {
+    if [[ ! -d $MODPROBE_DIR ]]; then
+        return 0
+    fi
+    grep -rhE "^\s*blacklist\s+" "$MODPROBE_DIR" 2>/dev/null | awk '{print $2}' | sort -u | while read -r mod; do
+        echo "BLACKLIST|${mod}"
+    done
+}
+
+_modprobe_blacklist_add() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    if [[ ! $module =~ ^[A-Za-z0-9_-]+$ ]]; then
+        echo "ERROR|invalid_module|${module}"
+        return 1
+    fi
+    local exists
+    exists=$(_module_exists "$module")
+    if [[ $exists != EXISTS* ]]; then
+        echo "ERROR|module_not_found|${module}"
+        return 1
+    fi
+    local conf="${MODPROBE_DIR}/blacklist-${module}.conf"
+    if grep -qE "^\s*blacklist\s+${module}\b" "$conf" 2>/dev/null; then
+        echo "ALREADY|${module}"
+        return 0
+    fi
+    echo "blacklist ${module}" | sudo tee "$conf" >/dev/null
+    echo "ADDED|${module}"
+}
+
+_modprobe_blacklist_remove() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    local conf="${MODPROBE_DIR}/blacklist-${module}.conf"
+    if [[ -f $conf ]]; then
+        sudo rm -f "$conf"
+    fi
+    echo "REMOVED|${module}"
+}
+
+_list_modules_load() {
+    if [[ ! -d $MODULES_LOAD_DIR ]]; then
+        return 0
+    fi
+    grep -rhE "^\s*[a-zA-Z0-9_]+" "$MODULES_LOAD_DIR" 2>/dev/null | awk '{print $1}' | sort -u | while read -r mod; do
+        echo "LOAD|${mod}"
+    done
+}
+
+_module_exists() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    if [[ ! $module =~ ^[A-Za-z0-9_-]+$ ]]; then
+        echo "ERROR|invalid_module|${module}"
+        return 1
+    fi
+    local canonical
+    canonical=$(modinfo -F name "$module" 2>/dev/null)
+    if [[ -z $canonical ]]; then
+        canonical=$(modinfo -k "$(uname -r)" -F name "$module" 2>/dev/null)
+    fi
+    if [[ -n $canonical ]]; then
+        echo "EXISTS|${canonical}"
+        return 0
+    fi
+    echo "NOT_FOUND|${module}"
+    return 1
+}
+
+_modules_load_add() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    if [[ ! $module =~ ^[A-Za-z0-9_-]+$ ]]; then
+        echo "ERROR|invalid_module|${module}"
+        return 1
+    fi
+    local exists
+    exists=$(_module_exists "$module")
+    if [[ $exists != EXISTS* ]]; then
+        echo "ERROR|module_not_found|${module}"
+        return 1
+    fi
+    local conf="${MODULES_LOAD_DIR}/${module}.conf"
+    if grep -qE "^\s*${module}\b" "$conf" 2>/dev/null; then
+        echo "ALREADY|${module}"
+        return 0
+    fi
+    echo "${module}" | sudo tee "$conf" >/dev/null
+    echo "ADDED|${module}"
+}
+
+_modules_load_remove() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    local conf="${MODULES_LOAD_DIR}/${module}.conf"
+    if [[ -f $conf ]]; then
+        sudo rm -f "$conf"
+    fi
+    echo "REMOVED|${module}"
+}
+
+_module_state() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    if lsmod 2>/dev/null | awk '{print $1}' | grep -qx "$module"; then
+        echo "LOADED|${module}"
+    else
+        echo "NOT_LOADED|${module}"
+    fi
+}
+
+_module_load() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    sudo modprobe "$module" 2>&1
+    local rc=$?
+    if [[ $rc -eq 0 ]]; then
+        echo "LOADED|${module}"
+    else
+        echo "ERROR|${module}"
+    fi
+    return $rc
+}
+
+_module_unload() {
+    local module="$1"
+    [[ -z $module ]] && { echo "ERROR|missing_module"; return 1; }
+    sudo modprobe -r "$module" 2>&1
+    local rc=$?
+    if [[ $rc -eq 0 ]]; then
+        echo "UNLOADED|${module}"
+    else
+        echo "ERROR|${module}"
+    fi
+    return $rc
 }
 
 _check_driver_conflicts() {
@@ -984,7 +1605,7 @@ _list_recommended_packages() {
     local seen=""
     while IFS= read -r line; do
         [[ -z $line ]] && continue
-        IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
+        IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
         [[ -z $pkgs ]] && continue
         for p in $pkgs; do
             if ! echo " $seen " | grep -q " $p "; then
@@ -1143,6 +1764,73 @@ configure_mkinitcpio_nvidia() {
     fi
 
     echo "result=success|action=mkinit_configured"
+}
+
+configure_network_driver() {
+    local vendor="$1"
+    local installed_pkgs="$2"
+    if [[ $vendor != "realtek" ]]; then
+        echo "result=skipped|reason=no_blacklist_needed"
+        return 0
+    fi
+
+    if echo "$installed_pkgs" | grep -qE "r8125-dkms"; then
+        local bl="/etc/modprobe.d/blacklist-r8169.conf"
+        if ! grep -q "blacklist r8169" "$bl" 2>/dev/null; then
+            echo "blacklist r8169" | sudo tee "$bl" >/dev/null
+            echo "result=blacklist_r8169"
+        else
+            echo "result=blacklist_already_set"
+        fi
+        local load="/etc/modules-load.d/r8125.conf"
+        if ! grep -q "^r8125" "$load" 2>/dev/null; then
+            echo "r8125" | sudo tee "$load" >/dev/null
+        fi
+    elif echo "$installed_pkgs" | grep -qE "r8168-dkms"; then
+        local bl="/etc/modprobe.d/blacklist-r8169.conf"
+        if ! grep -q "blacklist r8169" "$bl" 2>/dev/null; then
+            echo "blacklist r8169" | sudo tee "$bl" >/dev/null
+            echo "result=blacklist_r8169"
+        fi
+        local load="/etc/modules-load.d/r8168.conf"
+        if ! grep -q "^r8168" "$load" 2>/dev/null; then
+            echo "r8168" | sudo tee "$load" >/dev/null
+        fi
+    fi
+
+    if command -v mkinitcpio >/dev/null 2>&1; then
+        sudo mkinitcpio -P 2>&1 | head -5
+    fi
+    echo "result=network_driver_configured"
+}
+
+_net_driver_blacklist() {
+    local target="$1"
+    local bl="/etc/modprobe.d/blacklist-r8169.conf"
+    case "$target" in
+        r8125)
+            echo "blacklist r8169" | sudo tee "$bl" >/dev/null
+            echo "r8125" | sudo tee /etc/modules-load.d/r8125.conf >/dev/null
+            sudo modprobe -r r8169 2>/dev/null
+            sudo modprobe r8125 2>/dev/null
+            echo "SWITCHED|r8125"
+            ;;
+        r8168)
+            echo "blacklist r8169" | sudo tee "$bl" >/dev/null
+            echo "r8168" | sudo tee /etc/modules-load.d/r8168.conf >/dev/null
+            sudo modprobe -r r8169 2>/dev/null
+            sudo modprobe r8168 2>/dev/null
+            echo "SWITCHED|r8168"
+            ;;
+        r8169)
+            sudo rm -f "$bl" 2>/dev/null
+            sudo rm -f /etc/modules-load.d/r8125.conf /etc/modules-load.d/r8168.conf 2>/dev/null
+            sudo modprobe -r r8125 r8168 2>/dev/null
+            sudo modprobe r8169 2>/dev/null
+            echo "SWITCHED|r8169"
+            ;;
+        *) echo "ERROR|invalid_network_driver" ;;
+    esac
 }
 
 show_hypr_env() {
@@ -1304,14 +1992,35 @@ case "$1" in
     "--scan") run_full_scan ;;
     "--install") run_full_install ;;
     "--install-confirmed") run_full_install_confirmed ;;
+    "--install-extra") run_extra_install ;;
+    "--extra-list") list_extra_drivers ;;
+    "--extra-installed") list_installed_extra_drivers ;;
+    "--extra-uninstall") run_extra_uninstall ;;
     "--verify") verify_install "$2" ;;
     "--info") show_device_info "$2" ;;
     "--services") get_service_hints ;;
     "--sys-ai-env") sys_check_ai_env ;;
     "--kernel-warn") _kernel_warnings ;;
     "--switch") _switch_driver "$2" ;;
+    "--net-switch") _net_driver_blacklist "$2" ;;
+    "--net-configure") configure_network_driver "$2" "$3" ;;
+    "--net-drivers") get_network_driver_candidates "$2" "$3" "$4" ;;
     "--modules") _list_module_params "${@:2}" ;;
     "--modules-set") _set_module_param "$2" "$3" "$4" ;;
+    "--modprobe-files") _list_modprobe_files ;;
+    "--blacklist-list") _list_blacklisted ;;
+    "--blacklist-add") _modprobe_blacklist_add "$2" ;;
+    "--blacklist-remove") _modprobe_blacklist_remove "$2" ;;
+    "--modules-load-list") _list_modules_load ;;
+    "--modules-load-add") _modules_load_add "$2" ;;
+    "--modules-load-remove") _modules_load_remove "$2" ;;
+    "--module-state") _module_state "$2" ;;
+    "--module-load") _module_load "$2" ;;
+    "--module-unload") _module_unload "$2" ;;
+    "--module-exists") _module_exists "$2" ;;
+    "--module-list") _list_all_modules ;;
+    "--module-info") _module_info "$2" ;;
+    "--module-descs") _module_descs "${@:2}" ;;
     "--conflicts") _check_driver_conflicts ;;
     "--dual-gpu") _detect_dual_gpu ;;
     "--optimus") _setup_optimus ;;

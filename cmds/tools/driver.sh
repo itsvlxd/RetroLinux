@@ -77,7 +77,7 @@ cmd_driver() {
 
             while IFS= read -r line; do
                 [[ -z $line ]] && continue
-                IFS='|' read -r type vendor model driver pkgs missing <<<"$line"
+                IFS='|' read -r type vendor model driver pkgs missing device_id <<<"$line"
 
                 case "$type" in
                     GPU)
@@ -254,6 +254,27 @@ cmd_driver() {
                 export SKIP_PROMPT=true
             fi
 
+            if [[ $flag == "extra" ]]; then
+                local extra_out
+                extra_out=$(bash "$driver_script" --install-extra)
+                local extra_exit=$?
+                if echo "$extra_out" | grep -q "NO_EXTRA_DRIVERS"; then
+                    rx_log "info" "No extra optional drivers available for this system"
+                    return 0
+                fi
+                if echo "$extra_out" | grep -q "EXTRA_MISSING:"; then
+                    local extra_list
+                    extra_list=$(echo "$extra_out" | sed -n 's/^EXTRA_MISSING://p' | awk '{print $1}')
+                    rx_log "info" "Installing optional extra drivers: ${PINK}${extra_list}${RESET}"
+                fi
+                if echo "$extra_out" | grep -q "EXTRA_INSTALL_COMPLETE"; then
+                    rx_log "success" "Extra optional drivers installed"
+                    return 0
+                fi
+                rx_log "error" "Extra driver install failed or nothing to install"
+                return $extra_exit
+            fi
+
             local first_pass
             first_pass=$(bash "$driver_script" --install)
             [[ -z $first_pass ]] && rx_log "error" "Failed to scan for missing drivers" && return 1
@@ -300,6 +321,33 @@ cmd_driver() {
                 fi
             else
                 rx_log "error" "Installation failed"
+            fi
+            ;;
+
+        "uninstall")
+            if [[ $flag != "extra" ]]; then
+                rx_log "error" "Usage: retro driver uninstall extra"
+                return 1
+            fi
+            local uni_out
+            uni_out=$(bash "$driver_script" --extra-uninstall)
+            if echo "$uni_out" | grep -q "EXTRA_UNINSTALL_PKGS:"; then
+                local uni_list
+                uni_list=$(echo "$uni_out" | sed -n 's/^EXTRA_UNINSTALL_PKGS://p' | awk '{print $1}')
+                rx_log "info" "Removing optional extra drivers: ${PINK}${uni_list}${RESET}"
+            fi
+            if echo "$uni_out" | grep -q "EXTRA_UNINSTALL_COMPLETE"; then
+                rx_log "success" "Extra optional drivers removed"
+                return 0
+            elif echo "$uni_out" | grep -q "EXTRA_UNINSTALL_CANCELLED"; then
+                rx_log "info" "Extra driver removal cancelled"
+                return 0
+            elif echo "$uni_out" | grep -q "NO_EXTRA_DRIVERS_INSTALLED"; then
+                rx_log "info" "No extra optional drivers installed"
+                return 0
+            else
+                rx_log "error" "Extra driver removal failed"
+                return 1
             fi
             ;;
 
@@ -439,6 +487,143 @@ cmd_driver() {
                     return 1
                     ;;
             esac
+            rx_table_spacer
+            ;;
+
+        "net")
+            local net_target="${2,,}"
+            if [[ -z $net_target ]]; then
+                local nets
+                nets=$(bash "$driver_script" --scan | grep "^NET")
+                rx_table_header "󰤨" "Network Drivers"
+                if [[ -z $nets ]]; then
+                    rx_log "info" "No network controllers detected"
+                else
+                    while IFS= read -r n; do
+                        IFS='|' read -r typ vendor model driver pkgs missing device_id <<<"$n"
+                        local drv="${driver:-none}"
+                        local miss="${missing:-all installed}"
+                        if [[ $drv == "none" ]]; then
+                            rx_table_simple "󰤨" "${model} — NO DRIVER BOUND (${miss})" "$ERROR"
+                        else
+                            rx_table_simple "󰤨" "${model} — ${drv}" "$SUCCESS"
+                        fi
+                    done <<<"$nets"
+                fi
+                rx_table_spacer
+                rx_log "info" "Usage: retro driver net [r8125|r8168|r8169]"
+                return 0
+            fi
+
+            case "$net_target" in
+                r8125|r8168|r8169)
+                    if [[ $SKIP_PROMPT != "true" ]]; then
+                        rx_log "info" "Switch Realtek driver to ${PINK}${net_target}${RESET}? ${PINK}[y/N]${RESET}: "
+                        read -r confirm
+                        [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
+                    fi
+                    local net_res
+                    net_res=$(bash "$driver_script" --net-switch "$net_target")
+                    IFS='|' read -r net_status net_drv <<<"$net_res"
+                    case "$net_status" in
+                        SWITCHED) rx_log "success" "Switched Realtek driver to ${PINK}${net_drv}${RESET}" ;;
+                        *) rx_log "error" "Failed to switch network driver: $net_res" ;;
+                    esac
+                    ;;
+                *) rx_log "error" "Unknown network driver: ${net_target}. Use r8125, r8168 or r8169" ;;
+            esac
+            ;;
+
+        "blacklist")
+            local bl_action="${2,,}"
+            local bl_module="$3"
+            case "$bl_action" in
+                list)
+                    rx_table_header "󰓅" "Blacklisted Modules"
+                    local bl_list
+                    bl_list=$(bash "$driver_script" --blacklist-list | sed 's/^BLACKLIST|//')
+                    if [[ -z $bl_list ]]; then
+                        rx_log "info" "No modules blacklisted"
+                    else
+                        while IFS= read -r mod; do
+                            [[ -z $mod ]] && continue
+                            rx_table_simple "󰓅" "$mod" "$PINK"
+                        done <<<"$bl_list"
+                    fi
+                    rx_table_spacer
+                    ;;
+                add|on)
+                    [[ -z $bl_module ]] && rx_log "error" "Usage: retro driver blacklist add <module>" && return 1
+                    if [[ $SKIP_PROMPT != "true" ]]; then
+                        rx_log "info" "Blacklist ${PINK}${bl_module}${RESET}? ${PINK}[y/N]${RESET}: "
+                        read -r confirm
+                        [[ ! $confirm =~ ^[Yy]$ ]] && rx_log "info" "Aborted." && return 0
+                    fi
+                    local bl_res
+                    bl_res=$(pkexec bash "$driver_script" --blacklist-add "$bl_module")
+                    if echo "$bl_res" | grep -qE "ADDED|ALREADY"; then
+                        rx_log "success" "Blacklisted ${bl_module}"
+                    else
+                        rx_log "error" "Failed to blacklist ${bl_module}"
+                    fi
+                    ;;
+                remove|off)
+                    [[ -z $bl_module ]] && rx_log "error" "Usage: retro driver blacklist remove <module>" && return 1
+                    local bl_res
+                    bl_res=$(pkexec bash "$driver_script" --blacklist-remove "$bl_module")
+                    if echo "$bl_res" | grep -q "REMOVED"; then
+                        rx_log "success" "Unblacklisted ${bl_module}"
+                    else
+                        rx_log "error" "Failed to unblacklist ${bl_module}"
+                    fi
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro driver blacklist [list|add|remove] <module>"
+                    return 1
+                    ;;
+            esac
+            ;;
+
+        "mod-exists")
+            local me_module="$2"
+            [[ -z $me_module ]] && rx_log "error" "Usage: retro driver mod-exists <module>" && return 1
+            local me_res
+            me_res=$(bash "$driver_script" --module-exists "$me_module")
+            if echo "$me_res" | grep -q "^EXISTS"; then
+                rx_log "success" "Module found: ${me_res#EXISTS|}"
+            elif echo "$me_res" | grep -q "^NOT_FOUND"; then
+                rx_log "error" "Module not found: ${me_module}"
+            else
+                rx_log "error" "$me_res"
+            fi
+            ;;
+
+        "module-list")
+            rx_table_header "󰓅" "Installed Kernel Modules"
+            local ml_count=0
+            while IFS= read -r ml; do
+                [[ -z $ml ]] && continue
+                local m_name="${ml#MODULE|}"
+                m_name="${m_name%%|*}"
+                ((ml_count++))
+                rx_table_row "󰓅" "$m_name" "" "$GRAY" "44"
+            done <<<"$(bash "$driver_script" --module-list)"
+            rx_table_separator
+            rx_log "info" "${ml_count} modules available"
+            ;;
+
+        "module-info")
+            local mi_module="$2"
+            [[ -z $mi_module ]] && rx_log "error" "Usage: retro driver module-info <module>" && return 1
+            local mi_res
+            mi_res=$(bash "$driver_script" --module-info "$mi_module")
+            rx_table_header "󰓅" "Module: ${mi_module}"
+            while IFS= read -r line; do
+                [[ -z $line || "|" != *"$line"* ]] && [[ -z $line ]] && continue
+                IFS='|' read -r mi_key mi_val <<<"$line"
+                [[ -z $mi_key || -z $mi_val ]] && continue
+                rx_table_row "󰓅" "$mi_key" "$mi_val" "$GRAY" "22"
+            done <<<"$mi_res"
             rx_table_spacer
             ;;
 
@@ -857,6 +1042,11 @@ cmd_driver() {
             rx_help_cmd "env" "Show GPU compute env (CUDA/ONEAPI/RADV)"
             rx_help_cmd "info <keyword>" "Show detailed device info"
             rx_help_cmd "switch [xe|i915]" "Switch Intel GPU kernel driver"
+            rx_help_cmd "net [r8125|r8168|r8169]" "Show/switch Realtek ethernet driver"
+            rx_help_cmd "blacklist [list|add|remove] <mod>" "Manage modprobe blacklists"
+            rx_help_cmd "mod-exists <module>" "Check if a kernel module exists"
+            rx_help_cmd "module-list" "List all installed kernel modules"
+            rx_help_cmd "module-info <module>" "Show full module details"
             rx_help_cmd "modules [names...]" "List kernel module parameters"
             rx_help_cmd "modules-set" "Set a kernel module parameter"
             rx_help_cmd "conflicts" "Check for driver conflicts"
