@@ -1,0 +1,23 @@
+
+  <svg
+          xmlns='http://www.w3.org/2000/svg'
+          width='16'
+          height='16'
+          xmlns:gpa='https://www.gtk.org/grappa'
+          gpa:version='1'
+          gpa:state='0'
+          gpa:keywords='night light bulb lamp'>
+    <path
+            id='bulb'
+            fill='none'
+            stroke='url("#gpa:foreground") currentColor'
+            stroke-width='2'
+            stroke-linecap='round'
+            stroke-linejoin='round'
+            d='M 8 1.5 C 5.2385771 1.5 3 3.7385771 3 6.5 C 3 8.1844093 3.8656243 9.6774587 5.1660156 10.549805 C 5.5371589 10.799183 5.7938452 11.112295 5.9003906 11.466797 L 6 11.75 C 6 12.4403559 6.5596441 13 7.25 13 L 8.75 13 C 9.4403559 13 10 12.4403559 10 11.75 L 10 11.466797 C 10.106155 11.112295 10.362841 10.799183 10.833984 10.549805 C 12.134376 9.6774587 13 8.1844093 13 6.5 C 13 3.7385771 10.761423 1.5 8 1.5 Z M 7.25 14.5 L 8.75 14.5'
+            class='transparent-fill foreground-stroke'
+            gpa:stroke-width='0.5 2 3'
+            gpa:stroke='foreground'
+            gpa:fill='none'>
+    </path>
+  </svg>

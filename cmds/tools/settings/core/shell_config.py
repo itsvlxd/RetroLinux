@@ -314,7 +314,6 @@ NOTCH_DEFAULTS: dict = {
     "disableHoverExpansion": True,
     "noMediaDisplay": "userHost",
     "customText": "RetroLinux",
-    "quickshareEnabled": False,
 }
 
 
@@ -335,6 +334,7 @@ def save_notch(data: dict) -> None:
 # Mirrors ``modules/retroshell/files/config/defaults/workspaces.js`` and the
 # JsonAdapter defaults in ``Config.qml`` (lines ~587-593).
 WORKSPACES_DEFAULTS: dict = {
+    "enabled": True,
     "shown": 10,
     "showAppIcons": True,
     "alwaysShowNumbers": False,
@@ -520,6 +520,7 @@ PERFORMANCE_DEFAULTS: dict = {
     "windowPreview": True,
     "wavyLine": True,
     "rotateCoverArt": True,
+    "showCoverArt": True,
     "dashboardPersistTabs": True,
     "dashboardMaxPersistentTabs": 2,
 }
@@ -544,6 +545,7 @@ def save_performance(data: dict) -> None:
 # user presets live under the shell config dir at ``presets/``.
 _PRESET_FILES = (
     "bar.json",
+    "dashboard.json",
     "desktop.json",
     "dock.json",
     "compositor.json",
@@ -686,12 +688,19 @@ def rename_preset(old_name: str, new_name: str) -> None:
 
 
 def update_preset(preset: dict) -> None:
-    """Overwrite a user preset's files with current shell config."""
+    """Overwrite a user preset's files with current shell config.
+
+    Copies every managed file present in the live config into the preset,
+    creating any that the preset doesn't already have (e.g. a newly-added
+    config file such as ``dashboard.json``) so presets stay complete and in
+    sync after the list of managed files grows.
+    """
     dst = Path(preset["path"])
     src = shell_config_dir()
+    dst.mkdir(parents=True, exist_ok=True)
     for f in _PRESET_FILES:
         s = src / f
-        if s.exists() and (dst / f).exists():
+        if s.exists():
             shutil.copy2(s, dst / f)
 
 
@@ -761,3 +770,32 @@ def load_tools() -> dict:
 
 def save_tools(data: dict) -> None:
     save_shell_json("tools", data)
+
+
+# ── dashboard.json ───────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/dashboard.js`` and the
+# JsonAdapter defaults in ``Config.qml``. Controls the dashboard launcher
+# tab: the horizontal order of the widget groups and the QuickControls
+# hot-action buttons. Groups are all reorderable but never removable; the
+# QuickControls buttons can be added/removed down to DASHBOARD_MIN_CONTROLS.
+DASHBOARD_WIDGET_IDS = ("player", "quickactions", "notifications", "controls")
+DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight")
+DASHBOARD_MIN_CONTROLS = 5
+
+DASHBOARD_DEFAULTS: dict = {
+    "widgetOrder": list(DASHBOARD_WIDGET_IDS),
+    "controlOrder": list(DASHBOARD_CONTROL_IDS),
+}
+
+
+def dashboard_path() -> Path:
+    return shell_config_dir() / "dashboard.json"
+
+
+def load_dashboard() -> dict:
+    return load_shell_json("dashboard", DASHBOARD_DEFAULTS)
+
+
+def save_dashboard(data: dict) -> None:
+    save_shell_json("dashboard", data)

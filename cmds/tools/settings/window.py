@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from settings.pages.bluetooth import BluetoothPage
     from settings.pages.changelog import ChangelogPage
     from settings.pages.daemon import DaemonPage
+    from settings.pages.shell_dashboard import ShellDashboardPage
     from settings.pages.disk import DiskPage
     from settings.pages.env_vars import EnvVarsPage
     from settings.pages.fonts import FontsPage
@@ -532,6 +533,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.bluetooth", "BluetoothPage", "_bluetooth_page", "bluetooth", "Bluetooth"),
             ("settings.pages.network", "NetworkPage", "_network_page", "network", "Network"),
             ("settings.pages.daemon", "DaemonPage", "_daemon_page", "daemon", "Daemon"),
+            ("settings.pages.shell_dashboard", "ShellDashboardPage", "_shell_dashboard_page", "shell_dashboard", "Dashboard"),
             ("settings.pages.disk", "DiskPage", "_disk_page", "disks", "Disks"),
             ("settings.pages.driver", "DriverPage", "_driver_page", "driver", "Drivers"),
             ("settings.pages.fonts", "FontsPage", "_fonts_page", "fonts", "Fonts"),
@@ -975,6 +977,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         shell_overview_page = getattr(self, "_shell_overview_page", None)
         if shell_overview_page is not None and shell_overview_page.is_dirty():
             counts["shell_overview"] = 1
+        dashboard_page = getattr(self, "_shell_dashboard_page", None)
+        if dashboard_page is not None and dashboard_page.is_dirty():
+            counts["dashboard"] = 1
         misc_page = getattr(self, "_misc_page", None)
         if misc_page is not None and misc_page.is_dirty():
             counts["misc"] = 1
@@ -1263,6 +1268,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls_name == "DaemonPage":
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name == "ShellDashboardPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
@@ -1852,7 +1861,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             "_shell_bar_page", "_shell_frame_page", "_shell_theme_page",
             "_shell_dock_page", "_shell_desktop_page", "_shell_lock_page",
             "_shell_notch_page", "_shell_overview_page", "_shell_sidebar_page",
-            "_shell_workspaces_page", "_misc_page",
+            "_shell_workspaces_page", "_misc_page", "_shell_dashboard_page",
         )
         for attr in pages:
             page = getattr(self, attr, None)
