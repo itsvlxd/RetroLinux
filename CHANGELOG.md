@@ -1,3 +1,20 @@
+# [1.4.0](https://github.com/itsvlxd/RetroLinux/compare/v1.3.0...v1.4.0) (2026-08-17)
+
+
+### Features
+
+* **driver:** add gpu specific driver detection ([b9d25be](https://github.com/itsvlxd/RetroLinux/commit/b9d25be8974ce7159fc5bb775eb091172348a4ec))
+* **driver:** add support for modprobe drivers ([08ccb25](https://github.com/itsvlxd/RetroLinux/commit/08ccb25d2d7f8ed4836cdd4827fd75b098e3a420))
+* **lib:** add wallpaper gif cache generation ([c458dee](https://github.com/itsvlxd/RetroLinux/commit/c458deec5e9b8001fed8bf4a6e8098382db8b429))
+* **retro:** add default hl gesture ([ed7ac81](https://github.com/itsvlxd/RetroLinux/commit/ed7ac8159aaee174edacec9f82cb34fe7475a152))
+* **retro:** add driver modprobe, wallpaper gif preview and touchpad gesture ([#8](https://github.com/itsvlxd/RetroLinux/issues/8)) ([f0774e7](https://github.com/itsvlxd/RetroLinux/commit/f0774e76d9d8bba2343433cf154552b93df0a123))
+* **retroshell:** add support for animated wallpapers preview ([391dffc](https://github.com/itsvlxd/RetroLinux/commit/391dffcdc991819e3d2c6427ca06c8e2b2db2a59))
+* **settings:** add driver modprobe management ([cef2b1b](https://github.com/itsvlxd/RetroLinux/commit/cef2b1b462af88b1d0501e2423b89e6caa575cb1))
+* **settings:** add driver optional install ([b4c6171](https://github.com/itsvlxd/RetroLinux/commit/b4c6171b6b2e551317dd406149699f3c77009eed))
+* **settings:** add wallpapers live preview\ ([65f996c](https://github.com/itsvlxd/RetroLinux/commit/65f996cd324de0b3bb5dcfd54b0f8cf1f9067719))
+* **tests:** add driver mapping test ([4d3dc95](https://github.com/itsvlxd/RetroLinux/commit/4d3dc9558626686deb234dd705f979a0a95ba81a))
+* **wallpapers:** add wallpaper preview, pagination & filtering ([a4da4be](https://github.com/itsvlxd/RetroLinux/commit/a4da4be30373e8632bf84d12fe3b7ef61482da29))
+
 # [1.3.0](https://github.com/itsvlxd/RetroLinux/compare/v1.2.0...v1.3.0) (2026-08-16)
 
 
