@@ -47,6 +47,8 @@ class ShellWorkspacesPage:
             title="Workspaces",
             description="Appearance and behaviour of workspace indicators in the shell.",
         )
+        self._add_switch(group, "enabled", "Enabled",
+                         subtitle="Show the workspace indicators in the shell bar")
         self._add_spin(group, "shown", "Shown",
                        lower=1, upper=20, suffix="",
                        subtitle="Number of workspace indicators to display")
@@ -184,6 +186,7 @@ class ShellWorkspacesPage:
         for key in self._rows:
             if self._data.get(key) != self._saved.get(key):
                 label = {
+                    "enabled": "Enabled",
                     "shown": "Shown",
                 }.get(key, "Workspaces setting")
                 changed.append(label)
