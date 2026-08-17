@@ -371,6 +371,7 @@ Item {
 
                         Workspaces {
                             orientation: root.orientation
+                            visible: (Config.workspaces && Config.workspaces.enabled !== false)
                             bar: QtObject {
                                 property var screen: root.screen
                             }
@@ -672,6 +673,7 @@ Item {
                                 Workspaces {
                                     id: workspacesVert
                                     orientation: root.orientation
+                                    visible: (Config.workspaces && Config.workspaces.enabled !== false)
                                     bar: QtObject {
                                         property var screen: root.screen
                                     }

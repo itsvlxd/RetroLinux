@@ -5,6 +5,7 @@ var data = {
     "windowPreview": true,
     "wavyLine": true,
     "rotateCoverArt": true,
+    "showCoverArt": true,
     "dashboardPersistTabs": false,
     "dashboardMaxPersistentTabs": 2
 }
