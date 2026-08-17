@@ -1839,6 +1839,26 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._refresh_all_modified_indicators()
         self._schedule_pending_refresh()
 
+    def reload_shell_pages_after_preset(self) -> None:
+        """Re-read shell configs into the settings pages after a preset applies.
+
+        Applying a preset copies the shell's JSON config files, which the
+        shell picks up live via its FileView watchers. The settings pages
+        cache their values, so refresh any already-built page so its rows
+        reflect the newly applied preset without a restart. Pages that were
+        never opened load fresh when first shown.
+        """
+        pages = (
+            "_shell_bar_page", "_shell_frame_page", "_shell_theme_page",
+            "_shell_dock_page", "_shell_desktop_page", "_shell_lock_page",
+            "_shell_notch_page", "_shell_overview_page", "_shell_sidebar_page",
+            "_shell_workspaces_page", "_misc_page",
+        )
+        for attr in pages:
+            page = getattr(self, attr, None)
+            if page is not None and hasattr(page, "reload_from_disk"):
+                page.reload_from_disk()
+
     # -- Auto-save --
 
     def set_auto_save(self, value: bool) -> None:

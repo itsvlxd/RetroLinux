@@ -298,7 +298,13 @@ class ShellBarPage:
         self._data[key] = value
         self._notify_dirty()
 
+    def _write_live(self) -> None:
+        current = load_bar()
+        current.update({key: self._data.get(key, BAR_DEFAULTS[key]) for key in self._rows})
+        save_bar(current)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
 
@@ -321,6 +327,16 @@ class ShellBarPage:
         self._data = dict(self._saved)
         for mrow in self._rows.values():
             mrow.discard()
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read bar.json (e.g. after applying a preset) and sync widgets."""
+        self._data = load_bar()
+        self._saved = dict(self._data)
+        for key, mrow in self._rows.items():
+            value = self._data.get(key, BAR_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
 
     # ── Pending changes ──
 

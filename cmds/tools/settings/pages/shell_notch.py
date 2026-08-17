@@ -275,7 +275,11 @@ class ShellNotchPage:
         visible = self._data.get("noMediaDisplay", NOTCH_DEFAULTS["noMediaDisplay"]) == "custom"
         row.row.set_visible(visible)
 
+    def _write_live(self) -> None:
+        save_notch(self._data)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
 
@@ -311,6 +315,17 @@ class ShellNotchPage:
         self._data = dict(self._saved)
         for mrow in self._rows.values():
             mrow.discard()
+        self._refresh_custom_text_visible()
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read notch.json (e.g. after applying a preset) and sync widgets."""
+        self._data = load_notch()
+        self._saved = dict(self._data)
+        for key, mrow in self._rows.items():
+            value = self._data.get(key, NOTCH_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
         self._refresh_custom_text_visible()
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:

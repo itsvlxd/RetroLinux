@@ -641,7 +641,7 @@ def apply_preset(preset: dict) -> None:
     af.write_text(preset["name"] + "\n")
 
 
-def save_preset(name: str) -> None:
+def save_preset(name: str, author: str = "", author_url: str = "") -> None:
     """Create a new user preset from the current shell config."""
     dst_dir = user_presets_dir() / name
     dst_dir.mkdir(parents=True, exist_ok=True)
@@ -651,7 +651,13 @@ def save_preset(name: str) -> None:
         if s.exists():
             shutil.copy2(s, dst_dir / f)
     info = dst_dir / "info.json"
-    info.write_text(json.dumps({"author": "User", "authorUrl": ""}, indent=2) + "\n")
+    info.write_text(
+        json.dumps(
+            {"author": author or "User", "authorUrl": author_url or ""},
+            indent=2,
+        )
+        + "\n"
+    )
 
 
 def delete_preset(name: str) -> None:

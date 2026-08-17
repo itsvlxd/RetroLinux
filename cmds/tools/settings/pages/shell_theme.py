@@ -908,7 +908,11 @@ class ShellThemePage:
         self._data[key] = value
         self._notify_dirty()
 
+    def _write_live(self) -> None:
+        save_theme(self._data)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._preview is not None:
             self._preview.queue_draw()
         if self._on_dirty_changed is not None:
@@ -952,6 +956,19 @@ class ShellThemePage:
         for _vk, _f, _i, mrow in list(self._stops_rows):
             mrow.discard()
         self._rebuild_variant_editor()
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read theme.json (e.g. after applying a preset) and sync widgets."""
+        self._data = load_theme()
+        self._saved = deepcopy(self._data)
+        for key, mrow in list(self._rows.items()):
+            value = self._data.get(key, THEME_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
+        self._rebuild_variant_editor()
+        if self._preview is not None:
+            self._preview.queue_draw()
 
     # ── Pending changes ──
 

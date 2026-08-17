@@ -495,7 +495,11 @@ class ShellSidebarPage:
             self._refresh_provider_ui()
         self._notify_dirty()
 
+    def _write_live(self) -> None:
+        save_ai(self._data)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
 
@@ -516,6 +520,17 @@ class ShellSidebarPage:
         self._data = dict(self._saved)
         for mrow in self._rows.values():
             mrow.discard()
+        self._refresh_provider_ui()
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read ai.json (e.g. after applying a preset) and sync widgets."""
+        self._data = load_ai()
+        self._saved = dict(self._data)
+        for key, mrow in self._rows.items():
+            value = self._data.get(key, AI_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
         self._refresh_provider_ui()
 
     # ══  Pending changes  ══

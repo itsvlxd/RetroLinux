@@ -143,7 +143,11 @@ class ShellWorkspacesPage:
         self._data[key] = value
         self._notify_dirty()
 
+    def _write_live(self) -> None:
+        save_workspaces(self._data)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
 
@@ -162,6 +166,16 @@ class ShellWorkspacesPage:
         self._data = dict(self._saved)
         for mrow in self._rows.values():
             mrow.discard()
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read workspaces.json (e.g. after applying a preset) and sync widgets."""
+        self._data = load_workspaces()
+        self._saved = dict(self._data)
+        for key, mrow in self._rows.items():
+            value = self._data.get(key, WORKSPACES_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:
         if not self.is_dirty():
