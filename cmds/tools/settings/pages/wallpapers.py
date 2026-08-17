@@ -1214,6 +1214,7 @@ class WallpapersPage:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_halign(Gtk.Align.FILL)
         box.set_hexpand(True)
+        box.add_css_class("card-border")
 
         thumb_path = wp.get("thumb", "")
         gif_path = wp.get("gif", "")
