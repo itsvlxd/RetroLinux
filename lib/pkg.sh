@@ -52,13 +52,15 @@ rx_pkg_install() {
             else
                 skipped_pkgs+=("$pkg")
             fi
+        elif ! _pkg_resolves "$pkg"; then
+            skipped_pkgs+=("$pkg")
         else
             missing_pkgs+=("$pkg")
         fi
     done
 
     if [[ ${#skipped_pkgs[@]} -gt 0 ]]; then
-        rx_log "warn" "Skipping AUR packages (will install on first boot): ${PINK}${skipped_pkgs[*]}${RESET}"
+        rx_log "warn" "Skipping unavailable packages (target not found): ${PINK}${skipped_pkgs[*]}${RESET}"
     fi
 
     [[ ${#missing_pkgs[@]} -eq 0 ]] && return 0
@@ -86,8 +88,27 @@ rx_pkg_install() {
     fi
 
     if [[ $sudo_run == "true" && $EUID -ne 0 ]]; then
-        sudo bash -c "$install_cmd ${missing_pkgs[*]}"
+        if ! sudo bash -c "$install_cmd ${missing_pkgs[*]}"; then
+            rx_log "warn" "Some packages failed to install, continuing anyway: ${PINK}${missing_pkgs[*]}${RESET}"
+        fi
     else
-        $install_cmd "${missing_pkgs[@]}"
+        if ! $install_cmd "${missing_pkgs[@]}"; then
+            rx_log "warn" "Some packages failed to install, continuing anyway: ${PINK}${missing_pkgs[*]}${RESET}"
+        fi
+    fi
+}
+
+_pkg_resolves() {
+    local pkg="$1"
+    if [[ $RETRO_CHROOT == "true" || $EUID -eq 0 ]]; then
+        pacman -Si "$pkg" >/dev/null 2>&1
+        return $?
+    fi
+    local helper
+    helper=$(get_var "PKG_HELPER" "yay")
+    if command -v "$helper" >/dev/null 2>&1; then
+        $helper -Si "$pkg" >/dev/null 2>&1
+    else
+        pacman -Si "$pkg" >/dev/null 2>&1
     fi
 }
