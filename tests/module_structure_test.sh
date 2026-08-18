@@ -31,13 +31,16 @@ for mod_dir in "${MODULES_DIRS[@]}"; do
     schema_errors=$(jq -r '
         [
             if .title == null or (.title | type != "string") then "missing title" else empty end,
-            if .type == null or (.type | IN("core", "extra") | not) then "invalid type" else empty end,
-            if .access == null or (.access | IN("user", "root") | not) then "invalid access" else empty end,
-            if .defaults == null or (.defaults | type != "boolean") then "invalid defaults" else empty end,
-            if .mode == null or (.mode | IN("all", "install", "mirror") | not) then "invalid mode (must be all/install/mirror)" else empty end,
-            if .config == null or (.config | type != "string") then "invalid config path" else empty end,
-            if .install == null or (.install | type != "string") then "invalid install path" else empty end,
-            if .overwrite == null or (.overwrite | type != "boolean") then "missing or invalid overwrite (must be boolean)" else empty end
+            if .type != null and (.type | IN("core", "extra") | not) then "invalid type" else empty end,
+            if .access != null and (.access | IN("user", "root") | not) then "invalid access" else empty end,
+            if .defaults != null and (.defaults | type != "boolean") then "invalid defaults" else empty end,
+            if .mode != null and (.mode | IN("all", "install", "mirror") | not) then "invalid mode (must be all/install/mirror)" else empty end,
+            if .config != null and (.config | type != "string") then "invalid config path" else empty end,
+            if .install != null and (.install | type != "string") then "invalid install path" else empty end,
+            if .overwrite != null and (.overwrite | type != "boolean") then "invalid overwrite (must be boolean)" else empty end,
+            if .check != null and (.check | type != "string") then "invalid check" else empty end,
+            if .uninstall_pkgs != null and (.uninstall_pkgs | type != "boolean") then "invalid uninstall_pkgs" else empty end,
+            if .gui != null and (.gui | type != "boolean") then "invalid gui" else empty end
         ] | join(", ")
     ' "$json_file")
 
