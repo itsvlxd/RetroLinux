@@ -38,6 +38,7 @@ from settings.ui.icons import (
     POWER_ICON,
     PRESETS_ICON,
     QUICKSHARE_ICON,
+    SECURITY_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -284,6 +285,7 @@ class Sidebar:
 
         system = new_category("System")
         add_row(system, "users", "Users", USERS_ICON)
+        add_row(system, "security", "Security", SECURITY_ICON)
         add_row(system, "network", "Network", NETWORK_ICON)
         add_row(system, "bluetooth", "Bluetooth", BLUETOOTH_ICON)
         add_row(system, "quickshare", "Quick Share", QUICKSHARE_ICON)

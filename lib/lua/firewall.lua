@@ -15,8 +15,9 @@ local function run_cmd(cmd)
     return result:gsub("%s+$", "")
 end
 
-function Firewall.block_ip(ip)
-    run_bg("bash '" .. core .. "' --insert-block '" .. ip .. "' 1")
+function Firewall.block_ip(ip, reason)
+    reason = reason or "manual"
+    run_bg("bash '" .. core .. "' --block '" .. ip .. "' '" .. reason .. "'")
 end
 
 function Firewall.kill_ssh_sessions(ip)
@@ -24,7 +25,7 @@ function Firewall.kill_ssh_sessions(ip)
 end
 
 function Firewall.get_engine()
-    return run_cmd("bash '" .. core .. "' --engine")
+    return "nftables"
 end
 
 return Firewall

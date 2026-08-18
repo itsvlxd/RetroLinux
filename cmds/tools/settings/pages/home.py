@@ -48,6 +48,7 @@ from settings.ui.icons import (
     POWER_ICON,
     PRESETS_ICON,
     QUICKSHARE_ICON,
+    SECURITY_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -101,6 +102,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("env_vars", "Env Variables", "Environment variables", ENV_VARS_ICON),
     # System
     ("users", "Users", "Create and manage system users", USERS_ICON),
+    ("security", "Security", "Firewall, SSH and login security", SECURITY_ICON),
     ("network", "Network", "Wi-Fi and connections", NETWORK_ICON),
     ("bluetooth", "Bluetooth", "Bluetooth devices", BLUETOOTH_ICON),
     ("quickshare", "Quick Share", "Send and receive from Android Quick Share", QUICKSHARE_ICON),

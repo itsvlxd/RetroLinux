@@ -555,6 +555,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.shell_overview", "ShellOverviewPage", "_shell_overview_page", "shell_overview", "Overview"),
             ("settings.pages.misc", "MiscPage", "_misc_page", "misc", "Miscellaneous"),
             ("settings.pages.shell_presets", "ShellPresetsPage", "_shell_presets_page", "shell_presets", "Presets"),
+            ("settings.pages.security", "SecurityPage", "_security_page", "security", "Security"),
             ("settings.pages.themes", "ThemesPage", "_themes_page", "themes", "Themes"),
             ("settings.pages.wallpapers", "WallpapersPage", "_wallpapers_page", "wallpapers", "Wallpapers"),
             ("settings.pages.users", "UsersPage", "_users_page", "users", "Users"),
@@ -1348,6 +1349,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls_name == "XdgPage":
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name == "SecurityPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

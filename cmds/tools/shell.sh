@@ -21,7 +21,7 @@ cmd_shell() {
             cleaned=1
         fi
         if [[ $cleaned -eq 1 ]]; then
-            rx_log "info" "Killed lingering axctl processes"
+            rx_log "info" "Killed lingering processes"
         fi
     }
 

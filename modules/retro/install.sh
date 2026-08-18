@@ -419,12 +419,32 @@ EOF
     rx_log "success" "Sudoers rule added for retro background tools"
 }
 
+setup_security_sudoers() {
+    # Wheel members toggle the firewall, SSH, and faillock from the
+    # settings Security page without a password prompt. The core scripts
+    # run as root so their internal commands never re-trigger sudo, and
+    # nft/ss/kill are passwordless for the read-only status paths.
+    sudo rm -f /etc/sudoers.d/99-retro-security
+    cat <<EOF | sudo tee /etc/sudoers.d/99-retro-security >/dev/null
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/firewall_core.sh
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/ssh_core.sh
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nft
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/ss
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/kill
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/faillock
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /var/log/retro-firewall-blocked
+EOF
+    sudo chmod 440 /etc/sudoers.d/99-retro-security
+    rx_log "success" "Sudoers rule added for security tools (firewall, SSH, faillock)"
+}
+
 if [[ $SECONDARY_INSTALL != "true" ]]; then
     install_settings_desktop
     setup_theme_sudoers
     setup_sddm_sudoers
     setup_smartctl_sudoers
     setup_nopasswd_tools
+    setup_security_sudoers
     patch_os_release
 
     SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"

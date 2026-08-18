@@ -350,6 +350,68 @@ cmd_ssh() {
             fi
             ;;
 
+        "faillock")
+            local sub="${1,,}"
+            shift
+            case "$sub" in
+                "" | "status")
+                    local data
+                    data=$(bash "$core" --faillock-status 2>/dev/null)
+                    local deny unlock_time even_for_root state
+                    while IFS='=' read -r key val; do
+                        case "$key" in
+                            deny) deny="$val" ;;
+                            unlock_time) unlock_time="$val" ;;
+                            even_for_root) even_for_root="$val" ;;
+                            state) state="$val" ;;
+                        esac
+                    done <<<"$data"
+
+                    local deny_color="$MUTE"
+                    [[ $deny -ge 5 ]] && deny_color="$PINK"
+                    local lock_color="$SUCCESS"
+                    [[ $even_for_root == "true" ]] && lock_color="$WARN"
+
+                    rx_table_header "󰍁" "Faillock (brute-force protection)"
+                    rx_table_row "󰦝" "Max attempts (deny):" "${deny:-5}" "$deny_color" "24"
+                    rx_table_row "󰈐" "Unlock after (s):" "${unlock_time:-600}" "$PINK" "24"
+                    rx_table_row "󰒋" "Lock root too:" "${even_for_root:-false}" "$lock_color" "24"
+                    rx_table_separator
+                    rx_table_row "󰈀" "Status:" "${state:-no locks}" "$MUTE" "24"
+                    rx_table_spacer
+                    ;;
+                "reset")
+                    local result
+                    result=$(bash "$core" --faillock-reset 2>/dev/null)
+                    if echo "$result" | grep -q "^OK|"; then
+                        rx_log "success" "Failed login attempts reset"
+                    else
+                        rx_log "error" "Failed to reset faillock"
+                        return 1
+                    fi
+                    ;;
+                "set")
+                    local key="$1" value="$2"
+                    if [[ -z $key || -z $value ]]; then
+                        rx_log "error" "Usage: retro ssh faillock set <deny|unlock_time|even_for_root> <value>"
+                        return 1
+                    fi
+                    local result
+                    result=$(bash "$core" --faillock-set "$key" "$value" 2>/dev/null)
+                    if echo "$result" | grep -q "^OK|"; then
+                        rx_log "success" "faillock ${key} set to ${PINK}${value}${RESET}"
+                    else
+                        rx_log "error" "Failed to set faillock ${key}"
+                        return 1
+                    fi
+                    ;;
+                *)
+                    rx_log "error" "Usage: retro ssh faillock [status|reset|set <key> <value>]"
+                    return 1
+                    ;;
+            esac
+            ;;
+
         "logs")
             local lines="${1:-50}"
             bash "$core" --logs "$lines" 2>/dev/null
@@ -423,6 +485,9 @@ cmd_ssh() {
             rx_help_cmd "logs [lines]" "Tail SSH daemon logs" 24
             rx_help_cmd "known-hosts" "List known remote hosts" 24
             rx_help_cmd "users" "List users who can SSH in" 24
+            rx_help_cmd "faillock" "Show brute-force protection status" 24
+            rx_help_cmd "faillock reset" "Reset failed login attempts" 24
+            rx_help_cmd "faillock set <key> <val>" "Change faillock settings" 24
             rx_help_spacer
             rx_help_examples
             rx_help_example "retro ssh status" "Show full SSH status" "38"
@@ -442,4 +507,4 @@ cmd_ssh() {
     esac
 }
 
-register_command "TOOLS" "ssh" "OpenSSH daemon management and session monitoring" "cmd_ssh"
+register_command "TOOLS" "ssh" "OpenSSH daemon management, sessions, keys, and faillock" "cmd_ssh"

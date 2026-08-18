@@ -101,6 +101,38 @@ TOOLBOX_DEFAULT_ORDER: list = [
 
 TOOLBOX_MIN_ITEMS = 5
 
+# Bar items that can be reordered / shown-hide on each side of the shell bar.
+# Mirrors the components rendered in ``BarContent.qml``. Weather is part of the
+# Clock widget (symbol + temperature), so it is not a standalone item.
+BAR_LEFT_ITEMS: dict = {
+    "launcher": ("Launcher", "Open the app launcher", "start-here-symbolic"),
+    "workspaces": ("Workspaces", "Switch between workspaces", "view-grid-symbolic"),
+    "layout": ("Layout Selector", "Change the tiling layout", "view-list-symbolic"),
+    "pin": ("Pin Button", "Pin or unpin the bar", "pin-symbolic"),
+}
+
+BAR_RIGHT_ITEMS: dict = {
+    "presets": ("Presets", "Open the presets manager", "emblem-system-symbolic"),
+    "tools": ("Toolbox", "Open the tools menu", "applications-utilities-symbolic"),
+    "tray": ("System Tray", "Show StatusNotifier tray icons", "emblem-system-symbolic"),
+    "wifi": ("Wi-Fi", "Open the Wi-Fi panel", "network-wireless-symbolic"),
+    "bluetooth": ("Bluetooth", "Open the Bluetooth panel", "bluetooth-symbolic"),
+    "quickshare": ("Quick Share", "Open the Quick Share panel", "emblem-shared-symbolic"),
+    "controls": ("Audio Controls", "Volume, brightness and microphone", "audio-speakers-symbolic"),
+    "battery": ("Battery", "Show battery level", "battery-symbolic"),
+    "clock": ("Clock & Weather", "Time, date, calendar and weather", "clock-symbolic"),
+    "power": ("Power Button", "Open the power menu", "system-shutdown-symbolic"),
+}
+
+# Default left/right order mirrors the hardcoded layout in BarContent.qml.
+BAR_LEFT_DEFAULT_ORDER: list = ["launcher", "workspaces", "layout", "pin"]
+BAR_RIGHT_DEFAULT_ORDER: list = [
+    "presets", "tools", "tray", "wifi", "bluetooth",
+    "quickshare", "controls", "battery", "clock", "power",
+]
+
+BAR_MIN_ITEMS = 3
+
 # Mirrors ``modules/retroshell/files/config/defaults/bar.js`` and the
 # JsonAdapter defaults in ``Config.qml`` (lines ~528-549).
 BAR_DEFAULTS: dict = {
@@ -134,6 +166,8 @@ BAR_DEFAULTS: dict = {
     "showBluetoothPopup": False,
     "showQuickSharePopup": False,
     "toolboxOrder": list(TOOLBOX_DEFAULT_ORDER),
+    "barLeftOrder": list(BAR_LEFT_DEFAULT_ORDER),
+    "barRightOrder": list(BAR_RIGHT_DEFAULT_ORDER),
 }
 
 
