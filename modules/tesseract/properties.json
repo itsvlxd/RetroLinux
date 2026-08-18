@@ -1,0 +1,11 @@
+{
+    "title": "Tesseract",
+    "description": "OCR text recognition via tesseract — extract text from images and screenshots",
+    "type": "extra",
+    "access": "user",
+    "defaults": false,
+    "mode": "install",
+    "check": "tesseract",
+    "uninstall_pkgs": true,
+    "overwrite": false
+}
