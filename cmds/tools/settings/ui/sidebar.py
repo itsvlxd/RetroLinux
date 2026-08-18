@@ -150,6 +150,7 @@ class Sidebar:
         toolbar.add_top_bar(header)
 
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content.add_css_class("retro-sidebar")
         content.append(self._search_entry)
 
         scrolled = Gtk.ScrolledWindow()
