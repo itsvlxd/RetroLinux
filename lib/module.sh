@@ -79,6 +79,22 @@ get_module_overwrite() {
     rx_get_json "$json_file" "overwrite" "false" 2>/dev/null
 }
 
+get_module_check() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    rx_get_json "$json_file" "check" "" 2>/dev/null
+}
+
+get_module_uninstall_pkgs() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    rx_get_json "$json_file" "uninstall_pkgs" "false" 2>/dev/null
+}
+
 get_module_gui() {
     local name="$1"
     local mod_path="$RETRO_DIR/modules/$name"
@@ -259,6 +275,10 @@ execute_logic() {
         fi
     else
         run_default_task "$type" "$name"
+    fi
+
+    if [[ $type == "uninstall" && $(get_module_uninstall_pkgs "$name") == "true" && -f "$mod_path/packages.sh" ]]; then
+        rx_pkg_uninstall "$mod_path/packages.sh"
     fi
 
     [[ -f $post_hook ]] && (cd "$mod_path" && bash "./post.sh" "$type")
