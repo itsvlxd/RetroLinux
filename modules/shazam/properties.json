@@ -1,0 +1,11 @@
+{
+    "title": "Shazam",
+    "description": "Shazam music recognition via songrec — identify songs playing around you",
+    "type": "extra",
+    "access": "user",
+    "defaults": false,
+    "mode": "install",
+    "check": "songrec",
+    "uninstall_pkgs": true,
+    "overwrite": false
+}
