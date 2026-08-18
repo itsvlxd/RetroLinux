@@ -12,18 +12,30 @@ persisted on Save, exactly like the other standalone pages.
 """
 
 from collections.abc import Iterable
+import shutil
 from typing import TYPE_CHECKING
 
 from gi.repository import Adw, Gtk
 
 from settings.core.pending import PendingChange
-from settings.core.shell_config import BAR_DEFAULTS, load_bar, save_bar
-from settings.ui import clear_children, make_page_layout
+from settings.core.shell_config import (
+    BAR_DEFAULTS,
+    TOOLBOX_ITEMS,
+    TOOLBOX_MIN_ITEMS,
+    load_bar,
+    save_bar,
+)
+from settings.ui import make_page_layout
 from settings.ui.icons import BAR_ICON
 from settings.ui.managed_row import ManagedRow, make_combo_row, make_spin_int_row
+from settings.ui.reorder import RowReorderController
 
 if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
+
+
+def _which(binary: str) -> bool:
+    return shutil.which(binary) is not None
 
 # (key, config default) pairs rendered as an Adw.SwitchRow
 _SWITCH_KEYS = (
@@ -66,6 +78,17 @@ class ShellBarPage:
         self._saved = dict(self._data)
         self._rows: dict[str, ManagedRow] = {}
 
+        # Toolbox order (persisted in bar.json)
+        self._tools_order: list[str] = list(
+            self._data.get("toolboxOrder") or list(TOOLBOX_ITEMS)
+        )
+        self._saved_tools_order: list[str] = list(self._tools_order)
+        self._toolbox_rows: list[Adw.ActionRow] = []
+        self._toolbox_group: Adw.PreferencesGroup | None = None
+        self._toolbox_reorder = RowReorderController(
+            move=self._move_toolbox, iter_rows=lambda: self._toolbox_rows
+        )
+
     # ── Build ──
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
@@ -78,6 +101,9 @@ class ShellBarPage:
         )
         self._build_bar_group(bar_group)
         content_box.append(bar_group)
+
+        self._build_toolbox()
+        content_box.append(self._toolbox_group)
 
         autohide_group = Adw.PreferencesGroup(
             title="Auto-hide",
@@ -133,6 +159,130 @@ class ShellBarPage:
                          subtitle="Show a button to pin the bar")
         self._add_switch(group, "availableOnFullscreen", "Available on Fullscreen",
                          subtitle="Keep the bar visible over fullscreen apps")
+
+    # ── Toolbox ──
+
+    def _build_toolbox(self) -> None:
+        self._toolbox_group = Adw.PreferencesGroup(
+            title="Toolbox",
+            description="Order of the tools shown in the shell toolbox menu. "
+                        "Items whose package isn't installed are greyed out but stay draggable.",
+        )
+        add_btn = Gtk.Button(icon_name="list-add-symbolic")
+        add_btn.set_valign(Gtk.Align.CENTER)
+        add_btn.add_css_class("flat")
+        add_btn.set_tooltip_text("Add a toolbox item or separator")
+        add_btn.connect("clicked", self._on_add_toolbox)
+        self._toolbox_group.set_header_suffix(add_btn)
+        self._rebuild_toolbox()
+
+    def _rebuild_toolbox(self, focus_idx: int = -1) -> None:
+        if self._toolbox_group is None:
+            return
+        group = self._toolbox_group
+        for row in self._toolbox_rows:
+            group.remove(row)
+        self._toolbox_rows = []
+
+        for idx, tid in enumerate(self._tools_order):
+            if tid == "separator":
+                title, sub, icon_name = "Separator", "Visual divider", "view-fullscreen-symbolic"
+                unavailable = False
+            else:
+                title, sub, icon_name, pkg = TOOLBOX_ITEMS.get(tid, (tid, "", "view-list-symbolic", None))
+                unavailable = pkg is not None and not _which(pkg)
+                if unavailable:
+                    sub = f"Requires {pkg} (not installed)"
+
+            row = Adw.ActionRow(title=title, subtitle=sub)
+            row.set_subtitle_lines(2)
+
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            icon.set_pixel_size(24)
+            icon.add_css_class("dim-label")
+            row.add_prefix(icon)
+
+            if unavailable:
+                row.set_opacity(0.55)
+                row.add_css_class("toolbox-unavailable")
+
+            handle = Gtk.Image.new_from_icon_name("drag-handle-symbolic")
+            handle.set_opacity(0.5)
+            handle.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(handle)
+
+            remove_btn = Gtk.Button(icon_name="user-trash-symbolic")
+            remove_btn.set_valign(Gtk.Align.CENTER)
+            remove_btn.add_css_class("flat")
+            remove_btn.set_tooltip_text("Remove from toolbox")
+            remove_btn.set_sensitive(len(self._tools_order) > TOOLBOX_MIN_ITEMS)
+            remove_btn.connect("clicked", lambda _b, i=idx: self._on_remove_toolbox(i))
+            row.add_suffix(remove_btn)
+
+            self._toolbox_reorder.attach(row, idx)
+            group.add(row)
+            self._toolbox_rows.append(row)
+
+        if focus_idx >= 0 and focus_idx < len(self._toolbox_rows):
+            self._toolbox_rows[focus_idx].grab_focus()
+
+    def _move_toolbox(self, src: int, dst: int) -> bool:
+        n = len(self._tools_order)
+        if dst == src or not (0 <= src < n and 0 <= dst < n):
+            return False
+        item = self._tools_order.pop(src)
+        self._tools_order.insert(dst, item)
+        self._notify_dirty()
+        self._rebuild_toolbox(dst)
+        return True
+
+    def _on_add_toolbox(self, _btn=None) -> None:
+        available = [tid for tid in list(TOOLBOX_ITEMS) + ["separator"] if tid not in self._tools_order]
+        if not available:
+            self._window.show_toast("All toolbox items are already present", timeout=2)
+            return
+
+        labels = []
+        for tid in available:
+            if tid == "separator":
+                labels.append("Separator")
+            else:
+                labels.append(TOOLBOX_ITEMS[tid][0])
+
+        group = Adw.PreferencesGroup()
+        combo = Adw.ComboRow(title="Toolbox item")
+        combo.set_model(Gtk.StringList.new(labels))
+        combo.set_selected(0)
+        group.add(combo)
+
+        dialog = Adw.AlertDialog(heading="Add Toolbox Item", extra_child=group)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("add", "Add")
+        dialog.set_default_response("add")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "add":
+                return
+            idx = combo.get_selected()
+            if 0 <= idx < len(labels):
+                tid = available[idx]
+                self._tools_order.append(tid)
+                self._notify_dirty()
+                self._rebuild_toolbox()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    def _on_remove_toolbox(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._tools_order):
+            return
+        if len(self._tools_order) <= TOOLBOX_MIN_ITEMS:
+            self._window.show_toast(f"Keep at least {TOOLBOX_MIN_ITEMS} items", timeout=2)
+            return
+        del self._tools_order[idx]
+        self._notify_dirty()
+        self._rebuild_toolbox()
 
     # ── Row builders ──
 
@@ -301,6 +451,7 @@ class ShellBarPage:
     def _write_live(self) -> None:
         current = load_bar()
         current.update({key: self._data.get(key, BAR_DEFAULTS[key]) for key in self._rows})
+        current["toolboxOrder"] = list(self._tools_order)
         save_bar(current)
 
     def _notify_dirty(self) -> None:
@@ -311,22 +462,25 @@ class ShellBarPage:
     # ── Lifecycle ──
 
     def is_dirty(self) -> bool:
-        return any(self._data.get(key) != self._saved.get(key) for key in self._rows)
+        return (any(self._data.get(key) != self._saved.get(key) for key in self._rows)
+                or self._tools_order != self._saved_tools_order)
 
     def mark_saved(self) -> None:
-        if not self.is_dirty():
-            return
         current = load_bar()
         current.update({key: self._data.get(key, BAR_DEFAULTS[key]) for key in self._rows})
+        current["toolboxOrder"] = list(self._tools_order)
         save_bar(current)
         self._saved = dict(current)
         for key, mrow in self._rows.items():
             mrow.set_baseline(self._saved.get(key, BAR_DEFAULTS[key]))
+        self._saved_tools_order = list(self._tools_order)
 
     def discard(self) -> None:
         self._data = dict(self._saved)
         for mrow in self._rows.values():
             mrow.discard()
+        self._tools_order = list(self._saved_tools_order)
+        self._rebuild_toolbox()
         self._write_live()
 
     def reload_from_disk(self) -> None:
@@ -337,6 +491,9 @@ class ShellBarPage:
             value = self._data.get(key, BAR_DEFAULTS[key])
             mrow.apply_value(value)
             mrow.set_baseline(value)
+        self._tools_order = list(self._data.get("toolboxOrder") or list(TOOLBOX_ITEMS))
+        self._saved_tools_order = list(self._tools_order)
+        self._rebuild_toolbox()
 
     # ── Pending changes ──
 
@@ -357,6 +514,8 @@ class ShellBarPage:
                     "showQuickSharePopup": "Show Quick Share Button",
                 }.get(key, "Bar setting")
                 changed.append(label)
+        if self._tools_order != self._saved_tools_order:
+            changed.append("Toolbox")
         if changed:
             yield PendingChange(
                 category="Shell Bar",
@@ -378,6 +537,9 @@ class ShellBarPage:
             {"key": "shell_bar:autohide", "label": "Bar Auto-hide",
              "description": "Pin, hover-to-reveal, fullscreen behaviour",
              "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Auto-hide"},
+            {"key": "shell_bar:toolbox", "label": "Toolbox",
+             "description": "Order and availability of the shell toolbox tools",
+             "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Toolbox"},
         ]
 
 

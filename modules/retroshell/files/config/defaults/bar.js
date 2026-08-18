@@ -28,5 +28,6 @@ var data = {
     "batteryStyle": "arch",
     "showWifiPopup": false,
     "showBluetoothPopup": false,
-    "showQuickSharePopup": false
+    "showQuickSharePopup": false,
+    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
 }

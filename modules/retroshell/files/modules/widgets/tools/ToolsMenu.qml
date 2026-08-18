@@ -51,61 +51,48 @@ ActionGrid {
     iconSize: 20
     spacing: 8
 
-    actions: {
-        const base = [
-            {
-                icon: Icons.camera,
-                tooltip: "Screenshot",
-                command: ""
-            },
-            {
-                icon: Icons.screenshots,
-                tooltip: "Open Screenshots",
-                command: ""
-            },
-            {
-                type: "separator"
-            },
-            recordAction,
-            {
-                icon: Icons.recordings,
-                tooltip: "Open Recordings",
-                command: ""
-            },
-            {
-                type: "separator"
-            },
-            {
-                icon: Icons.picker,
-                tooltip: "Color Picker",
-                command: ""
-            },
-            {
-                icon: Icons.qrCode,
-                tooltip: "QR Code",
-                command: ""
-            },
-            {
-                icon: Icons.google,
-                tooltip: "Google Lens",
-                command: ""
-            },
-            {
+    function itemFor(id) {
+        switch (id) {
+        case "separator":
+            return { type: "separator" };
+        case "screenshot":
+            return { icon: Icons.camera, tooltip: "Screenshot", command: "" };
+        case "screenshots":
+            return { icon: Icons.screenshots, tooltip: "Open Screenshots", command: "" };
+        case "recorder":
+            return recordAction;
+        case "recordings":
+            return { icon: Icons.recordings, tooltip: "Open Recordings", command: "" };
+        case "colorpicker":
+            return { icon: Icons.picker, tooltip: "Color Picker", command: "" };
+        case "ocr":
+            return Tesseract.available ? ocrAction : null;
+        case "qr":
+            return { icon: Icons.qrCode, tooltip: "QR Code", command: "" };
+        case "lens":
+            return { icon: Icons.google, tooltip: "Google Lens", command: "" };
+        case "shazam":
+            return Shazam.available ? shazamAction : null;
+        case "webcam":
+            return {
                 icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
                 tooltip: "Webcam Overlay",
                 command: ""
-            }
-        ];
+            };
+        }
+        return null;
+    }
 
-        if (Tesseract.available) {
-            const pickerIdx = base.findIndex(a => a && a.tooltip === "Color Picker");
-            base.splice(pickerIdx + 1, 0, ocrAction);
+    actions: {
+        const order = (Config.bar && Config.bar.toolboxOrder)
+            ? Config.bar.toolboxOrder : ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"];
+        const result = [];
+        for (let i = 0; i < order.length; i++) {
+            const item = itemFor(order[i]);
+            if (item)
+                result.push(item);
         }
-        if (Shazam.available) {
-            const webcamIdx = base.findIndex(a => a && a.tooltip === "Webcam Overlay");
-            base.splice(webcamIdx, 0, shazamAction);
-        }
-        return base;
+        return result;
     }
 
     Process {

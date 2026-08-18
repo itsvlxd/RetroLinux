@@ -561,6 +561,7 @@ Singleton {
             property bool showWifiPopup: false
             property bool showBluetoothPopup: false
             property bool showQuickSharePopup: false
+            property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
         }
     }
 

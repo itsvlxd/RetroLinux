@@ -17,4 +17,6 @@ QtObject {
     function recheck() {
         probeProcess.running = true
     }
+
+    Component.onCompleted: probeProcess.running = true
 }

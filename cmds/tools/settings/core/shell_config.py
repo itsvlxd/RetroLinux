@@ -75,6 +75,32 @@ def save_shell_json(name: str, data: dict) -> None:
 
 # ── bar.json ────────────────────────────────────────────────────────────
 
+# Toolbox items shown in the shell's ToolsMenu (``ToolsMenu.qml``).
+# ``package`` names the binary whose presence enables the tool; when it is
+# missing the tool greys out in the settings page (but stays draggable) and
+# the shell skips it until the package is installed.
+TOOLBOX_ITEMS: dict = {
+    "screenshot": ("Screenshot", "Capture the whole screen", "camera-photo-symbolic", None),
+    "screenshots": ("Open Screenshots", "Browse the screenshots folder", "image-x-generic-symbolic", None),
+    "recorder": ("Screen Recorder", "Record the screen", "media-record-symbolic", None),
+    "recordings": ("Open Recordings", "Browse the recordings folder", "video-x-generic-symbolic", None),
+    "colorpicker": ("Color Picker", "Pick a color from the screen", "color-select-symbolic", None),
+    "ocr": ("OCR", "Recognize text on screen", "text-x-generic-symbolic", "tesseract"),
+    "qr": ("QR Code", "Scan a QR code", "view-barcode-symbolic", "zbarimg"),
+    "lens": ("Google Lens", "Reverse image search", "system-search-symbolic", None),
+    "shazam": ("Shazam", "Recognize playing music", "shazam-symbolic", "songrec"),
+    "webcam": ("Webcam Overlay", "Floating webcam preview", "camera-video-symbolic", None),
+}
+
+# Default toolbox order mirrors the current hardcoded layout in ToolsMenu.qml.
+TOOLBOX_DEFAULT_ORDER: list = [
+    "screenshot", "screenshots", "separator",
+    "recorder", "recordings", "separator",
+    "colorpicker", "ocr", "qr", "lens", "shazam", "webcam",
+]
+
+TOOLBOX_MIN_ITEMS = 5
+
 # Mirrors ``modules/retroshell/files/config/defaults/bar.js`` and the
 # JsonAdapter defaults in ``Config.qml`` (lines ~528-549).
 BAR_DEFAULTS: dict = {
@@ -107,6 +133,7 @@ BAR_DEFAULTS: dict = {
     "showWifiPopup": False,
     "showBluetoothPopup": False,
     "showQuickSharePopup": False,
+    "toolboxOrder": list(TOOLBOX_DEFAULT_ORDER),
 }
 
 
@@ -554,6 +581,7 @@ _PRESET_FILES = (
     "overview.json",
     "performance.json",
     "theme.json",
+    "tools.json",
     "workspaces.json",
 )
 

@@ -26,5 +26,6 @@
     "batteryStyle": "arch",
     "showWifiPopup": true,
     "showBluetoothPopup": true,
-    "showQuickSharePopup": true
+    "showQuickSharePopup": true,
+    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
 }
