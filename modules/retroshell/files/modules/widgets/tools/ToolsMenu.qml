@@ -12,6 +12,11 @@ ActionGrid {
 
     signal itemSelected
 
+    function recheck() {
+        Shazam.recheck();
+        Tesseract.recheck();
+    }
+
     QtObject {
         id: recordAction
         property string icon: ScreenRecorder.isRecording ? Icons.stop : Icons.recordScreen
@@ -33,61 +38,75 @@ ActionGrid {
         property string type: "button"
     }
 
+    QtObject {
+        id: ocrAction
+        property string icon: Icons.textT
+        property string tooltip: "OCR"
+        property string command: ""
+        property string type: "button"
+    }
+
     layout: "row"
     buttonSize: 48
     iconSize: 20
     spacing: 8
 
-    actions: [
-        {
-            icon: Icons.camera,
-            tooltip: "Screenshot",
-            command: ""
-        },
-        {
-            icon: Icons.screenshots,
-            tooltip: "Open Screenshots",
-            command: ""
-        },
-        {
-            type: "separator"
-        },
-        recordAction,
-        {
-            icon: Icons.recordings,
-            tooltip: "Open Recordings",
-            command: ""
-        },
-        {
-            type: "separator"
-        },
-        {
-            icon: Icons.picker,
-            tooltip: "Color Picker",
-            command: ""
-        },
-        {
-            icon: Icons.textT,
-            tooltip: "OCR",
-            command: ""
-        },
-        {
-            icon: Icons.qrCode,
-            tooltip: "QR Code",
-            command: ""
-        },
-        {
-            icon: Icons.google,
-            tooltip: "Google Lens",
-            command: ""
-        },
-        shazamAction,
-        {
-            icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
-            tooltip: "Webcam Overlay",
-            command: ""
+    actions: {
+        const base = [
+            {
+                icon: Icons.camera,
+                tooltip: "Screenshot",
+                command: ""
+            },
+            {
+                icon: Icons.screenshots,
+                tooltip: "Open Screenshots",
+                command: ""
+            },
+            {
+                type: "separator"
+            },
+            recordAction,
+            {
+                icon: Icons.recordings,
+                tooltip: "Open Recordings",
+                command: ""
+            },
+            {
+                type: "separator"
+            },
+            {
+                icon: Icons.picker,
+                tooltip: "Color Picker",
+                command: ""
+            },
+            {
+                icon: Icons.qrCode,
+                tooltip: "QR Code",
+                command: ""
+            },
+            {
+                icon: Icons.google,
+                tooltip: "Google Lens",
+                command: ""
+            },
+            {
+                icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
+                tooltip: "Webcam Overlay",
+                command: ""
+            }
+        ];
+
+        if (Tesseract.available) {
+            const pickerIdx = base.findIndex(a => a && a.tooltip === "Color Picker");
+            base.splice(pickerIdx + 1, 0, ocrAction);
         }
-    ]
+        if (Shazam.available) {
+            const webcamIdx = base.findIndex(a => a && a.tooltip === "Webcam Overlay");
+            base.splice(webcamIdx, 0, shazamAction);
+        }
+        return base;
+    }
 
     Process {
         id: colorPickerProc

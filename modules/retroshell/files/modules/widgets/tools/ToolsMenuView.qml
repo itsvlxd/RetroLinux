@@ -35,6 +35,7 @@ Item {
     // Forzar foco cuando aparece la vista en el StackView
     onVisibleChanged: {
         if (visible) {
+            toolsMenu.recheck();
             Qt.callLater(() => {
                 toolsMenu.forceActiveFocus();
             });
