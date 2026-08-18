@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source "$RETRO_DIR/lib/help.sh"
+source "$RETRO_DIR/lib/pkg.sh"
 
 rx_module_status() {
     local mod_name="$1"
@@ -8,6 +9,12 @@ rx_module_status() {
     local props_file="$mod_dir/properties.json"
 
     [[ ! -f $props_file ]] && return 255
+
+    local check_pkg=$(get_module_info "$mod_name" "check")
+    if [[ -n $check_pkg ]]; then
+        rx_pkg_installed "$check_pkg" && return 0
+        return 2
+    fi
 
     IFS='|' read -r repo_src system_dest <<<"$(get_module_paths "$mod_name")"
 
