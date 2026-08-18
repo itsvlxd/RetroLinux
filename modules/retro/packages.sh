@@ -10,6 +10,7 @@ unzip
 zenity
 expect
 notify
+grim
 udisks2
 usbutils
 dmidecode
@@ -57,7 +58,6 @@ papirus-folders
 papirus-icon-theme
 
 # Auth
-songrec
 fprintd
 seahorse
 libsecret
