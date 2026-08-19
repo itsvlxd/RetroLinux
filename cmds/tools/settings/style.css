@@ -71,15 +71,30 @@ row:hover .reset-button,
     transition: background-color 150ms ease-in-out;
 }
 
+/* Bordered card — subtle outline border with accent on hover (theme +
+   wallpaper gallery cards). */
+.card-border {
+    background-color: alpha(@card_bg_color, 0.55);
+    border-radius: 10px;
+    box-shadow: inset 0 0 0 1px alpha(@view_fg_color, 0.07);
+    transition: background-color 150ms ease-in-out,
+                box-shadow 150ms ease-in-out;
+}
+.card-border:hover {
+    background-color: alpha(@card_bg_color, 0.9);
+    box-shadow: inset 0 0 0 1px alpha(@accent_bg_color, 0.28);
+}
+
 /* Home page tile grid — Windows-style start page cards.
    The home page applies ``home-tile`` to plain flat buttons; this styling
    is what makes the grid of settings pages visible as cards (background,
-   rounded corners, hover feedback). Keep it in the app stylesheet so the
+   rounded corners, hover feedback). Cards use the sidebar background color
+   so they match the sidebar. Keep it in the app stylesheet so the
    homepage renders properly without relying on user custom CSS. */
 .home-tile {
-    background-color: alpha(@card_bg_color, 0.55);
+    background-color: @sidebar_bg_color;
     border-radius: 12px;
-    box-shadow: inset 0 0 0 1px alpha(@view_fg_color, 0.06);
+    box-shadow: inset 0 0 0 1px alpha(@view_fg_color, 0.1);
     padding: 10px 12px;
     min-height: 84px;
     transition: background-color 150ms ease-in-out,
@@ -149,6 +164,20 @@ row.spin spinbutton > text {
     min-height: 0;
     padding: 0;
     margin: 4px 12px;
+}
+
+/* Sidebar background — distinct color so it stands apart from the content
+   pane. Uses a 0.5-opacity card tint (matching the boxed-list rows) so the
+   sidebar is as dark as the option cards. */
+/* Whole sidebar background — the outer ``retro-sidebar`` container spans
+   the categories, rows, gaps and pinned list. Uses a 0.5-opacity card tint
+   (matching the boxed-list option rows) so the entire sidebar is uniformly
+   dark. */
+.retro-sidebar {
+    background-color: alpha(@card_bg_color, 0.5);
+}
+.navigation-sidebar {
+    background-color: transparent;
 }
 
 /* Sidebar navigation icons — theme accent color */
@@ -468,6 +497,23 @@ row.dragging-row {
     box-shadow: 0 4px 12px alpha(black, 0.35);
 }
 
+/* Dashboard drag boxes — reorderable widget/control cards */
+row.dashboard-drag-box {
+    background-color: alpha(@card_bg_color, 0.6);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px alpha(@view_fg_color, 0.07);
+    margin: 2px 0;
+}
+row.dashboard-drag-box:hover {
+    background-color: alpha(@card_bg_color, 0.9);
+    box-shadow: inset 0 0 0 1px alpha(@accent_bg_color, 0.28);
+}
+
+/* Toolbox rows whose required package is not installed (still draggable) */
+row.toolbox-unavailable {
+    color: alpha(@view_fg_color, 0.6);
+}
+
 /* Theme cards */
 .theme-card {
     padding: 4px 0;
@@ -558,4 +604,35 @@ colorchooserwidget {
     font-weight: 700;
     border: 1px solid @accent_bg_color;
 }
+
+/* ── In-page settings option rows ──
+   Adw.PreferencesGroup renders its rows in a ``boxed-list`` card. When the
+   user's matugen gtk.css sets card_bg_color == window_bg_color (#131313),
+   these rows blend into the flat dark background. Give every settings
+   option row a clearly-visible gray border (the same treatment used by the
+   dashboard drag boxes) and kill the default dark row separator. The
+   sidebar uses ``navigation-sidebar`` (a different container) so it is
+   unaffected. NOTE: GTK4 CSS has no ``!important`` — the ``boxed-list``
+   selector already carries enough specificity to override the theme. */
+boxed-list {
+    background-color: alpha(@card_bg_color, 0.5);
+    border-radius: 10px;
+    border: 1px solid alpha(@view_fg_color, 0.15);
+}
+list.boxed-list > row,
+boxed-list > row,
+boxed-list row {
+    background-color: transparent;
+    border-bottom: 1px solid alpha(@window_bg_color, 0.9);
+}
+list.boxed-list > row:last-child,
+boxed-list > row:last-child,
+boxed-list row:last-child {
+    border-bottom-width: 0;
+}
+boxed-list row:hover {
+    background-color: alpha(@card_bg_color, 0.6);
+}
+
+
 

@@ -373,6 +373,7 @@ class ThemesPage:
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         card.add_css_class("card")
         card.add_css_class("theme-card")
+        card.add_css_class("card-border")
         if self._active_scheme == "wallpaper":
             card.add_css_class("theme-card-active")
         card.set_margin_top(6)
@@ -451,6 +452,7 @@ class ThemesPage:
         card.set_halign(Gtk.Align.CENTER)
         card.add_css_class("card")
         card.add_css_class("theme-card")
+        card.add_css_class("card-border")
         is_active = theme["slug"] == self._active_scheme
         if is_active:
             card.add_css_class("theme-card-active")

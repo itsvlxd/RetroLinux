@@ -13,65 +13,113 @@ import qs.config
 import "calendar"
 
 Rectangle {
+    id: root
     color: "transparent"
     implicitWidth: 600
     implicitHeight: 750
 
     property int leftPanelWidth: 0
 
+    property var dashboardOrder: (Config.dashboard && Config.dashboard.widgetOrder) ? Config.dashboard.widgetOrder : ["player", "quickactions", "notifications", "controls"]
+
+    function widgetWidth(id) {
+        if (id === "player") return 216;
+        if (id === "quickactions") return root.quickActionsWidth;
+        if (id === "notifications") return -1; // fill remaining space
+        return 48 + 8; // controls column
+    }
+
+    function widgetFills(id) {
+        return id === "notifications";
+    }
+
+    // QuickControls implicit width (hardcoded to 5 buttons in QuickControls.qml:
+    // internalBgRect.implicitWidth = 5*48 + 4*4 + 8, plus 8 outer padding).
+    property int quickActionsWidth: 5 * 48 + 4 * 4 + 8 + 8
+
     RowLayout {
         anchors.fill: parent
         spacing: 8
 
+        Repeater {
+            model: root.dashboardOrder
+
+            Loader {
+                required property string modelData
+                Layout.preferredWidth: root.widgetFills(modelData) ? undefined : root.widgetWidth(modelData)
+                Layout.fillWidth: root.widgetFills(modelData)
+                Layout.fillHeight: true
+                sourceComponent: {
+                    switch (modelData) {
+                    case "player": return playerComponent;
+                    case "quickactions": return quickActionsComponent;
+                    case "notifications": return notificationsComponent;
+                    case "controls": return controlsComponent;
+                    default: return null;
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Music Player group ──
+    Component {
+        id: playerComponent
         FullPlayer {
             Layout.preferredWidth: 216
             Layout.fillHeight: true
         }
+    }
 
-        // Widgets column
+    // ── Quick Actions + Calendar group ──
+    Component {
+        id: quickActionsComponent
         ClippingRectangle {
-            id: widgetsContainer
-            Layout.preferredWidth: controlButtonsContainer.implicitWidth
+            Layout.preferredWidth: root.quickActionsWidth
+            Layout.maximumWidth: root.quickActionsWidth
             Layout.fillHeight: true
             radius: Styling.radius(4)
             color: "transparent"
 
-            property bool circularControlDragging: false
-
             Flickable {
-                id: widgetsFlickable
                 anchors.fill: parent
                 contentWidth: width
                 contentHeight: columnLayout.implicitHeight
                 clip: true
-                interactive: !widgetsContainer.circularControlDragging
 
                 ColumnLayout {
                     id: columnLayout
                     width: parent.width
                     spacing: 8
 
-                    // Control buttons - 5 buttons wrapped in StyledRect pane > internalbg
                     QuickControls {
                         id: controlButtonsContainer
                     }
 
                     Calendar {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: root.quickActionsWidth
+                        Layout.maximumWidth: root.quickActionsWidth
                         Layout.preferredHeight: width
+                        Layout.minimumWidth: root.quickActionsWidth
                     }
-
                 }
             }
         }
+    }
 
-        // Notification History
+    // ── Notifications group ──
+    Component {
+        id: notificationsComponent
         NotificationHistory {
             Layout.fillWidth: true
             Layout.fillHeight: true
         }
+    }
 
-        // Circular controls column
+    // ── Controls group (brightness / volume / mic) ──
+    Component {
+        id: controlsComponent
         ColumnLayout {
             Layout.fillHeight: true
             spacing: 8
@@ -174,15 +222,11 @@ Rectangle {
                                 let wasActive = Brightness.syncBrightness;
                                 Brightness.syncBrightness = !Brightness.syncBrightness;
 
-                                // Only show sync feedback animation when activating
                                 if (Brightness.syncBrightness) {
-                                    // Show sync icon instantly and start rotation
                                     iconContainer.showingSyncFeedback = true;
                                     brightnessIcon.iconOpacity = 1;
                                     brightnessIcon.syncIconRotation = 0;
                                     brightnessIcon.syncIconRotation = 360;
-
-                                    // Hold sync icon
                                     syncHoldTimer.start();
                                 }
                             }
@@ -210,7 +254,7 @@ Rectangle {
                             onTriggered: {
                                 iconContainer.showingSyncFeedback = false;
                                 brightnessIcon.iconOpacity = 1;
-                                brightnessIcon.syncIconRotation = 0; // Reset rotation
+                                brightnessIcon.syncIconRotation = 0;
                             }
                         }
                     }
@@ -269,7 +313,6 @@ Rectangle {
                             brightnessIcon.brightnessIconScale = 0.8 + (value / 1.0) * 0.2;
 
                             if (Brightness.syncBrightness) {
-                                // Sync all monitors
                                 for (let i = 0; i < Brightness.monitors.length; i++) {
                                     let mon = Brightness.monitors[i];
                                     if (mon && mon.ready) {
@@ -277,7 +320,6 @@ Rectangle {
                                     }
                                 }
                             } else {
-                                // Only current monitor
                                 if (currentMonitor && currentMonitor.ready) {
                                     currentMonitor.setBrightness(value);
                                 }

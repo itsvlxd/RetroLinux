@@ -172,6 +172,7 @@ class ShellPresetsPage:
     def _apply_preset(self, p):
         apply_preset(p)
         self._reload()
+        self._window.reload_shell_pages_after_preset()
 
     def _update_preset(self, p):
         update_preset(p)
@@ -179,8 +180,8 @@ class ShellPresetsPage:
 
     def _on_save(self, *_):
         d = Adw.Dialog(title="Save Current Configuration as Preset")
-        d.set_content_width(380)
-        d.set_content_height(180)
+        d.set_content_width(400)
+        d.set_content_height(260)
         tb = Adw.ToolbarView()
         hb = Adw.HeaderBar()
         hb.set_show_title(False)
@@ -190,14 +191,38 @@ class ShellPresetsPage:
         bx.set_margin_start(24)
         bx.set_margin_end(24)
         bx.set_margin_bottom(24)
+
+        name_lbl = Gtk.Label(label="Name", halign=Gtk.Align.START)
+        name_lbl.add_css_class("dim-label")
+        bx.append(name_lbl)
         e = Gtk.Entry(placeholder_text="My Preset", hexpand=True)
         bx.append(e)
+
+        author_lbl = Gtk.Label(label="Author", halign=Gtk.Align.START)
+        author_lbl.add_css_class("dim-label")
+        bx.append(author_lbl)
+        ae = Gtk.Entry(placeholder_text="Your name", hexpand=True)
+        bx.append(ae)
+
         bb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bb.set_halign(Gtk.Align.END)
-        bb.append(Gtk.Button(label="Cancel", clicked=lambda _: d.close()))
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda _: d.close())
+        bb.append(cancel_btn)
         sb = Gtk.Button(label="Save")
         sb.add_css_class("suggested-action")
-        sb.connect("clicked", lambda _: (save_preset(e.get_text().strip()) if e.get_text().strip() else None, self._reload(), d.close()))
+
+        def _do_save(_btn):
+            name = e.get_text().strip()
+            author = ae.get_text().strip()
+            if not name:
+                return
+            save_preset(name, author=author)
+            self._reload()
+            d.close()
+
+        sb.connect("clicked", _do_save)
+        e.connect("activate", _do_save)
         bb.append(sb)
         bx.append(bb)
         tb.set_content(bx)
@@ -221,7 +246,9 @@ class ShellPresetsPage:
         bx.append(e)
         bb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bb.set_halign(Gtk.Align.END)
-        bb.append(Gtk.Button(label="Cancel", clicked=lambda _: d.close()))
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda _: d.close())
+        bb.append(cancel_btn)
         rb = Gtk.Button(label="Rename")
         rb.add_css_class("suggested-action")
         rb.connect("clicked", lambda _: (
@@ -250,7 +277,9 @@ class ShellPresetsPage:
         bx.append(Gtk.Label(label="This preset will be permanently deleted.", wrap=True))
         bb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bb.set_halign(Gtk.Align.END)
-        bb.append(Gtk.Button(label="Cancel", clicked=lambda _: d.close()))
+        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn.connect("clicked", lambda _: d.close())
+        bb.append(cancel_btn)
         db = Gtk.Button(label="Delete")
         db.add_css_class("destructive-action")
         db.connect("clicked", lambda _: (delete_preset(preset["name"]), self._reload(), d.close()))

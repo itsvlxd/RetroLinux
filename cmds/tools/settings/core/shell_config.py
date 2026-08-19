@@ -75,6 +75,32 @@ def save_shell_json(name: str, data: dict) -> None:
 
 # ── bar.json ────────────────────────────────────────────────────────────
 
+# Toolbox items shown in the shell's ToolsMenu (``ToolsMenu.qml``).
+# ``package`` names the binary whose presence enables the tool; when it is
+# missing the tool greys out in the settings page (but stays draggable) and
+# the shell skips it until the package is installed.
+TOOLBOX_ITEMS: dict = {
+    "screenshot": ("Screenshot", "Capture the whole screen", "camera-photo-symbolic", None),
+    "screenshots": ("Open Screenshots", "Browse the screenshots folder", "image-x-generic-symbolic", None),
+    "recorder": ("Screen Recorder", "Record the screen", "media-record-symbolic", None),
+    "recordings": ("Open Recordings", "Browse the recordings folder", "video-x-generic-symbolic", None),
+    "colorpicker": ("Color Picker", "Pick a color from the screen", "color-select-symbolic", None),
+    "ocr": ("OCR", "Recognize text on screen", "text-x-generic-symbolic", "tesseract"),
+    "qr": ("QR Code", "Scan a QR code", "view-barcode-symbolic", "zbarimg"),
+    "lens": ("Google Lens", "Reverse image search", "system-search-symbolic", None),
+    "shazam": ("Shazam", "Recognize playing music", "shazam-symbolic", "songrec"),
+    "webcam": ("Webcam Overlay", "Floating webcam preview", "camera-video-symbolic", None),
+}
+
+# Default toolbox order mirrors the current hardcoded layout in ToolsMenu.qml.
+TOOLBOX_DEFAULT_ORDER: list = [
+    "screenshot", "screenshots", "separator",
+    "recorder", "recordings", "separator",
+    "colorpicker", "ocr", "qr", "lens", "shazam", "webcam",
+]
+
+TOOLBOX_MIN_ITEMS = 5
+
 # Mirrors ``modules/retroshell/files/config/defaults/bar.js`` and the
 # JsonAdapter defaults in ``Config.qml`` (lines ~528-549).
 BAR_DEFAULTS: dict = {
@@ -107,6 +133,7 @@ BAR_DEFAULTS: dict = {
     "showWifiPopup": False,
     "showBluetoothPopup": False,
     "showQuickSharePopup": False,
+    "toolboxOrder": list(TOOLBOX_DEFAULT_ORDER),
 }
 
 
@@ -314,7 +341,6 @@ NOTCH_DEFAULTS: dict = {
     "disableHoverExpansion": True,
     "noMediaDisplay": "userHost",
     "customText": "RetroLinux",
-    "quickshareEnabled": False,
 }
 
 
@@ -335,6 +361,7 @@ def save_notch(data: dict) -> None:
 # Mirrors ``modules/retroshell/files/config/defaults/workspaces.js`` and the
 # JsonAdapter defaults in ``Config.qml`` (lines ~587-593).
 WORKSPACES_DEFAULTS: dict = {
+    "enabled": True,
     "shown": 10,
     "showAppIcons": True,
     "alwaysShowNumbers": False,
@@ -520,6 +547,7 @@ PERFORMANCE_DEFAULTS: dict = {
     "windowPreview": True,
     "wavyLine": True,
     "rotateCoverArt": True,
+    "showCoverArt": True,
     "dashboardPersistTabs": True,
     "dashboardMaxPersistentTabs": 2,
 }
@@ -544,6 +572,7 @@ def save_performance(data: dict) -> None:
 # user presets live under the shell config dir at ``presets/``.
 _PRESET_FILES = (
     "bar.json",
+    "dashboard.json",
     "desktop.json",
     "dock.json",
     "compositor.json",
@@ -552,6 +581,7 @@ _PRESET_FILES = (
     "overview.json",
     "performance.json",
     "theme.json",
+    "tools.json",
     "workspaces.json",
 )
 
@@ -641,7 +671,7 @@ def apply_preset(preset: dict) -> None:
     af.write_text(preset["name"] + "\n")
 
 
-def save_preset(name: str) -> None:
+def save_preset(name: str, author: str = "", author_url: str = "") -> None:
     """Create a new user preset from the current shell config."""
     dst_dir = user_presets_dir() / name
     dst_dir.mkdir(parents=True, exist_ok=True)
@@ -651,7 +681,13 @@ def save_preset(name: str) -> None:
         if s.exists():
             shutil.copy2(s, dst_dir / f)
     info = dst_dir / "info.json"
-    info.write_text(json.dumps({"author": "User", "authorUrl": ""}, indent=2) + "\n")
+    info.write_text(
+        json.dumps(
+            {"author": author or "User", "authorUrl": author_url or ""},
+            indent=2,
+        )
+        + "\n"
+    )
 
 
 def delete_preset(name: str) -> None:
@@ -680,12 +716,19 @@ def rename_preset(old_name: str, new_name: str) -> None:
 
 
 def update_preset(preset: dict) -> None:
-    """Overwrite a user preset's files with current shell config."""
+    """Overwrite a user preset's files with current shell config.
+
+    Copies every managed file present in the live config into the preset,
+    creating any that the preset doesn't already have (e.g. a newly-added
+    config file such as ``dashboard.json``) so presets stay complete and in
+    sync after the list of managed files grows.
+    """
     dst = Path(preset["path"])
     src = shell_config_dir()
+    dst.mkdir(parents=True, exist_ok=True)
     for f in _PRESET_FILES:
         s = src / f
-        if s.exists() and (dst / f).exists():
+        if s.exists():
             shutil.copy2(s, dst / f)
 
 
@@ -755,3 +798,32 @@ def load_tools() -> dict:
 
 def save_tools(data: dict) -> None:
     save_shell_json("tools", data)
+
+
+# ── dashboard.json ───────────────────────────────────────────────────────
+
+# Mirrors ``modules/retroshell/files/config/defaults/dashboard.js`` and the
+# JsonAdapter defaults in ``Config.qml``. Controls the dashboard launcher
+# tab: the horizontal order of the widget groups and the QuickControls
+# hot-action buttons. Groups are all reorderable but never removable; the
+# QuickControls buttons can be added/removed down to DASHBOARD_MIN_CONTROLS.
+DASHBOARD_WIDGET_IDS = ("player", "quickactions", "notifications", "controls")
+DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight")
+DASHBOARD_MIN_CONTROLS = 5
+
+DASHBOARD_DEFAULTS: dict = {
+    "widgetOrder": list(DASHBOARD_WIDGET_IDS),
+    "controlOrder": list(DASHBOARD_CONTROL_IDS),
+}
+
+
+def dashboard_path() -> Path:
+    return shell_config_dir() / "dashboard.json"
+
+
+def load_dashboard() -> dict:
+    return load_shell_json("dashboard", DASHBOARD_DEFAULTS)
+
+
+def save_dashboard(data: dict) -> None:
+    save_shell_json("dashboard", data)

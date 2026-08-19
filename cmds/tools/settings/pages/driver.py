@@ -32,19 +32,18 @@ def _run(args: list[str], timeout: int = 15) -> str:
         return ""
 
 
-def _can_sudo() -> bool:
-    """True when the current user can elevate (root, or wheel/sudo group)."""
-    if os.geteuid() == 0:
-        return True
-    try:
-        r = subprocess.run(
-            ["id", "-nG"], capture_output=True, text=True, timeout=5,
-            stdin=subprocess.DEVNULL,
-        )
-        groups = r.stdout.split()
-        return bool({"wheel", "sudo"} & set(groups))
-    except Exception:
-        return False
+    def _can_sudo() -> bool:
+        if os.geteuid() == 0:
+            return True
+        try:
+            r = subprocess.run(
+                ["id", "-nG"], capture_output=True, text=True, timeout=5,
+                stdin=subprocess.DEVNULL,
+            )
+            groups = r.stdout.split()
+            return bool({"wheel", "sudo"} & set(groups))
+        except Exception:
+            return False
 
 
 class DriverPage:
@@ -85,6 +84,12 @@ class DriverPage:
         refresh_btn.set_tooltip_text("Refresh driver scan")
         refresh_btn.connect("clicked", lambda _b: self._full_refresh())
         header.pack_start(refresh_btn)
+
+        add_btn = Gtk.Button(icon_name="list-add-symbolic")
+        add_btn.set_tooltip_text("Install optional drivers\u2026")
+        add_btn.add_css_class("flat")
+        add_btn.connect("clicked", lambda _b: self._open_driver_bundles())
+        header.pack_start(add_btn)
 
         spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         spinner_box.set_valign(Gtk.Align.CENTER)
@@ -312,7 +317,6 @@ class DriverPage:
             ))
             any_warning = True
 
-        # If Intel Meteor Lake+ is on i915 instead of xe, warn
         for comp in self._scan_data:
             if comp["type"] == "GPU" and comp["vendor"] == "intel" and self._current_driver == "i915":
                 if any(k in comp["model"] for k in ("Meteor", "Arrow", "Lunar", "Battlemage")):
@@ -331,31 +335,6 @@ class DriverPage:
             group.add(self._make_warning_row(
                 f"{len(self._updates)} driver update{'s' if len(self._updates) > 1 else ''} available",
                 sub, "Update All", lambda _b: self._run_terminal("retro driver update"),
-            ))
-            any_warning = True
-
-        if self._extra_missing:
-            extra_count = len(self._extra_missing.split())
-            extra_names = ", ".join(self._extra_missing.split()[:5])
-            if extra_count > 5:
-                extra_names += f" and {extra_count - 5} more"
-            group.add(self._make_warning_row(
-                "Optional extra drivers available",
-                f"Optional extra drivers not installed by default \u2014 {extra_names}",
-                "Install Extras", lambda _b: self._install_extra(),
-                icon_name="dialog-information-symbolic", css_class="info-row",
-            ))
-            any_warning = True
-        elif self._extra_installed:
-            extra_count = len(self._extra_installed.split())
-            extra_names = ", ".join(self._extra_installed.split()[:5])
-            if extra_count > 5:
-                extra_names += f" and {extra_count - 5} more"
-            group.add(self._make_warning_row(
-                "Optional extra drivers installed",
-                f"Optional extra drivers \u2014 {extra_names}",
-                "Uninstall Extras", lambda _b: self._uninstall_extra(),
-                icon_name="dialog-information-symbolic", css_class="info-row",
             ))
             any_warning = True
 
@@ -797,13 +776,6 @@ class DriverPage:
         return icon
 
     def _module_picker(self, current: str, on_pick) -> Gtk.Button:
-        """A compact searchable dropdown of every installed kernel module.
-
-        The list is rendered lazily (25 matches per page, appended on scroll).
-        Each row is built only after its name, icon and description have all
-        been fetched together, so no row appears half-populated. A category
-        dropdown sits inline with the search bar to filter by module class.
-        """
         _PAGE = 25
         btn = Gtk.Button(label=current or "Choose module\u2026")
         btn.set_valign(Gtk.Align.CENTER)
@@ -944,11 +916,6 @@ class DriverPage:
         return sorted(names) or ["other"]
 
     def _load_descs(self, chunk: list[dict]) -> None:
-        """Fetch descriptions for a chunk in one batch call, filling the cache.
-
-        The batch call keeps this fast (a single subprocess invocation), so
-        the picker can render rows synchronously without blocking noticeably.
-        """
         names = [m["name"] for m in chunk if m["name"] not in self._module_desc_cache]
         if not names:
             return
@@ -1072,52 +1039,7 @@ class DriverPage:
         self._run_terminal("retro driver install")
         self._poll_main_install()
 
-    def _install_extra(self) -> None:
-        if not self._extra_missing:
-            self._window.show_toast("No extra drivers to install")
-            return
-        self._run_terminal("retro driver install extra")
-        self._poll_extra_installed()
-
-    def _uninstall_extra(self) -> None:
-        if not self._extra_installed:
-            self._window.show_toast("No extra drivers installed")
-            return
-        self._run_terminal("retro driver uninstall extra")
-        self._poll_extra_uninstalled()
-
-    def _poll_extra_installed(self, timeout_s: int = 45) -> None:
-        """Refresh once the extra install finishes (extras no longer missing)."""
-        deadline = time.time() + timeout_s
-
-        def check():
-            if time.time() > deadline:
-                GLib.idle_add(self._delayed_refresh)
-                return
-            missing = _run(["--extra-list"])
-            if not missing or missing == "NONE":
-                GLib.idle_add(self._delayed_refresh)
-                return
-            GLib.timeout_add(2000, check)
-        GLib.timeout_add(1500, check)
-
-    def _poll_extra_uninstalled(self, timeout_s: int = 45) -> None:
-        """Refresh once the extra uninstall finishes (extras no longer installed)."""
-        deadline = time.time() + timeout_s
-
-        def check():
-            if time.time() > deadline:
-                GLib.idle_add(self._delayed_refresh)
-                return
-            installed = _run(["--extra-installed"])
-            if not installed or installed == "NONE":
-                GLib.idle_add(self._delayed_refresh)
-                return
-            GLib.timeout_add(2000, check)
-        GLib.timeout_add(1500, check)
-
     def _poll_main_install(self, timeout_s: int = 120) -> None:
-        """Refresh once the main install finishes (no missing drivers remain)."""
         deadline = time.time() + timeout_s
 
         def check():
@@ -1152,9 +1074,12 @@ class DriverPage:
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
 
+    def _open_driver_bundles(self) -> None:
+        dialog = DriverBundlesDialog(self._window, self)
+        dialog.present(self._window)
+
     def missing_count(self) -> int:
         return len(self._missing_pkgs)
-
     def is_dirty(self) -> bool:
         return self._dirty
 
@@ -1190,3 +1115,190 @@ class DriverPage:
         if self._tick_source:
             GLib.source_remove(self._tick_source)
             self._tick_source = None
+
+
+class DriverBundlesDialog(Adw.Dialog):
+
+    def __init__(self, window: "RetroSettingsWindow", page: DriverPage):
+        super().__init__()
+        self._window = window
+        self._page = page
+        self.set_title("Install Optional Drivers")
+        self.set_content_width(560)
+        self.set_content_height(440)
+
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        close_btn = Gtk.Button(label="Close")
+        close_btn.connect("clicked", lambda _b: self.close())
+        header.pack_start(close_btn)
+        toolbar.add_top_bar(header)
+
+        self._listbox = Gtk.ListBox()
+        self._listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._listbox.set_margin_top(8)
+        self._listbox.set_margin_bottom(8)
+        self._listbox.set_margin_start(8)
+        self._listbox.set_margin_end(8)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_child(self._listbox)
+        scrolled.set_vexpand(True)
+
+        spinner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        spinner_box.set_valign(Gtk.Align.CENTER)
+        spinner_box.set_halign(Gtk.Align.CENTER)
+        spinner = Gtk.Spinner()
+        spinner.set_size_request(28, 28)
+        spinner.start()
+        spinner_box.append(spinner)
+        lbl = Gtk.Label(label="Loading optional drivers\u2026")
+        lbl.add_css_class("dim-label")
+        spinner_box.append(lbl)
+
+        stack = Gtk.Stack()
+        stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        stack.add_named(scrolled, "list")
+        stack.add_named(spinner_box, "spinner")
+        stack.set_visible_child_name("spinner")
+        self._stack = stack
+        self._list_scrolled = scrolled
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(560)
+        clamp.set_tightening_threshold(500)
+        clamp.set_child(stack)
+
+        toolbar.set_content(clamp)
+        self.set_child(toolbar)
+        self._clamp = clamp
+
+        self._rows: dict[str, dict] = {}
+        self._load()
+
+    def _load(self) -> None:
+        def worker():
+            gaming = _run(["--profile-list", "gaming"])
+            extra_missing = _run(["--extra-list"])
+            extra_installed = _run(["--extra-installed"])
+            GLib.idle_add(self._on_loaded, gaming, extra_missing, extra_installed)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_loaded(self, gaming: str, extra_missing: str, extra_installed: str) -> None:
+        self._stack.set_visible_child_name("list")
+
+        gaming_pkgs = self._parse_pkgs(gaming)
+
+        def _split(s: str) -> list[str]:
+            return s.split() if s.strip() and s.strip() != "NONE" else []
+
+        installed_set = set(_split(extra_installed))
+        extra_pkgs = []
+        for p in sorted(set(_split(extra_missing)) | installed_set):
+            extra_pkgs.append({
+                "name": p,
+                "version": "",
+                "status": "installed" if p in installed_set else "missing",
+            })
+        extra_pkgs.sort(key=lambda d: d["name"])
+
+        while child := self._listbox.get_first_child():
+            self._listbox.remove(child)
+
+        self._add_bundle_row(
+            key="gaming",
+            title="Gaming Drivers",
+            subtitle="gamemode, gamescope, mangohud, vulkan-tools and GPU libs for gaming",
+            icon="applications-games-symbolic",
+            pkgs=gaming_pkgs,
+            install_args=["--profile-install", "gaming"],
+            remove_args=["--profile-remove", "gaming"],
+        )
+        self._add_bundle_row(
+            key="extra",
+            title="Extra Drivers",
+            subtitle="AI / neural compute and NPU packages not installed by default",
+            icon="system-run-symbolic",
+            pkgs=extra_pkgs,
+            install_args=["--install-extra"],
+            remove_args=["--extra-uninstall", "--yes"],
+        )
+
+    @staticmethod
+    def _parse_pkgs(raw: str) -> list[dict]:
+        result = []
+        for line in raw.splitlines():
+            if not line.startswith("PKG|"):
+                continue
+            parts = line.split("|")
+            if len(parts) < 5:
+                continue
+            name = parts[2]
+            ver = parts[3]
+            status = parts[4]
+            result.append({"name": name, "version": ver, "status": status})
+        return result
+
+    def _add_bundle_row(self, key: str, title: str, subtitle: str, icon: str, pkgs: list[dict], install_args: list[str], remove_args: list[str]) -> None:
+        installed = sum(1 for p in pkgs if p["status"] == "installed")
+        total = len(pkgs)
+        missing = total - installed
+
+        exp = Adw.ExpanderRow(title=title)
+        exp.add_prefix(Gtk.Image.new_from_icon_name(icon))
+        exp.set_subtitle(f"{installed}/{total} installed \u00b7 {missing} missing")
+
+        for p in pkgs:
+            sub = Adw.ActionRow(title=p["name"], subtitle=p["version"] or "not installed")
+            badge = Gtk.Label(label="Installed" if p["status"] == "installed" else "Missing")
+            badge.add_css_class("success" if p["status"] == "installed" else "error")
+            badge.set_valign(Gtk.Align.CENTER)
+            sub.add_suffix(badge)
+            sub.set_activatable(False)
+            exp.add_row(sub)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        install_btn = Gtk.Button(label="Install")
+        install_btn.add_css_class("suggested-action")
+        install_btn.set_valign(Gtk.Align.CENTER)
+        install_btn.set_visible(missing > 0 or total == 0)
+        install_btn.connect("clicked", lambda _b: self._run_action(key, install_args, "install"))
+        box.append(install_btn)
+
+        remove_btn = Gtk.Button(label="Uninstall")
+        remove_btn.add_css_class("destructive-action")
+        remove_btn.set_valign(Gtk.Align.CENTER)
+        remove_btn.set_visible(installed > 0)
+        remove_btn.connect("clicked", lambda _b: self._run_action(key, remove_args, "remove"))
+        box.append(remove_btn)
+
+        exp.add_suffix(box)
+        self._listbox.append(exp)
+        self._rows[key] = {"expander": exp, "install_btn": install_btn, "remove_btn": remove_btn, "pkgs": pkgs}
+
+    def _run_action(self, key: str, args: list[str], kind: str) -> None:
+        self._window.show_toast(f"Requesting elevated access\u2026", timeout=3)
+        full_args = ["pkexec", "bash", _DRIVER_CORE, *args]
+
+        def worker():
+            try:
+                r = subprocess.run(full_args, capture_output=True, text=True, timeout=600, stdin=subprocess.DEVNULL)
+            except Exception as e:
+                GLib.idle_add(lambda: self._window.show_bug_toast("Action failed", detail=str(e), timeout=6))
+                return
+            out = (r.stdout or "") + (r.stderr or "")
+            ok = r.returncode == 0
+            msg = f"Optional drivers installed" if kind == "install" else f"Optional drivers removed"
+            if ok:
+                GLib.idle_add(lambda: self._window.show_toast(msg, timeout=4))
+            else:
+                tail = "\n".join(out.strip().splitlines()[-8:])
+                GLib.idle_add(lambda: self._window.show_bug_toast("Action failed", detail=tail or str(r.returncode), timeout=8))
+            GLib.idle_add(self._refresh_after_action)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _refresh_after_action(self) -> None:
+        self._load()
+        self._page._delayed_refresh()
+

@@ -1,0 +1,36 @@
+
+  <svg
+          xmlns='http://www.w3.org/2000/svg'
+          width='16'
+          height='16'
+          xmlns:gpa='https://www.gtk.org/grappa'
+          gpa:version='1'
+          gpa:state='0'
+          gpa:keywords='caffeine coffee mug cup'>
+    <path
+            id='cup'
+            fill='none'
+            stroke='url("#gpa:foreground") currentColor'
+            stroke-width='2'
+            stroke-linecap='round'
+            stroke-linejoin='round'
+            d='M 2 6 L 12 6 L 11 13 L 3 13 L 2 6 Z M 12 7 C 13.6568546 7 15 8.34314585 15 10 C 15 11.6568546 13.6568546 13 12 13'
+            class='transparent-fill foreground-stroke'
+            gpa:stroke-width='0.5 2 3'
+            gpa:stroke='foreground'
+            gpa:fill='none'>
+    </path>
+    <path
+            id='steam'
+            fill='none'
+            stroke='url("#gpa:foreground") currentColor'
+            stroke-width='1.5'
+            stroke-linecap='round'
+            stroke-linejoin='round'
+            d='M 5 4 C 4.5 3 5.5 2 5 1 M 8 4 C 7.5 3 8.5 2 8 1'
+            class='transparent-fill foreground-stroke'
+            gpa:stroke-width='0.5 1.5 2.5'
+            gpa:stroke='foreground'
+            gpa:fill='none'>
+    </path>
+  </svg>

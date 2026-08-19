@@ -22,6 +22,7 @@ import "defaults/system.js" as SystemDefaults
 import "defaults/tools.js" as ToolsDefaults
 import "defaults/dock.js" as DockDefaults
 import "defaults/ai.js" as AiDefaults
+import "defaults/dashboard.js" as DashboardDefaults
 import "ConfigValidator.js" as ConfigValidator
 
 Singleton {
@@ -55,11 +56,12 @@ Singleton {
     property bool prefixReady: false
     property bool systemReady: false
     property bool dockReady: false
+    property bool dashboardReady: false
     property bool aiReady: false
     property bool toolsReady: false
     property bool keybindsInitialLoadComplete: false
 
-    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && aiReady && toolsReady
+    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && aiReady && toolsReady
 
     // Compatibility aliases
     property alias loader: themeLoader
@@ -88,6 +90,7 @@ Singleton {
             "cp -n '" + root.presetDir + "/ai.json' '" + root.configDir + "/ai.json' 2>/dev/null || true; " +
             "cp -n '" + root.presetDir + "/system.json' '" + root.configDir + "/system.json' 2>/dev/null || true; " +
             "cp -n '" + root.presetDir + "/tools.json' '" + root.configDir + "/tools.json' 2>/dev/null || true; " +
+            "cp -n '" + root.presetDir + "/dashboard.json' '" + root.configDir + "/dashboard.json' 2>/dev/null || true; " +
             "echo 'Preset files copied if missing'"
         ]
     }
@@ -558,6 +561,7 @@ Singleton {
             property bool showWifiPopup: false
             property bool showBluetoothPopup: false
             property bool showQuickSharePopup: false
+            property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
         }
     }
 
@@ -596,6 +600,7 @@ Singleton {
         }
 
         adapter: JsonAdapter {
+            property bool enabled: true
             property int shown: 10
             property bool showAppIcons: true
             property bool alwaysShowNumbers: false
@@ -1174,6 +1179,46 @@ Singleton {
             property list<string> ignoredAppRegexes: ["quickshell.*", "xdg-desktop-portal.*"]
             property list<string> screenList: []
             property bool keepHidden: false
+        }
+    }
+
+    // ============================================
+    // DASHBOARD MODULE
+    // ============================================
+    FileView {
+        id: dashboardLoader
+        path: root.configDir + "/dashboard.json"
+        atomicWrites: true
+        watchChanges: true
+        onLoaded: {
+            if (!root.dashboardReady) {
+                validateModule("dashboard", dashboardLoader, DashboardDefaults.data, () => {
+                    root.dashboardReady = true;
+                });
+            }
+        }
+        onLoadFailed: {
+            if (error.toString().includes("FileNotFound") && !root.dashboardReady) {
+                handleMissingConfig("dashboard", dashboardLoader, DashboardDefaults.data, () => {
+                    root.dashboardReady = true;
+                });
+            }
+        }
+        onFileChanged: {
+            root.pauseAutoSave = true;
+            reload();
+            root.pauseAutoSave = false;
+        }
+        onPathChanged: reload()
+        onAdapterUpdated: {
+            if (root.dashboardReady && !root.pauseAutoSave) {
+                dashboardLoader.writeAdapter();
+            }
+        }
+
+        adapter: JsonAdapter {
+            property var widgetOrder: ["player", "quickactions", "notifications", "controls"]
+            property var controlOrder: ["wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight"]
         }
     }
 
@@ -3530,6 +3575,9 @@ Singleton {
 
     // Dock configuration
     property QtObject dock: dockLoader.adapter
+
+    // Dashboard configuration
+    property QtObject dashboard: dashboardLoader.adapter
 
     // Pinned apps configuration (stored in dataPath)
     property QtObject pinnedApps: pinnedAppsLoader.adapter

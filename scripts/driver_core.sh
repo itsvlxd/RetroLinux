@@ -281,8 +281,6 @@ detect_other() {
 }
 
 _gpu_generation() {
-    # Heuristic from the model string: returns "turing_plus" for GPUs that
-    # work with nvidia-open-dkms, "legacy" otherwise.
     local model="$1"
     if echo "$model" | grep -qiE "RTX (20[0-9]{2}|30[0-9]{2}|40[0-9]{2}|50[0-9]{2}|16[0-9]{2})|GTX 16|Turing|Ampere|Ada|Blackwell"; then
         echo "turing_plus"
@@ -292,8 +290,6 @@ _gpu_generation() {
 }
 
 _nvidia_dkms_pkg() {
-    # Prefer the proprietary dkms for legacy GPUs when available, else fall
-    # back to the open driver so the list stays installable.
     if pacman -Si nvidia-dkms >/dev/null 2>&1; then
         echo "nvidia-dkms"
     else
@@ -452,10 +448,8 @@ _aur_fetch_network_driver() {
     command -v paru >/dev/null 2>&1 && helper="paru"
     command -v "$helper" >/dev/null 2>&1 || return 1
     local terms=()
-    # Prefer searching by chip name from the model string (RTL8852BE -> rtl8852be-dkms).
     local chip=$(echo "$model" | grep -oiE "RTL[0-9]+[A-Z]*|MT[0-9]+|MT792[0-9]|AX[0-9]+" | head -1 | tr '[:upper:]' '[:lower:]')
     [[ -n $chip ]] && terms+=("${chip}-dkms" "${chip}")
-    # Fall back to mapping known hex device ids to their package names.
     if [[ -n $device_id ]]; then
         local known=$(_realtek_wifi_pkg_by_id "$device_id")
         [[ -n $known ]] && terms+=("$known")
@@ -496,7 +490,6 @@ get_other_packages() {
 
 get_firmware_packages() {
     local pkgs="linux-firmware sof-firmware"
-    # Vendor-specific firmware subpackages when matching hardware is present.
     local gpus=$(detect_gpus)
     if echo "$gpus" | grep -qE "^\S+\|\S+\|intel\|"; then
         pkgs+=" linux-firmware-intel"
@@ -561,6 +554,72 @@ get_profile_packages() {
             echo "$pkgs"
             ;;
     esac
+}
+
+list_profile_packages() {
+    local profile="$1"
+    local pkgs=$(get_profile_packages "$profile")
+    [[ -z $pkgs ]] && return 0
+    local p ver
+    for p in $pkgs; do
+        ver=$(pacman -Q "$p" 2>/dev/null | awk '{print $2}')
+        if [[ -n $ver ]]; then
+            echo "PKG|${profile}|${p}|${ver}|installed"
+        else
+            echo "PKG|${profile}|${p}||missing"
+        fi
+    done
+}
+
+install_profile_packages() {
+    local profile="$1"
+    local pkgs=$(get_profile_packages "$profile")
+    [[ -z $pkgs ]] && { echo "PROFILE_NONE|$profile"; return 0; }
+    local missing=$(_get_missing "$pkgs")
+    if [[ -z $missing ]]; then
+        echo "PROFILE_INSTALLED|$profile"
+        return 0
+    fi
+    echo "PROFILE_MISSING|${profile}|${missing}"
+    install_packages "$missing"
+    local status=$?
+    if [[ $status -eq 0 ]]; then
+        echo "PROFILE_INSTALL_COMPLETE|$profile"
+    else
+        echo "PROFILE_INSTALL_FAILED|$profile"
+        return 1
+    fi
+}
+
+remove_profile_packages() {
+    local profile="$1"
+    local pkgs=$(get_profile_packages "$profile")
+    [[ -z $pkgs ]] && { echo "PROFILE_NONE|$profile"; return 0; }
+    local to_remove=""
+    local p
+    for p in $pkgs; do
+        _is_pkg_installed "$p" && to_remove+=" $p"
+    done
+    to_remove=$(echo "$to_remove" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ')
+    if [[ -z "$(echo "$to_remove" | xargs)" ]]; then
+        echo "PROFILE_NOTHING_INSTALLED|$profile"
+        return 0
+    fi
+    echo "PROFILE_REMOVING|${profile}|${to_remove}"
+    local helper="yay"
+    command -v paru >/dev/null 2>&1 && helper="paru"
+    if command -v "$helper" >/dev/null 2>&1; then
+        $helper -Rns --noconfirm $to_remove 2>&1
+    else
+        sudo pacman -Rns --noconfirm $to_remove 2>&1
+    fi
+    local status=$?
+    if [[ $status -eq 0 ]]; then
+        echo "PROFILE_REMOVE_COMPLETE|$profile"
+    else
+        echo "PROFILE_REMOVE_FAILED|$profile"
+        return 1
+    fi
 }
 
 get_service_hints() {
@@ -641,8 +700,6 @@ run_full_scan() {
     if [[ $npus != "NONE" && -n $npus ]]; then
         while IFS= read -r npu; do
             IFS='|' read -r vendor model driver <<<"$npu"
-            # NPU drivers are optional extras; keep the row for display but
-            # never count them among missing MAIN driver packages.
             results+="NPU|${vendor}|${model}|${driver}||\n"
         done <<<"$npus"
     fi
@@ -694,7 +751,6 @@ run_full_scan() {
     results+="SYS|rebar|${rebar}|||\n"
     local kern_warn=$(_kernel_warnings)
     [[ -n $kern_warn ]] && results+="WARN|${kern_warn}||||\n"
-    # GuC firmware check for Meteor Lake+
     local gpu_line=$(lspci -nn 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
     if echo "$gpu_line" | grep -qiE "meteor.*lake|Meteor|Arrow|Lunar|Battlemage"; then
         if [[ ! -d /lib/firmware/intel ]]; then
@@ -805,8 +861,6 @@ run_full_install_confirmed() {
 }
 
 _extra_driver_set() {
-    # All optional/AI packages relevant to the detected hardware: per-GPU
-    # compute stacks plus NPU accelerators. Prints space-separated names.
     local scan_data=$(run_full_scan)
     local extra_pkgs=""
     while IFS= read -r line; do
@@ -829,8 +883,6 @@ _extra_driver_set() {
 }
 
 run_extra_install() {
-    # Optional/AI drivers only: CUDA/ROCm/oneAPI stacks plus other extras.
-    # The base install (--install) never touches these.
     local scan_data=$(run_full_scan)
     local extra_pkgs=$(_extra_driver_set)
     local gpu_vendors_found=()
@@ -863,7 +915,6 @@ run_extra_install() {
 }
 
 list_extra_drivers() {
-    # Report which optional/AI packages are missing (no install).
     local unique_extra=$(_extra_driver_set)
     if [[ -z "$(echo "$unique_extra" | xargs)" ]]; then
         echo "NONE"
@@ -882,7 +933,6 @@ list_extra_drivers() {
 }
 
 list_installed_extra_drivers() {
-    # Report which optional/AI packages are installed (no changes).
     local unique_extra=$(_extra_driver_set)
     if [[ -z "$(echo "$unique_extra" | xargs)" ]]; then
         echo "NONE"
@@ -901,7 +951,7 @@ list_installed_extra_drivers() {
 }
 
 run_extra_uninstall() {
-    # Remove installed optional/AI drivers, with an interactive prompt.
+    local assume_yes="$1"
     local installed=$(_extra_driver_set)
     local to_remove=""
     for p in $installed; do
@@ -913,11 +963,13 @@ run_extra_uninstall() {
         return 0
     fi
     echo "EXTRA_UNINSTALL_PKGS:$to_remove"
-    printf "Remove optional extra drivers? [y/N]: " >&2
-    read -r confirm
-    if [[ ! $confirm =~ ^[Yy]$ ]]; then
-        echo "EXTRA_UNINSTALL_CANCELLED"
-        return 0
+    if [[ $assume_yes != "--yes" ]]; then
+        printf "Remove optional extra drivers? [y/N]: " >&2
+        read -r confirm
+        if [[ ! $confirm =~ ^[Yy]$ ]]; then
+            echo "EXTRA_UNINSTALL_CANCELLED"
+            return 0
+        fi
     fi
     local helper="yay"
     command -v paru >/dev/null 2>&1 && helper="paru"
@@ -1101,8 +1153,6 @@ _list_all_modules() {
     if [[ ! -f ${mod_dir}/modules.dep && ! -f ${mod_dir}/modules.builtin ]]; then
         return 0
     fi
-    # Build a name -> full path map in a single awk pass (fast: one parse of
-    # modules.dep) instead of grepping the file per module.
     local tmp
     tmp=$(mktemp)
     {
@@ -1137,9 +1187,6 @@ _list_all_modules() {
 }
 
 _module_descs() {
-    # Batch descriptions for many modules in ONE subprocess invocation.
-    # Reads all module names from argv and prints DESC|<name>|<description>
-    # for each, reusing the builtin modinfo blob where possible.
     local kver=$(uname -r)
     local mod_dir="/lib/modules/${kver}"
     local blob=""
@@ -1520,12 +1567,10 @@ _fwupd_install() {
 }
 
 _hardware_specs() {
-    # CPU cores/threads
     local cpu_cores=$(grep -m1 "cpu cores" /proc/cpuinfo 2>/dev/null | awk -F': ' '{print $2}')
     local cpu_threads=$(grep -m1 "siblings" /proc/cpuinfo 2>/dev/null | awk -F': ' '{print $2}')
     [[ -n $cpu_cores && -n $cpu_threads ]] && echo "CPU|${cpu_cores}|${cpu_threads}"
 
-    # GPU compute units via device ID mapping
     local gpu_line=$(lspci -nn 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
     if [[ -n $gpu_line ]]; then
         local pci_id=$(echo "$gpu_line" | awk '{print $1}')
@@ -1544,13 +1589,13 @@ _hardware_specs() {
         if [[ $vendor == "intel" && -n $gpu_device ]]; then
             local xe_cores=""
             case "$gpu_device" in
-                7d45|7d55|7d40|7d60) xe_cores="8" ;;  # Meteor/Arrow Lake integrated
-                7d67|7d68) xe_cores="8" ;;             # Lunar Lake integrated
-                56a0|56a1) xe_cores="32" ;;             # Arc A770
-                56a2|56a3) xe_cores="28" ;;             # Arc A750
-                56b0|56b1) xe_cores="16" ;;             # Arc A580
-                56b2|56b3) xe_cores="8" ;;              # Arc A380
-                56c0|56c1) xe_cores="8" ;;              # Arc A310
+                7d45|7d55|7d40|7d60) xe_cores="8" ;;
+                7d67|7d68) xe_cores="8" ;;
+                56a0|56a1) xe_cores="32" ;;
+                56a2|56a3) xe_cores="28" ;;
+                56b0|56b1) xe_cores="16" ;;
+                56b2|56b3) xe_cores="8" ;;
+                56c0|56c1) xe_cores="8" ;;
                 *) xe_cores="" ;;
             esac
             echo "GPU|${vendor}|${xe_cores}|Xe Cores|${gpu_device}|${raw_model}"
@@ -1573,17 +1618,16 @@ _hardware_specs() {
         elif [[ $vendor == "amd" && -n $gpu_device ]]; then
             local sp_count=""
             case "$gpu_device" in
-                164e|164f|1650) sp_count="512" ;;  # RX 6400/6500
-                73df|73ff|743f) sp_count="2304" ;; # RX 7600
-                744c) sp_count="3840" ;;           # RX 7700 XT
-                747e) sp_count="5376" ;;           # RX 7800 XT
-                7643|74b5) sp_count="6144" ;;      # RX 7900 GRE
+                164e|164f|1650) sp_count="512" ;;
+                73df|73ff|743f) sp_count="2304" ;;
+                744c) sp_count="3840" ;;
+                747e) sp_count="5376" ;;
+                7643|74b5) sp_count="6144" ;;
             esac
             [[ -z $sp_count ]] || echo "GPU|${vendor}|${sp_count}|Stream Processors|${gpu_device}|${raw_model}"
         fi
     fi
 
-    # NPU TOPS — prefer vpu driver or Processing accelerators class
     local npu_line=$(lspci 2>/dev/null | grep -iE "Processing accelerators" | head -1)
     if [[ -z $npu_line ]]; then
         npu_line=$(lspci 2>/dev/null | grep -iE "NPU" | head -1)
@@ -1669,19 +1713,16 @@ generate_hypr_env() {
         esac
     fi
 
-    # Ensure file exists with header
     if [[ ! -f $env_file ]]; then
         echo "-- GPU driver environment (generated by retro driver)" > "$env_file"
     fi
 
-    # Strip old GPU env lines and surrounding blank/comment lines
     for var in LIBVA_DRIVER_NAME __GLX_VENDOR_LIBRARY_NAME GBM_BACKEND NVD_BACKEND VDPAU_DRIVER mesa_glthread; do
         sed -i "/hl.env(\"${var}\"/d" "$env_file" 2>/dev/null
     done
     sed -i '/^-- .*GPU.*$/d' "$env_file" 2>/dev/null
     sed -i '/^$/N;/^\n$/D' "$env_file" 2>/dev/null
 
-    # Build new GPU section
     local new_section=""
     local result_line=""
     if $is_hybrid; then
@@ -1719,7 +1760,6 @@ generate_hypr_env() {
         result_line="result=warn|no_gpu_detected"
     fi
 
-    # Insert GPU section after the first line (header), before remaining content
     local tmp=$(mktemp)
     {
         sed -n '1p' "$env_file"
@@ -1893,7 +1933,6 @@ _thermal_readings() {
     local gpu_temp=""
     local npu_temp=""
 
-    # CPU — x86_pkg_temp or similar
     local cpu_zone=$(find /sys/class/thermal -maxdepth 1 -name "thermal_zone*" 2>/dev/null | while read z; do
         [[ $(cat "$z/type" 2>/dev/null) == "x86_pkg_temp" ]] && echo "$z" && break
     done)
@@ -1905,7 +1944,6 @@ _thermal_readings() {
     fi
     [[ -n $cpu_temp ]] && echo "CPU|${cpu_temp}"
 
-    # GPU — DRM hwmon
     local gpu_hwmon=$(find /sys/class/drm -maxdepth 2 -path "*/hwmon/hwmon*/temp1_input" 2>/dev/null | head -1)
     if [[ -z $gpu_hwmon ]]; then
         gpu_hwmon=$(find /sys/class/drm -maxdepth 3 -path "*/device/hwmon/hwmon*/temp1_input" 2>/dev/null | head -1)
@@ -1917,7 +1955,6 @@ _thermal_readings() {
     fi
     [[ -n $gpu_temp ]] && echo "GPU|${gpu_temp}"
 
-    # NPU — look for thermal zone with npu/vpu in type name
     local npu_zone=$(find /sys/class/thermal -maxdepth 1 -name "thermal_zone*" 2>/dev/null | while read z; do
         local t=$(cat "$z/type" 2>/dev/null)
         [[ $t == *"npu"* || $t == *"vpu"* || $t == *"NPU"* ]] && echo "$z" && break
@@ -1958,7 +1995,6 @@ _configure_intel() {
     echo "options xe force_probe=${device_id}" | sudo tee -a "$conf_file" >/dev/null
     echo "MODPROBE_CONFIGURED|${device_id}"
 
-    # Set INTEL_DEBUG=norbc globally
     local env_file="/etc/environment"
     if grep -q "^INTEL_DEBUG=" "$env_file" 2>/dev/null; then
         sudo sed -i "s|^INTEL_DEBUG=.*|INTEL_DEBUG=norbc|" "$env_file"
@@ -1967,7 +2003,6 @@ _configure_intel() {
     fi
     echo "INTEL_DEBUG_SET|norbc"
 
-    # Ensure firmware is installed
     if ! _is_pkg_installed "linux-firmware-intel" && ! ls /lib/firmware/intel/*.bin 2>/dev/null | head -1 | grep -q .; then
         echo "WARN|linux-firmware-intel recommended for xe driver"
     fi
@@ -1995,7 +2030,10 @@ case "$1" in
     "--install-extra") run_extra_install ;;
     "--extra-list") list_extra_drivers ;;
     "--extra-installed") list_installed_extra_drivers ;;
-    "--extra-uninstall") run_extra_uninstall ;;
+    "--extra-uninstall") run_extra_uninstall "$2" ;;
+    "--profile-list") list_profile_packages "$2" ;;
+    "--profile-install") install_profile_packages "$2" ;;
+    "--profile-remove") remove_profile_packages "$2" ;;
     "--verify") verify_install "$2" ;;
     "--info") show_device_info "$2" ;;
     "--services") get_service_hints ;;

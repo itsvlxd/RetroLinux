@@ -50,8 +50,14 @@ cmd_branch() {
                 git -C "$RETRO_DIR" reset --hard >/dev/null 2>&1
             fi
 
-            git -C "$RETRO_DIR" fetch origin --tags >/dev/null 2>&1 \
-                || { echo "result=error|reason=fetch_failed"; return 1; }
+            local fetch_err
+            fetch_err=$(git -C "$RETRO_DIR" fetch origin 2>&1)
+            if [[ $? -ne 0 ]]; then
+                local detail
+                detail=$(echo "$fetch_err" | head -1)
+                echo "result=error|reason=fetch_failed|detail=${detail}"
+                return 1
+            fi
 
             git -C "$RETRO_DIR" rev-parse --verify "origin/$target" >/dev/null 2>&1 \
                 || { echo "result=error|reason=branch_not_found|branch=$target"; return 1; }
@@ -87,7 +93,7 @@ cmd_branch() {
             local branch=$(rx_git_run rev-parse --abbrev-ref HEAD)
             [[ -z $branch || $branch == "N/A" ]] && { echo "count=-1"; return 0; }
 
-            git -C "$RETRO_DIR" fetch origin --tags >/dev/null 2>&1 || true
+            git -C "$RETRO_DIR" fetch origin >/dev/null 2>&1 || true
 
             if [[ $branch == "main" ]]; then
                 local cur=$(_stable_tag)

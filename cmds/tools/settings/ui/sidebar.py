@@ -16,6 +16,7 @@ from settings.ui.icons import (
     BINDS_ICON,
     BLUETOOTH_ICON,
     DAEMON_ICON,
+    DASHBOARD_ICON,
     DESKTOP_ICON,
     DISKS_ICON,
     DOCK_ICON,
@@ -149,6 +150,7 @@ class Sidebar:
         toolbar.add_top_bar(header)
 
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content.add_css_class("retro-sidebar")
         content.append(self._search_entry)
 
         scrolled = Gtk.ScrolledWindow()
@@ -248,6 +250,7 @@ class Sidebar:
         add_row(shell, "shell_notch", "Notch", NOTCH_ICON)
         add_row(shell, "shell_sidebar", "Sidebar", SIDEBAR_ICON)
         add_row(shell, "shell_frame", "Frame", FRAME_ICON)
+        add_row(shell, "shell_dashboard", "Dashboard", DASHBOARD_ICON)
         add_row(shell, "shell_workspaces", "Workspaces", WORKSPACES_ICON)
         add_row(shell, "shell_overview", "Overview", OVERVIEW_ICON)
         add_row(shell, "shell_dock", "Dock", DOCK_ICON)

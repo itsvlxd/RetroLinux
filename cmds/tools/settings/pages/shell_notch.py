@@ -6,9 +6,6 @@ watches that file with ``watchChanges`` and reloads on external writes, so
 changes apply live without a shell restart.
 """
 
-import os
-import subprocess
-import threading
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -69,13 +66,6 @@ class ShellNotchPage:
         self._build_display_group(display_group)
         content_box.append(display_group)
 
-        quickshare_group = Adw.PreferencesGroup(
-            title="Quick Share",
-            description="Show the Quick Share button in the dashboard and run the receiver.",
-        )
-        self._build_quickshare_group(quickshare_group)
-        content_box.append(quickshare_group)
-
         self._refresh_custom_text_visible()
         return toolbar
 
@@ -101,10 +91,6 @@ class ShellNotchPage:
         self._add_entry(group, "customText", "Custom Text",
                         placeholder="Enter text…",
                         subtitle="Text to display when custom is selected")
-
-    def _build_quickshare_group(self, group: Adw.PreferencesGroup) -> None:
-        self._add_switch(group, "quickshareEnabled", "Quick Share",
-                         subtitle="Show in dashboard and receive files when on")
 
     def _add_switch(self, group: Adw.PreferencesGroup, key: str, label: str,
                     subtitle: str = "") -> ManagedRow:
@@ -275,7 +261,11 @@ class ShellNotchPage:
         visible = self._data.get("noMediaDisplay", NOTCH_DEFAULTS["noMediaDisplay"]) == "custom"
         row.row.set_visible(visible)
 
+    def _write_live(self) -> None:
+        save_notch(self._data)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
 
@@ -285,32 +275,26 @@ class ShellNotchPage:
     def mark_saved(self) -> None:
         if not self.is_dirty():
             return
-        old_qs = bool(self._saved.get("quickshareEnabled", NOTCH_DEFAULTS["quickshareEnabled"]))
         save_notch(self._data)
         self._saved = dict(self._data)
         for key, mrow in self._rows.items():
             mrow.set_baseline(self._data.get(key, NOTCH_DEFAULTS[key]))
-        new_qs = bool(self._data.get("quickshareEnabled", NOTCH_DEFAULTS["quickshareEnabled"]))
-        if new_qs != old_qs:
-            self._apply_quickshare(new_qs)
-
-    @staticmethod
-    def _apply_quickshare(enabled: bool) -> None:
-        core = os.path.join(os.environ.get("RETRO_DIR", "/opt/retrolinux"), "scripts", "quickshare_core.sh")
-
-        def run():
-            subprocess.run(
-                ["bash", core, "--start" if enabled else "--stop"],
-                capture_output=True, text=True, timeout=30,
-                stdin=subprocess.DEVNULL,
-            )
-
-        threading.Thread(target=run, daemon=True).start()
 
     def discard(self) -> None:
         self._data = dict(self._saved)
         for mrow in self._rows.values():
             mrow.discard()
+        self._refresh_custom_text_visible()
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read notch.json (e.g. after applying a preset) and sync widgets."""
+        self._data = load_notch()
+        self._saved = dict(self._data)
+        for key, mrow in self._rows.items():
+            value = self._data.get(key, NOTCH_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
         self._refresh_custom_text_visible()
 
     def iter_pending_changes(self) -> Iterable[PendingChange]:
@@ -323,7 +307,6 @@ class ShellNotchPage:
                     "position": "Position",
                     "theme": "Theme",
                     "noMediaDisplay": "No Media Display",
-                    "quickshareEnabled": "Quick Share",
                 }.get(key, "Notch setting")
                 changed.append(label)
         if changed:

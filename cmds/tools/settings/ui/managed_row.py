@@ -182,6 +182,16 @@ class ManagedRow:
     def reset(self) -> None:
         self._apply(self._default)
 
+    def apply_value(self, value: Any) -> None:
+        """Set the row's value to *value* and refresh state indicators.
+
+        Public wrapper around the internal apply path — sets the widget via
+        its ``set_value_silent`` closure, updates indicators, and fires the
+        ``on_value_set`` callback (e.g. used when reloading from disk after
+        a preset/profile switch).
+        """
+        self._apply(value)
+
     def _apply(self, value: Any) -> None:
         self._set_silent(value)
         self.refresh()

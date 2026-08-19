@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import qs.modules.theme
@@ -259,6 +260,7 @@ FocusScope {
 
                             // 1. Icono centrado en el área base del botón (siempre fijo a la izquierda)
                             Image {
+                                id: actionImage
                                 width: root.buttonSize
                                 height: root.iconSize
                                 anchors.left: parent.left
@@ -269,6 +271,16 @@ FocusScope {
                                 sourceSize.height: root.iconSize * 2
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
+                            }
+
+                            // Tint image icons (e.g. Shazam) to match the text icon
+                            // fg color on hover/focus/press.
+                            MultiEffect {
+                                anchors.fill: actionImage
+                                source: actionImage
+                                visible: !!modelData.image
+                                colorization: 1.0
+                                colorizationColor: actionButton.pressed ? Styling.srItem("overprimary") : (index === root.currentIndex ? (highlight.targetItem ? highlight.item : Styling.srItem("primary")) : Colors.overBackground)
                             }
 
                             Text {

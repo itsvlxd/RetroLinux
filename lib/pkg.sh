@@ -2,6 +2,35 @@
 
 source "$RETRO_DIR/lib/variable.sh"
 
+rx_pkg_installed() {
+    local pkg="$1"
+    [[ -z $pkg ]] && return 1
+    pacman -Qq "$pkg" >/dev/null 2>&1
+}
+
+rx_pkg_uninstall() {
+    local list_file="$1"
+    [[ ! -f $list_file ]] && return 0
+
+    local all_pkgs=$(grep -v '^#' "$list_file" | xargs)
+    [[ -z $all_pkgs ]] && return 0
+
+    local installed_pkgs=()
+    for pkg in $all_pkgs; do
+        rx_pkg_installed "$pkg" && installed_pkgs+=("$pkg")
+    done
+
+    [[ ${#installed_pkgs[@]} -eq 0 ]] && return 0
+
+    rx_log "info" "Removing packages: ${PINK}${installed_pkgs[*]}${RESET}"
+
+    local remove_cmd="pacman -Rns --noconfirm"
+    if [[ $EUID -ne 0 ]]; then
+        remove_cmd="sudo pacman -Rns --noconfirm"
+    fi
+    $remove_cmd "${installed_pkgs[@]}"
+}
+
 rx_pkg_install() {
     local list_file="$1"
     local sudo_run="${2:-false}"
@@ -13,7 +42,7 @@ rx_pkg_install() {
     local missing_pkgs=()
     local skipped_pkgs=()
     for pkg in $all_pkgs; do
-        if pacman -Qq "$pkg" >/dev/null 2>&1; then
+        if rx_pkg_installed "$pkg"; then
             continue
         fi
 

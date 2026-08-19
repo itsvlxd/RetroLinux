@@ -528,7 +528,15 @@ class MiscPage:
 
     # ══ Lifecycle ══
 
+    def _write_live(self) -> None:
+        self._data["ocr"] = dict(self._ocr)
+        save_system(self._data)
+        save_weather(self._weather)
+        save_performance(self._perf)
+        save_tools(self._tools)
+
     def _notify_dirty(self) -> None:
+        self._write_live()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
 
@@ -573,6 +581,49 @@ class MiscPage:
             mrow.discard()
         for mrow in self._perf_rows.values():
             mrow.discard()
+        for key, spin in self._spin_rows.items():
+            spin.set_value(self._tools.get(key, TOOLS_DEFAULTS[key]))
+        self._preview_row.set_active(self._tools.get("previewCountdown", TOOLS_DEFAULTS["previewCountdown"]))
+        self._timer_enabled_row.set_active(self._tools.get("screenshotTimerEnabled", TOOLS_DEFAULTS["screenshotTimerEnabled"]))
+        self._portal_row.set_active(self._tools.get("recordingPortalEnabled", TOOLS_DEFAULTS["recordingPortalEnabled"]))
+        self._skin_tone_row.set_active(self._tools.get("emojiShowRecent", TOOLS_DEFAULTS["emojiShowRecent"]))
+        self._wall_anim_row.set_active(self._tools.get("wallpaperAnimatedPreview", TOOLS_DEFAULTS["wallpaperAnimatedPreview"]))
+        if hasattr(self, "_dir_entries"):
+            for key, entry in self._dir_entries.items():
+                entry.set_text(self._tools.get(key, TOOLS_DEFAULTS[key]))
+        res = self._tools.get("recordingResolution", TOOLS_DEFAULTS["recordingResolution"])
+        try:
+            self._res_row.set_selected(self._res_ids.index(res))
+        except ValueError:
+            self._res_row.set_selected(0)
+        self._write_live()
+
+    def reload_from_disk(self) -> None:
+        """Re-read the shell configs (e.g. after applying a preset) and sync widgets."""
+        self._data = load_system()
+        self._saved = dict(self._data)
+        self._ocr = dict(self._data.get("ocr", SYSTEM_OCR_DEFAULTS))
+        self._saved_ocr = dict(self._ocr)
+        self._weather = load_weather()
+        self._saved_weather = dict(self._weather)
+        self._perf = load_performance()
+        self._saved_perf = dict(self._perf)
+        self._tools = load_tools()
+        self._saved_tools = dict(self._tools)
+
+        for key, mrow in self._ocr_rows.items():
+            value = self._ocr.get(key, SYSTEM_OCR_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
+        for key, mrow in self._weather_rows.items():
+            value = self._weather.get(key, WEATHER_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
+        for key, mrow in self._perf_rows.items():
+            value = self._perf.get(key, PERFORMANCE_DEFAULTS[key])
+            mrow.apply_value(value)
+            mrow.set_baseline(value)
+
         for key, spin in self._spin_rows.items():
             spin.set_value(self._tools.get(key, TOOLS_DEFAULTS[key]))
         self._preview_row.set_active(self._tools.get("previewCountdown", TOOLS_DEFAULTS["previewCountdown"]))

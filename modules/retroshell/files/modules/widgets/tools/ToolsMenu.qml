@@ -12,6 +12,11 @@ ActionGrid {
 
     signal itemSelected
 
+    function recheck() {
+        Shazam.recheck();
+        Tesseract.recheck();
+    }
+
     QtObject {
         id: recordAction
         property string icon: ScreenRecorder.isRecording ? Icons.stop : Icons.recordScreen
@@ -33,61 +38,62 @@ ActionGrid {
         property string type: "button"
     }
 
+    QtObject {
+        id: ocrAction
+        property string icon: Icons.textT
+        property string tooltip: "OCR"
+        property string command: ""
+        property string type: "button"
+    }
+
     layout: "row"
     buttonSize: 48
     iconSize: 20
     spacing: 8
 
-    actions: [
-        {
-            icon: Icons.camera,
-            tooltip: "Screenshot",
-            command: ""
-        },
-        {
-            icon: Icons.screenshots,
-            tooltip: "Open Screenshots",
-            command: ""
-        },
-        {
-            type: "separator"
-        },
-        recordAction,
-        {
-            icon: Icons.recordings,
-            tooltip: "Open Recordings",
-            command: ""
-        },
-        {
-            type: "separator"
-        },
-        {
-            icon: Icons.picker,
-            tooltip: "Color Picker",
-            command: ""
-        },
-        {
-            icon: Icons.textT,
-            tooltip: "OCR",
-            command: ""
-        },
-        {
-            icon: Icons.qrCode,
-            tooltip: "QR Code",
-            command: ""
-        },
-        {
-            icon: Icons.google,
-            tooltip: "Google Lens",
-            command: ""
-        },
-        shazamAction,
-        {
-            icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
-            tooltip: "Webcam Overlay",
-            command: ""
+    function itemFor(id) {
+        switch (id) {
+        case "separator":
+            return { type: "separator" };
+        case "screenshot":
+            return { icon: Icons.camera, tooltip: "Screenshot", command: "" };
+        case "screenshots":
+            return { icon: Icons.screenshots, tooltip: "Open Screenshots", command: "" };
+        case "recorder":
+            return recordAction;
+        case "recordings":
+            return { icon: Icons.recordings, tooltip: "Open Recordings", command: "" };
+        case "colorpicker":
+            return { icon: Icons.picker, tooltip: "Color Picker", command: "" };
+        case "ocr":
+            return Tesseract.available ? ocrAction : null;
+        case "qr":
+            return { icon: Icons.qrCode, tooltip: "QR Code", command: "" };
+        case "lens":
+            return { icon: Icons.google, tooltip: "Google Lens", command: "" };
+        case "shazam":
+            return Shazam.available ? shazamAction : null;
+        case "webcam":
+            return {
+                icon: GlobalStates.webcamOverlayVisible ? Icons.webcamSlash : Icons.webcam,
+                tooltip: "Webcam Overlay",
+                command: ""
+            };
         }
-    ]
+        return null;
+    }
+
+    actions: {
+        const order = (Config.bar && Config.bar.toolboxOrder)
+            ? Config.bar.toolboxOrder : ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"];
+        const result = [];
+        for (let i = 0; i < order.length; i++) {
+            const item = itemFor(order[i]);
+            if (item)
+                result.push(item);
+        }
+        return result;
+    }
 
     Process {
         id: colorPickerProc
