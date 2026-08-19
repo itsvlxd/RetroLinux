@@ -9,6 +9,18 @@ setup_network() {
     sudo -v
     rx_log "info" "Configuring network connection..."
 
+    _wait_internet() {
+        local try=0
+        while (( try < 15 )); do
+            if ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+                return 0
+            fi
+            sleep 1
+            ((try++))
+        done
+        return 1
+    }
+
     sudo systemctl enable NetworkManager.service 2>&1 | tail -1
     sudo systemctl start NetworkManager.service 2>&1 | tail -1
     sleep 2
@@ -75,14 +87,18 @@ setup_network() {
         status=$(echo "$conn_result" | grep -oP "result=\K[^|]+")
 
         if [[ $status == "success" || $status == "already_connected" ]]; then
-            rx_log "success" "WiFi connected: $WIFI_SSID"
-            
-            sudo nmcli connection modify "$WIFI_SSID" connection.interface-name "" 2>/dev/null || true
-            sudo nmcli connection modify "$WIFI_SSID" 802-11-wireless.cloned-mac-address "random" 2>/dev/null || true
-            sudo nmcli connection up "$WIFI_SSID" 2>/dev/null || true
-            
-            rx_log "info" "WiFi connection made persistent (interface-agnostic)"
-            return 0
+            if ! _wait_internet; then
+                rx_log "warn" "WiFi connected to $WIFI_SSID but no internet yet, retrying..."
+            else
+                rx_log "success" "WiFi connected: $WIFI_SSID"
+
+                sudo nmcli connection modify "$WIFI_SSID" connection.interface-name "" 2>/dev/null || true
+                sudo nmcli connection modify "$WIFI_SSID" 802-11-wireless.cloned-mac-address "random" 2>/dev/null || true
+                sudo nmcli connection up "$WIFI_SSID" 2>/dev/null || true
+
+                rx_log "info" "WiFi connection made persistent (interface-agnostic)"
+                return 0
+            fi
         else
             rx_log "warn" "WiFi connection failed, trying alternative method..."
 
@@ -96,14 +112,18 @@ setup_network() {
             status=$(echo "$conn_result" | grep -oP "result=\K[^|]+")
 
             if [[ $status == "success" ]]; then
-                rx_log "success" "WiFi connected: $WIFI_SSID"
-                
-                sudo nmcli connection modify "$WIFI_SSID" connection.interface-name "" 2>/dev/null || true
-                sudo nmcli connection modify "$WIFI_SSID" 802-11-wireless.cloned-mac-address "random" 2>/dev/null || true
-                sudo nmcli connection up "$WIFI_SSID" 2>/dev/null || true
-                
-                rx_log "info" "WiFi connection made persistent (interface-agnostic)"
-                return 0
+                if ! _wait_internet; then
+                    rx_log "warn" "WiFi connected to $WIFI_SSID but no internet yet, trying scan..."
+                else
+                    rx_log "success" "WiFi connected: $WIFI_SSID"
+
+                    sudo nmcli connection modify "$WIFI_SSID" connection.interface-name "" 2>/dev/null || true
+                    sudo nmcli connection modify "$WIFI_SSID" 802-11-wireless.cloned-mac-address "random" 2>/dev/null || true
+                    sudo nmcli connection up "$WIFI_SSID" 2>/dev/null || true
+
+                    rx_log "info" "WiFi connection made persistent (interface-agnostic)"
+                    return 0
+                fi
             fi
         fi
     fi
@@ -148,16 +168,20 @@ setup_network() {
                         status=$(echo "$conn_result" | grep -oP "result=\K[^|]+")
 
                         if [[ $status == "success" ]]; then
-                            WIFI_SSID="$selected_ssid"
-                            WIFI_PASSWORD="$wifi_password"
-                            rx_log "success" "WiFi connected: $selected_ssid"
-                            
-                            sudo nmcli connection modify "$selected_ssid" connection.interface-name "" 2>/dev/null || true
-                            sudo nmcli connection modify "$selected_ssid" 802-11-wireless.cloned-mac-address "random" 2>/dev/null || true
-                            sudo nmcli connection up "$selected_ssid" 2>/dev/null || true
-                            
-                            rx_log "info" "WiFi connection made persistent (interface-agnostic)"
-                            return 0
+                            if ! _wait_internet; then
+                                rx_log "error" "Connected to $selected_ssid but no internet"
+                            else
+                                WIFI_SSID="$selected_ssid"
+                                WIFI_PASSWORD="$wifi_password"
+                                rx_log "success" "WiFi connected: $selected_ssid"
+
+                                sudo nmcli connection modify "$selected_ssid" connection.interface-name "" 2>/dev/null || true
+                                sudo nmcli connection modify "$selected_ssid" 802-11-wireless.cloned-mac-address "random" 2>/dev/null || true
+                                sudo nmcli connection up "$selected_ssid" 2>/dev/null || true
+
+                                rx_log "info" "WiFi connection made persistent (interface-agnostic)"
+                                return 0
+                            fi
                         else
                             rx_log "error" "Failed to connect to $selected_ssid"
                         fi
