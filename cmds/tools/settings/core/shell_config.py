@@ -101,6 +101,20 @@ TOOLBOX_DEFAULT_ORDER: list = [
 
 TOOLBOX_MIN_ITEMS = 5
 
+# Sections inside the clock ("Time, Weather & Calendar") popup. Rendered in
+# the order listed by ``Clock.qml``; ``clockOrder`` in bar.json controls the
+# popup section order. Each id maps to one section component in Clock.qml.
+CLOCK_ITEMS: dict = {
+    "clock": ("Time & Calendar", "Time and date card with the month calendar", "clock-symbolic"),
+    "weather": ("Weather", "Live conditions and the 7-day forecast", "weather-clear-symbolic"),
+    "pomodoro": ("Pomodoro", "Focus timer", "hourglass-symbolic"),
+}
+
+# Default order mirrors the hardcoded layout in Clock.qml's popup.
+CLOCK_DEFAULT_ORDER: list = ["clock", "weather", "pomodoro"]
+
+CLOCK_MIN_ITEMS = 1
+
 # Bar items that can be reordered / shown-hide on each side of the shell bar.
 # Mirrors the components rendered in ``BarContent.qml``. Weather is part of the
 # Clock widget (symbol + temperature), so it is not a standalone item.
@@ -120,18 +134,24 @@ BAR_RIGHT_ITEMS: dict = {
     "quickshare": ("Quick Share", "Open the Quick Share panel", "emblem-shared-symbolic"),
     "controls": ("Audio Controls", "Volume, brightness and microphone", "audio-speakers-symbolic"),
     "battery": ("Battery", "Show battery level", "battery-symbolic"),
-    "clock": ("Clock & Weather", "Time, date, calendar and weather", "clock-symbolic"),
+    "clock": ("Time, Weather & Calendar", "Time, date, calendar and weather", "clock-symbolic"),
     "power": ("Power Button", "Open the power menu", "system-shutdown-symbolic"),
 }
 
+# Unified catalog of every reorderable bar item (left + right), so an item keeps
+# its title/description/icon no matter which side it is dragged onto.
+BAR_ITEMS: dict = {**BAR_LEFT_ITEMS, **BAR_RIGHT_ITEMS}
+
 # Default left/right order mirrors the hardcoded layout in BarContent.qml.
-BAR_LEFT_DEFAULT_ORDER: list = ["launcher", "workspaces", "layout", "pin"]
+# The layout selector, presets and quick share items are hidden by default
+# (but still addable via the settings UI).
+BAR_LEFT_DEFAULT_ORDER: list = ["launcher", "workspaces", "pin"]
 BAR_RIGHT_DEFAULT_ORDER: list = [
-    "presets", "tools", "tray", "wifi", "bluetooth",
-    "quickshare", "controls", "battery", "clock", "power",
+    "tools", "tray", "wifi", "bluetooth",
+    "controls", "battery", "clock", "power",
 ]
 
-BAR_MIN_ITEMS = 3
+BAR_MIN_ITEMS = 0
 
 # Mirrors ``modules/retroshell/files/config/defaults/bar.js`` and the
 # JsonAdapter defaults in ``Config.qml`` (lines ~528-549).
@@ -157,15 +177,11 @@ BAR_DEFAULTS: dict = {
     "containBar": False,
     "keepBarShadow": False,
     "keepBarBorder": False,
-    "showLayoutChanger": True,
-    "showPresetsButton": True,
     "showWeatherTemp": False,
     "showDayOfWeek": False,
     "batteryStyle": "arch",
-    "showWifiPopup": False,
-    "showBluetoothPopup": False,
-    "showQuickSharePopup": False,
     "toolboxOrder": list(TOOLBOX_DEFAULT_ORDER),
+    "clockOrder": list(CLOCK_DEFAULT_ORDER),
     "barLeftOrder": list(BAR_LEFT_DEFAULT_ORDER),
     "barRightOrder": list(BAR_RIGHT_DEFAULT_ORDER),
 }

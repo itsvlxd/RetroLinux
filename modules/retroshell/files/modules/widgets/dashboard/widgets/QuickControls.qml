@@ -21,6 +21,22 @@ StyledRect {
     property bool darkMode: true
     property bool dlLocked: false
 
+    property var controlOrder: (Config.dashboard && Config.dashboard.controlOrder)
+        ? Config.dashboard.controlOrder
+        : ["wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight"]
+
+    function controlComponentFor(id) {
+        switch (id) {
+        case "wifi": return wifiComponent;
+        case "bluetooth": return bluetoothComponent;
+        case "quickshare": return quickshareComponent;
+        case "caffeine": return caffeineComponent;
+        case "darkmode": return darkModeComponent;
+        case "nightlight": return nightLightComponent;
+        }
+        return undefined;
+    }
+
     Process { id: dlProc; running: false; stdout: SplitParser {} }
     Timer { id: dlUnlock; interval: 3000; repeat: false; onTriggered: dlLocked = false }
 
@@ -83,142 +99,15 @@ StyledRect {
                     height: 48
                     spacing: 4
 
-                ControlButton {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    iconName: {
-                        if (!NetworkService.wifiEnabled)
-                            return Icons.wifiOff;
-                        const strength = NetworkService.networkStrength;
-                        if (strength === 0)
-                            return Icons.wifiHigh;
-                        if (strength < 25)
-                            return Icons.wifiNone;
-                        if (strength < 50)
-                            return Icons.wifiLow;
-                        if (strength < 75)
-                            return Icons.wifiMedium;
-                        return Icons.wifiHigh;
+                Repeater {
+                    model: root.controlOrder
+
+                    Loader {
+                        required property string modelData
+                        Layout.preferredWidth: 48
+                        Layout.preferredHeight: 48
+                        sourceComponent: root.controlComponentFor(modelData)
                     }
-                    isActive: NetworkService.wifiEnabled || root.expandedPanel === 0
-                    tooltipText: NetworkService.wifiEnabled ? "Wi-Fi: On" : "Wi-Fi: Off"
-                    onClicked: NetworkService.toggleWifi()
-                    onRightClicked: root.togglePanel(0)
-                    onLongPressed: root.togglePanel(0)
-                }
-
-                ControlButton {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    iconName: {
-                        if (!BluetoothService.enabled)
-                            return Icons.bluetoothOff;
-                        if (BluetoothService.connected)
-                            return Icons.bluetoothConnected;
-                        return Icons.bluetooth;
-                    }
-                    isActive: BluetoothService.enabled || root.expandedPanel === 1
-                    tooltipText: {
-                        if (!BluetoothService.enabled)
-                            return "Bluetooth: Off";
-                        if (BluetoothService.connected)
-                            return "Bluetooth: Connected";
-                        return "Bluetooth: On";
-                    }
-                    onClicked: BluetoothService.toggle()
-                    onRightClicked: root.togglePanel(1)
-                    onLongPressed: root.togglePanel(1)
-                }
-
-                ControlButton {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    visible: Config.notch.quickshareEnabled
-                    iconName: Icons.quickshare
-                    isActive: QuickShareService.running
-                    tooltipText: QuickShareService.running ? "Quick Share: On" : "Quick Share: Off"
-                    onClicked: QuickShareService.toggle()
-                    onRightClicked: root.togglePanel(2)
-                    onLongPressed: root.togglePanel(2)
-                }
-
-                ControlButton {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    iconName: Icons.caffeine
-                    isActive: CaffeineService.inhibit
-                    activeVariant: CaffeineService.timedMinutes > 0 ? "bg" : "primary"
-                    activeHoverVariant: CaffeineService.timedMinutes > 0 ? "focus" : "primaryfocus"
-                    tooltipText: CaffeineService.inhibit ? "Caffeine: On" : "Caffeine: Off"
-                    onClicked: CaffeineService.toggleInhibit()
-                    onRightClicked: root.togglePanel(3)
-                    onLongPressed: root.togglePanel(3)
-
-                    Item {
-                        anchors.fill: parent
-                        clip: true
-                        z: -1
-                        visible: CaffeineService.inhibit && CaffeineService.timedMinutes > 0
-
-                        Rectangle {
-                            id: caffeineFill
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            height: parent.height * (CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60))
-                            color: Styling.srItem("overprimary")
-                            opacity: 0.35
-
-                            Behavior on height {
-                                enabled: Config.animDuration > 0
-                                NumberAnimation {
-                                    duration: 1000
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
-                        }
-
-                        WavyLine {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            y: {
-                                var ratio = CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60);
-                                return parent.height * (1 - ratio) - height / 2;
-                            }
-                            height: 10
-                            color: Styling.srItem("overprimary")
-                            lineWidth: 2
-                            amplitudeMultiplier: 0.5
-                            frequency: 3
-                            running: CaffeineService.timedMinutes > 0
-                        }
-                    }
-                }
-
-                ControlButton {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    iconName: darkMode ? Icons.nightLight : Icons.sun
-                    isActive: darkMode
-                    tooltipText: darkMode ? "Dark Mode" : "Light Mode"
-                    onClicked: {
-                        if (dlLocked) return;
-                        dlLocked = true;
-                        darkMode = !darkMode;
-                        var rd = Quickshell.env("RETRO_DIR");
-                        dlProc.command = ["bash", rd + "/scripts/theme_core.sh", "--mode", darkMode ? "dark" : "light"];
-                        dlProc.running = true;
-                        dlUnlock.start();
-                    }
-                }
-
-                ControlButton {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    iconName: Icons.lightbulb
-                    isActive: NightLightService.active
-                    tooltipText: NightLightService.active ? "Night Light: On" : "Night Light: Off"
-                    onClicked: NightLightService.toggle()
                 }
                 }
             }
@@ -350,4 +239,160 @@ StyledRect {
             root.expandedPanel = index;
         }
     }
+    Component {
+        id: wifiComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: {
+                if (!NetworkService.wifiEnabled)
+                    return Icons.wifiOff;
+                const strength = NetworkService.networkStrength;
+                if (strength === 0)
+                    return Icons.wifiHigh;
+                if (strength < 25)
+                    return Icons.wifiNone;
+                if (strength < 50)
+                    return Icons.wifiLow;
+                if (strength < 75)
+                    return Icons.wifiMedium;
+                return Icons.wifiHigh;
+            }
+            isActive: NetworkService.wifiEnabled || root.expandedPanel === 0
+            tooltipText: NetworkService.wifiEnabled ? "Wi-Fi: On" : "Wi-Fi: Off"
+            onClicked: NetworkService.toggleWifi()
+            onRightClicked: root.togglePanel(0)
+            onLongPressed: root.togglePanel(0)
+        }
+    }
+
+    Component {
+        id: bluetoothComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: {
+                if (!BluetoothService.enabled)
+                    return Icons.bluetoothOff;
+                if (BluetoothService.connected)
+                    return Icons.bluetoothConnected;
+                return Icons.bluetooth;
+            }
+            isActive: BluetoothService.enabled || root.expandedPanel === 1
+            tooltipText: {
+                if (!BluetoothService.enabled)
+                    return "Bluetooth: Off";
+                if (BluetoothService.connected)
+                    return "Bluetooth: Connected";
+                return "Bluetooth: On";
+            }
+            onClicked: BluetoothService.toggle()
+            onRightClicked: root.togglePanel(1)
+            onLongPressed: root.togglePanel(1)
+        }
+    }
+
+    Component {
+        id: quickshareComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            visible: Config.notch.quickshareEnabled
+            iconName: Icons.quickshare
+            isActive: QuickShareService.running
+            tooltipText: QuickShareService.running ? "Quick Share: On" : "Quick Share: Off"
+            onClicked: QuickShareService.toggle()
+            onRightClicked: root.togglePanel(2)
+            onLongPressed: root.togglePanel(2)
+        }
+    }
+
+    Component {
+        id: caffeineComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: Icons.caffeine
+            isActive: CaffeineService.inhibit
+            activeVariant: CaffeineService.timedMinutes > 0 ? "bg" : "primary"
+            activeHoverVariant: CaffeineService.timedMinutes > 0 ? "focus" : "primaryfocus"
+            tooltipText: CaffeineService.inhibit ? "Caffeine: On" : "Caffeine: Off"
+            onClicked: CaffeineService.toggleInhibit()
+            onRightClicked: root.togglePanel(3)
+            onLongPressed: root.togglePanel(3)
+
+            Item {
+                anchors.fill: parent
+                clip: true
+                z: -1
+                visible: CaffeineService.inhibit && CaffeineService.timedMinutes > 0
+
+                Rectangle {
+                    id: caffeineFill
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: parent.height * (CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60))
+                    color: Styling.srItem("overprimary")
+                    opacity: 0.35
+
+                    Behavior on height {
+                        enabled: Config.animDuration > 0
+                        NumberAnimation {
+                            duration: 1000
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+
+                WavyLine {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    y: {
+                        var ratio = CaffeineService.totalSecondsRemaining / Math.max(1, CaffeineService.initialMinutes * 60);
+                        return parent.height * (1 - ratio) - height / 2;
+                    }
+                    height: 10
+                    color: Styling.srItem("overprimary")
+                    lineWidth: 2
+                    amplitudeMultiplier: 0.5
+                    frequency: 3
+                    running: CaffeineService.timedMinutes > 0
+                }
+            }
+        }
+    }
+
+    Component {
+        id: darkModeComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: root.darkMode ? Icons.nightLight : Icons.sun
+            isActive: root.darkMode
+            tooltipText: root.darkMode ? "Dark Mode" : "Light Mode"
+            onClicked: {
+                if (root.dlLocked) return;
+                root.dlLocked = true;
+                root.darkMode = !root.darkMode;
+                var rd = Quickshell.env("RETRO_DIR");
+                dlProc.command = ["bash", rd + "/scripts/theme_core.sh", "--mode", root.darkMode ? "dark" : "light"];
+                dlProc.running = true;
+                root.dlUnlock.start();
+            }
+        }
+    }
+
+    Component {
+        id: nightLightComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: Icons.lightbulb
+            isActive: NightLightService.active
+            tooltipText: NightLightService.active ? "Night Light: On" : "Night Light: Off"
+            onClicked: NightLightService.toggle()
+        }
+    }
+
 }

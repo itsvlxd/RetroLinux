@@ -553,15 +553,13 @@ Singleton {
             property bool containBar: false
             property bool keepBarShadow: false
             property bool keepBarBorder: false
-            property bool showLayoutChanger: true
-            property bool showPresetsButton: true
             property bool showWeatherTemp: false
             property bool showDayOfWeek: false
             property string batteryStyle: "arch"
-            property bool showWifiPopup: false
-            property bool showBluetoothPopup: false
-            property bool showQuickSharePopup: false
             property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
+            property var clockOrder: ["clock", "weather", "pomodoro"]
+            property var barLeftOrder: ["launcher", "workspaces", "pin"]
+            property var barRightOrder: ["tools", "tray", "wifi", "bluetooth", "controls", "battery", "clock", "power"]
         }
     }
 

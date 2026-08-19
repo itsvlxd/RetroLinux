@@ -161,10 +161,9 @@ class ShellDashboardPage:
                 subtitle=_WIDGET_DESCRIPTIONS.get(wid, ""),
             )
             row.set_subtitle_lines(2)
-            row.add_css_class("dashboard-drag-box")
 
             icon = Gtk.Image.new_from_icon_name(_WIDGET_ICONS.get(wid, "view-list-symbolic"))
-            icon.set_pixel_size(28)
+            icon.set_pixel_size(24)
             icon.add_css_class("dim-label")
             row.add_prefix(icon)
 
@@ -206,7 +205,6 @@ class ShellDashboardPage:
                 subtitle=_CONTROL_DESCRIPTIONS.get(cid, ""),
             )
             row.set_subtitle_lines(1)
-            row.add_css_class("dashboard-drag-box")
 
             icon = Gtk.Image.new_from_icon_name(_CONTROL_ICONS.get(cid, "emblem-system-symbolic"))
             icon.set_pixel_size(24)

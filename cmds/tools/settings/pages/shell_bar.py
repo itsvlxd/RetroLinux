@@ -13,13 +13,22 @@ persisted on Save, exactly like the other standalone pages.
 
 from collections.abc import Iterable
 import shutil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, GLib, Gtk
 
 from settings.core.pending import PendingChange
 from settings.core.shell_config import (
     BAR_DEFAULTS,
+    BAR_ITEMS,
+    BAR_LEFT_DEFAULT_ORDER,
+    BAR_LEFT_ITEMS,
+    BAR_MIN_ITEMS,
+    BAR_RIGHT_DEFAULT_ORDER,
+    BAR_RIGHT_ITEMS,
+    CLOCK_DEFAULT_ORDER,
+    CLOCK_ITEMS,
+    CLOCK_MIN_ITEMS,
     TOOLBOX_ITEMS,
     TOOLBOX_MIN_ITEMS,
     load_bar,
@@ -36,6 +45,11 @@ if TYPE_CHECKING:
 
 def _which(binary: str) -> bool:
     return shutil.which(binary) is not None
+
+
+def _markup(text: str) -> str:
+    """Escape text for use as an Adw row title/subtitle (parsed as markup)."""
+    return GLib.markup_escape_text(text, -1)
 
 # (key, config default) pairs rendered as an Adw.SwitchRow
 _SWITCH_KEYS = (
@@ -84,9 +98,44 @@ class ShellBarPage:
         )
         self._saved_tools_order: list[str] = list(self._tools_order)
         self._toolbox_rows: list[Adw.ActionRow] = []
-        self._toolbox_group: Adw.PreferencesGroup | None = None
+        self._toolbox_group: Adw.ExpanderRow | None = None
         self._toolbox_reorder = RowReorderController(
             move=self._move_toolbox, iter_rows=lambda: self._toolbox_rows
+        )
+
+        # Clock popup section order (persisted in bar.json). The "clock" bar
+        # item doubles as the accordion revealing these reorderable sections.
+        self._clock_order: list[str] = list(
+            self._data.get("clockOrder") or list(CLOCK_DEFAULT_ORDER)
+        )
+        self._saved_clock_order: list[str] = list(self._clock_order)
+        self._clock_rows: list[Adw.ActionRow] = []
+        self._clock_group: Adw.ExpanderRow | None = None
+        self._clock_reorder = RowReorderController(
+            move=self._move_clock, iter_rows=lambda: self._clock_rows
+        )
+
+        # Bar item order, shared across the left/right groups. ``_bar_order``
+        # is the global drag order; ``_bar_side`` maps each id to its side so an
+        # item can be dragged between the two groups. Persisted as
+        # ``barLeftOrder``/``barRightOrder``.
+        self._bar_order: list[str] = list(
+            self._data.get("barLeftOrder") or list(BAR_LEFT_DEFAULT_ORDER)
+        ) + list(self._data.get("barRightOrder") or list(BAR_RIGHT_DEFAULT_ORDER))
+        self._bar_side: dict[str, str] = {}
+        for it in (self._data.get("barLeftOrder") or list(BAR_LEFT_DEFAULT_ORDER)):
+            self._bar_side[it] = "left"
+        for it in (self._data.get("barRightOrder") or list(BAR_RIGHT_DEFAULT_ORDER)):
+            self._bar_side[it] = "right"
+        self._saved_bar_order: list[str] = list(self._bar_order)
+        self._saved_bar_side: dict[str, str] = dict(self._bar_side)
+        self._left_rows: list[Adw.ActionRow] = []
+        self._right_rows: list[Adw.ActionRow] = []
+        self._left_group: Adw.PreferencesGroup | None = None
+        self._right_group: Adw.PreferencesGroup | None = None
+        self._bar_reorder = RowReorderController(
+            move=self._move_bar,
+            iter_rows=lambda: self._left_rows + self._right_rows,
         )
 
     # ── Build ──
@@ -102,8 +151,21 @@ class ShellBarPage:
         self._build_bar_group(bar_group)
         content_box.append(bar_group)
 
-        self._build_toolbox()
-        content_box.append(self._toolbox_group)
+        self._left_group = Adw.PreferencesGroup(
+            title="Left Bar",
+            description="Items on the left of the bar. Drag to reorder or "
+                        "move an item to the right side.",
+        )
+        self._build_bar_group_rows(self._left_group, "left")
+        content_box.append(self._left_group)
+
+        self._right_group = Adw.PreferencesGroup(
+            title="Right Bar",
+            description="Items on the right of the bar. Drag to reorder or "
+                        "move an item to the left side.",
+        )
+        self._build_bar_group_rows(self._right_group, "right")
+        content_box.append(self._right_group)
 
         autohide_group = Adw.PreferencesGroup(
             title="Auto-hide",
@@ -139,11 +201,6 @@ class ShellBarPage:
             ("enableFirefoxPlayer", "Enable Firefox Player", "Show Firefox media controls in the bar"),
             ("showWeatherTemp", "Show Weather Temperature", "Display temperature in Celsius next to the weather icon"),
             ("showDayOfWeek", "Show Day of Week", "Show the day abbreviation (Mon, Tue...) beside the clock"),
-            ("showLayoutChanger", "Show Layout Changer", "Display the dwindle/master/scrolling layout selector in the bar"),
-            ("showPresetsButton", "Show Presets Button", "Display the presets manager button in the bar"),
-            ("showWifiPopup", "Show Wifi Button", "Show a Wi-Fi panel button in the bar"),
-            ("showBluetoothPopup", "Show Bluetooth Button", "Show a Bluetooth panel button in the bar"),
-            ("showQuickSharePopup", "Show Quick Share Button", "Show a Quick Share panel button in the bar"),
         ):
             self._add_switch(group, key, label, subtitle=sub)
 
@@ -160,28 +217,187 @@ class ShellBarPage:
         self._add_switch(group, "availableOnFullscreen", "Available on Fullscreen",
                          subtitle="Keep the bar visible over fullscreen apps")
 
-    # ── Toolbox ──
+    # ── Left / Right bar reorder ──
 
-    def _build_toolbox(self) -> None:
-        self._toolbox_group = Adw.PreferencesGroup(
-            title="Toolbox",
-            description="Order of the tools shown in the shell toolbox menu. "
-                        "Items whose package isn't installed are greyed out but stay draggable.",
-        )
+    def _build_bar_group_rows(self, group: Adw.PreferencesGroup, side: str) -> None:
         add_btn = Gtk.Button(icon_name="list-add-symbolic")
         add_btn.set_valign(Gtk.Align.CENTER)
         add_btn.add_css_class("flat")
-        add_btn.set_tooltip_text("Add a toolbox item or separator")
-        add_btn.connect("clicked", self._on_add_toolbox)
-        self._toolbox_group.set_header_suffix(add_btn)
+        add_btn.set_tooltip_text(f"Add an item to the {'left' if side == 'left' else 'right'} side")
+        add_btn.connect("clicked", lambda _b, s=side: self._on_add_bar(s))
+        group.set_header_suffix(add_btn)
+        self._rebuild_bar()
+
+    def _rebuild_bar(self, focus_idx: int = -1) -> None:
+        if self._left_group is None or self._right_group is None:
+            return
+        for row in self._left_rows:
+            self._left_group.remove(row)
+        for row in self._right_rows:
+            self._right_group.remove(row)
+        self._left_rows = []
+        self._right_rows = []
+        self._toolbox_group = None
+        self._toolbox_rows = []
+        self._clock_group = None
+        self._clock_rows = []
+
+        for idx, item in enumerate(self._bar_order):
+            side = self._bar_side.get(item, "left")
+            title, sub, icon_name = BAR_ITEMS.get(item, (item, "", "view-list-symbolic"))
+            group = self._left_group if side == "left" else self._right_group
+            side_items = [it for it in self._bar_order if self._bar_side.get(it) == side]
+
+            # The Toolbox bar item doubles as the accordion for the toolbox
+            # item order: expanding it reveals the tools in the shell toolbox.
+            row: Adw.ActionRow
+            if item == "tools":
+                expander = Adw.ExpanderRow(title=_markup(title), subtitle=_markup(sub), expanded=False)
+                self._toolbox_group = expander
+                add_btn = Gtk.Button(icon_name="list-add-symbolic")
+                add_btn.set_valign(Gtk.Align.CENTER)
+                add_btn.add_css_class("flat")
+                add_btn.set_tooltip_text("Add a toolbox item or separator")
+                add_btn.connect("clicked", self._on_add_toolbox)
+                expander.add_suffix(add_btn)
+                row = cast(Adw.ActionRow, expander)
+            # The Time, Weather & Calendar bar item doubles as the accordion
+            # for the clock popup section order.
+            elif item == "clock":
+                expander = Adw.ExpanderRow(title=_markup(title), subtitle=_markup(sub), expanded=False)
+                self._clock_group = expander
+                add_btn = Gtk.Button(icon_name="list-add-symbolic")
+                add_btn.set_valign(Gtk.Align.CENTER)
+                add_btn.add_css_class("flat")
+                add_btn.set_tooltip_text("Add a clock popup section")
+                add_btn.connect("clicked", self._on_add_clock)
+                expander.add_suffix(add_btn)
+                row = cast(Adw.ActionRow, expander)
+            else:
+                row = Adw.ActionRow(title=_markup(title), subtitle=_markup(sub))
+            row.set_subtitle_lines(2)
+
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            icon.set_pixel_size(24)
+            icon.add_css_class("dim-label")
+            row.add_prefix(icon)
+
+            handle = Gtk.Image.new_from_icon_name("drag-handle-symbolic")
+            handle.set_opacity(0.5)
+            handle.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(handle)
+
+            remove_btn = Gtk.Button(icon_name="user-trash-symbolic")
+            remove_btn.set_valign(Gtk.Align.CENTER)
+            remove_btn.add_css_class("flat")
+            remove_btn.set_tooltip_text("Remove from bar")
+            remove_btn.set_sensitive(len(side_items) > BAR_MIN_ITEMS)
+            remove_btn.connect("clicked", lambda _b, i=idx: self._on_remove_bar(i))
+            row.add_suffix(remove_btn)
+
+            # Every row shares the single controller, using its global combined
+            # index so an item can be dragged between the left and right groups.
+            # The accordion rows (tools/clock) host nested reorderable children,
+            # so their whole-row drag is bound to the drag handle instead: a
+            # whole-row drag source would capture the pointer first (ancestors
+            # before descendants) and hijack the inner toolbox/clock item drags.
+            if item in ("tools", "clock"):
+                self._bar_reorder.attach(row, idx, drag=False)
+                self._bar_reorder.attach_drag_source_to(handle, row, idx)
+            else:
+                self._bar_reorder.attach(row, idx)
+            group.add(row)
+            if side == "left":
+                self._left_rows.append(row)
+            else:
+                self._right_rows.append(row)
+
         self._rebuild_toolbox()
+        self._rebuild_clock()
+
+        if focus_idx >= 0:
+            all_rows = self._left_rows + self._right_rows
+            if focus_idx < len(all_rows):
+                all_rows[focus_idx].grab_focus()
+
+    def _move_bar(self, src: int, dst: int) -> bool:
+        n = len(self._bar_order)
+        if dst == src or not (0 <= src < n and 0 <= dst < n):
+            return False
+        item = self._bar_order.pop(src)
+        self._bar_order.insert(dst, item)
+        # Adopt the side of the neighbouring item, so dragging across the
+        # left/right boundary moves the item to the other group.
+        i = dst
+        if i > 0:
+            self._bar_side[item] = self._bar_side.get(self._bar_order[i - 1], "left")
+        else:
+            self._bar_side[item] = self._bar_side.get(self._bar_order[i + 1], "left")
+        self._notify_dirty()
+        self._rebuild_bar(dst)
+        return True
+
+    def _on_remove_bar(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._bar_order):
+            return
+        item = self._bar_order[idx]
+        side = self._bar_side.get(item, "left")
+        side_count = sum(1 for it in self._bar_order if self._bar_side.get(it) == side)
+        if side_count <= BAR_MIN_ITEMS:
+            self._window.show_toast("Keep at least 1 item on each side", timeout=2)
+            return
+        del self._bar_order[idx]
+        self._bar_side.pop(item, None)
+        self._notify_dirty()
+        self._rebuild_bar()
+
+    def _on_add_bar(self, side: str) -> None:
+        present = set(self._bar_order)
+        if side == "left":
+            available = [it for it in BAR_LEFT_ITEMS if it not in present]
+        else:
+            available = [it for it in BAR_RIGHT_ITEMS if it not in present]
+        if not available:
+            self._window.show_toast("All items for this side are already present", timeout=2)
+            return
+
+        catalog = BAR_LEFT_ITEMS if side == "left" else BAR_RIGHT_ITEMS
+        labels = [catalog[it][0] for it in available]
+
+        group = Adw.PreferencesGroup()
+        combo = Adw.ComboRow(title="Bar item")
+        combo.set_model(Gtk.StringList.new(labels))
+        combo.set_selected(0)
+        group.add(combo)
+
+        dialog = Adw.AlertDialog(heading="Add Bar Item", extra_child=group)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("add", "Add")
+        dialog.set_default_response("add")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "add":
+                return
+            idx = combo.get_selected()
+            if 0 <= idx < len(labels):
+                item = available[idx]
+                self._bar_order.append(item)
+                self._bar_side[item] = side
+                self._notify_dirty()
+                self._rebuild_bar()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── Toolbox ──
 
     def _rebuild_toolbox(self, focus_idx: int = -1) -> None:
         if self._toolbox_group is None:
             return
-        group = self._toolbox_group
+        expander = self._toolbox_group
         for row in self._toolbox_rows:
-            group.remove(row)
+            expander.remove(row)
         self._toolbox_rows = []
 
         for idx, tid in enumerate(self._tools_order):
@@ -194,7 +410,7 @@ class ShellBarPage:
                 if unavailable:
                     sub = f"Requires {pkg} (not installed)"
 
-            row = Adw.ActionRow(title=title, subtitle=sub)
+            row = Adw.ActionRow(title=_markup(title), subtitle=_markup(sub))
             row.set_subtitle_lines(2)
 
             icon = Gtk.Image.new_from_icon_name(icon_name)
@@ -220,7 +436,7 @@ class ShellBarPage:
             row.add_suffix(remove_btn)
 
             self._toolbox_reorder.attach(row, idx)
-            group.add(row)
+            expander.add_row(row)
             self._toolbox_rows.append(row)
 
         if focus_idx >= 0 and focus_idx < len(self._toolbox_rows):
@@ -283,6 +499,100 @@ class ShellBarPage:
         del self._tools_order[idx]
         self._notify_dirty()
         self._rebuild_toolbox()
+
+    # ── Clock ──
+
+    def _rebuild_clock(self, focus_idx: int = -1) -> None:
+        if self._clock_group is None:
+            return
+        expander = self._clock_group
+        for row in self._clock_rows:
+            expander.remove(row)
+        self._clock_rows = []
+
+        for idx, cid in enumerate(self._clock_order):
+            title, sub, icon_name = CLOCK_ITEMS.get(cid, (cid, "", "clock-symbolic"))
+
+            row = Adw.ActionRow(title=_markup(title), subtitle=_markup(sub))
+            row.set_subtitle_lines(2)
+
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            icon.set_pixel_size(24)
+            icon.add_css_class("dim-label")
+            row.add_prefix(icon)
+
+            handle = Gtk.Image.new_from_icon_name("drag-handle-symbolic")
+            handle.set_opacity(0.5)
+            handle.set_valign(Gtk.Align.CENTER)
+            row.add_suffix(handle)
+
+            remove_btn = Gtk.Button(icon_name="user-trash-symbolic")
+            remove_btn.set_valign(Gtk.Align.CENTER)
+            remove_btn.add_css_class("flat")
+            remove_btn.set_tooltip_text("Remove from clock popup")
+            remove_btn.set_sensitive(len(self._clock_order) > CLOCK_MIN_ITEMS)
+            remove_btn.connect("clicked", lambda _b, i=idx: self._on_remove_clock(i))
+            row.add_suffix(remove_btn)
+
+            self._clock_reorder.attach(row, idx)
+            expander.add_row(row)
+            self._clock_rows.append(row)
+
+        if focus_idx >= 0 and focus_idx < len(self._clock_rows):
+            self._clock_rows[focus_idx].grab_focus()
+
+    def _move_clock(self, src: int, dst: int) -> bool:
+        n = len(self._clock_order)
+        if dst == src or not (0 <= src < n and 0 <= dst < n):
+            return False
+        item = self._clock_order.pop(src)
+        self._clock_order.insert(dst, item)
+        self._notify_dirty()
+        self._rebuild_clock(dst)
+        return True
+
+    def _on_add_clock(self, _btn=None) -> None:
+        available = [cid for cid in CLOCK_ITEMS if cid not in self._clock_order]
+        if not available:
+            self._window.show_toast("All clock sections are already present", timeout=2)
+            return
+
+        labels = [CLOCK_ITEMS[cid][0] for cid in available]
+
+        group = Adw.PreferencesGroup()
+        combo = Adw.ComboRow(title="Clock section")
+        combo.set_model(Gtk.StringList.new(labels))
+        combo.set_selected(0)
+        group.add(combo)
+
+        dialog = Adw.AlertDialog(heading="Add Clock Section", extra_child=group)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("add", "Add")
+        dialog.set_default_response("add")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "add":
+                return
+            idx = combo.get_selected()
+            if 0 <= idx < len(labels):
+                cid = available[idx]
+                self._clock_order.append(cid)
+                self._notify_dirty()
+                self._rebuild_clock()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    def _on_remove_clock(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self._clock_order):
+            return
+        if len(self._clock_order) <= CLOCK_MIN_ITEMS:
+            self._window.show_toast(f"Keep at least {CLOCK_MIN_ITEMS} section", timeout=2)
+            return
+        del self._clock_order[idx]
+        self._notify_dirty()
+        self._rebuild_clock()
 
     # ── Row builders ──
 
@@ -448,10 +758,19 @@ class ShellBarPage:
         self._data[key] = value
         self._notify_dirty()
 
+    def _bar_split(self) -> tuple[list[str], list[str]]:
+        left = [it for it in self._bar_order if self._bar_side.get(it) == "left"]
+        right = [it for it in self._bar_order if self._bar_side.get(it) != "left"]
+        return left, right
+
     def _write_live(self) -> None:
         current = load_bar()
         current.update({key: self._data.get(key, BAR_DEFAULTS[key]) for key in self._rows})
         current["toolboxOrder"] = list(self._tools_order)
+        current["clockOrder"] = list(self._clock_order)
+        left, right = self._bar_split()
+        current["barLeftOrder"] = left
+        current["barRightOrder"] = right
         save_bar(current)
 
     def _notify_dirty(self) -> None:
@@ -463,17 +782,27 @@ class ShellBarPage:
 
     def is_dirty(self) -> bool:
         return (any(self._data.get(key) != self._saved.get(key) for key in self._rows)
-                or self._tools_order != self._saved_tools_order)
+                or self._tools_order != self._saved_tools_order
+                or self._clock_order != self._saved_clock_order
+                or self._bar_order != self._saved_bar_order
+                or self._bar_side != self._saved_bar_side)
 
     def mark_saved(self) -> None:
         current = load_bar()
         current.update({key: self._data.get(key, BAR_DEFAULTS[key]) for key in self._rows})
         current["toolboxOrder"] = list(self._tools_order)
+        current["clockOrder"] = list(self._clock_order)
+        left, right = self._bar_split()
+        current["barLeftOrder"] = left
+        current["barRightOrder"] = right
         save_bar(current)
         self._saved = dict(current)
         for key, mrow in self._rows.items():
             mrow.set_baseline(self._saved.get(key, BAR_DEFAULTS[key]))
         self._saved_tools_order = list(self._tools_order)
+        self._saved_clock_order = list(self._clock_order)
+        self._saved_bar_order = list(self._bar_order)
+        self._saved_bar_side = dict(self._bar_side)
 
     def discard(self) -> None:
         self._data = dict(self._saved)
@@ -481,6 +810,11 @@ class ShellBarPage:
             mrow.discard()
         self._tools_order = list(self._saved_tools_order)
         self._rebuild_toolbox()
+        self._clock_order = list(self._saved_clock_order)
+        self._rebuild_clock()
+        self._bar_order = list(self._saved_bar_order)
+        self._bar_side = dict(self._saved_bar_side)
+        self._rebuild_bar()
         self._write_live()
 
     def reload_from_disk(self) -> None:
@@ -494,6 +828,20 @@ class ShellBarPage:
         self._tools_order = list(self._data.get("toolboxOrder") or list(TOOLBOX_ITEMS))
         self._saved_tools_order = list(self._tools_order)
         self._rebuild_toolbox()
+        self._clock_order = list(self._data.get("clockOrder") or list(CLOCK_DEFAULT_ORDER))
+        self._saved_clock_order = list(self._clock_order)
+        self._rebuild_clock()
+        self._bar_order = list(
+            self._data.get("barLeftOrder") or list(BAR_LEFT_DEFAULT_ORDER)
+        ) + list(self._data.get("barRightOrder") or list(BAR_RIGHT_DEFAULT_ORDER))
+        self._bar_side = {}
+        for it in (self._data.get("barLeftOrder") or list(BAR_LEFT_DEFAULT_ORDER)):
+            self._bar_side[it] = "left"
+        for it in (self._data.get("barRightOrder") or list(BAR_RIGHT_DEFAULT_ORDER)):
+            self._bar_side[it] = "right"
+        self._saved_bar_order = list(self._bar_order)
+        self._saved_bar_side = dict(self._bar_side)
+        self._rebuild_bar()
 
     # ── Pending changes ──
 
@@ -508,14 +856,15 @@ class ShellBarPage:
                     "launcherIcon": "Launcher Icon",
                     "pillStyle": "Pill Style",
                     "batteryStyle": "Battery Style",
-                    "showLayoutChanger": "Layout Changer",
-                    "showWifiPopup": "Show Wifi Button",
-                    "showBluetoothPopup": "Show Bluetooth Button",
-                    "showQuickSharePopup": "Show Quick Share Button",
                 }.get(key, "Bar setting")
                 changed.append(label)
         if self._tools_order != self._saved_tools_order:
             changed.append("Toolbox")
+        if self._clock_order != self._saved_clock_order:
+            changed.append("Time, Weather & Calendar")
+        if (self._bar_order != self._saved_bar_order
+                or self._bar_side != self._saved_bar_side):
+            changed.append("Left/Right bar")
         if changed:
             yield PendingChange(
                 category="Shell Bar",
@@ -534,6 +883,12 @@ class ShellBarPage:
             {"key": "shell_bar:bar", "label": "Bar",
              "description": "Position, launcher icon, clock format",
              "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Bar"},
+            {"key": "shell_bar:left", "label": "Left Bar",
+             "description": "Reorder items on the left side of the bar",
+             "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Left Bar"},
+            {"key": "shell_bar:right", "label": "Right Bar",
+             "description": "Reorder items on the right side of the bar",
+             "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Right Bar"},
             {"key": "shell_bar:autohide", "label": "Bar Auto-hide",
              "description": "Pin, hover-to-reveal, fullscreen behaviour",
              "_group_id": "shell_bar", "_group_label": "Bar", "_section_label": "Auto-hide"},

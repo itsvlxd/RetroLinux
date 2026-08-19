@@ -68,11 +68,32 @@ class RowReorderController:
 
     # ── Attachment ──
 
-    def attach(self, row: Adw.ActionRow, idx: int) -> None:
-        """Attach drag, drop, and keyboard reorder to *row* at position *idx*."""
+    def attach(self, row: Adw.ActionRow, idx: int, drag: bool = True) -> None:
+        """Attach drag, drop, and keyboard reorder to *row* at position *idx*.
+
+        When *drag* is False the row keeps its drop target and keyboard
+        reorder (so it stays a valid destination and can still be moved with
+        Alt+↑/↓) but does not gain a ``Gtk.DragSource``.
+        """
         self.attach_keyboard(row, idx)
-        self._attach_drag_source(row, idx)
         self._attach_drop_target(row, idx)
+        if drag:
+            self._attach_drag_source(row, row, idx)
+
+    def attach_drag_source_to(self, drag_widget: Gtk.Widget, row: Adw.ActionRow, idx: int) -> None:
+        """Attach only the drag source to *drag_widget* while treating *row* as
+        the visual drag target.
+
+        Used for rows that host nested reorderable children (e.g. an accordion
+        expander whose expanded body contains its own draggable rows). A
+        whole-row ``Gtk.DragSource`` would fire first (drag sources handle input
+        in the capture phase, ancestors before descendants) and hijack the inner
+        drag, so the source is instead bound to a small handle widget. The drag
+        ghost icon and ``dragging-row`` styling come from *row* so the whole row
+        card is dragged, while *row* itself stays drag-free so its inner rows can
+        start their own drags.
+        """
+        self._attach_drag_source(drag_widget, row, idx)
 
     def attach_keyboard(self, row: Adw.ActionRow, idx: int) -> None:
         """Attach Alt+↑/↓ reorder only, for rows that don't support dragging."""
@@ -80,13 +101,13 @@ class RowReorderController:
         controller.connect("key-pressed", self._on_key_pressed, idx)
         row.add_controller(controller)
 
-    def _attach_drag_source(self, row: Adw.ActionRow, idx: int) -> None:
+    def _attach_drag_source(self, widget: Gtk.Widget, row: Adw.ActionRow, idx: int) -> None:
         source = Gtk.DragSource.new()
         source.set_actions(Gdk.DragAction.MOVE)
-        source.connect("prepare", self._on_drag_prepare, idx)
-        source.connect("drag-begin", self._on_drag_begin, idx)
-        source.connect("drag-end", self._on_drag_end)
-        row.add_controller(source)
+        source.connect("prepare", self._on_drag_prepare, row, idx)
+        source.connect("drag-begin", self._on_drag_begin, row, idx)
+        source.connect("drag-end", self._on_drag_end, row)
+        widget.add_controller(source)
 
     def _attach_drop_target(self, row: Adw.ActionRow, idx: int) -> None:
         target = Gtk.DropTarget.new(int, Gdk.DragAction.MOVE)
@@ -98,7 +119,7 @@ class RowReorderController:
     # ── Drag source ──
 
     def _on_drag_prepare(
-        self, _source: Gtk.DragSource, x: float, y: float, idx: int
+        self, _source: Gtk.DragSource, x: float, y: float, row: Adw.ActionRow, idx: int
     ) -> Gdk.ContentProvider:
         # Stash the press coords so ``drag-begin`` can use them as the icon's
         # hot spot. Setting the icon in ``prepare`` doesn't always stick: some
@@ -107,7 +128,7 @@ class RowReorderController:
         self._drag_press = (x, y)
         return Gdk.ContentProvider.new_for_value(GObject.Value(GObject.TYPE_INT, idx))
 
-    def _on_drag_begin(self, source: Gtk.DragSource, drag: Gdk.Drag, idx: int) -> None:
+    def _on_drag_begin(self, _source: Gtk.DragSource, drag: Gdk.Drag, row: Adw.ActionRow, idx: int) -> None:
         self._dragging_idx = idx
         press = self._drag_press or (0.0, 0.0)
         hot_x, hot_y = int(press[0]), int(press[1])
@@ -116,22 +137,18 @@ class RowReorderController:
         # isolation the row would be transparent, so a short-lived CSS class
         # gives it a solid background for the drag. ``Gtk.WidgetPaintable`` is
         # a live view, so it picks up the class on the next paint.
-        widget = source.get_widget()
-        if widget is not None:
-            widget.add_css_class("dragging-row")
-            source.set_icon(Gtk.WidgetPaintable.new(widget), hot_x, hot_y)
+        row.add_css_class("dragging-row")
+        _source.set_icon(Gtk.WidgetPaintable.new(row), hot_x, hot_y)
         # ``set_icon`` calls ``set_hotspot`` internally, but at least one
         # Wayland compositor (Hyprland) ignores the hot spot at that point;
         # repeating it against the live ``Gdk.Drag`` is harmless if redundant
         # and effective when the earlier call was lost.
         drag.set_hotspot(hot_x, hot_y)
 
-    def _on_drag_end(self, source: Gtk.DragSource, _drag: Gdk.Drag, _delete: bool) -> None:
+    def _on_drag_end(self, _source: Gtk.DragSource, _drag: Gdk.Drag, _delete: bool, row: Adw.ActionRow) -> None:
         self._dragging_idx = None
         self._drag_press = None
-        widget = source.get_widget()
-        if widget is not None:
-            widget.remove_css_class("dragging-row")
+        row.remove_css_class("dragging-row")
         # If the drop rebuilt the list before ``leave`` fired, dangling
         # indicator classes would carry over to rows reusing the same widgets.
         self._clear_indicators()
