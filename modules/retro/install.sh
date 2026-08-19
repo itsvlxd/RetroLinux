@@ -18,11 +18,28 @@ setup_cronie() {
 
     if systemctl is-active cronie.service &>/dev/null; then
         rx_log "info" "Cronie service is running"
+        return 0
+    fi
+
+    if ! systemctl list-unit-files cronie.service &>/dev/null | grep -q "cronie.service"; then
+        rx_log "warn" "cronie.service not found — cronie may not be installed"
+        return 1
+    fi
+
+    rx_log "info" "Enabling cronie service..."
+    local ok=true
+    if [[ $EUID -eq 0 ]]; then
+        systemctl enable cronie.service 2>/dev/null || ok=false
+        systemctl start cronie.service 2>/dev/null || ok=false
     else
-        rx_log "info" "Enabling cronie service..."
-        [[ $EUID -eq 0 ]] && systemctl enable cronie.service || sudo systemctl enable cronie.service
-        [[ $EUID -eq 0 ]] && systemctl start cronie.service || sudo systemctl start cronie.service
+        sudo systemctl enable cronie.service 2>/dev/null || ok=false
+        sudo systemctl start cronie.service 2>/dev/null || ok=false
+    fi
+
+    if [[ $ok == true ]]; then
         rx_log "success" "Cronie service enabled and started"
+    else
+        rx_log "warn" "Failed to enable/start cronie.service"
     fi
 }
 
