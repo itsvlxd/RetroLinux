@@ -1,3 +1,28 @@
+# [1.5.0](https://github.com/itsvlxd/RetroLinux/compare/v1.4.0...v1.5.0) (2026-08-19)
+
+
+### Bug Fixes
+
+* **branch:** fix git fetch branch ([e9d27bb](https://github.com/itsvlxd/RetroLinux/commit/e9d27bb7b690b7b4e7625c04be391191215ae7c8))
+* **driver:** fix ghost none driver optional ([e30e2a2](https://github.com/itsvlxd/RetroLinux/commit/e30e2a261ef0dd94e41a7544f2786e4fb6c59277))
+
+
+### Features
+
+* **lib:** add package install, uninstall and new module props ([1f78a2e](https://github.com/itsvlxd/RetroLinux/commit/1f78a2e1dffff6ca79e23117c5705b2c5670d05d))
+* **modules:** add package check condition ([733f11e](https://github.com/itsvlxd/RetroLinux/commit/733f11ec8a9fadd5135fb0c23a498f6fca914b9a))
+* **modules:** add shazam music recognition ([c31d8a1](https://github.com/itsvlxd/RetroLinux/commit/c31d8a108137b15a450a38fa1f6aa4f4173944b4))
+* **modules:** add tesseract ocr ([0598778](https://github.com/itsvlxd/RetroLinux/commit/0598778fc5b7416259bc49bb0e0277588604257d))
+* **retro:** add shell settings preview, dashboard & modular packages ([#10](https://github.com/itsvlxd/RetroLinux/issues/10)) ([32847b3](https://github.com/itsvlxd/RetroLinux/commit/32847b3b3060d5f6f1960396c2f6cce63a799f51))
+* **retroshell:** add support for dashboard widgets placement ([a32ae8a](https://github.com/itsvlxd/RetroLinux/commit/a32ae8a5bab59c4a6f5f11441988c2b94cf0dbd4))
+* **retroshell:** add toolbox customization ([a5ae5e0](https://github.com/itsvlxd/RetroLinux/commit/a5ae5e007f0cc07ecd2eecae1dd988165555a889))
+* **retroshell:** make toolbox shazam and ocr optional ([a07b82c](https://github.com/itsvlxd/RetroLinux/commit/a07b82c47542e195e1eb6ecdfc19ae91795b98d4))
+* **settings:** add card boder for themes and wallpapers ([c49e7ce](https://github.com/itsvlxd/RetroLinux/commit/c49e7ceda50ff52b39b224729f4b80ea41c7ad18))
+* **settings:** add dashboard shell settings ([add0ff3](https://github.com/itsvlxd/RetroLinux/commit/add0ff378485289c717903a6d72003717d651b51))
+* **settings:** add shell customization preview ([c7eceb6](https://github.com/itsvlxd/RetroLinux/commit/c7eceb6daf1228b639bf237fc5e38537bc9ec48d))
+* **settings:** add toggle for workspaces ([a1523a9](https://github.com/itsvlxd/RetroLinux/commit/a1523a9accb4f3fcc2d184239bb23e7e4c4c0536))
+* **tests:** add support for the new module props ([52f5d62](https://github.com/itsvlxd/RetroLinux/commit/52f5d62ec596625a1752e2f36f0120c453c04be0))
+
 # [1.4.0](https://github.com/itsvlxd/RetroLinux/compare/v1.3.0...v1.4.0) (2026-08-17)
 
 
