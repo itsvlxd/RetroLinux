@@ -231,6 +231,17 @@ EOF
             fi
             ;;
 
+        "dedup")
+            local result
+            result=$(bash "$core" --dedup 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Firewall ruleset deduplicated"
+            else
+                rx_log "error" "Failed to deduplicate firewall ruleset"
+                return 1
+            fi
+            ;;
+
         "rules")
             local data
             data=$(bash "$core" --rules 2>/dev/null)
@@ -506,6 +517,7 @@ EOF
             rx_help_cmd "on" "Enable and start firewall" 50
             rx_help_cmd "off" "Disable and stop firewall" 50
             rx_help_cmd "restart" "Restart firewall" 50
+            rx_help_cmd "dedup" "Remove duplicate firewall rules" 50
             rx_help_cmd "rules" "List all firewall rules" 50
             rx_help_cmd "add deny <port|ip> [both|tcp|udp]" "Append a deny rule" 50
             rx_help_cmd "add accept <port|ip> [both|tcp|udp]" "Append an accept rule" 50

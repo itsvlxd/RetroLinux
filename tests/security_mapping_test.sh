@@ -28,7 +28,7 @@ check_cli_uses() {
 }
 
 # ── firewall_core.sh flags ──
-for f in --status --rules --test --on --off --restart --allow --deny --allow-ip --deny-ip --block --unblock --delete --default --kill-ssh --kill-connection --logs --blocked --ping --outbound --boot --connections --drops --export --import; do
+for f in --status --rules --test --on --off --restart --dedup --allow --deny --allow-ip --deny-ip --block --unblock --delete --default --kill-ssh --kill-connection --logs --blocked --ping --outbound --boot --connections --drops --export --import; do
     check_core_flag "$FW_CORE" "$f" "firewall"
 done
 

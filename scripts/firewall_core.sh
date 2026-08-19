@@ -38,22 +38,22 @@ _nft_ensure_basic() {
 
     local _input_rules
     _input_rules=$(_nft list chain inet filter input 2>/dev/null)
-    echo "$_input_rules" | grep -q "ct state established,related" || \
+    echo "$_input_rules" | grep -Fq "ct state established,related" || \
         _nft add rule inet filter input ct state established,related accept 2>/dev/null || true
-    echo "$_input_rules" | grep -q 'iif "lo" accept' || \
+    echo "$_input_rules" | grep -Fq 'iif "lo" accept' || \
         _nft add rule inet filter input iif lo accept 2>/dev/null || true
-    echo "$_input_rules" | grep -q "icmp type echo-request" || \
+    echo "$_input_rules" | grep -Fq "icmp type echo-request" || \
         _nft add rule inet filter input ip protocol icmp icmp type echo-request accept 2>/dev/null || true
-    echo "$_input_rules" | grep -q "icmpv6 type echo-request" || \
+    echo "$_input_rules" | grep -Fq "icmpv6 type echo-request" || \
         _nft add rule inet filter input ip6 nexthdr icmpv6 icmpv6 type echo-request accept 2>/dev/null || true
 
     local _fwd_rules
     _fwd_rules=$(_nft list chain inet filter forward 2>/dev/null)
-    echo "$_fwd_rules" | grep -q "ct state established,related" || \
+    echo "$_fwd_rules" | grep -Fq "ct state established,related" || \
         _nft add rule inet filter forward ct state established,related accept 2>/dev/null || true
-    echo "$_fwd_rules" | grep -q 'iifname "docker0"' || \
+    echo "$_fwd_rules" | grep -Fq 'iifname "docker0" accept' || \
         _nft add rule inet filter forward iifname "docker0" accept 2>/dev/null || true
-    echo "$_fwd_rules" | grep -q 'iifname "br-*"' || \
+    echo "$_fwd_rules" | grep -Fq 'iifname "br-*" accept' || \
         _nft add rule inet filter forward iifname "br-*" accept 2>/dev/null || true
 
     $SUDO_CMD sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
@@ -65,12 +65,56 @@ _nft_ensure_basic() {
         _nft add chain inet nat postrouting '{ type nat hook postrouting priority 100; }' 2>/dev/null || true
     local _nat_rules
     _nat_rules=$(_nft list chain inet nat postrouting 2>/dev/null)
-    echo "$_nat_rules" | grep -q "172.17.0.0/16" || \
+    echo "$_nat_rules" | grep -Fq "ip saddr 172.17.0.0/16" || \
         _nft add rule inet nat postrouting ip saddr 172.17.0.0/16 oif != docker0 masquerade 2>/dev/null || true
 }
 
 _nft_commit() {
-    _nft list ruleset | $SUDO_CMD tee "$NFT_CONF" >/dev/null 2>&1 || true
+    {
+        _nft list table inet filter
+        _nft list table inet nat
+    } | $SUDO_CMD tee "$NFT_CONF" >/dev/null 2>&1 || true
+}
+
+# Rebuild the inet filter/nat chains removing any duplicate rules while
+# keeping blocked-IP drop rules at the top of the input chain.
+_nft_dedup() {
+    local chains=(
+        "inet filter input"
+        "inet filter forward"
+        "inet filter output"
+        "inet nat postrouting"
+    )
+    for c in "${chains[@]}"; do
+        local tbl="${c% *}"   # e.g. "inet filter"
+        local chain="${c##* }"  # e.g. "input"
+        local blocks=()
+        local others=()
+        local seen=""
+        while IFS= read -r line; do
+            [[ -z $line ]] && continue
+            [[ $line == *"type filter hook"* || $line == *"type nat hook"* || $line == "table "* || $line == "}"* || $line == *"chain "* ]] && continue
+            local body
+            body=$(echo "$line" | sed -E 's/ counter packets [0-9]+ bytes [0-9]+//; s/ # handle [0-9]+$//')
+            echo "$seen" | grep -Fqx "$body" && continue
+            seen=$(printf '%s\n%s' "$seen" "$body")
+            if [[ $chain == "input" && $body == *" drop" && $body == ip* ]]; then
+                blocks+=("$body")
+            else
+                others+=("$body")
+            fi
+        done < <(_nft -a list chain "$tbl" "$chain" 2>/dev/null)
+        _nft flush chain "$tbl" "$chain" 2>/dev/null
+        local b
+        for ((b = ${#blocks[@]} - 1; b >= 0; b--)); do
+            _nft insert rule "$tbl" "$chain" ${blocks[$b]} 2>/dev/null || true
+        done
+        local o
+        for o in "${others[@]}"; do
+            _nft add rule "$tbl" "$chain" $o 2>/dev/null || true
+        done
+    done
+    _nft_commit
 }
 
 _nft_status() {
@@ -727,6 +771,12 @@ case "$1" in
             echo "result=error|reason=invalid_config"
             exit 1
         fi
+        ;;
+
+    --dedup)
+        _nft_dedup
+        echo "OK|deduped"
+        rx_log_file "info" "Firewall ruleset deduplicated"
         ;;
 
     --on)

@@ -90,12 +90,17 @@ wifi_connect() {
     done
 
     if [[ "$connected_ssid" == "$ssid" ]]; then
+        if ! _wifi_has_ip_and_internet "$iface"; then
+            echo "result=error|reason=no_internet|ssid=$ssid"
+            return 1
+        fi
+
         echo "result=success|method=nmcli|ssid=$ssid"
-        
+
         nmcli connection modify "$ssid" connection.interface-name "" 2>/dev/null
         nmcli connection modify "$ssid" 802-11-wireless.cloned-mac-address "random" 2>/dev/null
         nmcli connection up "$ssid" 2>/dev/null
-        
+
         return 0
     fi
 
@@ -118,12 +123,42 @@ $password" | iwd station "$iface" 2>/dev/null
         done
 
         if [[ "$connected_ssid" == "$ssid" ]]; then
+            if ! _wifi_has_ip_and_internet "$iface"; then
+                echo "result=error|reason=no_internet|ssid=$ssid"
+                return 1
+            fi
             echo "result=success|method=iwd|ssid=$ssid"
             return 0
         fi
     fi
 
     echo "result=error|reason=connection_failed|ssid=$ssid"
+    return 1
+}
+
+_wifi_has_ip_and_internet() {
+    local iface="$1"
+    local ip_try=0
+    while (( ip_try < 15 )); do
+        if ip addr show "$iface" 2>/dev/null | grep -q "inet "; then
+            break
+        fi
+        sleep 1
+        ((ip_try++))
+    done
+
+    if ! ip addr show "$iface" 2>/dev/null | grep -q "inet "; then
+        return 1
+    fi
+
+    local ping_try=0
+    while (( ping_try < 10 )); do
+        if ping -c 1 -W 3 1.1.1.1 &>/dev/null; then
+            return 0
+        fi
+        sleep 1
+        ((ping_try++))
+    done
     return 1
 }
 
