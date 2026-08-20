@@ -27,8 +27,8 @@ _ensure_aur_helper() {
         [[ $helper == "paru" ]] && repo="https://aur.archlinux.org/paru.git"
         local tmpdir
         tmpdir=$(mktemp -d)
-        git clone --depth 1 "$repo" "$tmpdir/$helper" >/dev/null 2>&1 \
-            && (cd "$tmpdir/$helper" && makepkg -si --noconfirm >/dev/null 2>&1)
+        git clone --depth 1 "$repo" "$tmpdir/$helper" >/dev/null 2>&1 &&
+            (cd "$tmpdir/$helper" && makepkg -si --noconfirm >/dev/null 2>&1)
         rm -rf "$tmpdir" 2>/dev/null
     fi
 
@@ -95,15 +95,9 @@ run_postinstall() {
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${xdg_browser},filemanager=${FILEMANAGER_CHOICE:-nemo},image=loupe,video=mpv"
 
     retro wallpaper setup --needed -y -o "theme=retro"
-    echo -n " Download the retro wallpaper collection? [Y/n]: "
-    local _wall_answer=""
-    read -r _wall_answer
-    [[ -z $_wall_answer ]] && _wall_answer="Y"
-    if [[ $_wall_answer =~ ^[Yy]$ ]]; then
-        retro wallpaper pull retro
-    else
-        rx_log "info" "Skipping wallpaper collection download."
-    fi
+
+    retro wallpaper pull retro
+
     retro theme setup --needed -y
     retro theme mode dark
 
