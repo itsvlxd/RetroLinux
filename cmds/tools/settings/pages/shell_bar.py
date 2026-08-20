@@ -720,7 +720,9 @@ class ShellBarPage:
         entry = Gtk.Entry(text=str(self._data.get(key, BAR_DEFAULTS[key])))
         if placeholder:
             entry.set_placeholder_text(placeholder)
-        row.set_child(entry)
+        entry.set_width_chars(20)
+        entry.set_valign(Gtk.Align.CENTER)
+        row.add_suffix(entry)
         row.set_activatable_widget(entry)
         group.add(row)
 
