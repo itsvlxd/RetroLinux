@@ -177,6 +177,11 @@ BAR_DEFAULTS: dict = {
     "containBar": False,
     "keepBarShadow": False,
     "keepBarBorder": False,
+    "scale": 1.0,
+    "barPaddingTop": 4,
+    "barPaddingRight": 4,
+    "barPaddingBottom": 4,
+    "barPaddingLeft": 4,
     "showWeatherTemp": False,
     "showDayOfWeek": False,
     "batteryStyle": "arch",
@@ -682,7 +687,7 @@ def scan_presets() -> list[dict]:
     # Bundled (official) presets
     bundled = _BUNDLED_PRESETS_DIR
     if bundled.is_dir():
-        for d in sorted(bundled.iterdir()):
+        for d in sorted(bundled.iterdir(), key=lambda p: (p.name != "RetroLinux", p.name)):
             if d.is_dir() and _has_config_files(d):
                 seen.add(d.name)
                 presets.append({
