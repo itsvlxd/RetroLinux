@@ -32,6 +32,8 @@ from settings.ui.icons import (
     DOCK_ICON,
     DRIVER_ICON,
     ENV_VARS_ICON,
+    FAILLOCK_ICON,
+    FIREWALL_ICON,
     FONTS_ICON,
     FRAME_ICON,
     GRUB_ICON,
@@ -51,6 +53,7 @@ from settings.ui.icons import (
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
+    SSH_ICON,
     THEMES_ICON,
     TIMESHIFT_ICON,
     USERS_ICON,
@@ -101,6 +104,10 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("env_vars", "Env Variables", "Environment variables", ENV_VARS_ICON),
     # System
     ("users", "Users", "Create and manage system users", USERS_ICON),
+    # Security
+    ("firewall", "Firewall", "nftables firewall, rules and traffic", FIREWALL_ICON),
+    ("ssh", "SSH", "SSH daemon, sessions and keys", SSH_ICON),
+    ("faillock", "Faillock", "Brute-force protection and locked accounts", FAILLOCK_ICON),
     ("network", "Network", "Wi-Fi and connections", NETWORK_ICON),
     ("bluetooth", "Bluetooth", "Bluetooth devices", BLUETOOTH_ICON),
     ("quickshare", "Quick Share", "Send and receive from Android Quick Share", QUICKSHARE_ICON),

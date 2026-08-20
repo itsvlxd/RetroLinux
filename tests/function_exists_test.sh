@@ -25,6 +25,8 @@ core_scripts=(
     "benchmark_core.sh"
     "event_core.sh"
     "xdg_core.sh"
+    "firewall_core.sh"
+    "ssh_core.sh"
 )
 
 for script in "${core_scripts[@]}"; do

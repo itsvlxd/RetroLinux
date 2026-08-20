@@ -22,6 +22,8 @@ from settings.ui.icons import (
     DOCK_ICON,
     DRIVER_ICON,
     ENV_VARS_ICON,
+    FAILLOCK_ICON,
+    FIREWALL_ICON,
     FONTS_ICON,
     FRAME_ICON,
     GRUB_ICON,
@@ -41,6 +43,7 @@ from settings.ui.icons import (
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
+    SSH_ICON,
     THEMES_ICON,
     TIMESHIFT_ICON,
     USERS_ICON,
@@ -281,6 +284,11 @@ class Sidebar:
         startup = new_category("Startup")
         add_row(startup, "autostart", "Autostart", AUTOSTART_ICON)
         add_row(startup, "env_vars", "Env Variables", ENV_VARS_ICON)
+
+        security = new_category("Security")
+        add_row(security, "firewall", "Firewall", FIREWALL_ICON)
+        add_row(security, "ssh", "SSH", SSH_ICON)
+        add_row(security, "faillock", "Faillock", FAILLOCK_ICON)
 
         system = new_category("System")
         add_row(system, "users", "Users", USERS_ICON)

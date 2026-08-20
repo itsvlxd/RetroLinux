@@ -21,13 +21,11 @@ var data = {
     "containBar": false,
     "keepBarShadow": false,
     "keepBarBorder": false,
-    "showLayoutChanger": true,
-    "showPresetsButton": true,
     "showWeatherTemp": false,
     "showDayOfWeek": false,
     "batteryStyle": "arch",
-    "showWifiPopup": false,
-    "showBluetoothPopup": false,
-    "showQuickSharePopup": false,
-    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
+    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"],
+    "clockOrder": ["clock", "weather", "pomodoro"],
+    "barLeftOrder": ["launcher", "workspaces", "pin"],
+    "barRightOrder": ["tools", "tray", "wifi", "bluetooth", "controls", "battery", "clock", "power"]
 }

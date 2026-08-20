@@ -298,6 +298,7 @@ ShellRoot {
         running: true
         onTriggered: {
             let _ = NightLightService.active;
+            BluetoothService.initialize();
         }
     }
 }

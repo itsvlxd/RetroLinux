@@ -180,7 +180,7 @@ function Events.on_ssh_login(username, ip, method)
 		)
 	elseif action == "block" then
 		log("Blocking: " .. ip)
-		Firewall.block_ip(ip)
+		Firewall.block_ip(ip, "brute-force")
 		Firewall.kill_ssh_sessions(ip)
 		log("Blocked: " .. ip)
 		Notify.send(
@@ -216,7 +216,7 @@ function Events.on_ssh_failed(username, ip)
 		Watcher.set_var(failed_count_key, "0")
 		if action == "block" then
 			log("Brute force blocking: " .. ip)
-			Firewall.block_ip(ip)
+			Firewall.block_ip(ip, "brute-force")
 			Firewall.kill_ssh_sessions(ip)
 			log("Brute force blocked: " .. ip)
 			Notify.send(
@@ -252,7 +252,7 @@ function Events.on_ssh_close(username, ip, reason)
 		)
 		if action == "block" then
 			log("Blocking: " .. ip)
-			Firewall.block_ip(ip)
+			Firewall.block_ip(ip, "brute-force")
 			Firewall.kill_ssh_sessions(ip)
 			log("Blocked: " .. ip)
 			Notify.send(

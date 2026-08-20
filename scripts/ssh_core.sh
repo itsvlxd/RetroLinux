@@ -1,5 +1,7 @@
 #!/bin/bash
 
+RETRO_DIR="${RETRO_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+
 source "$RETRO_DIR/scripts/log_core.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 rx_log_register "ssh"
@@ -11,13 +13,87 @@ else
 fi
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
+FIREWALL_CORE="$RETRO_DIR/scripts/firewall_core.sh"
+FAILLOCK_CONF="/etc/security/faillock.conf"
+
+_target_user() {
+    if [[ -n $SUDO_USER ]]; then
+        echo "$SUDO_USER"
+    elif [[ $EUID -ne 0 ]]; then
+        id -un
+    else
+        echo ""
+    fi
+}
+
+_target_home() {
+    local user
+    user=$(_target_user)
+    if [[ -n $user ]]; then
+        getent passwd "$user" | cut -d: -f6
+    else
+        echo "$HOME"
+    fi
+}
+
+_fw_allow() {
+    bash "$FIREWALL_CORE" --allow "$1" tcp >/dev/null 2>&1 || true
+    bash "$FIREWALL_CORE" --allow "$1" udp >/dev/null 2>&1 || true
+}
+
+_fw_deny() {
+    bash "$FIREWALL_CORE" --deny "$1" tcp >/dev/null 2>&1 || true
+    bash "$FIREWALL_CORE" --deny "$1" udp >/dev/null 2>&1 || true
+}
+
+_ssh_port() {
+    local port
+    port=$(grep -E "^Port\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+    echo "${port:-22}"
+}
+
+_ssh_conf_value() {
+    local key="$1"
+    grep -E "^\s*${key}\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{$1=""; print $0}' | xargs
+}
+
+_ssh_set_value() {
+    local key="$1" value="$2"
+    if grep -qE "^\s*${key}\s+" "$SSHD_CONFIG" 2>/dev/null; then
+        $SUDO_CMD sed -i "s/^\s*${key}\s\+.*/${key} ${value}/" "$SSHD_CONFIG"
+    else
+        echo "${key} ${value}" | $SUDO_CMD tee -a "$SSHD_CONFIG" >/dev/null
+    fi
+}
+
+_faillock_read() {
+    local key="$1"
+    local default="${2:-}"
+    local val
+    val=$(grep -E "^\s*${key}\s*=" "$FAILLOCK_CONF" 2>/dev/null | head -1 | cut -d= -f2 | xargs)
+    echo "${val:-$default}"
+}
+
+_faillock_set() {
+    local key="$1" value="$2"
+    [[ ! -f $FAILLOCK_CONF ]] && return 1
+    local backup="${FAILLOCK_CONF}.bak.$(date +%s)"
+    $SUDO_CMD cp "$FAILLOCK_CONF" "$backup" || return 1
+    local applied=false
+    if grep -qE "^\s*${key}\s*=" "$FAILLOCK_CONF" 2>/dev/null; then
+        $SUDO_CMD sed -i "s|^\s*${key}\s*=.*|${key} = ${value}|" "$FAILLOCK_CONF" && applied=true
+    else
+        echo "${key} = ${value}" | $SUDO_CMD tee -a "$FAILLOCK_CONF" >/dev/null && applied=true
+    fi
+    $applied
+}
 
 case "$1" in
     --status)
         daemon_status="inactive"
         daemon_pid=""
         ssh_version=""
-        ssh_port="22"
+        ssh_port="$(_ssh_port)"
         password_auth="unknown"
         pubkey_auth="unknown"
         root_login="unknown"
@@ -33,16 +109,11 @@ case "$1" in
         ssh_version=$(ssh -V 2>&1 || echo "unknown")
 
         if [[ -f $SSHD_CONFIG ]]; then
-            port_val=$(grep -E "^Port\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
-            [[ -n $port_val ]] && ssh_port="$port_val"
-
-            pass_val=$(grep -E "^PasswordAuthentication\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+            pass_val=$(_ssh_conf_value "PasswordAuthentication")
             [[ -n $pass_val ]] && password_auth="$pass_val"
-
-            pub_val=$(grep -E "^PubkeyAuthentication\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+            pub_val=$(_ssh_conf_value "PubkeyAuthentication")
             [[ -n $pub_val ]] && pubkey_auth="$pub_val"
-
-            root_val=$(grep -E "^PermitRootLogin\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+            root_val=$(_ssh_conf_value "PermitRootLogin")
             [[ -n $root_val ]] && root_login="$root_val"
         fi
 
@@ -50,22 +121,34 @@ case "$1" in
 
         host_keys=$(find /etc/ssh/ -name 'ssh_host_*key.pub' 2>/dev/null | wc -l)
 
-        local firewall_status="unmanaged"
-        local fw_data fw_engine fw_open_ports
-        fw_data=$(bash "$RETRO_DIR/scripts/firewall_core.sh" --status 2>/dev/null)
+        fw_data=$(bash "$FIREWALL_CORE" --status 2>/dev/null)
+        fw_open_ports=""
         while IFS='=' read -r key val; do
-            case "$key" in
-                engine) fw_engine="$val" ;;
-                open_ports) fw_open_ports="$val" ;;
-            esac
+            [[ $key == "open_ports" ]] && fw_open_ports="$val"
         done <<<"$fw_data"
 
-        if [[ -n $fw_engine && $fw_engine != "none" ]]; then
-            if echo "$fw_open_ports" | grep -qE "(^|,)${ssh_port}/"; then
-                firewall_status="open"
-            else
-                firewall_status="closed"
-            fi
+        if echo "$fw_open_ports" | grep -qE "(^|,)${ssh_port}/"; then
+            firewall_status="open"
+        else
+            firewall_status="closed"
+        fi
+
+        empty_passwords="unknown"
+        x11_forwarding="unknown"
+        tcp_forwarding="unknown"
+        max_auth_tries="unknown"
+        idle_timeout="unknown"
+        if [[ -f $SSHD_CONFIG ]]; then
+            empty_val=$(_ssh_conf_value "PermitEmptyPasswords")
+            [[ -n $empty_val ]] && empty_passwords="$empty_val"
+            x11_val=$(_ssh_conf_value "X11Forwarding")
+            [[ -n $x11_val ]] && x11_forwarding="$x11_val"
+            tcp_val=$(_ssh_conf_value "AllowTcpForwarding")
+            [[ -n $tcp_val ]] && tcp_forwarding="$tcp_val"
+            tries_val=$(_ssh_conf_value "MaxAuthTries")
+            [[ -n $tries_val ]] && max_auth_tries="$tries_val"
+            alive_val=$(_ssh_conf_value "ClientAliveInterval")
+            [[ -n $alive_val ]] && idle_timeout="$alive_val"
         fi
 
         echo "daemon_status=${daemon_status}"
@@ -78,6 +161,11 @@ case "$1" in
         echo "sessions_count=${sessions_count}"
         echo "host_keys=${host_keys}"
         echo "firewall_status=${firewall_status}"
+        echo "empty_passwords=${empty_passwords}"
+        echo "x11_forwarding=${x11_forwarding}"
+        echo "tcp_forwarding=${tcp_forwarding}"
+        echo "max_auth_tries=${max_auth_tries}"
+        echo "idle_timeout=${idle_timeout}"
         rx_log_file "info" "Status: ${daemon_status} port=${ssh_port} sessions=${sessions_count} keys=${host_keys}"
         ;;
 
@@ -131,9 +219,12 @@ case "$1" in
 
         $SUDO_CMD systemctl enable sshd 2>/dev/null || true
         $SUDO_CMD systemctl start sshd 2>/dev/null || true
+        port=$(_ssh_port)
+        _fw_allow "$port"
+
         if systemctl is-enabled sshd &>/dev/null && systemctl is-active sshd &>/dev/null; then
             echo "OK|enabled"
-            rx_log_file "success" "sshd enabled and running"
+            rx_log_file "success" "sshd enabled and running (port ${port} opened)"
         elif systemctl is-active sshd &>/dev/null; then
             echo "OK|started"
             rx_log_file "warn" "sshd running but not enabled at boot"
@@ -145,11 +236,13 @@ case "$1" in
         ;;
 
     --disable)
+        port=$(_ssh_port)
+        _fw_deny "$port"
         $SUDO_CMD systemctl disable sshd 2>/dev/null || true
         $SUDO_CMD systemctl stop sshd 2>/dev/null || true
         if ! systemctl is-enabled sshd &>/dev/null && ! systemctl is-active sshd &>/dev/null; then
             echo "OK|disabled"
-            rx_log_file "success" "sshd disabled and stopped"
+            rx_log_file "success" "sshd disabled and stopped (port ${port} closed)"
         else
             echo "result=error|reason=disable_failed"
             rx_log_file "error" "Failed to disable sshd"
@@ -162,8 +255,7 @@ case "$1" in
             echo "result=error|reason=no_config"
             exit 1
         fi
-        port=$(grep -E "^Port\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
-        port="${port:-22}"
+        port=$(_ssh_port)
 
         who_output=$(who 2>/dev/null || true)
         session_count=0
@@ -180,8 +272,7 @@ case "$1" in
         ;;
 
     --session-count)
-        port=$(grep -E "^Port\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
-        port="${port:-22}"
+        port=$(_ssh_port)
         ss -tnp 2>/dev/null | grep -c ":${port}\s" || echo 0
         ;;
 
@@ -195,7 +286,7 @@ case "$1" in
             echo "result=error|reason=no_config"
             exit 1
         fi
-        val=$(grep -E "^\s*${key}\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{$1=""; print $0}' | xargs)
+        val=$(_ssh_conf_value "$key")
         if [[ -z $val ]]; then
             echo "result=not_set|key=${key}"
         else
@@ -217,13 +308,9 @@ case "$1" in
 
         backup="${SSHD_CONFIG}.bak.$(date +%s)"
         $SUDO_CMD cp "$SSHD_CONFIG" "$backup"
-        trap "$SUDO_CMD mv '$backup' '$SSHD_CONFIG'; exit 1" INT TERM EXIT
+        trap 'exit 1' INT TERM EXIT
 
-        if grep -qE "^\s*${key}\s+" "$SSHD_CONFIG" 2>/dev/null; then
-            $SUDO_CMD sed -i "s/^\s*${key}\s\+.*/${key} ${value}/" "$SSHD_CONFIG"
-        else
-            echo "${key} ${value}" | $SUDO_CMD tee -a "$SSHD_CONFIG" >/dev/null
-        fi
+        _ssh_set_value "$key" "$value"
 
         if $SUDO_CMD sshd -t 2>/dev/null; then
             $SUDO_CMD rm -f "$backup"
@@ -245,16 +332,12 @@ case "$1" in
             exit 1
         fi
 
-        port=$(grep -E "^\s*Port\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
-        port="${port:-22}"
-
-        pass=$(grep -E "^\s*PasswordAuthentication\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+        port=$(_ssh_port)
+        pass=$(_ssh_conf_value "PasswordAuthentication")
         pass="${pass:-no}"
-
-        pubkey=$(grep -E "^\s*PubkeyAuthentication\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+        pubkey=$(_ssh_conf_value "PubkeyAuthentication")
         pubkey="${pubkey:-yes}"
-
-        root=$(grep -E "^\s*PermitRootLogin\s+" "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}')
+        root=$(_ssh_conf_value "PermitRootLogin")
         root="${root:-prohibit-password}"
 
         echo "port=${port}"
@@ -263,7 +346,53 @@ case "$1" in
         echo "root_login=${root}"
         ;;
 
+    --setup-apply)
+        $SUDO_CMD systemctl stop sshd 2>/dev/null || true
+
+        if ! pacman -Qs openssh &>/dev/null; then
+            $SUDO_CMD pacman -S --noconfirm openssh 2>&1 | tail -3 || true
+        fi
+
+        [[ -f $SSHD_CONFIG ]] || { echo "result=error|reason=no_config"; exit 1; }
+
+        port="${2:-22}"
+        password_auth="${3:-no}"
+        pubkey_auth="${4:-yes}"
+        root_login="${5:-prohibit-password}"
+
+        if ! [[ $port =~ ^[0-9]+$ && $port -ge 1 && $port -le 65535 ]]; then
+            echo "result=error|reason=invalid_port"
+            exit 1
+        fi
+
+        $SUDO_CMD sed -i "s/^#*Port.*/Port ${port}/" "$SSHD_CONFIG"
+        $SUDO_CMD sed -i "s/^#*PasswordAuthentication.*/PasswordAuthentication ${password_auth}/" "$SSHD_CONFIG"
+        $SUDO_CMD sed -i "s/^#*PubkeyAuthentication.*/PubkeyAuthentication ${pubkey_auth}/" "$SSHD_CONFIG"
+        $SUDO_CMD sed -i "s/^#*PermitRootLogin.*/PermitRootLogin ${root_login}/" "$SSHD_CONFIG"
+
+        if ! ls /etc/ssh/ssh_host_* &>/dev/null; then
+            $SUDO_CMD ssh-keygen -A 2>/dev/null || true
+        fi
+
+        if $SUDO_CMD sshd -t 2>/dev/null; then
+            _fw_allow "$port"
+            $SUDO_CMD systemctl enable --now sshd 2>/dev/null || true
+
+            user_home=$(_target_home)
+            [[ ! -f "$user_home/.ssh/id_ed25519" ]] && mkdir -p "$user_home/.ssh" && ssh-keygen -t ed25519 -f "$user_home/.ssh/id_ed25519" -N "" 2>/dev/null || true
+
+            echo "OK|configured|port=${port}"
+            rx_log_file "success" "SSH configured (port ${port})"
+        else
+            error=$($SUDO_CMD sshd -t 2>&1)
+            echo "result=error|reason=invalid_config|error=${error}"
+            rx_log_file "error" "SSH setup produced invalid config: ${error}"
+            exit 1
+        fi
+        ;;
+
     --key-status)
+        user_home=$(_target_home)
         echo "---host_keys---"
         for key_file in /etc/ssh/ssh_host_*_key.pub; do
             if [[ -f $key_file ]]; then
@@ -273,7 +402,7 @@ case "$1" in
             fi
         done
         echo "---user_keys---"
-        for key_file in "$HOME/.ssh/"*.pub; do
+        for key_file in "$user_home/.ssh/"*.pub; do
             if [[ -f $key_file ]]; then
                 type=$(basename "$key_file")
                 fingerprint=$(ssh-keygen -lf "$key_file" 2>/dev/null | awk '{print $2}')
@@ -284,14 +413,15 @@ case "$1" in
 
     --key-generate)
         key_type="${2:-ed25519}"
-        key_path="$HOME/.ssh/id_${key_type}"
+        user_home=$(_target_home)
+        key_path="$user_home/.ssh/id_${key_type}"
         if [[ -f $key_path ]]; then
             echo "result=error|reason=already_exists|path=${key_path}"
             rx_log_file "warn" "SSH key already exists: ${key_path}"
             exit 1
         fi
-        mkdir -p "$HOME/.ssh"
-        chmod 700 "$HOME/.ssh"
+        mkdir -p "$user_home/.ssh"
+        chmod 700 "$user_home/.ssh"
         if ssh-keygen -t "$key_type" -f "$key_path" -N "" 2>&1; then
             echo "OK|generated|path=${key_path}|type=${key_type}"
             fingerprint=$(ssh-keygen -lf "${key_path}.pub" 2>/dev/null | awk '{print $2}')
@@ -322,7 +452,7 @@ case "$1" in
         ;;
 
     --known-hosts)
-        known_hosts="$HOME/.ssh/known_hosts"
+        known_hosts="$(_target_home)/.ssh/known_hosts"
         if [[ ! -f $known_hosts ]]; then
             echo "result=error|reason=no_known_hosts"
             exit 0
@@ -340,6 +470,25 @@ case "$1" in
         echo "count=${count}"
         ;;
 
+    --known-hosts-remove)
+        host_to_remove="$2"
+        [[ -z $host_to_remove ]] && { echo "result=error|reason=no_host"; exit 1; }
+        known_hosts="$(_target_home)/.ssh/known_hosts"
+        if [[ ! -f $known_hosts ]]; then
+            echo "result=error|reason=no_known_hosts"
+            exit 0
+        fi
+        kept=$(grep -vE "^(\\|1\\|)?${host_to_remove}(,|\\[|\\s|$)" "$known_hosts" 2>/dev/null || true)
+        cp "$known_hosts" "${known_hosts}.bak" 2>/dev/null || true
+        printf '%s\n' "$kept" > "$known_hosts" 2>/dev/null
+        if [[ $EUID -eq 0 ]]; then
+            user=$(_target_user)
+            [[ -n $user ]] && chown "$user" "$known_hosts" 2>/dev/null || true
+        fi
+        echo "OK|removed|host=${host_to_remove}"
+        rx_log_file "info" "Known host removed: ${host_to_remove}"
+        ;;
+
     --users)
         while IFS=: read -r user _ uid _ _ shell _; do
             if [[ $uid -ge 1000 && $uid -lt 65534 ]]; then
@@ -350,49 +499,114 @@ case "$1" in
         done < /etc/passwd
         ;;
 
-    --setup-apply)
-        $SUDO_CMD systemctl stop sshd 2>/dev/null || true
-
-        if ! pacman -Qs openssh &>/dev/null; then
-            $SUDO_CMD pacman -S --noconfirm openssh 2>&1 | tail -3 || true
-        fi
-
-        [[ -f $SSHD_CONFIG ]] || { echo "result=error|reason=no_config"; exit 1; }
-
-        port="${2:-22}"
-        password_auth="${3:-no}"
-        pubkey_auth="${4:-yes}"
-        root_login="${5:-prohibit-password}"
-
-        $SUDO_CMD sed -i "s/^#*Port.*/Port ${port}/" "$SSHD_CONFIG"
-        $SUDO_CMD sed -i "s/^#*PasswordAuthentication.*/PasswordAuthentication ${password_auth}/" "$SSHD_CONFIG"
-        $SUDO_CMD sed -i "s/^#*PubkeyAuthentication.*/PubkeyAuthentication ${pubkey_auth}/" "$SSHD_CONFIG"
-        $SUDO_CMD sed -i "s/^#*PermitRootLogin.*/PermitRootLogin ${root_login}/" "$SSHD_CONFIG"
-
-        if ! ls /etc/ssh/ssh_host_* &>/dev/null; then
-            $SUDO_CMD ssh-keygen -A 2>/dev/null || true
-        fi
-
-        bash "$RETRO_DIR/scripts/firewall_core.sh" --allow "${port}" tcp >/dev/null 2>&1 || true
-
-        if $SUDO_CMD sshd -t 2>/dev/null; then
-            $SUDO_CMD systemctl enable --now sshd 2>/dev/null || true
-
-            [[ ! -f "$HOME/.ssh/id_ed25519" ]] && mkdir -p "$HOME/.ssh" && ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N "" 2>/dev/null || true
-
-            echo "OK|configured|port=${port}"
-            rx_log_file "success" "SSH configured (port ${port})"
+    --faillock-status)
+        if [[ ! -f $FAILLOCK_CONF ]]; then
+            echo "configured=false"
+            echo "deny=5"
+            echo "unlock_time=600"
+            echo "even_for_root=false"
         else
-            error=$($SUDO_CMD sshd -t 2>&1)
-            echo "result=error|reason=invalid_config|error=${error}"
-            rx_log_file "error" "SSH setup produced invalid config: ${error}"
+            echo "configured=true"
+            echo "deny=$(_faillock_read "deny" "5")"
+            echo "unlock_time=$(_faillock_read "unlock_time" "600")"
+            echo "even_for_root=$(_faillock_read "even_for_root" "false")"
+        fi
+        state=$(faillock --user "$USER" 2>/dev/null | tail -1 || true)
+        echo "state=${state}"
+        ;;
+
+    --faillock-set)
+        key="$2"
+        value="$3"
+        if [[ -z $key || -z $value ]]; then
+            echo "result=error|reason=missing_key_or_value"
+            exit 1
+        fi
+        case "$key" in
+            deny)
+                [[ $value =~ ^[0-9]+$ ]] || { echo "result=error|reason=invalid_value"; exit 1; }
+                ;;
+            unlock_time)
+                [[ $value =~ ^[0-9]+$ ]] || { echo "result=error|reason=invalid_value"; exit 1; }
+                ;;
+            even_for_root)
+                [[ $value == "true" || $value == "false" ]] || { echo "result=error|reason=invalid_value"; exit 1; }
+                ;;
+            *)
+                echo "result=error|reason=unknown_key"
+                exit 1
+                ;;
+        esac
+        if _faillock_set "$key" "$value"; then
+            echo "OK|set|key=${key}|value=${value}"
+            rx_log_file "success" "faillock.conf: ${key}=${value}"
+        else
+            echo "result=error|reason=apply_failed"
+            rx_log_file "error" "Failed to set faillock.conf: ${key}=${value}"
             exit 1
         fi
         ;;
 
+    --faillock-reset)
+        user="${2:-$USER}"
+        [[ -n $user ]] && faillock --user "$user" --reset 2>/dev/null
+        echo "OK|reset|user=${user}"
+        rx_log_file "success" "faillock reset for ${user}"
+        ;;
+
+    --faillock-users)
+        deny=$(_faillock_read "deny" "5")
+        even_root=$(_faillock_read "even_for_root" "false")
+        for file in /run/faillock/*; do
+            [[ -e $file ]] || continue
+            user=$(basename "$file")
+            [[ -r $file ]] || continue
+            failures=0
+            last_time=0
+            source=""
+            recsize=64
+            size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            if [[ $size -ge $recsize ]]; then
+                count=$((size / recsize))
+                for ((i = 0; i < count; i++)); do
+                    off=$((i * recsize))
+                    status=$(od -An -j $((off + 54)) -N 2 -t u2 "$file" 2>/dev/null | tr -d ' ')
+                    tval=$(od -An -j $((off + 56)) -N 8 -t u8 "$file" 2>/dev/null | tr -d ' ')
+                    [[ -z $status ]] && status=0
+                    [[ -z $tval ]] && tval=0
+                    if (( status & 1 )); then
+                        ((failures += 1))
+                        if (( tval > last_time )); then
+                            last_time=$tval
+                            if (( status & 2 )); then
+                                src=$(dd if="$file" bs=1 skip="$off" count=52 2>/dev/null | tr -d '\0' | xargs)
+                                [[ -n $src ]] && source=$src
+                            fi
+                        fi
+                    fi
+                done
+            fi
+            locked=false
+            reason="no_failures"
+            if (( failures > 0 )); then
+                if (( failures >= deny )); then
+                    locked=true
+                    if [[ $even_root == "true" || $user != "root" ]]; then
+                        reason="locked: ${failures} of ${deny} allowed attempts"
+                    else
+                        reason="failed: ${failures} attempts (root exempt)"
+                    fi
+                else
+                    reason="failed: ${failures} of ${deny} allowed attempts"
+                fi
+            fi
+            echo "user=${user}|failures=${failures}|locked=${locked}|reason=${reason}|source=${source}|last=${last_time}"
+        done
+        ;;
+
     *)
         echo "result=error|reason=unknown_flag|flag=$1"
-        echo "Usage: $0 <--status|--start|--stop|--restart|--enable|--disable|--sessions|--session-count|--config-get|--config-set|--setup-get|--key-status|--key-generate|--test|--logs|--known-hosts|--users|--setup-apply>"
+        echo "Usage: $0 <--status|--start|--stop|--restart|--enable|--disable|--sessions|--session-count|--config-get|--config-set|--setup-get|--key-status|--key-generate|--test|--logs|--known-hosts|--users|--setup-apply|--faillock-status|--faillock-set|--faillock-reset>"
         exit 1
         ;;
 esac

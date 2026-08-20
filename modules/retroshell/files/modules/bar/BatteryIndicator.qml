@@ -223,6 +223,8 @@ Item {
         return Qt.rgba(Colors.red.r + (Colors.green.r - Colors.red.r) * ratio, Colors.red.g + (Colors.green.g - Colors.red.g) * ratio, Colors.red.b + (Colors.green.b - Colors.red.b) * ratio, 1);
     }
 
+    implicitWidth: 36
+    implicitHeight: 36
     Layout.preferredWidth: 36
     Layout.preferredHeight: 36
     Layout.fillWidth: vertical

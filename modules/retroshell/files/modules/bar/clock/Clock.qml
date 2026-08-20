@@ -41,8 +41,25 @@ Item {
 
     readonly property bool weatherAvailable: WeatherService.dataAvailable
 
+    // Order of the popup sections (Time & Calendar / Weather / Pomodoro),
+    // persisted in bar.json's ``clockOrder``.
+    readonly property var clockOrder: (Config.bar && Config.bar.clockOrder)
+        ? Config.bar.clockOrder : ["clock", "weather", "pomodoro"]
+
+    function clockSectionFor(id) {
+        switch (id) {
+        case "clock": return clockCalendarCardComponent;
+        case "weather": return weatherSectionComponent;
+        case "pomodoro": return pomodoroSectionComponent;
+        }
+        return undefined;
+    }
+
     Layout.preferredWidth: vertical ? 36 : buttonBg.implicitWidth
     Layout.preferredHeight: vertical ? buttonBg.implicitHeight : 36
+
+    implicitWidth: vertical ? 36 : buttonBg.implicitWidth
+    implicitHeight: vertical ? buttonBg.implicitHeight : 36
 
     HoverHandler {
         onHoveredChanged: root.isHovered = hovered
@@ -231,7 +248,19 @@ Item {
             id: popupColumn
             spacing: 4
 
-            // Combined Clock + Calendar Card
+            Repeater {
+                model: root.clockOrder
+
+                delegate: Loader {
+                    required property string modelData
+                    sourceComponent: root.clockSectionFor(modelData)
+                }
+            }
+        }
+
+        // Combined Clock + Calendar Card
+        Component {
+            id: clockCalendarCardComponent
             StyledRect {
                 id: clockCalendarCard
                 variant: "popup"
@@ -405,8 +434,11 @@ Item {
                 }
                 }
             }
+        }
 
-            // Weather Wrapper StyledRect
+        // Weather Wrapper StyledRect
+        Component {
+            id: weatherSectionComponent
             StyledRect {
                 id: popupWrapper
                 variant: "popup"
@@ -689,12 +721,15 @@ Item {
                                     }
                                 }
                             }
-                        }
                     }
                 }
             }
+        }
+        }
 
-            // Pomodoro Wrapper StyledRect
+        // Pomodoro Wrapper StyledRect
+        Component {
+            id: pomodoroSectionComponent
             StyledRect {
                 id: pomodoroWrapper
                 variant: "popup"

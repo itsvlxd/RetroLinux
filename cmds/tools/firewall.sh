@@ -16,7 +16,7 @@ cmd_firewall() {
             data=$(bash "$core" --status 2>/dev/null)
             [[ -z $data ]] && rx_log "error" "Failed to get firewall status" && return 1
 
-            local engine daemon_status rule_count default_policy open_ports
+            local engine daemon_status rule_count default_policy open_ports boot_enabled outbound_policy ping blocked_packets
             while IFS='=' read -r key val; do
                 case "$key" in
                     engine) engine="$val" ;;
@@ -24,11 +24,12 @@ cmd_firewall() {
                     rule_count) rule_count="$val" ;;
                     default_policy) default_policy="$val" ;;
                     open_ports) open_ports="$val" ;;
+                    boot_enabled) boot_enabled="$val" ;;
+                    outbound_policy) outbound_policy="$val" ;;
+                    ping) ping="$val" ;;
+                    blocked_packets) blocked_packets="$val" ;;
                 esac
             done <<<"$data"
-
-            local engine_color="$MUTE"
-            [[ $engine != "none" && $engine != "unknown" ]] && engine_color="$PINK"
 
             local daemon_color="$MUTE"
             local daemon_display="○ Inactive"
@@ -43,14 +44,30 @@ cmd_firewall() {
                 accept | allow) policy_color="$WARN" ;;
             esac
 
+            local boot_color="$SUCCESS"
+            [[ $boot_enabled != "enabled" ]] && boot_color="$MUTE"
+
+            local out_color="$SUCCESS"
+            [[ ${outbound_policy:-accept} == "drop" ]] && out_color="$WARN"
+
+            local ping_color="$MUTE"
+            [[ ${ping:-on} == "on" ]] && ping_color="$SUCCESS"
+
             local ports_color="$MUTE"
             [[ -n $open_ports ]] && ports_color="$PINK"
 
+            local blocked_color="$MUTE"
+            [[ ${blocked_packets:-0} -gt 0 ]] && blocked_color="$WARN"
+
             rx_table_header "󰦝" "Firewall Status"
-            rx_table_row "󰀐" "Engine:" "${engine^}" "$engine_color" "24"
+            rx_table_row "󰀐" "Engine:" "${engine:-nftables}" "$PINK" "24"
             rx_table_row "󰈐" "Status:" "${daemon_display}" "$daemon_color" "24"
             rx_table_row "󰦝" "Rules:" "${rule_count:-0}" "$rules_color" "24"
             rx_table_row "󰒋" "Default Policy:" "${default_policy^}" "$policy_color" "24"
+            rx_table_row "󰰔" "Outbound Policy:" "${outbound_policy^}" "$out_color" "24"
+            rx_table_row "󰈐" "Boot:" "${boot_enabled^}" "$boot_color" "24"
+            rx_table_row "󰒈" "Ping:" "${ping^}" "$ping_color" "24"
+            rx_table_row "󰘦" "Packets Blocked:" "${blocked_packets:-0}" "$blocked_color" "24"
             rx_table_row "󱂷" "Open Ports:" "${open_ports:-None}" "$ports_color" "24"
             rx_table_separator
             rx_table_spacer
@@ -61,21 +78,19 @@ cmd_firewall() {
             rx_setup_validate "default,ports" "default:in=drop,accept" || return 1
 
             local config_data
-            config_data=$(bash "$core" --setup-get 2>/dev/null)
-            local current_engine current_status current_policy
+            config_data=$(bash "$core" --status 2>/dev/null)
+            local current_status current_policy
             while IFS='=' read -r key val; do
                 case "$key" in
-                    engine) current_engine="$val" ;;
                     daemon_status) current_status="$val" ;;
                     default_policy) current_policy="$val" ;;
                 esac
             done <<<"$config_data"
 
-            : "${current_engine:=nftables}"
             : "${current_status:=inactive}"
 
             local config_exists=false
-            [[ $current_engine != "none" ]] && config_exists=true
+            [[ $current_status == "active" ]] && config_exists=true
 
             rx_setup_check_needed "$config_exists" && return 0
 
@@ -84,6 +99,16 @@ cmd_firewall() {
 
             if [[ $RX_SETUP_MODE == "non-interactive" ]]; then
                 default_input=$(rx_setup_get_opt "default" "drop")
+                local opt_ports
+                opt_ports=$(rx_setup_get_opt "ports" "")
+                if [[ -n $opt_ports ]]; then
+                    local IFS_SAVE=$IFS
+                    IFS=','
+                    for pp in $opt_ports; do
+                        [[ -n $pp ]] && port_inputs+=("$pp" "tcp")
+                    done
+                    IFS=$IFS_SAVE
+                fi
             else
                 if [[ $config_exists == true ]]; then
                     rx_setup_prompt_reconfigure "󰦝" "Current Firewall Configuration" \
@@ -131,45 +156,46 @@ cmd_firewall() {
             fi
 
             rx_log "info" "Applying firewall configuration..."
-            local result
-            result=$(bash "$core" --setup-apply "nftables" "${port_inputs[@]}" 2>/dev/null)
+            bash "$core" --on >/dev/null 2>&1 || true
+            bash "$core" --default "$default_input" >/dev/null 2>&1 || true
 
-            if echo "$result" | grep -q "^OK|"; then
-                if [[ -n $default_input ]]; then
-                    bash "$core" --default "$default_input" >/dev/null 2>&1 || true
-                fi
+            local i=0
+            while [[ $i -lt ${#port_inputs[@]} ]]; do
+                bash "$core" --allow "${port_inputs[$i]}" "${port_inputs[$((i + 1))]}" >/dev/null 2>&1 || true
+                i=$((i + 2))
+            done
 
-                local sudoers_file="/etc/sudoers.d/99-retro-firewall"
-                if [[ ! -f $sudoers_file ]]; then
-                    local rule="%wheel ALL=(ALL) NOPASSWD: /usr/bin/nft, /usr/bin/ss, /usr/bin/kill"
-                    echo "$rule" | sudo tee "$sudoers_file" >/dev/null 2>&1 && sudo chmod 440 "$sudoers_file" 2>/dev/null || true
-                fi
-
-                local result_data
-                result_data=$(bash "$core" --status 2>/dev/null)
-                local res_engine res_status res_rules res_policy res_ports
-                while IFS='=' read -r key val; do
-                    case "$key" in
-                        engine) res_engine="$val" ;;
-                        daemon_status) res_status="$val" ;;
-                        rule_count) res_rules="$val" ;;
-                        default_policy) res_policy="$val" ;;
-                        open_ports) res_ports="$val" ;;
-                    esac
-                done <<<"$result_data"
-
-                rx_setup_success "󰦝" "Firewall Configured" \
-                    "Engine" "nftables" \
-                    "Status" "${res_status^}" \
-                    "Rules" "${res_rules:-0}" \
-                    "Default Policy" "${res_policy^}" \
-                    "Open Ports" "${res_ports:-None}"
-            else
-                local error_reason
-                error_reason=$(echo "$result" | grep -oP 'error=\K[^|]+' || echo "unknown")
-                rx_log "error" "Failed to apply firewall config: ${error_reason}"
-                return 1
+            local sudoers_file="/etc/sudoers.d/99-retro-security"
+            if [[ ! -f $sudoers_file ]]; then
+                cat <<'EOF' | sudo tee "$sudoers_file" >/dev/null 2>&1 && sudo chmod 440 "$sudoers_file" 2>/dev/null || true
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/firewall_core.sh
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/ssh_core.sh
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nft
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/ss
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/kill
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/faillock
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /var/log/retro-firewall-blocked
+EOF
             fi
+
+            local result_data
+            result_data=$(bash "$core" --status 2>/dev/null)
+            local res_status res_rules res_policy res_ports
+            while IFS='=' read -r key val; do
+                case "$key" in
+                    daemon_status) res_status="$val" ;;
+                    rule_count) res_rules="$val" ;;
+                    default_policy) res_policy="$val" ;;
+                    open_ports) res_ports="$val" ;;
+                esac
+            done <<<"$result_data"
+
+            rx_setup_success "󰦝" "Firewall Configured" \
+                "Engine" "nftables" \
+                "Status" "${res_status^}" \
+                "Rules" "${res_rules:-0}" \
+                "Default Policy" "${res_policy^}" \
+                "Open Ports" "${res_ports:-None}"
             ;;
 
         "on")
@@ -205,69 +231,61 @@ cmd_firewall() {
             fi
             ;;
 
+        "dedup")
+            local result
+            result=$(bash "$core" --dedup 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Firewall ruleset deduplicated"
+            else
+                rx_log "error" "Failed to deduplicate firewall ruleset"
+                return 1
+            fi
+            ;;
+
         "rules")
             local data
             data=$(bash "$core" --rules 2>/dev/null)
             local count=0
-            while IFS='=' read -r key val; do
-                if [[ $key == "count" ]]; then
-                    count="$val"
-                fi
+            while IFS='|' read -r entry proto port ip action; do
+                [[ $entry =~ ^count=([0-9]+)$ ]] && count="${BASH_REMATCH[1]}"
             done <<<"$data"
 
+            count=$(echo "$data" | grep "^count=" | cut -d= -f2)
             if [[ $count -eq 0 ]]; then
                 rx_log "info" "No firewall rules configured"
                 return 0
             fi
 
             rx_table_header "󰦝" "Firewall Rules: ${count} rules"
-            local entry chain port proto action ip
-            while IFS='|' read -r part; do
-                if [[ $part =~ ^entry=([0-9]+) ]]; then
-                    entry="${BASH_REMATCH[1]}"
-                    chain=""; port=""; proto=""; ip=""
-                fi
-                if [[ $part =~ chain=([a-z_]+) ]]; then
-                    chain="${BASH_REMATCH[1]}"
-                fi
-                if [[ $part =~ ip=([0-9.]+) ]]; then
-                    ip="${BASH_REMATCH[1]}"
-                fi
-                if [[ $part =~ port=([0-9]+) ]]; then
-                    port="${BASH_REMATCH[1]}"
-                fi
-                if [[ $part =~ proto=([a-z0-9]+) ]]; then
-                    proto="${BASH_REMATCH[1]}"
-                fi
-                if [[ $part =~ action=([a-z]+) ]]; then
-                    action="${BASH_REMATCH[1]}"
-                    local action_color="$PINK"
-                    [[ $action == "drop" || $action == "deny" ]] && action_color="$WARN"
-                    [[ $action == "accept" || $action == "allow" ]] && action_color="$SUCCESS"
-                    local rule_desc
-                    if [[ -n $ip && -n $port ]]; then
+            while IFS='|' read -r entry proto port ip action; do
+                [[ $entry != "RULES" ]] && continue
+                local action_color="$PINK"
+                [[ $action == "drop" ]] && action_color="$WARN"
+                [[ $action == "accept" ]] && action_color="$SUCCESS"
+                local rule_desc
+                if [[ -n $ip && $ip != "-" ]]; then
+                    if [[ $port != "-" ]]; then
                         rule_desc="ip:${ip}:${port}/${proto} → ${action}"
-                    elif [[ -n $ip ]]; then
-                        rule_desc="ip:${ip} → ${action}"
                     else
-                        rule_desc="${chain}:${port}/${proto} → ${action}"
+                        rule_desc="ip:${ip} → ${action}"
                     fi
-                    rx_table_row "󰦝" "#${entry}" "$rule_desc" "$action_color" "4"
-                    ip=""; port=""; proto=""
+                else
+                    rule_desc="input:${port}/${proto} → ${action}"
                 fi
+                rx_table_row "󰦝" "#${entry}" "$rule_desc" "$action_color" "4"
             done <<<"$data"
             rx_table_separator
             rx_table_spacer
             ;;
 
         "add")
-            local action="${1,,}" target="$2" proto="${3:-tcp}"
-            [[ -z $action || ! $action =~ ^(deny|accept)$ ]] && \
-                rx_log "error" "Usage: retro firewall add <deny|accept> <port|ip> [tcp|udp|all]" && return 1
+            local rule_action="${1,,}" target="$2" proto="${3:-both}"
+            [[ -z $rule_action || ! $rule_action =~ ^(deny|accept)$ ]] && \
+                rx_log "error" "Usage: retro firewall add <deny|accept> <port|ip> [both|tcp|udp]" && return 1
             [[ -z $target ]] && \
-                rx_log "error" "Usage: retro firewall add <deny|accept> <port|ip> [tcp|udp|all]" && return 1
-            [[ ! $proto =~ ^(tcp|udp|all)$ ]] && \
-                rx_log "error" "Invalid protocol '${proto}'. Use tcp, udp, or all." && return 1
+                rx_log "error" "Usage: retro firewall add <deny|accept> <port|ip> [both|tcp|udp]" && return 1
+            [[ ! $proto =~ ^(both|tcp|udp)$ ]] && \
+                rx_log "error" "Invalid protocol '${proto}'. Use both, tcp or udp." && return 1
 
             local ip="" port="" is_ip_only=false
             if [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
@@ -283,112 +301,46 @@ cmd_firewall() {
                     rx_log "error" "Invalid port '${port}'. Must be a number 1-65535." && return 1
             fi
 
-            if [[ $is_ip_only == true && $action == "accept" ]]; then
+            if [[ $is_ip_only == true && $rule_action == "accept" ]]; then
                 rx_log "error" "Cannot accept an entire IP. Use a specific port or 'deny' to block."
                 return 1
             fi
 
+            local result
             if [[ $is_ip_only == true ]]; then
-                local result
-                result=$(bash "$core" --add-block "$ip" 2>/dev/null)
-                if echo "$result" | grep -q "^OK|"; then
-                    rx_log "success" "Rule added: deny ${ip}"
+                result=$(bash "$core" --block "$ip" "manual" "$proto" 2>/dev/null)
+            elif [[ -n $ip ]]; then
+                if [[ $rule_action == "deny" ]]; then
+                    result=$(bash "$core" --deny-ip "$ip" "$port" "$proto" 2>/dev/null)
                 else
-                    rx_log "error" "Failed to add deny for ${ip}"
-                    return 1
+                    result=$(bash "$core" --allow-ip "$ip" "$port" "$proto" 2>/dev/null)
                 fi
             else
-                local -a protos=("$proto")
-                [[ $proto == "all" ]] && protos=("tcp" "udp")
-                for p in "${protos[@]}"; do
-                    local result
-                    if [[ -n $ip ]]; then
-                        if [[ $action == "deny" ]]; then
-                            result=$(bash "$core" --add-deny-ip-port "$ip" "$port" "$p" 2>/dev/null)
-                        else
-                            result=$(bash "$core" --allow-ip-port "$ip" "$port" "$p" 2>/dev/null)
-                        fi
-                    else
-                        if [[ $action == "deny" ]]; then
-                            result=$(bash "$core" --deny "$port" "$p" 2>/dev/null)
-                        else
-                            result=$(bash "$core" --allow "$port" "$p" 2>/dev/null)
-                        fi
-                    fi
-                    if ! echo "$result" | grep -q "^OK|"; then
-                        rx_log "error" "Failed to add ${action} for ${target}/${p}"
-                        return 1
-                    fi
-                done
-                rx_log "success" "Rule added: ${action} ${target}/${proto}"
+                if [[ $rule_action == "deny" ]]; then
+                    result=$(bash "$core" --deny "$port" "$proto" 2>/dev/null)
+                else
+                    result=$(bash "$core" --allow "$port" "$proto" 2>/dev/null)
+                fi
+            fi
+
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Rule added: ${rule_action} ${target}"
+            else
+                rx_log "error" "Failed to add ${rule_action} for ${target}"
+                return 1
             fi
             ;;
 
-        "insert")
-            local action="${1,,}" target="$2" position="$3" proto="${4:-tcp}"
-            [[ -z $action || ! $action =~ ^(deny|accept)$ ]] && \
-                rx_log "error" "Usage: retro firewall insert <deny|accept> <port|ip> <pos> [tcp|udp|all]" && return 1
-            [[ -z $target ]] && \
-                rx_log "error" "Usage: retro firewall insert <deny|accept> <port|ip> <pos> [tcp|udp|all]" && return 1
-            [[ -z $position || ! $position =~ ^[0-9]+$ || $position -eq 0 ]] && \
-                rx_log "error" "Invalid position '${position}'. Must be a positive number." && return 1
-            [[ ! $proto =~ ^(tcp|udp|all)$ ]] && \
-                rx_log "error" "Invalid protocol '${proto}'. Use tcp, udp, or all." && return 1
-
-            local ip="" port="" is_ip_only=false
-            if [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}:[0-9]+$ ]]; then
-                ip="${target%:*}"; port="${target#*:}"
-            elif [[ $target =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-                ip="$target"; is_ip_only=true
+        "unblock")
+            local target="$1"
+            [[ -z $target ]] && rx_log "error" "Usage: retro firewall unblock <ip>" && return 1
+            local result
+            result=$(bash "$core" --unblock "$target" 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Unblocked ${PINK}${target}${RESET}"
             else
-                port="$target"
-            fi
-
-            if [[ -n $port ]]; then
-                [[ ! $port =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && \
-                    rx_log "error" "Invalid port '${port}'. Must be a number 1-65535." && return 1
-            fi
-
-            if [[ $is_ip_only == true && $action == "accept" ]]; then
-                rx_log "error" "Cannot accept an entire IP. Use a specific port or 'deny' to block."
+                rx_log "error" "Failed to unblock ${target}"
                 return 1
-            fi
-
-            if [[ $is_ip_only == true ]]; then
-                local result
-                result=$(bash "$core" --insert-block "$ip" "$position" 2>/dev/null)
-                if echo "$result" | grep -q "^OK|"; then
-                    rx_log "success" "Rule inserted: deny ${ip} at ${position}"
-                else
-                    rx_log "error" "Failed to insert deny for ${ip} at ${position}"
-                    return 1
-                fi
-            else
-                local -a protos=("$proto")
-                [[ $proto == "all" ]] && protos=("tcp" "udp")
-                local p_idx="$position"
-                for p in "${protos[@]}"; do
-                    local result
-                    if [[ -n $ip ]]; then
-                        if [[ $action == "deny" ]]; then
-                            result=$(bash "$core" --insert-deny-ip-port "$ip" "$port" "$p_idx" "$p" 2>/dev/null)
-                        else
-                            result=$(bash "$core" --insert-accept-ip-port "$ip" "$port" "$p_idx" "$p" 2>/dev/null)
-                        fi
-                    else
-                        if [[ $action == "deny" ]]; then
-                            result=$(bash "$core" --insert-deny "$port" "$p_idx" "$p" 2>/dev/null)
-                        else
-                            result=$(bash "$core" --insert-accept "$port" "$p_idx" "$p" 2>/dev/null)
-                        fi
-                    fi
-                    if ! echo "$result" | grep -q "^OK|"; then
-                        rx_log "error" "Failed to insert ${action} for ${target}/${p} at ${p_idx}"
-                        return 1
-                    fi
-                    [[ ${#protos[@]} -gt 1 ]] && p_idx=$((p_idx + 1))
-                done
-                rx_log "success" "Rule inserted: ${action} ${target}/${proto} at ${position}"
             fi
             ;;
 
@@ -397,7 +349,7 @@ cmd_firewall() {
             [[ -z $id || ! $id =~ ^[0-9]+(-[0-9]+)?$ ]] && \
                 rx_log "error" "Usage: retro firewall delete <rule_number> (e.g. 5 or 1-3)" && return 1
             local result
-            result=$(bash "$core" --delete-id "$id" 2>/dev/null)
+            result=$(bash "$core" --delete "$id" 2>/dev/null)
             if echo "$result" | grep -q "^OK|"; then
                 if [[ $id == *-* ]]; then
                     rx_log "success" "Rules ${PINK}${id}${RESET} deleted"
@@ -405,11 +357,7 @@ cmd_firewall() {
                     rx_log "success" "Rule #${PINK}${id}${RESET} deleted"
                 fi
             else
-                if [[ $id == *-* ]]; then
-                    rx_log "error" "Failed to delete rules ${id}. Do they exist?"
-                else
-                    rx_log "error" "Failed to delete rule #${id}. Does it exist?"
-                fi
+                rx_log "error" "Failed to delete rule(s) ${id}. Do they exist?"
                 return 1
             fi
             ;;
@@ -427,10 +375,133 @@ cmd_firewall() {
             fi
             ;;
 
-        "engine")
-            local engine
-            engine=$(bash "$core" --engine 2>/dev/null)
-            rx_log "info" "Current firewall engine: ${PINK}${engine^}${RESET}"
+        "test")
+            local result
+            result=$(bash "$core" --test 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "nftables config is valid"
+            else
+                rx_log "error" "nftables config is invalid"
+                return 1
+            fi
+            ;;
+
+        "ping")
+            local mode="$1"
+            [[ -z $mode || ! $mode =~ ^(on|off)$ ]] && rx_log "error" "Usage: retro firewall ping <on|off>" && return 1
+            local result
+            result=$(bash "$core" --ping "$mode" 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Ping ${PINK}${mode}${RESET}"
+            else
+                rx_log "error" "Failed to set ping policy"
+                return 1
+            fi
+            ;;
+
+        "outbound")
+            local policy="$1"
+            [[ -z $policy || ! $policy =~ ^(drop|accept)$ ]] && rx_log "error" "Usage: retro firewall outbound <drop|accept>" && return 1
+            local result
+            result=$(bash "$core" --outbound "$policy" 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Outbound policy set to ${PINK}${policy}${RESET}"
+            else
+                rx_log "error" "Failed to set outbound policy"
+                return 1
+            fi
+            ;;
+
+        "boot")
+            local mode="${1:-status}"
+            local result
+            result=$(bash "$core" --boot "$mode" 2>/dev/null)
+            case "$mode" in
+                enable) rx_log "success" "Firewall will start at boot" ;;
+                disable) rx_log "success" "Firewall will not start at boot" ;;
+                *) rx_log "info" "Boot: ${result#boot=}" ;;
+            esac
+            ;;
+
+        "blocked")
+            local data
+            data=$(bash "$core" --blocked 2>/dev/null)
+            local count=0
+            count=$(echo "$data" | grep "^count=" | cut -d= -f2)
+            if [[ $count -eq 0 ]]; then
+                rx_log "info" "No blocked addresses"
+                return 0
+            fi
+            rx_table_header "󰦝" "Blocked Addresses: ${count}"
+            while IFS='|' read -r entry ip reason time_str; do
+                [[ $entry != "BLOCK" ]] && continue
+                rx_table_row "󰒋" "$ip" "${reason} \u00b7 ${time_str}" "$WARN" "4"
+            done <<<"$data"
+            rx_table_separator
+            rx_table_spacer
+            ;;
+
+        "connections")
+            local port="${1:-}"
+            local data
+            data=$(bash "$core" --connections "$port" 2>/dev/null)
+            local count=0
+            count=$(echo "$data" | grep "^count=" | cut -d= -f2)
+            if [[ $count -eq 0 ]]; then
+                rx_log "info" "No active connections"
+                return 0
+            fi
+            rx_table_header "󰦝" "Active Connections: ${count}"
+            while IFS='|' read -r entry proto state _local_addr remote_addr _pid proc; do
+                [[ $entry != "CONN" ]] && continue
+                rx_table_row "󰈐" "$remote_addr" "${proto}/${state} \u00b7 ${proc:-unknown}" "$PINK" "4"
+            done <<<"$data"
+            rx_table_separator
+            rx_table_spacer
+            ;;
+
+        "drops")
+            local lines="${1:-10}"
+            bash "$core" --drops "$lines" 2>/dev/null
+            ;;
+
+        "close")
+            local pid="$2"
+            [[ -z $pid ]] && rx_log "error" "Usage: retro firewall close <pid>" && return 1
+            local result
+            result=$(bash "$core" --kill-connection "$pid" 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Connection closed (pid ${pid})"
+            else
+                rx_log "error" "Failed to close connection ${pid}: $result"
+                return 1
+            fi
+            ;;
+
+        "export")
+            local file="$2"
+            [[ -z $file ]] && rx_log "error" "Usage: retro firewall export <file>" && return 1
+            local result
+            result=$(bash "$core" --export "$file" 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Ruleset exported to ${PINK}${file}${RESET}"
+            else
+                rx_log "error" "Failed to export ruleset"
+                return 1
+            fi
+            ;;
+
+        "import")
+            local file="$2"
+            [[ -z $file ]] && rx_log "error" "Usage: retro firewall import <file>" && return 1
+            local result
+            result=$(bash "$core" --import "$file" 2>/dev/null)
+            if echo "$result" | grep -q "^OK|"; then
+                rx_log "success" "Ruleset imported from ${PINK}${file}${RESET}"
+            else
+                rx_log "error" "Failed to import ruleset (is it valid nftables?)"
+                return 1
+            fi
             ;;
 
         "logs")
@@ -441,20 +512,29 @@ cmd_firewall() {
         "help" | "")
             rx_help_usage "retro firewall <command>"
             rx_help_commands "Available commands"
-            rx_help_cmd "status" "Show firewall engine, status, rules, and open ports" 50
+            rx_help_cmd "status" "Show firewall status, rules, and open ports" 50
             rx_help_cmd "setup" "Run firewall setup wizard" 50
             rx_help_cmd "on" "Enable and start firewall" 50
             rx_help_cmd "off" "Disable and stop firewall" 50
             rx_help_cmd "restart" "Restart firewall" 50
+            rx_help_cmd "dedup" "Remove duplicate firewall rules" 50
             rx_help_cmd "rules" "List all firewall rules" 50
+            rx_help_cmd "add deny <port|ip> [both|tcp|udp]" "Append a deny rule" 50
+            rx_help_cmd "add accept <port|ip> [both|tcp|udp]" "Append an accept rule" 50
+            rx_help_cmd "unblock <ip>" "Remove a blocked IP" 50
             rx_help_cmd "delete <id>" "Delete rule(s) by ID (e.g. 5 or 1-3)" 50
             rx_help_cmd "default <drop|accept>" "Set default input policy" 50
-            rx_help_cmd "engine" "Show current firewall engine" 50
+            rx_help_cmd "ping <on|off>" "Allow or block ping (ICMP)" 50
+            rx_help_cmd "outbound <drop|accept>" "Set default outbound policy" 50
+            rx_help_cmd "boot <enable|disable|status>" "Control firewall at boot" 50
+            rx_help_cmd "blocked" "List blocked addresses" 50
+            rx_help_cmd "connections [port]" "Show active connections" 50
+            rx_help_cmd "close <pid>" "Close an active connection by PID" 50
+            rx_help_cmd "drops [lines]" "Show recent dropped packets" 50
+            rx_help_cmd "export <file>" "Export the ruleset to a file" 50
+            rx_help_cmd "import <file>" "Import a ruleset from a file" 50
+            rx_help_cmd "test" "Validate the nftables config" 50
             rx_help_cmd "logs [lines]" "Show firewall daemon logs" 50
-            rx_help_cmd "add deny <port|ip> [tcp|udp|all]" "Append a deny rule" 50
-            rx_help_cmd "add accept <port|ip> [tcp|udp|all]" "Append an accept rule" 50
-            rx_help_cmd "insert deny <port|ip> <pos> [tcp|udp|all]" "Insert a deny at position" 50
-            rx_help_cmd "insert accept <port|ip> <pos> [tcp|udp|all]" "Insert an accept at position" 50
             rx_help_spacer
             rx_help_examples
             rx_help_example "retro firewall status" "Show full firewall status" "44"
@@ -463,8 +543,7 @@ cmd_firewall() {
             rx_help_example "retro firewall add deny 8080" "Deny port 8080 (append)" "44"
             rx_help_example "retro firewall add accept 80" "Allow port 80 (append)" "44"
             rx_help_example "retro firewall add deny 10.0.0.5:22" "Deny IP on specific port" "44"
-            rx_help_example "retro firewall insert deny 10.0.0.5 1" "Block IP at position 1" "44"
-            rx_help_example "retro firewall insert accept 80 2" "Allow port 80 at position 2" "44"
+            rx_help_example "retro firewall unblock 10.0.0.5" "Unblock an IP" "44"
             rx_help_example "retro firewall default drop" "Drop all incoming by default" "44"
             rx_help_example "retro firewall rules" "List active rules" "44"
             rx_help_spacer
@@ -477,4 +556,4 @@ cmd_firewall() {
     esac
 }
 
-register_command "TOOLS" "firewall" "Multi-engine firewall management (nftables, ufw, firewalld, iptables)" "cmd_firewall"
+register_command "TOOLS" "firewall" "nftables firewall management (ports, rules, blocked IPs)" "cmd_firewall"

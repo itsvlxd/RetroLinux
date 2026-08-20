@@ -13,6 +13,33 @@ register_command() {
     local empty=1
 }
 
+_ensure_aur_helper() {
+    local helper="${AUR_HELPER:-yay}"
+    [[ $helper == "paru" ]] && helper="paru"
+    [[ $helper == "yay" ]] && helper="yay"
+    [[ $helper != "yay" && $helper != "paru" ]] && helper="yay"
+
+    if ! command -v "$helper" >/dev/null 2>&1; then
+        rx_log "info" "AUR helper ${PINK}${helper}${RESET} not found, installing..."
+        sudo pacman -S --needed --noconfirm base-devel git >/dev/null 2>&1
+        local repo=""
+        [[ $helper == "yay" ]] && repo="https://aur.archlinux.org/yay-bin.git"
+        [[ $helper == "paru" ]] && repo="https://aur.archlinux.org/paru.git"
+        local tmpdir
+        tmpdir=$(mktemp -d)
+        git clone --depth 1 "$repo" "$tmpdir/$helper" >/dev/null 2>&1 \
+            && (cd "$tmpdir/$helper" && makepkg -si --noconfirm >/dev/null 2>&1)
+        rm -rf "$tmpdir" 2>/dev/null
+    fi
+
+    if command -v "$helper" >/dev/null 2>&1; then
+        "$RETRO_DIR/retro.sh" variable set PKG_HELPER "$helper" >/dev/null 2>&1 || true
+        rx_log "success" "AUR helper ready: ${PINK}${helper}${RESET}"
+    else
+        rx_log "warn" "Could not install AUR helper, AUR packages may be skipped"
+    fi
+}
+
 run_postinstall() {
     SETUP_LOG="/var/log/retrolinux-setup.log"
     if ! sudo mkdir -p /var/log 2>/dev/null || ! sudo touch "$SETUP_LOG" 2>/dev/null; then
@@ -35,6 +62,7 @@ run_postinstall() {
     source "$HOME/.retro_install"
 
     source "$RETRO_DIR/cmds/system/setup/network.sh" && setup_network
+    _ensure_aur_helper
     source "$RETRO_DIR/cmds/system/setup/modules.sh" && setup_modules
 
     hash -r
@@ -67,7 +95,11 @@ run_postinstall() {
     retro xdg setup -o "editor=${EDITOR_CHOICE:-nvim},browser=${xdg_browser},filemanager=${FILEMANAGER_CHOICE:-nemo},image=loupe,video=mpv"
 
     retro wallpaper setup --needed -y -o "theme=retro"
-    if rx_confirm "Download the retro wallpaper collection?" "Y"; then
+    echo -n " Download the retro wallpaper collection? [Y/n]: "
+    local _wall_answer=""
+    read -r _wall_answer
+    [[ -z $_wall_answer ]] && _wall_answer="Y"
+    if [[ $_wall_answer =~ ^[Yy]$ ]]; then
         retro wallpaper pull retro
     else
         rx_log "info" "Skipping wallpaper collection download."
@@ -92,7 +124,9 @@ run_postinstall() {
     retro audio eq download JackHack96
 
     retro polkit setup --needed -y
-    retro firewall setup --needed -o "default=drop"
+    if [[ ${FIREWALL_ENABLED:-true} == "true" ]]; then
+        sudo systemctl enable nftables 2>/dev/null || true
+    fi
 
     [[ $FINGERPRINT_ENABLED == true ]] && retro fingerprint setup --needed
     [[ $SSH_ENABLED == true ]] && retro ssh setup --needed -o "port=${SSH_PORT:-22},password=${SSH_PASSWORD_LOGIN:-false},pubkey=${SSH_KEY_LOGIN:-true},root=${SSH_ROOT_LOGIN:-false}"

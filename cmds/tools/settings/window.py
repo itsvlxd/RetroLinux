@@ -160,6 +160,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._pending_page: object | None = None
         self._pre_search_page_id: str | None = None
         self._current_page_id: str | None = None
+        self._built_pages: dict[str, object] = {}
         self._search_results: list | None = None
         # Populated at the end of _build_ui() once section pages exist;
         # initialized empty so has_dirty() is safe during initial builds.
@@ -555,6 +556,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.shell_overview", "ShellOverviewPage", "_shell_overview_page", "shell_overview", "Overview"),
             ("settings.pages.misc", "MiscPage", "_misc_page", "misc", "Miscellaneous"),
             ("settings.pages.shell_presets", "ShellPresetsPage", "_shell_presets_page", "shell_presets", "Presets"),
+            ("settings.pages.firewall", "FirewallPage", "_firewall_page", "firewall", "Firewall"),
+            ("settings.pages.ssh", "SshPage", "_ssh_page", "ssh", "SSH"),
+            ("settings.pages.faillock", "FaillockPage", "_faillock_page", "faillock", "Faillock"),
             ("settings.pages.themes", "ThemesPage", "_themes_page", "themes", "Themes"),
             ("settings.pages.wallpapers", "WallpapersPage", "_wallpapers_page", "wallpapers", "Wallpapers"),
             ("settings.pages.users", "UsersPage", "_users_page", "users", "Users"),
@@ -1221,6 +1225,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         cls = self._resolve_page_class(module, cls_name)
         page = cls(self)
         setattr(self, attr, page)
+        self._built_pages[slug] = page
         with_chip = cls_name != "PendingChangesPage"
         header = self._make_page_header(title, with_pending_chip=with_chip)
         widget = page.build(header=header)
@@ -1351,10 +1356,18 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name in ("FirewallPage", "SshPage", "FaillockPage"):
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
 
 
     def show_page(self, gid: str):
         """Switch the content pane to the given page."""
+        # "security" was split into Firewall / SSH / Faillock pages; keep the
+        # old slug as an alias to the Firewall page for saved shortcuts.
+        if gid == "security":
+            gid = "firewall"
         if gid == "keyring":
             cmd = "seahorse"
             lua = f'hl.dsp.exec_cmd("{cmd}", {{ float = true, size = {{ 1000, 700 }}, center = true }})'
@@ -1384,9 +1397,15 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             if gid == "pending" and self._pending_page is not None:
                 # Catch up on any changes that happened while the page wasn't visible
                 self._pending_page.refresh()
+            prev = self._built_pages.get(self._current_page_id or "")
+            if prev is not None and getattr(prev, "on_hidden", None):
+                prev.on_hidden()
             self._current_page_id = gid
             self._page_stack.set_visible_child_name(gid)
             self._content_nav.set_title(self._page_titles[gid])
+            cur = self._built_pages.get(gid)
+            if cur is not None and getattr(cur, "on_shown", None):
+                cur.on_shown()
 
     def _show_pending(self):
         # Pending Changes is a non-sidebar page; clearing the sidebar

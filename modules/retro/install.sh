@@ -18,11 +18,28 @@ setup_cronie() {
 
     if systemctl is-active cronie.service &>/dev/null; then
         rx_log "info" "Cronie service is running"
+        return 0
+    fi
+
+    if ! systemctl list-unit-files cronie.service &>/dev/null | grep -q "cronie.service"; then
+        rx_log "warn" "cronie.service not found — cronie may not be installed"
+        return 1
+    fi
+
+    rx_log "info" "Enabling cronie service..."
+    local ok=true
+    if [[ $EUID -eq 0 ]]; then
+        systemctl enable cronie.service 2>/dev/null || ok=false
+        systemctl start cronie.service 2>/dev/null || ok=false
     else
-        rx_log "info" "Enabling cronie service..."
-        [[ $EUID -eq 0 ]] && systemctl enable cronie.service || sudo systemctl enable cronie.service
-        [[ $EUID -eq 0 ]] && systemctl start cronie.service || sudo systemctl start cronie.service
+        sudo systemctl enable cronie.service 2>/dev/null || ok=false
+        sudo systemctl start cronie.service 2>/dev/null || ok=false
+    fi
+
+    if [[ $ok == true ]]; then
         rx_log "success" "Cronie service enabled and started"
+    else
+        rx_log "warn" "Failed to enable/start cronie.service"
     fi
 }
 
@@ -419,12 +436,32 @@ EOF
     rx_log "success" "Sudoers rule added for retro background tools"
 }
 
+setup_security_sudoers() {
+    # Wheel members toggle the firewall, SSH, and faillock from the
+    # settings Security page without a password prompt. The core scripts
+    # run as root so their internal commands never re-trigger sudo, and
+    # nft/ss/kill are passwordless for the read-only status paths.
+    sudo rm -f /etc/sudoers.d/99-retro-security
+    cat <<EOF | sudo tee /etc/sudoers.d/99-retro-security >/dev/null
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/firewall_core.sh
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/ssh_core.sh
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nft
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/ss
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/kill
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/faillock
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /var/log/retro-firewall-blocked
+EOF
+    sudo chmod 440 /etc/sudoers.d/99-retro-security
+    rx_log "success" "Sudoers rule added for security tools (firewall, SSH, faillock)"
+}
+
 if [[ $SECONDARY_INSTALL != "true" ]]; then
     install_settings_desktop
     setup_theme_sudoers
     setup_sddm_sudoers
     setup_smartctl_sudoers
     setup_nopasswd_tools
+    setup_security_sudoers
     patch_os_release
 
     SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"

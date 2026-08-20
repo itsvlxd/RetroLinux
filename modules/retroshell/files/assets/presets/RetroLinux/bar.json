@@ -19,13 +19,11 @@
     "containBar": false,
     "keepBarShadow": false,
     "keepBarBorder": true,
-    "showLayoutChanger": false,
-    "showPresetsButton": false,
     "showWeatherTemp": false,
     "showDayOfWeek": false,
     "batteryStyle": "arch",
-    "showWifiPopup": true,
-    "showBluetoothPopup": true,
-    "showQuickSharePopup": true,
-    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
+    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"],
+    "clockOrder": ["clock", "weather", "pomodoro"],
+    "barLeftOrder": ["launcher", "workspaces", "pin"],
+    "barRightOrder": ["tools", "tray", "wifi", "bluetooth", "controls", "battery", "clock", "power"]
 }

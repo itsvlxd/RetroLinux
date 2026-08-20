@@ -23,6 +23,8 @@ Item {
     // Popup visibility state (tracks intent, not animation)
     property bool popupOpen: layoutPopup.isOpen
 
+    implicitWidth: 36
+    implicitHeight: 36
     Layout.preferredWidth: 36
     Layout.preferredHeight: 36
     Layout.maximumWidth: 36

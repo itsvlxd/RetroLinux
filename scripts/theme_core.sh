@@ -1517,19 +1517,19 @@ case "$1" in
         rx_theme_browser_status
         ;;
     "--papirus-setup")
-        command -v papirus-folders >/dev/null 2>&1 || return 0
-        sudo rm -f /etc/sudoers.d/papirus-folders
-        cat <<EOF | sudo tee /etc/sudoers.d/papirus-folders >/dev/null
+        if command -v papirus-folders >/dev/null 2>&1; then
+            sudo rm -f /etc/sudoers.d/papirus-folders
+            cat <<EOF | sudo tee /etc/sudoers.d/papirus-folders >/dev/null
 %wheel ALL=(ALL) NOPASSWD: SETENV: /usr/bin/papirus-folders
 Defaults!/usr/bin/papirus-folders !env_reset
 EOF
-        sudo chmod 440 /etc/sudoers.d/papirus-folders
-        sudo mkdir -p /usr/share/icons/default /etc/gtk-3.0 /etc/gtk-4.0
-        cat <<EOF | sudo tee /usr/share/icons/default/index.theme >/dev/null
+            sudo chmod 440 /etc/sudoers.d/papirus-folders
+            sudo mkdir -p /usr/share/icons/default /etc/gtk-3.0 /etc/gtk-4.0
+            cat <<EOF | sudo tee /usr/share/icons/default/index.theme >/dev/null
 [Icon Theme]
 Inherits=Papirus-Dark
 EOF
-        cat <<EOF | sudo tee /etc/gtk-3.0/settings.ini >/dev/null
+            cat <<EOF | sudo tee /etc/gtk-3.0/settings.ini >/dev/null
 [Settings]
 gtk-icon-theme-name = Papirus-Dark
 gtk-xft-antialias=1
@@ -1537,7 +1537,7 @@ gtk-xft-hinting=0
 gtk-xft-hintstyle=hintnone
 gtk-xft-rgba=rgb
 EOF
-        cat <<EOF | sudo tee /etc/gtk-4.0/settings.ini >/dev/null
+            cat <<EOF | sudo tee /etc/gtk-4.0/settings.ini >/dev/null
 [Settings]
 gtk-icon-theme-name = Papirus-Dark
 gtk-xft-antialias=1
@@ -1545,6 +1545,7 @@ gtk-xft-hinting=0
 gtk-xft-hintstyle=hintnone
 gtk-xft-rgba=rgb
 EOF
+        fi
         ;;
     "--apply-gtk-font")
         rx_theme_apply_gtk_font

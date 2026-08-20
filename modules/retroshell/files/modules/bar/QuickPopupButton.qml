@@ -27,6 +27,8 @@ Item {
     property bool isHovered: false
     readonly property bool popupOpen: popup.isOpen
 
+    implicitWidth: 36
+    implicitHeight: 36
     Layout.preferredWidth: 36
     Layout.preferredHeight: 36
     Layout.fillWidth: vertical
