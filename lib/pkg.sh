@@ -87,15 +87,53 @@ rx_pkg_install() {
         fi
     fi
 
-    if [[ $sudo_run == "true" && $EUID -ne 0 ]]; then
-        if ! sudo bash -c "$install_cmd ${missing_pkgs[*]}"; then
-            rx_log "warn" "Some packages failed to install, continuing anyway: ${PINK}${missing_pkgs[*]}${RESET}"
-        fi
-    else
-        if ! $install_cmd "${missing_pkgs[@]}"; then
-            rx_log "warn" "Some packages failed to install, continuing anyway: ${PINK}${missing_pkgs[*]}${RESET}"
-        fi
+    if _rx_pkg_run "$install_cmd" "$sudo_run" "${missing_pkgs[@]}"; then
+        return 0
     fi
+
+    rx_log "warn" "Batch install failed; retrying with a targeted overwrite for overlapping package files"
+    if _rx_pkg_run "$install_cmd --overwrite \"$_RX_OVERWRITE_GLOBS\"" "$sudo_run" "${missing_pkgs[@]}"; then
+        return 0
+    fi
+
+    rx_log "warn" "Overwrite batch still failing; retrying per-package so one bad package cannot abort the rest"
+    local failed=()
+    local pkg
+    for pkg in "${missing_pkgs[@]}"; do
+        if rx_pkg_installed "$pkg"; then
+            continue
+        fi
+        if ! _rx_pkg_install_one "$install_cmd" "$sudo_run" "$pkg"; then
+            failed+=("$pkg")
+        fi
+    done
+
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        rx_log "warn" "Some packages failed to install: ${PINK}${failed[*]}${RESET}"
+    fi
+}
+
+_RX_OVERWRITE_GLOBS="/usr/include/libdex-1/*,/usr/lib/libdex-1.so*,/usr/lib/pkgconfig/libdex-1.pc,/usr/lib/girepository-1.0/Dex-1.typelib,/usr/lib/python3.14/site-packages/gi/overrides/Dex.py*,/usr/share/gir-1.0/Dex-1.gir,/usr/share/vala/vapi/libdex-1.*"
+
+_rx_pkg_run() {
+    local cmd="$1" sudo_run="$2"
+    shift 2
+    local pkgs=("$@")
+    [[ ${#pkgs[@]} -eq 0 ]] && return 0
+
+    if [[ $sudo_run == "true" && $EUID -ne 0 ]]; then
+        sudo bash -c "$cmd ${pkgs[*]}"
+    else
+        $cmd "${pkgs[@]}"
+    fi
+}
+
+_rx_pkg_install_one() {
+    local cmd="$1" sudo_run="$2" pkg="$3"
+    if _rx_pkg_run "$cmd" "$sudo_run" "$pkg"; then
+        return 0
+    fi
+    _rx_pkg_run "$cmd --overwrite \"$_RX_OVERWRITE_GLOBS\"" "$sudo_run" "$pkg"
 }
 
 _pkg_resolves() {
