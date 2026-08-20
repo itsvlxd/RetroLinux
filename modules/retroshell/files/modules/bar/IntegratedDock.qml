@@ -22,8 +22,10 @@ StyledRect {
     readonly property string dockPosition: Config.dock?.position ?? "center"
 
     // Compact sizing for integrated dock
-    readonly property int iconSize: 18
-    readonly property int itemSpacing: 2
+    readonly property real dockScale: Config.dock?.scale ?? 1.0
+    readonly property int iconSize: Math.round((Config.dock?.iconSize ?? 18) * dockScale)
+    readonly property int itemSpacing: Math.round(2 * dockScale)
+    readonly property int compactSize: Math.round(36 * dockScale)
 
     visible: (Config.dock?.enabled ?? false) && isIntegrated
 
@@ -40,11 +42,11 @@ StyledRect {
     
     enableShadow: Config.showBackground
 
-    implicitWidth: isVertical ? 36 : dockLayout.implicitWidth + 8
-    implicitHeight: isVertical ? dockLayoutVertical.implicitHeight + 8 : 36
+    implicitWidth: isVertical ? root.compactSize : dockLayout.implicitWidth + 8
+    implicitHeight: isVertical ? dockLayoutVertical.implicitHeight + 8 : root.compactSize
     
-    Layout.maximumWidth: isVertical ? 36 : -1
-    Layout.maximumHeight: isVertical ? -1 : 36
+    Layout.maximumWidth: isVertical ? root.compactSize : -1
+    Layout.maximumHeight: isVertical ? -1 : root.compactSize
 
     Flickable {
         id: flickable

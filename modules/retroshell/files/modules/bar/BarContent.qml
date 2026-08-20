@@ -166,7 +166,11 @@ Item {
     readonly property int frameOffset: (Config.bar && Config.bar.frameEnabled !== undefined ? Config.bar.frameEnabled : false) ? (Config.bar && Config.bar.frameThickness !== undefined ? Config.bar.frameThickness : 6) : 0
 
     // Size derived from barBg properties
-    readonly property int barPadding: barBg.padding
+    readonly property real barScale: (Config.bar && Config.bar.scale !== undefined ? Config.bar.scale : 1.0)
+    readonly property int barPaddingTop: barBg.paddingTop
+    readonly property int barPaddingRight: barBg.paddingRight
+    readonly property int barPaddingBottom: barBg.paddingBottom
+    readonly property int barPaddingLeft: barBg.paddingLeft
     readonly property int topOuterMargin: (orientation === "vertical" || barPosition === "top") ? barBg.outerMargin : 0
     readonly property int bottomOuterMargin: (orientation === "vertical" || barPosition === "bottom") ? barBg.outerMargin : 0
     readonly property int leftOuterMargin: (orientation === "horizontal" || barPosition === "left") ? barBg.outerMargin : 0
@@ -174,9 +178,9 @@ Item {
 
     readonly property int contentImplicitWidth: orientation === "horizontal" ? (horizontalLoader.item && horizontalLoader.item.implicitWidth !== undefined ? horizontalLoader.item.implicitWidth : 0) : (verticalLoader.item && verticalLoader.item.implicitWidth !== undefined ? verticalLoader.item.implicitWidth : 0)
     readonly property int contentImplicitHeight: orientation === "horizontal" ? (horizontalLoader.item && horizontalLoader.item.implicitHeight !== undefined ? horizontalLoader.item.implicitHeight : 0) : (verticalLoader.item && verticalLoader.item.implicitHeight !== undefined ? verticalLoader.item.implicitHeight : 0)
-    
-    readonly property int barTargetWidth: orientation === "vertical" ? (contentImplicitWidth + 2 * barPadding) : 0
-    readonly property int barTargetHeight: orientation === "horizontal" ? (contentImplicitHeight + 2 * barPadding) : 0
+
+    readonly property int barTargetWidth: orientation === "vertical" ? (Math.round(contentImplicitWidth) + barPaddingLeft + barPaddingRight) : 0
+    readonly property int barTargetHeight: orientation === "horizontal" ? (Math.round(contentImplicitHeight) + barPaddingTop + barPaddingBottom) : 0
 
     readonly property bool actualContainBar: (Config.bar && Config.bar.containBar !== undefined ? Config.bar.containBar : false) && (Config.bar && Config.bar.frameEnabled !== undefined ? Config.bar.frameEnabled : false)
     readonly property int totalBarWidth: barTargetWidth + 
@@ -357,11 +361,11 @@ Item {
                     active: root.orientation === "horizontal"
                     anchors.fill: parent
                     sourceComponent: RowLayout {
-                        spacing: 4
+                        spacing: 4 * root.barScale
 
                         Repeater {
                             model: root.barLeftOrder
-                            delegate: Loader {
+                            delegate: Item {
                                 required property string modelData
                                 required property int index
                                 property string side: "left"
@@ -371,11 +375,21 @@ Item {
                                 Layout.fillWidth: root.orientation === "vertical"
                                 Layout.fillHeight: root.orientation === "horizontal"
                                 Layout.alignment: root.barItemAlignment(modelData)
-                                sourceComponent: root.barItemFor(modelData)
-                                onLoaded: {
-                                    if (item) {
-                                        item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
-                                        item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                implicitWidth: itemLoader.implicitWidth * root.barScale
+                                implicitHeight: itemLoader.implicitHeight * root.barScale
+
+                                Loader {
+                                    id: itemLoader
+                                    anchors.centerIn: parent
+                                    width: parent.width / root.barScale
+                                    height: parent.height / root.barScale
+                                    scale: root.barScale
+                                    sourceComponent: root.barItemFor(modelData)
+                                    onLoaded: {
+                                        if (item) {
+                                            item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
+                                            item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                        }
                                     }
                                 }
                             }
@@ -418,7 +432,7 @@ Item {
 
                         Repeater {
                             model: root.barRightOrder
-                            delegate: Loader {
+                            delegate: Item {
                                 required property string modelData
                                 required property int index
                                 property string side: "right"
@@ -428,11 +442,21 @@ Item {
                                 Layout.fillWidth: root.orientation === "vertical"
                                 Layout.fillHeight: root.orientation === "horizontal"
                                 Layout.alignment: root.barItemAlignment(modelData)
-                                sourceComponent: root.barItemFor(modelData)
-                                onLoaded: {
-                                    if (item) {
-                                        item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
-                                        item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                implicitWidth: itemLoader.implicitWidth * root.barScale
+                                implicitHeight: itemLoader.implicitHeight * root.barScale
+
+                                Loader {
+                                    id: itemLoader
+                                    anchors.centerIn: parent
+                                    width: parent.width / root.barScale
+                                    height: parent.height / root.barScale
+                                    scale: root.barScale
+                                    sourceComponent: root.barItemFor(modelData)
+                                    onLoaded: {
+                                        if (item) {
+                                            item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
+                                            item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                        }
                                     }
                                 }
                             }
@@ -445,11 +469,11 @@ Item {
                     active: root.orientation === "vertical"
                     anchors.fill: parent
                     sourceComponent: ColumnLayout {
-                        spacing: 4
+                        spacing: 4 * root.barScale
 
                         Repeater {
                             model: root.barLeftOrder
-                            delegate: Loader {
+                            delegate: Item {
                                 required property string modelData
                                 required property int index
                                 property string side: "left"
@@ -459,11 +483,21 @@ Item {
                                 Layout.fillWidth: root.orientation === "vertical"
                                 Layout.fillHeight: root.orientation === "horizontal"
                                 Layout.alignment: root.barItemAlignment(modelData)
-                                sourceComponent: root.barItemFor(modelData)
-                                onLoaded: {
-                                    if (item) {
-                                        item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
-                                        item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                implicitWidth: itemLoader.implicitWidth * root.barScale
+                                implicitHeight: itemLoader.implicitHeight * root.barScale
+
+                                Loader {
+                                    id: itemLoader
+                                    anchors.centerIn: parent
+                                    width: parent.width / root.barScale
+                                    height: parent.height / root.barScale
+                                    scale: root.barScale
+                                    sourceComponent: root.barItemFor(modelData)
+                                    onLoaded: {
+                                        if (item) {
+                                            item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
+                                            item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                        }
                                     }
                                 }
                             }
@@ -488,7 +522,7 @@ Item {
 
                         Repeater {
                             model: root.barRightOrder
-                            delegate: Loader {
+                            delegate: Item {
                                 required property string modelData
                                 required property int index
                                 property string side: "right"
@@ -498,11 +532,21 @@ Item {
                                 Layout.fillWidth: root.orientation === "vertical"
                                 Layout.fillHeight: root.orientation === "horizontal"
                                 Layout.alignment: root.barItemAlignment(modelData)
-                                sourceComponent: root.barItemFor(modelData)
-                                onLoaded: {
-                                    if (item) {
-                                        item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
-                                        item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                implicitWidth: itemLoader.implicitWidth * root.barScale
+                                implicitHeight: itemLoader.implicitHeight * root.barScale
+
+                                Loader {
+                                    id: itemLoader
+                                    anchors.centerIn: parent
+                                    width: parent.width / root.barScale
+                                    height: parent.height / root.barScale
+                                    scale: root.barScale
+                                    sourceComponent: root.barItemFor(modelData)
+                                    onLoaded: {
+                                        if (item) {
+                                            item.startRadius = Qt.binding(function() { return root.barItemStartRadius(side, index); });
+                                            item.endRadius = Qt.binding(function() { return root.barItemEndRadius(side, index, sideCount); });
+                                        }
                                     }
                                 }
                             }

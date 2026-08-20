@@ -11,7 +11,7 @@ are staged in memory (``_data`` vs the ``_saved`` snapshot) and only
 persisted on Save, exactly like the other standalone pages.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 import shutil
 from typing import TYPE_CHECKING, cast
 
@@ -79,6 +79,23 @@ _BATTERY_STYLE_OPTIONS = [
     ("arch", "Arch"),
     ("bar", "Bar"),
 ]
+
+_SCALE_OPTIONS = [
+    (0.7, "70%"),
+    (0.8, "80%"),
+    (0.9, "90%"),
+    (1.0, "100%"),
+    (1.1, "110%"),
+    (1.2, "120%"),
+    (1.3, "130%"),
+]
+
+_PADDING_KEYS = (
+    ("barPaddingTop", "Top"),
+    ("barPaddingRight", "Right"),
+    ("barPaddingBottom", "Bottom"),
+    ("barPaddingLeft", "Left"),
+)
 
 
 class ShellBarPage:
@@ -151,6 +168,13 @@ class ShellBarPage:
         self._build_bar_group(bar_group)
         content_box.append(bar_group)
 
+        padding_group = Adw.PreferencesGroup(
+            title="Bar Padding",
+            description="Inner padding on each side of the bar.",
+        )
+        self._build_padding_group(padding_group)
+        content_box.append(padding_group)
+
         self._left_group = Adw.PreferencesGroup(
             title="Left Bar",
             description="Items on the left of the bar. Drag to reorder or "
@@ -196,6 +220,8 @@ class ShellBarPage:
                         subtitle="Shape of the launcher pill")
         self._add_combo(group, "batteryStyle", "Battery Style", _BATTERY_STYLE_OPTIONS,
                         subtitle="Progress ring around the icon, or a small bar beneath it")
+        self._add_combo(group, "scale", "Scale", _SCALE_OPTIONS,
+                        subtitle="Overall size of the bar and its items")
         for key, label, sub in (
             ("use12hFormat", "Use 12h Format", "Show the clock in 12-hour format"),
             ("enableFirefoxPlayer", "Enable Firefox Player", "Show Firefox media controls in the bar"),
@@ -203,6 +229,12 @@ class ShellBarPage:
             ("showDayOfWeek", "Show Day of Week", "Show the day abbreviation (Mon, Tue...) beside the clock"),
         ):
             self._add_switch(group, key, label, subtitle=sub)
+
+    def _build_padding_group(self, group: Adw.PreferencesGroup) -> None:
+        for key, label in _PADDING_KEYS:
+            self._add_spin(group, key, f"Padding {label}",
+                           lower=0, upper=32, suffix="px",
+                           subtitle=f"Inner padding on the {label.lower()} side of the bar")
 
     def _build_autohide_group(self, group: Adw.PreferencesGroup) -> None:
         self._add_switch(group, "pinnedOnStartup", "Pinned on Startup",
@@ -625,7 +657,7 @@ class ShellBarPage:
         group: Adw.PreferencesGroup,
         key: str,
         label: str,
-        options: list[tuple[str, str]],
+        options: Sequence[tuple[object, str]],
         *,
         subtitle: str = "",
     ) -> ManagedRow:

@@ -24,7 +24,12 @@ Item {
 
     // New logic: padding 4 if opaque (>1%), 0 if transparent
     readonly property real bgOpacity: Config.theme.srBarBg.opacity
-    readonly property int padding: bgOpacity < 0.01 ? 0 : 4
+    readonly property bool barOpaque: bgOpacity >= 0.01
+    readonly property real barScale: (Config.bar && Config.bar.scale !== undefined ? Config.bar.scale : 1.0)
+    readonly property int paddingTop: barOpaque ? Math.round((Config.bar.barPaddingTop !== undefined ? Config.bar.barPaddingTop : 4) * barScale) : 0
+    readonly property int paddingRight: barOpaque ? Math.round((Config.bar.barPaddingRight !== undefined ? Config.bar.barPaddingRight : 4) * barScale) : 0
+    readonly property int paddingBottom: barOpaque ? Math.round((Config.bar.barPaddingBottom !== undefined ? Config.bar.barPaddingBottom : 4) * barScale) : 0
+    readonly property int paddingLeft: barOpaque ? Math.round((Config.bar.barPaddingLeft !== undefined ? Config.bar.barPaddingLeft : 4) * barScale) : 0
 
     // Combined outer margin for screen/frame edges
     // This margin (4px) should only exist when bar is floating (!effectiveContainBar)
@@ -56,7 +61,10 @@ Item {
     Item {
         id: contentContainer
         anchors.fill: parent
-        anchors.margins: root.padding
+        anchors.topMargin: root.paddingTop
+        anchors.rightMargin: root.paddingRight
+        anchors.bottomMargin: root.paddingBottom
+        anchors.leftMargin: root.paddingLeft
     }
 
     // Mascara combinada para la bar + corners
