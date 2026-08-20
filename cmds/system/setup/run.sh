@@ -40,6 +40,18 @@ _ensure_aur_helper() {
     fi
 }
 
+_write_shell_pinned_apps() {
+    local terminal_app="${RETRO_TERMINAL_CMD:-kitty}"
+    local filemanager="${FILEMANAGER_CHOICE:-nemo}"
+    local browser="${BROWSER_CHOICE:-firefox}"
+    [[ $browser == "zen-browser-bin" ]] && browser="zen"
+
+    mkdir -p "$HOME/.local/share/retroshell"
+    cat > "$HOME/.local/share/retroshell/pinnedapps.json" <<EOF
+{"apps":["$terminal_app","io.github.retrolinux.settings","$filemanager","$browser","io.github.kolunmi.Bazaar"]}
+EOF
+}
+
 run_postinstall() {
     SETUP_LOG="/var/log/retrolinux-setup.log"
     if ! sudo mkdir -p /var/log 2>/dev/null || ! sudo touch "$SETUP_LOG" 2>/dev/null; then
@@ -131,6 +143,8 @@ run_postinstall() {
     fi
 
     retro shell start
+
+    _write_shell_pinned_apps
 
     sudo rm -f /etc/sudoers.d/retro-post-install
     rm "$HOME/.retro_install"

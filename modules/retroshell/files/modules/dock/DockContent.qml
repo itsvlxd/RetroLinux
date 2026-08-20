@@ -120,6 +120,119 @@ Item {
     readonly property real dockScale: Config.dock?.scale ?? 1.0
     readonly property int dockSize: Math.round((Config.dock?.height ?? 56) * dockScale)
 
+    // Drag-and-drop state
+    property string dragAppId: ""
+    property int dragPinnedIndex: -1
+    property bool appDragging: false
+    property bool desktopDragging: false
+    readonly property bool showInsertion: appDragging || desktopDragging
+    property int insertionIndex: -1
+    property point dragCursorPos: Qt.point(0, 0)
+
+    readonly property real dragIconSize: Math.round((Config.dock?.iconSize ?? 40) * (Config.dock?.scale ?? 1.0))
+
+    function iconForAppId(appId) {
+        if (!appId) return "image-missing";
+        const entry = DesktopEntries.heuristicLookup(appId);
+        if (entry && entry.icon) return entry.icon;
+        return AppSearch.guessIcon(appId);
+    }
+
+    function appIdFromPath(path) {
+        if (!path) return "";
+        const str = path.toString();
+        if (!str.endsWith(".desktop")) return "";
+        const base = str.substring(str.lastIndexOf("/") + 1);
+        return base.slice(0, -8);
+    }
+
+    // Insertion index within the pinned region for a point in dockContainer coords
+    function insertionIndexAt(pos) {
+        var rep = root.isVertical ? appsRepeaterVertical : appsRepeaterHorizontal;
+        var layout = root.isVertical ? dockLayoutVertical : dockLayoutHorizontal;
+        var local = layout.mapFromItem(dockContainer, pos.x, pos.y);
+        var cursor = root.isVertical ? local.y : local.x;
+        var pinnedCount = (Config.pinnedApps?.apps || []).length;
+        for (var i = 0; i < pinnedCount; i++) {
+            var it = rep.itemAt(i);
+            if (!it) return i;
+            var origin = layout.mapFromItem(it, 0, 0);
+            var center = root.isVertical ? origin.y + it.height / 2 : origin.x + it.width / 2;
+            if (cursor < center) return i;
+        }
+        return pinnedCount;
+    }
+
+    // Position (along the dock axis, in dockContainer coords) of the insertion boundary
+    function insertionBoundary(index) {
+        var rep = root.isVertical ? appsRepeaterVertical : appsRepeaterHorizontal;
+        var layout = root.isVertical ? dockLayoutVertical : dockLayoutHorizontal;
+        var pinnedCount = (Config.pinnedApps?.apps || []).length;
+        var clamped = Math.max(0, Math.min(index, pinnedCount));
+        var p;
+        if (pinnedCount === 0) {
+            p = layout.mapToItem(dockContainer, 0, 0);
+        } else if (clamped >= pinnedCount) {
+            var last = rep.itemAt(pinnedCount - 1);
+            p = last.mapToItem(dockContainer, root.isVertical ? last.width / 2 : last.width, root.isVertical ? last.height : last.height / 2);
+        } else {
+            var item = rep.itemAt(clamped);
+            p = item.mapToItem(dockContainer, 0, root.isVertical ? 0 : item.height / 2);
+        }
+        return root.isVertical ? p.y : p.x;
+    }
+
+    // Drops are only valid along the dock's own line
+    function dragWithinBounds(pos) {
+        if (root.isVertical) return pos.y >= -8 && pos.y <= dockContainer.height + 8;
+        return pos.x >= -8 && pos.x <= dockContainer.width + 8;
+    }
+
+    function updateInsertion(pos) {
+        root.dragCursorPos = Qt.point(pos.x, pos.y);
+        root.insertionIndex = root.dragWithinBounds(pos) ? root.insertionIndexAt(pos) : -1;
+    }
+
+    function beginAppDrag(button) {
+        root.dragAppId = button.dragAppId;
+        root.dragPinnedIndex = button.dragPinnedIndex;
+        root.appDragging = true;
+        var c = button.appDragHandler.centroid.position;
+        root.updateInsertion(dockContainer.mapFromItem(button, c.x, c.y));
+    }
+
+    function updateAppDrag(button) {
+        if (!root.appDragging) return;
+        var c = button.appDragHandler.centroid.position;
+        root.updateInsertion(dockContainer.mapFromItem(button, c.x, c.y));
+    }
+
+    function endAppDrag(button) {
+        if (!root.appDragging) return;
+        var c = button.appDragHandler.centroid.position;
+        var pos = dockContainer.mapFromItem(button, c.x, c.y);
+        if (root.dragWithinBounds(pos)) {
+            var computed = root.insertionIndexAt(pos);
+            var target = computed;
+            if (root.dragPinnedIndex >= 0 && root.dragPinnedIndex < computed) target = computed - 1;
+            if (root.dragPinnedIndex >= 0) {
+                TaskbarApps.reorderPinned(root.dragAppId, target);
+            } else {
+                TaskbarApps.pinApp(root.dragAppId, target);
+            }
+        }
+        root.dragAppId = "";
+        root.dragPinnedIndex = -1;
+        root.appDragging = false;
+        root.insertionIndex = -1;
+    }
+
+    function pinDroppedApp(appId, dropX, dropY) {
+        var pos = Qt.point(dropX, dropY);
+        if (!root.dragWithinBounds(pos)) return;
+        TaskbarApps.pinApp(appId, root.insertionIndexAt(pos));
+    }
+
     implicitWidth: root.isVertical ? dockSize + totalMargin + shadowSpace * 2 : dockContent.implicitWidth + shadowSpace * 2
     implicitHeight: root.isVertical ? dockContent.implicitHeight + shadowSpace * 2 : dockSize + totalMargin + shadowSpace * 2
 
@@ -471,13 +584,29 @@ Item {
                 }
 
                 Repeater {
+                    id: appsRepeaterHorizontal
                     model: TaskbarApps.apps
 
                     DockAppButton {
+                        id: appBtnH
                         required property var modelData
                         appToplevel: modelData
                         Layout.alignment: Qt.AlignVCenter
                         dockPosition: "bottom"
+                        appDragHandler.onActiveChanged: {
+                            if (appBtnH.appDragHandler.active) root.beginAppDrag(appBtnH);
+                            else root.endAppDrag(appBtnH);
+                        }
+                        appDragHandler.onCentroidChanged: {
+                            if (appBtnH.appDragHandler.active) root.updateAppDrag(appBtnH);
+                        }
+                        opacity: (root.appDragging && root.dragAppId === appBtnH.dragAppId) ? 0.35 : 1.0
+                        Behavior on opacity {
+                            enabled: Config.animDuration > 0
+                            NumberAnimation {
+                                duration: Config.animDuration / 2
+                            }
+                        }
                     }
                 }
 
@@ -605,13 +734,29 @@ Item {
                 }
 
                 Repeater {
+                    id: appsRepeaterVertical
                     model: TaskbarApps.apps
 
                     DockAppButton {
+                        id: appBtnV
                         required property var modelData
                         appToplevel: modelData
                         Layout.alignment: Qt.AlignHCenter
                         dockPosition: root.position
+                        appDragHandler.onActiveChanged: {
+                            if (appBtnV.appDragHandler.active) root.beginAppDrag(appBtnV);
+                            else root.endAppDrag(appBtnV);
+                        }
+                        appDragHandler.onCentroidChanged: {
+                            if (appBtnV.appDragHandler.active) root.updateAppDrag(appBtnV);
+                        }
+                        opacity: (root.appDragging && root.dragAppId === appBtnV.dragAppId) ? 0.35 : 1.0
+                        Behavior on opacity {
+                            enabled: Config.animDuration > 0
+                            NumberAnimation {
+                                duration: Config.animDuration / 2
+                            }
+                        }
                     }
                 }
 
@@ -664,6 +809,113 @@ Item {
                             show: overviewButtonV.hovered
                             tooltipText: "Overview"
                         }
+                    }
+                }
+            }
+
+            // Drop target for desktop icons (pin into dock)
+            DropArea {
+                id: dockDropArea
+                anchors.fill: parent
+                z: 4000
+                keys: ["desktopIcon"]
+                enabled: root.reveal
+
+                onEntered: {
+                    root.desktopDragging = true;
+                    root.updateInsertion(Qt.point(drag.x, drag.y));
+                }
+                onPositionChanged: drag => {
+                    root.updateInsertion(Qt.point(drag.x, drag.y));
+                }
+                onExited: {
+                    root.desktopDragging = false;
+                    root.insertionIndex = -1;
+                }
+                onDropped: drop => {
+                    root.desktopDragging = false;
+                    root.insertionIndex = -1;
+                    var src = drop.source;
+                    if (src && src.isDesktopFile) {
+                        var appId = root.appIdFromPath(src.path);
+                        if (appId) {
+                            root.pinDroppedApp(appId, drop.x, drop.y);
+                            drop.acceptProposedAction();
+                        }
+                    }
+                }
+            }
+
+            // Drag ghost, clamped to the dock's own line
+            Item {
+                id: dragGhost
+                visible: root.appDragging
+                z: 5001
+                width: root.dragIconSize + 8
+                height: root.dragIconSize + 8
+                x: root.isVertical ? (dockContainer.width - width) / 2 : root.dragCursorPos.x - width / 2
+                y: root.isVertical ? root.dragCursorPos.y - height / 2 : (dockContainer.height - height) / 2
+                scale: 1.1
+                transformOrigin: Item.Center
+                opacity: 0.85
+
+                Behavior on x {
+                    enabled: Config.animDuration > 0
+                    NumberAnimation {
+                        duration: 80
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on y {
+                    enabled: Config.animDuration > 0
+                    NumberAnimation {
+                        duration: 80
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                StyledRect {
+                    anchors.fill: parent
+                    radius: Styling.radius(-2)
+                    variant: "focus"
+                }
+
+                Image {
+                    anchors.centerIn: parent
+                    width: root.dragIconSize
+                    height: root.dragIconSize
+                    source: "image://icon/" + root.iconForAppId(root.dragAppId)
+                    sourceSize.width: root.dragIconSize * 2
+                    sourceSize.height: root.dragIconSize * 2
+                    fillMode: Image.PreserveAspectFit
+                    mipmap: true
+                }
+            }
+
+            // Insertion indicator along the dock's line
+            Rectangle {
+                id: insertionLine
+                visible: root.insertionIndex >= 0 && root.showInsertion
+                z: 5000
+                width: root.isVertical ? Math.round(dockLayoutVertical.width) : 3
+                height: root.isVertical ? 3 : Math.round(dockLayoutHorizontal.height)
+                x: root.isVertical ? (dockContainer.width - width) / 2 : root.insertionBoundary(root.insertionIndex) - width / 2
+                y: root.isVertical ? root.insertionBoundary(root.insertionIndex) - height / 2 : (dockContainer.height - height) / 2
+                radius: 2
+                color: Styling.srItem("overprimary")
+
+                Behavior on x {
+                    enabled: Config.animDuration > 0
+                    NumberAnimation {
+                        duration: 80
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on y {
+                    enabled: Config.animDuration > 0
+                    NumberAnimation {
+                        duration: 80
+                        easing.type: Easing.OutCubic
                     }
                 }
             }

@@ -1257,7 +1257,7 @@ Singleton {
         }
 
         adapter: JsonAdapter {
-            property list<string> apps: ["kitty"]
+            property list<string> apps: ["kitty", "io.github.retrolinux.settings", "nemo", "firefox", "io.github.kolunmi.Bazaar"]
         }
     }
 

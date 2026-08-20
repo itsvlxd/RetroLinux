@@ -35,6 +35,11 @@ Button {
     readonly property bool showIndicators: !isSeparator && (Config.dock?.showRunningIndicators ?? true) && appIsRunning
     readonly property int instanceCount: (isSeparator || !appToplevel) ? 0 : appToplevel.toplevelCount
 
+    // Drag-and-drop
+    readonly property string dragAppId: isSeparator ? "" : (appToplevel?.appId ?? "")
+    readonly property int dragPinnedIndex: TaskbarApps.pinnedIndex(dragAppId)
+    property alias appDragHandler: appDragHandler
+
     enabled: !isSeparator
     implicitWidth: isSeparator ? (isVertical ? iconSize * 0.6 : 2) : iconSize + 8
     implicitHeight: isSeparator ? (isVertical ? 2 : iconSize * 0.6) : iconSize + 8
@@ -210,6 +215,16 @@ Button {
                 TaskbarApps.togglePin(root.appToplevel?.appId ?? "");
             }
         }
+    }
+
+    // Drag to reorder / pin within the dock (axis-constrained by DockContent)
+    DragHandler {
+        id: appDragHandler
+        target: null
+        dragThreshold: 10
+        enabled: !root.isSeparator
+        cursorShape: Qt.ClosedHandCursor
+        acceptedButtons: Qt.LeftButton
     }
 
     // Tooltip
