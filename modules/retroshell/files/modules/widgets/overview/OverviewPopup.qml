@@ -192,7 +192,11 @@ PanelWindow {
                     }
 
                     onAccepted: {
-                        if (overviewLoader.item) {
+                        if (!overviewLoader.item)
+                            return;
+                        if (searchInput.text.length === 0) {
+                            overviewLoader.item.activateSelectedWindow();
+                        } else {
                             overviewLoader.item.navigateToSelectedWindow();
                         }
                     }
@@ -227,13 +231,21 @@ PanelWindow {
 
                     onDownPressed: {
                         if (overviewLoader.item) {
-                            overviewLoader.item.selectNextMatch();
+                            if (searchInput.text.length === 0) {
+                                overviewLoader.item.keyboardMove("down");
+                            } else {
+                                overviewLoader.item.selectNextMatch();
+                            }
                         }
                     }
 
                     onUpPressed: {
                         if (overviewLoader.item) {
-                            overviewLoader.item.selectPrevMatch();
+                            if (searchInput.text.length === 0) {
+                                overviewLoader.item.keyboardMove("up");
+                            } else {
+                                overviewLoader.item.selectPrevMatch();
+                            }
                         }
                     }
 
@@ -249,30 +261,22 @@ PanelWindow {
                     }
 
                     onLeftPressed: {
-                        if (searchInput.text.length === 0) {
-                            const current = AxctlService.focusedWorkspace?.id || 1;
-                            const prev = current - 1;
-                            if (prev < 1) {
-                                AxctlService.dispatch("workspace " + Config.workspaces.shown);
+                        if (overviewLoader.item) {
+                            if (searchInput.text.length === 0) {
+                                overviewLoader.item.keyboardMove("left");
                             } else {
-                                AxctlService.dispatch("workspace r-1");
+                                overviewLoader.item.selectPrevMatch();
                             }
-                        } else if (overviewLoader.item) {
-                            overviewLoader.item.selectPrevMatch();
                         }
                     }
 
                     onRightPressed: {
-                        if (searchInput.text.length === 0) {
-                            const current = AxctlService.focusedWorkspace?.id || 1;
-                            const next = current + 1;
-                            if (next > Config.workspaces.shown) {
-                                AxctlService.dispatch("workspace 1");
+                        if (overviewLoader.item) {
+                            if (searchInput.text.length === 0) {
+                                overviewLoader.item.keyboardMove("right");
                             } else {
-                                AxctlService.dispatch("workspace r+1");
+                                overviewLoader.item.selectNextMatch();
                             }
-                        } else if (overviewLoader.item) {
-                            overviewLoader.item.selectNextMatch();
                         }
                     }
                 }
@@ -392,6 +396,7 @@ PanelWindow {
                 searchInput.clear();
                 if (overviewLoader.item) {
                     overviewLoader.item.resetSearch();
+                    overviewLoader.item.keyboardInitialize();
                 }
                 searchInput.focusInput();
             });

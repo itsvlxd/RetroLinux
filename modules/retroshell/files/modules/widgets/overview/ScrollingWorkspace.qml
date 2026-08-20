@@ -391,7 +391,7 @@ Item {
                         anchors.fill: parent
                         radius: windowDelegate.calculatedRadius
                         color: windowDelegate.dragging ? Colors.surfaceBright : windowDelegate.hovered ? Colors.surface : Colors.background
-                        border.color: windowDelegate.isSelected ? Colors.tertiary : windowDelegate.isMatched ? Styling.srItem("overprimary") : Styling.srItem("overprimary")
+                        border.color: Styling.srItem("overprimary")
                         border.width: windowDelegate.isSelected ? 3 : windowDelegate.isMatched ? 2 : (windowDelegate.hovered ? 2 : 0)
                         visible: !Config.performance.windowPreview
 
@@ -424,7 +424,7 @@ Item {
                         anchors.fill: parent
                         radius: windowDelegate.calculatedRadius
                         color: windowDelegate.dragging ? Qt.rgba(Colors.surfaceContainerHighest.r, Colors.surfaceContainerHighest.g, Colors.surfaceContainerHighest.b, 0.5) : windowDelegate.hovered ? Qt.rgba(Colors.surfaceContainer.r, Colors.surfaceContainer.g, Colors.surfaceContainer.b, 0.2) : "transparent"
-                        border.color: windowDelegate.isSelected ? Colors.tertiary : windowDelegate.isMatched ? Styling.srItem("overprimary") : Styling.srItem("overprimary")
+                        border.color: Styling.srItem("overprimary")
                         border.width: windowDelegate.isSelected ? 3 : windowDelegate.isMatched ? 2 : (windowDelegate.hovered ? 2 : 0)
                         visible: Config.performance.windowPreview && (windowDelegate.hovered || windowDelegate.dragging || windowDelegate.isMatched || windowDelegate.isSelected)
                         z: 5

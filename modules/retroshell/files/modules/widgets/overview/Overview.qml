@@ -46,6 +46,9 @@ Item {
     property var matchingWindows: []
     property int selectedMatchIndex: 0
 
+    // Keyboard navigation (arrow keys) — source of truth is the window address
+    property string keyboardSelectedAddress: ""
+
     // Reset search state
     function resetSearch() {
         searchQuery = "";
@@ -54,7 +57,12 @@ Item {
     }
 
     // Update matching windows when search query or window list changes
-    onSearchQueryChanged: updateMatchingWindows()
+    onSearchQueryChanged: {
+        updateMatchingWindows();
+        if (searchQuery.length === 0) {
+            keyboardInitialize();
+        }
+    }
     onWindowListChanged: updateMatchingWindows()
 
     // Fuzzy match: checks if all characters of query appear in order in target
@@ -167,9 +175,147 @@ Item {
     }
 
     function isWindowSelected(windowAddress) {
-        if (matchingWindows.length === 0 || selectedMatchIndex < 0)
-            return false;
-        return matchingWindows[selectedMatchIndex]?.address === windowAddress;
+        if (searchQuery.length > 0) {
+            if (matchingWindows.length === 0 || selectedMatchIndex < 0)
+                return false;
+            return matchingWindows[selectedMatchIndex]?.address === windowAddress;
+        }
+        return keyboardSelectedAddress === windowAddress;
+    }
+
+    // Visible windows in this workspace group, with on-screen centers for spatial navigation
+    readonly property var navigationWindows: {
+        const minWs = workspaceGroup * workspacesShown;
+        const maxWs = (workspaceGroup + 1) * workspacesShown;
+        const monId = monitorId;
+        const result = [];
+        for (const win of windowList) {
+            if (!win)
+                continue;
+            const wsId = win?.workspace?.id;
+            if (!(wsId > minWs && wsId <= maxWs) || win.monitor !== monId)
+                continue;
+
+            const colIndex = (wsId - 1) % columns;
+            const rowIndex = Math.floor(((wsId - 1) % workspacesShown) / columns);
+            const xOff = Math.round((workspaceImplicitWidth + workspacePadding + workspaceSpacing) * colIndex + workspacePadding / 2);
+            const yOff = Math.round((workspaceImplicitHeight + workspacePadding + workspaceSpacing) * rowIndex + workspacePadding / 2);
+
+            let baseX = (win.at?.[0] || 0) - (monitorData?.x || 0);
+            if (barPosition === "left")
+                baseX -= barReserved;
+            let baseY = (win.at?.[1] || 0) - (monitorData?.y || 0);
+            if (barPosition === "top")
+                baseY -= barReserved;
+
+            const x = Math.round(Math.max(baseX * scale, 0) + xOff);
+            const y = Math.round(Math.max(baseY * scale, 0) + yOff);
+            const w = Math.round((win.size?.[0] || 100) * scale);
+            const h = Math.round((win.size?.[1] || 100) * scale);
+
+            result.push({
+                windowData: win,
+                address: win.address,
+                row: rowIndex,
+                centerX: x + w / 2,
+                centerY: y + h / 2
+            });
+        }
+        return result;
+    }
+
+    function keyboardInitialize() {
+        const list = navigationWindows;
+        if (list.length === 0) {
+            keyboardSelectedAddress = "";
+            return;
+        }
+        const focused = AxctlService.focusedClient?.address;
+        if (focused && list.some(w => w.address === focused)) {
+            keyboardSelectedAddress = focused;
+        } else {
+            keyboardSelectedAddress = list[0].address;
+        }
+    }
+
+    // For wrap-around: pick the extreme window along the opposite axis, tie-broken by proximity
+    function shouldWrapReplace(direction, cur, cand, currentBest) {
+        if (direction === "right" || direction === "left") {
+            if (cand.centerX === currentBest.centerX)
+                return Math.abs(cand.centerY - cur.centerY) < Math.abs(currentBest.centerY - cur.centerY);
+            if (direction === "right")
+                return cand.centerX < currentBest.centerX;
+            return cand.centerX > currentBest.centerX;
+        }
+        if (cand.centerY === currentBest.centerY)
+            return Math.abs(cand.centerX - cur.centerX) < Math.abs(currentBest.centerX - cur.centerX);
+        if (direction === "down")
+            return cand.centerY < currentBest.centerY;
+        return cand.centerY > currentBest.centerY;
+    }
+
+    function keyboardMove(direction) {
+        const list = navigationWindows;
+        if (list.length === 0)
+            return;
+
+        let currentIndex = -1;
+        if (keyboardSelectedAddress) {
+            currentIndex = list.findIndex(w => w.address === keyboardSelectedAddress);
+        }
+        if (currentIndex < 0)
+            currentIndex = 0;
+        const cur = list[currentIndex];
+
+        // Horizontal moves stay within the same grid row to avoid jumping rows
+        const isHorizontal = direction === "left" || direction === "right";
+        const candidates = isHorizontal ? list.filter(w => w.row === cur.row) : list;
+
+        let best = -1;
+        let bestDist = Infinity;
+        for (let i = 0; i < candidates.length; i++) {
+            const w = candidates[i];
+            if (w.address === cur.address)
+                continue;
+            const dx = w.centerX - cur.centerX;
+            const dy = w.centerY - cur.centerY;
+            const inDirection = direction === "right" ? dx > 0
+                : direction === "left" ? dx < 0
+                : direction === "down" ? dy > 0
+                : dy < 0;
+            if (!inDirection)
+                continue;
+            const dist = dx * dx + dy * dy;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = i;
+            }
+        }
+
+        // Wrap: horizontal wraps within the same row, vertical wraps globally
+        if (best === -1 && candidates.length > 1) {
+            best = 0;
+            for (let i = 1; i < candidates.length; i++) {
+                if (shouldWrapReplace(direction, cur, candidates[i], candidates[best]))
+                    best = i;
+            }
+        }
+
+        // Only window in its row (or nothing to move to) — stay put
+        if (best === -1)
+            return;
+
+        keyboardSelectedAddress = candidates[best].address;
+    }
+
+    function activateSelectedWindow() {
+        const address = keyboardSelectedAddress;
+        if (!address)
+            return;
+        Visibilities.setActiveModule("", true);
+        Qt.callLater(() => {
+            HyprService.focusWindow(address);
+        });
     }
 
     // Pre-calculate workspace dimensions once
