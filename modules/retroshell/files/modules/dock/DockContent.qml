@@ -117,7 +117,8 @@ Item {
 
     readonly property int totalMargin: root.windowSideMargin + root.edgeSideMargin
     readonly property int shadowSpace: 32
-    readonly property int dockSize: Config.dock?.height ?? 56
+    readonly property real dockScale: Config.dock?.scale ?? 1.0
+    readonly property int dockSize: Math.round((Config.dock?.height ?? 56) * dockScale)
 
     implicitWidth: root.isVertical ? dockSize + totalMargin + shadowSpace * 2 : dockContent.implicitWidth + shadowSpace * 2
     implicitHeight: root.isVertical ? dockContent.implicitHeight + shadowSpace * 2 : dockSize + totalMargin + shadowSpace * 2
@@ -404,7 +405,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 anchors.topMargin: (dockContent.implicitHeight - implicitHeight) / 2
-                spacing: Config.dock?.spacing ?? 4
+                spacing: Math.round((Config.dock?.spacing ?? 4) * root.dockScale)
                 visible: !root.isVertical
 
                 Loader {
@@ -414,8 +415,8 @@ Item {
 
                     sourceComponent: Button {
                         id: pinButton
-                        implicitWidth: 32
-                        implicitHeight: 32
+                        implicitWidth: Math.round(32 * root.dockScale)
+                        implicitHeight: Math.round(32 * root.dockScale)
 
                         background: StyledRect {
                             visible: root.pinned || pinButton.hovered
@@ -428,7 +429,7 @@ Item {
                         contentItem: Text {
                             text: Icons.pin
                             font.family: Icons.font
-                            font.pixelSize: 16
+                            font.pixelSize: Math.round(16 * root.dockScale)
                             color: root.pinned ? Styling.srItem("primary") : Colors.overBackground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -465,7 +466,7 @@ Item {
 
                     sourceComponent: Separator {
                         vert: true
-                        implicitHeight: (Config.dock?.iconSize ?? 40) * 0.6
+                        implicitHeight: (Config.dock?.iconSize ?? 40) * 0.6 * root.dockScale
                     }
                 }
 
@@ -487,7 +488,7 @@ Item {
 
                     sourceComponent: Separator {
                         vert: true
-                        implicitHeight: (Config.dock?.iconSize ?? 40) * 0.6
+                        implicitHeight: (Config.dock?.iconSize ?? 40) * 0.6 * root.dockScale
                     }
                 }
 
@@ -498,8 +499,8 @@ Item {
 
                     sourceComponent: Button {
                         id: overviewButton
-                        implicitWidth: 32
-                        implicitHeight: 32
+                        implicitWidth: Math.round(32 * root.dockScale)
+                        implicitHeight: Math.round(32 * root.dockScale)
 
                         background: StyledRect {
                             visible: overviewButton.hovered
@@ -512,7 +513,7 @@ Item {
                         contentItem: Text {
                             text: Icons.overview
                             font.family: Icons.font
-                            font.pixelSize: 18
+                            font.pixelSize: Math.round(18 * root.dockScale)
                             color: Colors.overBackground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -538,7 +539,7 @@ Item {
                 id: dockLayoutVertical
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: dockContainer.cornerSize + (dockContent.implicitHeight - implicitHeight) / 2
-                spacing: Config.dock?.spacing ?? 4
+                spacing: Math.round((Config.dock?.spacing ?? 4) * root.dockScale)
                 visible: root.isVertical
 
                 Loader {
@@ -548,8 +549,8 @@ Item {
 
                     sourceComponent: Button {
                         id: pinButtonV
-                        implicitWidth: 32
-                        implicitHeight: 32
+                        implicitWidth: Math.round(32 * root.dockScale)
+                        implicitHeight: Math.round(32 * root.dockScale)
 
                         background: StyledRect {
                             visible: root.pinned || pinButtonV.hovered
@@ -562,7 +563,7 @@ Item {
                         contentItem: Text {
                             text: Icons.pin
                             font.family: Icons.font
-                            font.pixelSize: 16
+                            font.pixelSize: Math.round(16 * root.dockScale)
                             color: root.pinned ? Styling.srItem("primary") : Colors.overBackground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -599,7 +600,7 @@ Item {
 
                     sourceComponent: Separator {
                         vert: false
-                        implicitWidth: (Config.dock?.iconSize ?? 40) * 0.6
+                        implicitWidth: (Config.dock?.iconSize ?? 40) * 0.6 * root.dockScale
                     }
                 }
 
@@ -621,7 +622,7 @@ Item {
 
                     sourceComponent: Separator {
                         vert: false
-                        implicitWidth: (Config.dock?.iconSize ?? 40) * 0.6
+                        implicitWidth: (Config.dock?.iconSize ?? 40) * 0.6 * root.dockScale
                     }
                 }
 
@@ -632,8 +633,8 @@ Item {
 
                     sourceComponent: Button {
                         id: overviewButtonV
-                        implicitWidth: 32
-                        implicitHeight: 32
+                        implicitWidth: Math.round(32 * root.dockScale)
+                        implicitHeight: Math.round(32 * root.dockScale)
 
                         background: StyledRect {
                             visible: overviewButtonV.hovered
@@ -646,7 +647,7 @@ Item {
                         contentItem: Text {
                             text: Icons.overview
                             font.family: Icons.font
-                            font.pixelSize: 18
+                            font.pixelSize: Math.round(18 * root.dockScale)
                             color: Colors.overBackground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter

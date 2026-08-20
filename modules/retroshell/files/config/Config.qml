@@ -553,6 +553,11 @@ Singleton {
             property bool containBar: false
             property bool keepBarShadow: false
             property bool keepBarBorder: false
+            property real scale: 1.0
+            property int barPaddingTop: 4
+            property int barPaddingRight: 4
+            property int barPaddingBottom: 4
+            property int barPaddingLeft: 4
             property bool showWeatherTemp: false
             property bool showDayOfWeek: false
             property string batteryStyle: "arch"
@@ -1167,6 +1172,7 @@ Singleton {
             property int iconSize: 40
             property int spacing: 4
             property int margin: 8
+            property real scale: 1.0
             property int hoverRegionHeight: 4
             property bool pinnedOnStartup: false
             property bool hoverToReveal: true

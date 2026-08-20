@@ -9,7 +9,7 @@ Rows that are not relevant when the theme is ``integrated`` are hidden
 automatically, matching the QML ``visible`` bindings.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING
 
 from gi.repository import Adw, Gtk
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from settings.window import RetroSettingsWindow
 
 _INTEGRATED_HIDDEN = (
-    "height", "iconSize", "spacing", "margin",
+    "height", "spacing", "margin",
     "hoverToReveal", "hoverRegionHeight", "pinnedOnStartup",
     "showPinButton", "availableOnFullscreen", "keepHidden",
     "showRunningIndicators", "showOverviewButton",
@@ -41,6 +41,16 @@ _THEME_OPTIONS = [
     ("default", "Default"),
     ("floating", "Floating"),
     ("integrated", "Integrated"),
+]
+
+_SCALE_OPTIONS = [
+    (0.7, "70%"),
+    (0.8, "80%"),
+    (0.9, "90%"),
+    (1.0, "100%"),
+    (1.1, "110%"),
+    (1.2, "120%"),
+    (1.3, "130%"),
 ]
 
 
@@ -73,6 +83,8 @@ class ShellDockPage:
                        subtitle="Total height of the dock")
         self._add_spin(group, "iconSize", "Icon Size", lower=24, upper=96, suffix="px",
                        subtitle="Size of application icons in the dock")
+        self._add_combo(group, "scale", "Scale", _SCALE_OPTIONS,
+                        subtitle="Scales icons, spacing and dock size in place")
         self._add_spin(group, "spacing", "Spacing", lower=0, upper=32, suffix="px",
                        subtitle="Gap between dock items")
         self._add_spin(group, "margin", "Margin", lower=0, upper=32, suffix="px",
@@ -127,7 +139,7 @@ class ShellDockPage:
         group: Adw.PreferencesGroup,
         key: str,
         label: str,
-        options: list[tuple[str, str]],
+        options: Sequence[tuple[object, str]],
         *,
         subtitle: str = "",
     ) -> ManagedRow:
@@ -280,6 +292,7 @@ class ShellDockPage:
                     "theme": "Theme",
                     "height": "Height",
                     "iconSize": "Icon Size",
+                    "scale": "Scale",
                     "spacing": "Spacing",
                     "margin": "Margin",
                 }.get(key, "Dock setting")

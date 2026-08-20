@@ -16,7 +16,7 @@ Button {
 
     required property var appToplevel
     property int lastFocused: -1
-    property real iconSize: Config.dock?.iconSize ?? 40
+    property real iconSize: (Config.dock?.iconSize ?? 40) * (Config.dock?.scale ?? 1.0)
     property real countDotWidth: 10
     property real countDotHeight: 4
     property string dockPosition: "bottom"
