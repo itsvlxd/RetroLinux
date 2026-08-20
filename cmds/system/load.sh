@@ -186,10 +186,11 @@ cmd_load() {
 
             faillock --user "$USER" --reset 2>/dev/null || true
 
-            local restart_marker="/tmp/retro_shell_restart_done"
+            local restart_marker="$HOME/.config/retro/.shell_restart_done"
             if [[ ! -f $restart_marker ]]; then
+                mkdir -p "$HOME/.config/retro"
                 touch "$restart_marker"
-                rx_log "info" "Scheduling RetroShell restart in 3s (first boot stabilization)..."
+                rx_log "info" "Scheduling RetroShell restart in 3s (first login stabilization)..."
                 (
                     sleep 3
                     retro shell restart
