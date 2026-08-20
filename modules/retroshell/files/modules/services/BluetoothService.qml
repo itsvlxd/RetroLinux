@@ -253,6 +253,14 @@ Singleton {
     }
 
     Timer {
+        id: powerSyncTimer
+        interval: 30000
+        running: !SuspendManager.isSuspending
+        repeat: true
+        onTriggered: root.updateStatus()
+    }
+
+    Timer {
         id: scanTimer
         interval: 15000
         running: false
