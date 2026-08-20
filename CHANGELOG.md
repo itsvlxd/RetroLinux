@@ -1,3 +1,24 @@
+# [1.6.0](https://github.com/itsvlxd/RetroLinux/compare/v1.5.0...v1.6.0) (2026-08-20)
+
+
+### Bug Fixes
+
+* **retro:** fix cronie setup ([cdeac5d](https://github.com/itsvlxd/RetroLinux/commit/cdeac5da9b352738b2a03afc36f9b6ff9df9da6b))
+
+
+### Features
+
+* **bluetooth:** sync dashboard and menu bluetooth states ([288239c](https://github.com/itsvlxd/RetroLinux/commit/288239c3e8a66086d2bfb4a80a20115612f84d44))
+* **lib:** add pkg skip if target not found ([0a6341d](https://github.com/itsvlxd/RetroLinux/commit/0a6341d56a16477beacfcf1f47d809015524d97c))
+* **pkg:** add recovery for libdex and bazaar ([eef9b00](https://github.com/itsvlxd/RetroLinux/commit/eef9b0030cf5c9fe6a64a6fd8fb19ab611198615))
+* **retro:** add firewall, ssh, faillock, shell dashboard, bar settings and various bug fixes ([#11](https://github.com/itsvlxd/RetroLinux/issues/11)) ([cf3fc84](https://github.com/itsvlxd/RetroLinux/commit/cf3fc8495f2a4e9789a6dce25c760fc4a1fe8fea))
+* **retroshell:** add dashboard, bar & clock weather widget reoder ([3ea6b0b](https://github.com/itsvlxd/RetroLinux/commit/3ea6b0b0b582d4ba416a4b07bdc7b8465a804c4c))
+* **security:** add security page and new firewall engine and faillock settings ([3474092](https://github.com/itsvlxd/RetroLinux/commit/347409270385e20f7e514d331b35541a7be1bc7a))
+* **settings:** add dedicatd pages for firewall, ssh & faillock ([653021e](https://github.com/itsvlxd/RetroLinux/commit/653021e558fff552a3abfdfa198e9874914ac054))
+* **setup:** add network wait while loop ([a573368](https://github.com/itsvlxd/RetroLinux/commit/a573368ce6a53bb3f68f360c63c44784851f95f1))
+* **setup:** ensure aur helper ([0893260](https://github.com/itsvlxd/RetroLinux/commit/0893260cd12e45f64652fc4e1fe22bfbd3e68b96))
+* **tests:** add packages name test ([7eefa15](https://github.com/itsvlxd/RetroLinux/commit/7eefa1577a7b5052e27d28fc8dcbb7287f418582))
+
 # [1.5.0](https://github.com/itsvlxd/RetroLinux/compare/v1.4.0...v1.5.0) (2026-08-19)
 
 
