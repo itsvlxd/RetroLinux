@@ -35,7 +35,7 @@ rx_link() {
     mkdir -p "$(dirname "$target_on_system")"
 
     if ln -sfnT "$source_in_repo" "$target_on_system"; then
-        rx_log "success" "Linked: ${PINK}$(basename "$target_on_system")${RESET}"
+        rx_log "success" "Configuration files linked for module ${PINK}$(basename "$target_on_system")${RESET}"
     else
         rx_log "error" "Failed to link $target_on_system"
     fi
@@ -64,7 +64,7 @@ rx_mirror_install() {
     local repo_data_path="$1"
     local system_path="$2"
 
-    rx_log "info" "Installing physical copies to $system_path"
+    rx_log "info" "Copying module files to ${PINK}$system_path${RESET}"
 
     [[ -L $system_path ]] && unlink "$system_path"
 
@@ -120,7 +120,7 @@ rx_mirror_add_missing() {
     fi
 
     if [[ $added -eq 1 ]]; then
-        rx_log "success" "Added missing files to $system_path"
+        rx_log "success" "Missing configuration files synced to ${PINK}$(basename "$system_path")${RESET}"
     fi
 }
 
@@ -132,7 +132,7 @@ rx_sanitize() {
     if [[ -f $target ]]; then
         sed -i "s|/home/[^/]*|/home/$USER|g" "$target" 2>/dev/null
     elif [[ -d $target ]]; then
-        rx_log "info" "Sanitizing paths for $USER..."
+        rx_log "info" "Updating user paths to ${PINK}$USER${RESET}..."
         find "$target" -type f \( -name "*.json" -o -name "*.conf" -o -name "*.toml" -o -name "*.yaml" \) \
             -exec sed -i "s|/home/[^/]*|/home/$USER|g" {} + 2>/dev/null
     fi
@@ -143,14 +143,14 @@ rx_restore() {
     local backup="${target}.bak"
 
     if [[ -L $target || -e $target ]]; then
-        rx_log "info" "Removing system files at $target"
+        rx_log "info" "Removing module configuration files from ${PINK}$target${RESET}"
         rm -rf "$target"
     fi
 
     if [[ -e $backup ]]; then
         mv "$backup" "$target"
-        rx_log "success" "Backup restored to $target"
+        rx_log "success" "Previous configuration restored from backup for ${PINK}$(basename "$target")${RESET}"
     else
-        rx_log "warn" "No backup found for $(basename "$target"). System path is now clean."
+        rx_log "warn" "No backup found for ${PINK}$(basename "$target")${RESET}, system path cleaned"
     fi
 }

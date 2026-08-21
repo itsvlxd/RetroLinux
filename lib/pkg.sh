@@ -29,6 +29,8 @@ rx_pkg_uninstall() {
         remove_cmd="sudo pacman -Rns --noconfirm"
     fi
     $remove_cmd "${installed_pkgs[@]}"
+
+    rx_log "success" "Packages removed successfully: ${PINK}${installed_pkgs[*]}${RESET}"
 }
 
 rx_pkg_install() {
@@ -88,11 +90,13 @@ rx_pkg_install() {
     fi
 
     if _rx_pkg_run "$install_cmd" "$sudo_run" "${missing_pkgs[@]}"; then
+        rx_log "success" "Successfully installed ${PINK}${#missing_pkgs[@]}${RESET} packages"
         return 0
     fi
 
     rx_log "warn" "Batch install failed; retrying with a targeted overwrite for overlapping package files"
     if _rx_pkg_run "$install_cmd --overwrite \"$_RX_OVERWRITE_GLOBS\"" "$sudo_run" "${missing_pkgs[@]}"; then
+        rx_log "success" "Successfully installed ${PINK}${#missing_pkgs[@]}${RESET} packages"
         return 0
     fi
 
@@ -110,6 +114,8 @@ rx_pkg_install() {
 
     if [[ ${#failed[@]} -gt 0 ]]; then
         rx_log "warn" "Some packages failed to install: ${PINK}${failed[*]}${RESET}"
+    else
+        rx_log "success" "Successfully installed ${PINK}${#missing_pkgs[@]}${RESET} packages"
     fi
 }
 
