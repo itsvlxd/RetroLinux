@@ -642,6 +642,19 @@ cmd_audio() {
 
         "setup")
             rx_setup_parse "$@"
+
+            mkdir -p "$HOME/.config/pipewire/pipewire.conf.d"
+            cat > "$HOME/.config/pipewire/pipewire.conf.d/99-echo-cancel.conf" <<'EOF'
+context.modules = [
+    { name = libpipewire-module-echo-cancel
+      args = {
+          # Adjust latency if you notice any audio stuttering
+          node.latency = 1024/48000
+      }
+    }
+]
+EOF
+
             rx_setup_validate "sink_primary,sink_fallback,source_primary,source_fallback" || return 1
 
             local config_exists=false
