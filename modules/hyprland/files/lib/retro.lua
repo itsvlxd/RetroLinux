@@ -187,6 +187,9 @@ local MIN_ZOOM = 1.0
 
 local function change_zoom(offset)
 	local current = hl.get_config("cursor.zoom_factor") or 1.0
+	if current <= MIN_ZOOM then
+		return
+	end
 	local next_zoom = math.max(MIN_ZOOM, math.min(MAX_ZOOM, current + offset))
 	hl.config({ cursor = { zoom_factor = next_zoom } })
 end
@@ -197,7 +200,7 @@ end
 function Retro.zoom_out()
 	change_zoom(-0.5)
 end
-function Retro.zoom_reset()
+function Retro.zoom_toggle()
 	local current = hl.get_config("cursor.zoom_factor") or 1.0
 	local target = (current > MIN_ZOOM) and MIN_ZOOM or 1.5
 	hl.config({ cursor = { zoom_factor = target } })
