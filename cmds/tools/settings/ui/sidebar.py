@@ -23,6 +23,7 @@ from settings.ui.icons import (
     DRIVER_ICON,
     ENV_VARS_ICON,
     FAILLOCK_ICON,
+    FAN_CONTROL_ICON,
     FIREWALL_ICON,
     FONTS_ICON,
     FRAME_ICON,
@@ -299,6 +300,7 @@ class Sidebar:
         if any(f.startswith("BAT") for f in os.listdir("/sys/class/power_supply/") if os.path.isdir("/sys/class/power_supply/")):
             add_row(system, "battery", "Battery", BATTERY_ICON)
         add_row(system, "power", "Power", POWER_ICON)
+        add_row(system, "fan_control", "Fan Control", FAN_CONTROL_ICON)
         add_row(system, "disks", "Disks", DISKS_ICON)
         add_row(system, "grub", "Bootloader", GRUB_ICON)
         add_row(system, "driver", "Drivers", DRIVER_ICON)

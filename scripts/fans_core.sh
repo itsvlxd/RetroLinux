@@ -4,21 +4,11 @@ source "$RETRO_DIR/lib/variable.sh"
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "fans"
 
-if [[ $EUID -eq 0 ]]; then
-    SUDO_CMD=""
-else
-    SUDO_CMD="sudo"
-fi
+SUDO_CMD=""
+[[ $EUID -ne 0 ]] && SUDO_CMD="sudo"
 
-_has_liquidctl() {
-    command -v liquidctl &>/dev/null && return 0
-    return 1
-}
-
-_has_sensors() {
-    command -v sensors &>/dev/null && return 0
-    return 1
-}
+_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/retro"
+_CONFIG_FILE="${_CONFIG_DIR}/fan_config.json"
 
 _hwmon_dirs() {
     for d in /sys/class/hwmon/hwmon*; do
@@ -26,491 +16,340 @@ _hwmon_dirs() {
     done
 }
 
-_has_pwm() {
-    local dir="$1"
-    for f in "$dir"/pwm*; do
-        [[ -f $f ]] && return 0
-    done
-    return 1
-}
+_has_liquidctl() { command -v liquidctl &>/dev/null; }
+_has_sensors() { command -v sensors &>/dev/null; }
+_has_acpi_platform_profile() { [[ -f /sys/firmware/acpi/platform_profile_choices ]]; }
 
-_is_pwm_writable() {
-    local pwm="$1"
-    [[ -w $pwm ]] && return 0
-    return 1
-}
-
-_pwm_to_pct() {
-    local val="$1"
-    echo "$(( (val * 100 + 127) / 255 ))"
-}
-
+_pwm_to_pct() { echo "$(( ($1 * 100 + 127) / 255 ))"; }
 _pct_to_pwm() {
-    local pct="$1"
-    echo "$(( (pct * 255 + 50) / 100 ))"
+    local p=$1
+    [[ $p -gt 100 ]] && p=100; [[ $p -lt 0 ]] && p=0
+    echo "$(( (p * 255 + 50) / 100 ))"
 }
 
-_detect_engine() {
-    _has_liquidctl && { echo "liquidctl"; return; }
-    _has_sensors && { echo "lm-sensors"; return; }
-    echo "sysfs"
+_config_read() {
+    [[ -f $_CONFIG_FILE ]] && cat "$_CONFIG_FILE" || echo '{"master":false,"profile":"balanced","fans":{}}'
+}
+_config_write() {
+    mkdir -p "$_CONFIG_DIR"
+    echo "$1" | jq '.' > "${_CONFIG_FILE}.tmp" && mv "${_CONFIG_FILE}.tmp" "$_CONFIG_FILE"
+}
+_config_set_fan() {
+    local id="$1" mode="$2" curve="$3" speed="$4"
+    _config_write "$(_config_read | jq --arg id "$id" --arg m "$mode" --arg c "$curve" --argjson s "$speed" '.fans[$id] = {mode:$m,curve:$c,speed:$s}')"
+}
+_config_set_master() {
+    _config_write "$(_config_read | jq --argjson v "$1" '.master = $v')"
+}
+_config_apply_profile_to_fans() {
+    local c
+    c=$(_get_default_curve "$1")
+    _config_write "$(_config_read | jq --arg c "$c" --arg p "$1" '(.profile=$p) | (.fans |= with_entries(.value.curve=$c | .value.mode="curve"))')"
 }
 
-_get_liquidctl_devices() {
-    _has_liquidctl || return 1
-    $SUDO_CMD liquidctl list 2>/dev/null | grep -oP 'Device #\d+:.*' | sed 's/Device #\d+: //'
-}
-
-_get_liquidctl_status() {
-    _has_liquidctl || return 1
-    $SUDO_CMD liquidctl status --json 2>/dev/null
-}
-
-_get_liquidctl_fans() {
-    local status
-    status=$(_get_liquidctl_status)
-    [[ -z $status ]] && return
-
-    local count=0
-    while true; do
-        local key="fan${count} speed"
-        local label_key="fan${count} label"
-        local speed=$(echo "$status" | grep -oP "\"${key}\" *: *\K[0-9]+" 2>/dev/null || echo "")
-        local label=$(echo "$status" | grep -oP "\"${label_key}\" *: *\"\K[^\"]+" 2>/dev/null || echo "Fan $count")
-        [[ -z $speed ]] && break
-        local temp=$(echo "$status" | grep -oP '"liquid temperature" *: *\K[0-9.]+' 2>/dev/null || echo "0")
-        echo "liquidctl|${label}|${speed}|0|${temp}C"
-        count=$((count + 1))
-    done
-}
-
-_liquidctl_set_speed() {
-    local fan="$1"
-    local pct="$2"
-    _has_liquidctl || return 1
-    $SUDO_CMD liquidctl set "${fan}" speed "${pct}" 2>/dev/null && rx_log_file "info" "liquidctl: ${fan} set to ${pct}%"
-}
-
-_liquidctl_reset() {
-    _has_liquidctl || return 1
-    $SUDO_CMD liquidctl initialize 2>/dev/null
-    rx_log_file "info" "liquidctl: all devices reset to defaults"
+_get_default_curve() {
+    case "${1:-balanced}" in
+        quiet)        echo "30:20,50:40,70:60,85:80" ;;
+        balanced)     echo "30:30,50:50,70:75,85:100" ;;
+        performance)  echo "30:40,50:70,70:90,85:100" ;;
+        *)            echo "30:30,50:50,70:75,85:100" ;;
+    esac
 }
 
 _parse_curve() {
-    local curve="$1"
-    local target_temp="$2"
-    local prev_pct=30
-    local prev_temp=0
-
-    IFS=',' read -ra points <<<"$curve"
+    local curve="$1" target_temp="$2"
+    local prev_pct=30 prev_temp=0 temp pct range pct_range delta result
+    [[ -z $curve ]] && echo "30" && return
+    IFS=',' read -ra points <<< "$curve"
     for point in "${points[@]}"; do
-        local temp="${point%%:*}"
-        local pct="${point#*:}"
+        temp="${point%%:*}"; pct="${point#*:}"
         if [[ $target_temp -ge $temp ]]; then
-            prev_pct="$pct"
-            prev_temp="$temp"
+            prev_pct="$pct"; prev_temp="$temp"
         else
-            if [[ $target_temp -le $prev_temp ]]; then
-                echo "$prev_pct"
-                return
-            fi
-            local range=$((temp - prev_temp))
+            [[ $target_temp -le $prev_temp ]] && echo "$prev_pct" && return
+            range=$((temp - prev_temp))
             [[ $range -eq 0 ]] && echo "$prev_pct" && return
-            local pct_range=$((pct - prev_pct))
-            local delta=$((target_temp - prev_temp))
-            local result=$((prev_pct + (pct_range * delta) / range))
-            echo "$result"
-            return
+            pct_range=$((pct - prev_pct))
+            delta=$((target_temp - prev_temp))
+            result=$((prev_pct + (pct_range * delta) / range))
+            [[ $result -gt 100 ]] && result=100
+            [[ $result -lt 0 ]] && result=0
+            echo "$result"; return
         fi
     done
     echo "$prev_pct"
 }
 
-_sysfs_fans() {
+_get_cpu_temp() {
+    local max=0 hw hw_name f val
     for hw in $(_hwmon_dirs); do
-        local hw_name=$(basename "$hw")
+        hw_name=$(cat "$hw/name" 2>/dev/null || echo "")
+        case "$hw_name" in
+            coretemp|k10temp|zenpower|it87*|nct*)
+                for f in "$hw"/temp*_input; do
+                    [[ -f $f ]] || continue
+                    val=$(cat "$f" 2>/dev/null || echo "0")
+                    val=$((val / 1000))
+                    [[ $val -gt $max ]] && max=$val
+                done ;;
+        esac
+    done
+    if [[ $max -eq 0 ]]; then
+        for f in /sys/class/hwmon/hwmon*/temp*_input; do
+            [[ -f $f ]] || continue
+            val=$(cat "$f" 2>/dev/null || echo "0"); val=$((val / 1000))
+            [[ $val -gt $max ]] && max=$val
+        done
+    fi
+    echo "$max"
+}
 
+_sysfs_fans() {
+    local hw hw_name fi f rpm label pf pv pct temp tval w
+    for hw in $(_hwmon_dirs); do
+        hw_name=$(cat "$hw/name" 2>/dev/null || echo "")
         for f in "$hw"/fan*_input; do
             [[ -f $f ]] || continue
-            local fan_idx
-            fan_idx=$(echo "$f" | grep -oP 'fan\K[0-9]+')
-            local rpm
+            fi=$(echo "$f" | grep -oP 'fan\K[0-9]+')
             rpm=$(cat "$f" 2>/dev/null || echo "0")
-            local label
-            label=$(cat "$hw/fan${fan_idx}_label" 2>/dev/null || echo "")
-            [[ -z $label ]] && label="Fan ${fan_idx}"
-            label="${hw_name}/${label}"
-            local pwm_file="$hw/pwm${fan_idx}"
-            local pwm_val=0
-            local pct=0
-            if [[ -f $pwm_file ]]; then
-                pwm_val=$(cat "$pwm_file" 2>/dev/null || echo "0")
-                pct=$(_pwm_to_pct "$pwm_val")
+            label=$(cat "$hw/fan${fi}_label" 2>/dev/null || echo "Fan ${fi}")
+            pf="$hw/pwm${fi}"; pv=0; pct=0
+            if [[ -f $pf ]]; then
+                pv=$(cat "$pf" 2>/dev/null || echo "0")
+                pct=$(_pwm_to_pct "$pv")
             fi
-            if [[ $pct -eq 0 && $rpm -gt 0 ]]; then
-                local max_rpm=5000
-                pct=$(( (rpm * 100 + max_rpm / 2) / max_rpm ))
-                [[ $pct -gt 100 ]] && pct=100
-            fi
-            local temp="0C"
+            [[ $pct -eq 0 && $rpm -gt 0 ]] && { pct=$(( (rpm*100+2500)/5000 )); [[ $pct -gt 100 ]] && pct=100; }
+            temp="0C"
             for tf in "$hw"/temp*_input; do
                 [[ -f $tf ]] || continue
-                local tval
                 tval=$(cat "$tf" 2>/dev/null || echo "0")
-                local tlabel
-                tlabel=$(cat "${tf%_input}_label" 2>/dev/null || echo "sensor")
-                temp="$((tval / 1000))C ($tlabel)"
-                break
+                temp="$((tval / 1000))C"; break
             done
-            local writable="no"
-            _is_pwm_writable "$pwm_file" && writable="yes"
-            echo "${hw_name}|${label}|${rpm}|${pct}|${temp}|${writable}"
+            w="no"
+            [[ -f "$hw/pwm${fi}_enable" && -w "$hw/pwm${fi}_enable" ]] && w="yes"
+            echo "${hw_name}|${label}|${rpm}|${pct}|${temp}|${w}|$(basename "$hw")|${fi}"
         done
     done
 }
 
 _sysfs_temps() {
+    local hw hw_name f ti tv tl
     for hw in $(_hwmon_dirs); do
-        local hw_name=$(basename "$hw")
+        hw_name=$(cat "$hw/name" 2>/dev/null || echo "")
         for f in "$hw"/temp*_input; do
             [[ -f $f ]] || continue
-            local tidx
-            tidx=$(echo "$f" | grep -oP 'temp\K[0-9]+')
-            local tval
-            tval=$(cat "$f" 2>/dev/null || echo "0")
-            local tlabel
-            tlabel=$(cat "$hw/temp${tidx}_label" 2>/dev/null || echo "Temp ${tidx}")
-            tlabel="${hw_name}/${tlabel}"
-            echo "${hw_name}|${tlabel}|$((tval / 1000))C"
+            ti=$(echo "$f" | grep -oP 'temp\K[0-9]+')
+            tv=$(cat "$f" 2>/dev/null || echo "0")
+            tl=$(cat "$hw/temp${ti}_label" 2>/dev/null || echo "Temp ${ti}")
+            echo "${hw_name}|${tl}|$((tv / 1000))C"
         done
     done
 }
 
 _sysfs_set_speed() {
-    local fan_name="$1"
-    local pct="$2"
-    local pwm_val
-    pwm_val=$(_pct_to_pwm "$pct")
+    local fid="$1" pct="$2"
+    local hn fn hw pf pv ef
+    hn=$(echo "$fid" | grep -oP 'hwmon\K[0-9]+')
+    fn=$(echo "$fid" | grep -oP 'fan\K[0-9]+$')
+    [[ -z $hn || -z $fn ]] && return 1
+    hw="/sys/class/hwmon/hwmon${hn}"; [[ ! -d $hw ]] && return 1
+    pf="${hw}/pwm${fn}"; ef="${hw}/pwm${fn}_enable"
+    [[ -f $pf ]] || return 1
+    pv=$(_pct_to_pwm "$pct")
+    echo 1 > "$ef" 2>/dev/null; echo "$pv" > "$pf" 2>/dev/null
+}
 
-    for hw in $(_hwmon_dirs); do
-        local hw_name=$(basename "$hw")
-        for f in "$hw"/fan*_input; do
-            [[ -f $f ]] || continue
-            local idx
-            idx=$(echo "$f" | grep -oP 'fan\K[0-9]+')
-            local raw_label
-            raw_label=$(cat "$hw/fan${idx}_label" 2>/dev/null || echo "Fan ${idx}")
-            local full_label="${hw_name}/${raw_label}"
-            if [[ "$raw_label" == "$fan_name" || "$full_label" == "$fan_name" || "$raw_label" == "${fan_name//_/ }" || "$full_label" == "${fan_name//_/ }" || "$raw_label" == "${fan_name// /_}" || "$full_label" == "${fan_name// /_}" ]]; then
-                local pwm_file="$hw/pwm${idx}"
-                if [[ -f $pwm_file ]]; then
-                    $SUDO_CMD bash -c "echo 1 > '$hw/pwm${idx}_enable' 2>/dev/null; echo ${pwm_val} > '$pwm_file' 2>/dev/null" 2>/dev/null && {
-                        rx_log_file "info" "sysfs: ${fan_name} set to ${pct}% (PWM ${pwm_val})"
-                        return 0
-                    }
-                fi
-                return 1
+_sysfs_set_auto() {
+    local fid="$1" hn fn ef
+    hn=$(echo "$fid" | grep -oP 'hwmon\K[0-9]+')
+    fn=$(echo "$fid" | grep -oP 'fan\K[0-9]+$')
+    [[ -z $hn || -z $fn ]] && return 1
+    ef="/sys/class/hwmon/hwmon${hn}/pwm${fn}_enable"
+    [[ -f $ef ]] || return 1
+    echo 2 > "$ef" 2>/dev/null
+}
+
+_sysfs_reset_all() { local hw f; for hw in $(_hwmon_dirs); do for f in "$hw"/pwm*_enable; do [[ -f $f ]] && echo 2 > "$f" 2>/dev/null; done; done; }
+
+_has_writable_pwm() { local hw f; for hw in $(_hwmon_dirs); do for f in "$hw"/pwm*_enable; do [[ -w $f ]] && return 0; done; done; return 1; }
+
+_detect_engine() {
+    if _has_liquidctl; then
+        local d; d=$(liquidctl list 2>/dev/null | grep -oP 'Device #\d+' || true)
+        [[ -n $d ]] && { echo "liquidctl"; return; }
+    fi
+    _has_writable_pwm && { echo "sysfs"; return; }
+    _has_acpi_platform_profile && { echo "acpi_platform"; return; }
+    echo "sysfs"
+}
+
+_acpi_get_choices() { cat /sys/firmware/acpi/platform_profile_choices 2>/dev/null || echo ""; }
+_acpi_set_profile() {
+    [[ ! -w /sys/firmware/acpi/platform_profile ]] && return 1
+    echo "$1" > /sys/firmware/acpi/platform_profile 2>/dev/null
+}
+
+_output_json() {
+    local engine cpu_temp master profile pwm_avail acpi_choices acpi_current
+    engine=$(_detect_engine)
+    cpu_temp=$(_get_cpu_temp)
+    master=$(echo "$(_config_read)" | jq -r '.master')
+    profile=$(echo "$(_config_read)" | jq -r '.profile // "balanced"')
+    pwm_avail="false"; _has_writable_pwm && pwm_avail="true"
+    acpi_choices=""; acpi_current=""
+    _has_acpi_platform_profile && { acpi_choices=$(_acpi_get_choices); acpi_current=$(cat /sys/firmware/acpi/platform_profile 2>/dev/null || echo ""); }
+
+    local fans_json="[]"
+    local fans_data; fans_data=$(_sysfs_fans)
+    if [[ -n $fans_data ]]; then
+        local tmpf; tmpf=$(mktemp)
+        while IFS='|' read -r hw_name label rpm pct temp writable hw_id fan_idx; do
+            [[ -z $hw_name ]] && continue
+            local fid="${hw_id}_${hw_name}_fan${fan_idx}"
+            local cfg_mode="auto" cfg_curve="" cfg_speed=100
+            local fc; fc=$(echo "$(_config_read)" | jq -r ".fans[\"$fid\"] // empty")
+            if [[ -n $fc ]]; then
+                cfg_mode=$(echo "$fc" | jq -r '.mode // "auto"')
+                cfg_curve=$(echo "$fc" | jq -r '.curve // ""')
+                cfg_speed=$(echo "$fc" | jq -r '.speed // 100')
             fi
-        done
-    done
-    return 1
-}
+            jq -n --arg id "$fid" --arg label "$label" --arg hw "$hw_name" \
+                --arg hid "$hw_id" --argjson fi "$fan_idx" --argjson rpm "$rpm" \
+                --argjson pct "$pct" --arg temp "$temp" --arg w "$writable" \
+                --arg mode "$cfg_mode" --arg curve "$cfg_curve" --argjson speed "$cfg_speed" \
+                '{id:$id,label:$label,hwmon:$hw,hw_id:$hid,fan_idx:$fi,rpm:$rpm,pct:$pct,temp:$temp,writable:$w,mode:$mode,curve:$curve,speed:$speed}'
+        done <<< "$fans_data" > "$tmpf"
+        fans_json=$(jq -s '.' "$tmpf")
+        rm -f "$tmpf"
+    fi
 
-_sysfs_set_curve() {
-    local fan_name="$1"
-    local curve="$2"
+    local temps_json="[]"
+    local temps_data; temps_data=$(_sysfs_temps)
+    if [[ -n $temps_data ]]; then
+        local tmpf; tmpf=$(mktemp)
+        while IFS='|' read -r hw_name label temp; do
+            [[ -z $hw_name ]] && continue
+            jq -n --arg hw "$hw_name" --arg label "$label" --arg temp "$temp" \
+                '{hwmon:$hw,label:$label,temp:$temp}'
+        done <<< "$temps_data" > "$tmpf"
+        temps_json=$(jq -s '.' "$tmpf")
+        rm -f "$tmpf"
+    fi
 
-    rx_log_file "info" "sysfs: set_curve called for '${fan_name}' with curve '${curve}'"
-
-    for hw in $(_hwmon_dirs); do
-        local hw_name=$(basename "$hw")
-        for f in "$hw"/fan*_input; do
-            [[ -f $f ]] || continue
-            local idx
-            idx=$(echo "$f" | grep -oP 'fan\K[0-9]+')
-            local raw_label
-            raw_label=$(cat "$hw/fan${idx}_label" 2>/dev/null || echo "Fan ${idx}")
-            local full_label="${hw_name}/${raw_label}"
-            if [[ "$raw_label" == "$fan_name" || "$full_label" == "$fan_name" || "$raw_label" == "${fan_name//_/ }" || "$full_label" == "${fan_name//_/ }" || "$raw_label" == "${fan_name// /_}" || "$full_label" == "${fan_name// /_}" ]]; then
-                local current_temp
-                current_temp=$(_get_coretemp)
-                [[ -z $current_temp || $current_temp -eq 0 ]] && current_temp=30
-
-                local target_pct
-                target_pct=$(_parse_curve "$curve" "$current_temp")
-                local pwm_val
-                pwm_val=$(_pct_to_pwm "$target_pct")
-
-                local pwm_ctrl="$hw/pwm${idx}"
-                if [[ -f $pwm_ctrl ]]; then
-                    rx_log_file "info" "sysfs: ${fan_name} → ${target_pct}% (${current_temp}C) at ${pwm_ctrl}"
-                    $SUDO_CMD bash -c "echo 1 > '$hw/pwm${idx}_enable' 2>/dev/null; echo ${pwm_val} > '$pwm_ctrl' 2>/dev/null" 2>/dev/null
-                    local rc=$?
-                    if [[ $rc -eq 0 ]]; then
-                        rx_log_file "success" "sysfs: ${fan_name} set ${target_pct}% (${current_temp}C, PWM ${pwm_val})"
-                        return 0
-                    else
-                        rx_log_file "error" "sysfs: ${fan_name} PWM write failed (rc=${rc})"
-                    fi
-                fi
-                return 1
-            fi
-        done
-    done
-    return 1
-}
-
-_sysfs_reset() {
-    for hw in $(_hwmon_dirs); do
-        for f in "$hw"/pwm*_enable; do
-            [[ -f $f ]] || continue
-            $SUDO_CMD bash -c "echo 2 > '$f'" 2>/dev/null
-        done
-    done
-    rx_log_file "info" "sysfs: all fans reset to auto mode"
-}
-
-_get_coretemp() {
-    local max_temp=0
-    for f in /sys/class/hwmon/hwmon*/temp*_input; do
-        [[ -f $f ]] || continue
-        local val
-        val=$(cat "$f" 2>/dev/null || echo "0")
-        val=$((val / 1000))
-        [[ $val -gt $max_temp ]] && max_temp=$val
-    done
-    echo "$max_temp"
-}
-
-_get_default_curve() {
-    local profile="${1:-balanced}"
-    case "$profile" in
-        quiet) echo "30:20,50:40,70:60,85:80" ;;
-        balanced) echo "30:30,50:50,70:75,85:100" ;;
-        performance) echo "30:40,50:70,70:90,85:100" ;;
-        *) echo "30:30,50:50,70:75,85:100" ;;
-    esac
+    jq -n --arg engine "$engine" --argjson cpu_temp "$cpu_temp" --argjson master "$master" \
+        --arg profile "$profile" --argjson fans "$fans_json" --argjson temps "$temps_json" \
+        --argjson pwm "$pwm_avail" --arg acpi_choices "$acpi_choices" --arg acpi_current "$acpi_current" \
+        '{engine:$engine,cpu_temp:$cpu_temp,master:$master,profile:$profile,fans:$fans,temps:$temps,writable_pwm:$pwm,acpi_choices:$acpi_choices,acpi_current:$acpi_current}'
 }
 
 case "$1" in
+    "--json") _output_json ;;
     "--detect")
-        engine=$(_detect_engine)
-        devices=""
-        if [[ $engine == "liquidctl" ]]; then
-            devices=$(_get_liquidctl_devices | tr '\n' ',' | sed 's/,$//')
-        elif [[ $engine == "lm-sensors" ]]; then
-            devices=$(_has_sensors && sensors --version 2>/dev/null | head -1 | xargs || echo "lm-sensors")
-        else
-            local count=0
-            for hw in $(_hwmon_dirs); do
-                for f in "$hw"/pwm*; do
-                    [[ -f $f ]] && count=$((count + 1))
-                done
-            done
-            devices="${count} PWM controls"
-        fi
-        echo "engine=${engine}"
-        echo "devices=${devices}"
-        rx_log_file "info" "Detected engine: ${engine} (${devices})"
-        ;;
-
+        engine=$(_detect_engine); echo "engine=${engine}"
+        case "$engine" in
+            liquidctl)  echo "devices=$(_get_liquidctl_devices | tr '\n' ',' | sed 's/,$//')" ;;
+            acpi_platform) echo "devices=ACPI platform profile ($(_acpi_get_choices))" ;;
+            *)  n=0; for hw in $(_hwmon_dirs); do for f in "$hw"/pwm*_enable; do [[ -f $f ]] && n=$((n+1)); done; done; echo "devices=${n} PWM controls" ;;
+        esac ;;
     "--scan-engines")
         _has_liquidctl && echo "liquidctl"
-        _has_sensors && echo "lm-sensors"
         echo "sysfs"
-        ;;
-
+        _has_acpi_platform_profile && echo "acpi_platform" ;;
     "--status")
-        engine=$(_detect_engine)
-        echo "engine:${engine}"
-
-        _get_coretemp >/dev/null 2>&1
-        cpu_temp=$(_get_coretemp)
-        echo "cpu_temp:${cpu_temp}C"
-
-        if [[ $engine == "liquidctl" ]]; then
-            lq_status=""
-            lq_status=$(_get_liquidctl_status)
-            if [[ -n $lq_status ]]; then
-                liq_temp=$(echo "$lq_status" | grep -oP '"liquid temperature" *: *\K[0-9.]+' 2>/dev/null || echo "0")
-                echo "liquid_temp:${liq_temp}C"
-                count=0
-                while true; do
-                    key="fan${count} speed"
-                    speed=$(echo "$lq_status" | grep -oP "\"${key}\" *: *\K[0-9]+" 2>/dev/null || echo "")
-                    [[ -z $speed ]] && break
-                    dkey="fan${count} duty"
-                    duty=$(echo "$lq_status" | grep -oP "\"${dkey}\" *: *\K[0-9]+" 2>/dev/null || echo "0")
-                    echo "fan_${count}:${speed}rpm (${duty}%)"
-                    count=$((count + 1))
-                done
-            fi
-        else
-            while IFS='|' read -r hw label rpm pct temp writable; do
-                safe_label="${label// /_}"
-                echo "fan_${safe_label}:${rpm}rpm (${pct}%)"
-            done < <(_sysfs_fans)
-        fi
-
-        profile=$(get_var "FAN_PROFILE" "balanced")
-        echo "profile:${profile}"
-        rx_log_file "info" "Status reported (engine: ${engine}, profile: ${profile})"
-        ;;
-
-    "--list-fans")
-        engine=$(_detect_engine)
-        if [[ $engine == "liquidctl" ]]; then
-            _get_liquidctl_fans
-        else
-            _sysfs_fans
-        fi
-        ;;
-
-    "--list-temps")
-        _sysfs_temps
-        ;;
-
+        engine=$(_detect_engine); cpu_temp=$(_get_cpu_temp)
+        profile=$(echo "$(_config_read)" | jq -r '.profile // "balanced"')
+        master=$(echo "$(_config_read)" | jq -r '.master')
+        echo "engine:${engine}"; echo "cpu_temp:${cpu_temp}C"; echo "profile:${profile}"; echo "master:${master}"
+        while IFS='|' read -r hw_name label rpm pct temp writable hw_id fan_idx; do
+            [[ -z $hw_name ]] && continue
+            echo "fan_${hw_id}_fan${fan_idx}:${label}:${rpm}rpm (${pct}%) [${temp}]"
+        done < <(_sysfs_fans) ;;
+    "--list-fans") _sysfs_fans ;;
+    "--list-temps") _sysfs_temps ;;
+    "--set-master")
+        [[ -z $2 ]] && { echo "Usage: --set-master on|off"; exit 1; }
+        case "$2" in
+            on|true|1)  _config_set_master "true"; set_var "FAN_ENABLED" "true" ;;
+            off|false|0) _config_set_master "false"; set_var "FAN_ENABLED" "false"; _sysfs_reset_all ;;
+            *) echo "Invalid: use on or off"; exit 1 ;;
+        esac; echo "OK|master=$2" ;;
+    "--set-mode")
+        [[ -z $2 || -z $3 ]] && { echo "Usage: --set-mode <id> auto|curve|manual"; exit 1; }
+        case "$3" in auto) _sysfs_set_auto "$2" ;; curve|manual) ;; *) echo "Invalid"; exit 1 ;; esac
+        c= c=$(echo "$(_config_read)" | jq -r ".fans[\"$2\"].curve // \"\""); s=$(echo "$(_config_read)" | jq -r ".fans[\"$2\"].speed // 100")
+        [[ -z $c ]] && c=$(_get_default_curve "balanced")
+        _config_set_fan "$2" "$3" "$c" "$s"; echo "OK|fan=$2|mode=$3" ;;
     "--set-speed")
-        fan_name="$2"
-        pct="$3"
-        [[ -z $fan_name ]] && rx_log_file "error" "Missing fan name" && exit 1
-        [[ -z $pct ]] && rx_log_file "error" "Missing speed percentage" && exit 1
-        [[ ! $pct =~ ^[0-9]+$ ]] && rx_log_file "error" "Speed must be numeric" && exit 1
-        [[ $pct -lt 0 || $pct -gt 100 ]] && rx_log_file "error" "Speed must be 0-100" && exit 1
-
-        engine=$(_detect_engine)
-        if [[ $engine == "liquidctl" ]]; then
-            _liquidctl_set_speed "$fan_name" "$pct"
-        else
-            _sysfs_set_speed "$fan_name" "$pct"
-        fi
-        set_var "FAN_ENGINE" "$engine"
-        set_var "FAN_ENABLED" "true"
-        ;;
-
+        [[ -z $2 || -z $3 ]] && { echo "Usage: --set-speed <id> <0-100>"; exit 1; }
+        [[ ! $3 =~ ^[0-9]+$ || $3 -lt 0 || $3 -gt 100 ]] && { echo "Speed must be 0-100"; exit 1; }
+        _sysfs_set_speed "$2" "$3"; c= c=$(echo "$(_config_read)" | jq -r ".fans[\"$2\"].curve // \"\"")
+        [[ -z $c ]] && c=$(_get_default_curve "balanced")
+        _config_set_fan "$2" "manual" "$c" "$3"; echo "OK|fan=$2|speed=$3" ;;
     "--set-curve")
-        fan_name="$2"
-        curve="$3"
-        [[ -z $fan_name ]] && rx_log_file "error" "Missing fan name" && exit 1
-        [[ -z $curve ]] && rx_log_file "error" "Missing curve data" && exit 1
-
-        set_var "FAN_CURVE_${fan_name}" "$curve"
-        _sysfs_set_curve "$fan_name" "$curve"
-        ;;
-
-    "--profile")
-        profile="$2"
-        curve=""
-        curve=$(_get_default_curve "${profile:-balanced}")
-
-        engine=$(_detect_engine)
-        if [[ $engine == "liquidctl" ]]; then
-            devices=""
-            devices=$(_get_liquidctl_devices)
-            count=0
-            current_temp=$(_get_coretemp)
-            [[ -z $current_temp || $current_temp -eq 0 ]] && current_temp=30
-            while IFS= read -r dev; do
-                [[ -z $dev ]] && continue
-                target_pct=$(_parse_curve "$curve" "$current_temp")
-                _liquidctl_set_speed "fan${count}" "$target_pct" 2>/dev/null
-                count=$((count + 1))
-            done <<<"$devices"
-        else
-            while IFS='|' read -r hw label rpm pct temp writable; do
-                safe_label="${label// /_}"
-                _sysfs_set_curve "$label" "$curve"
-                set_var "FAN_CURVE_${safe_label}" "$curve"
-            done < <(_sysfs_fans)
+        [[ -z $2 || -z $3 ]] && { echo "Usage: --set-curve <id> <curve>"; exit 1; }
+        tp=$(_get_cpu_temp); [[ $tp -eq 0 ]] && tp=30
+        tpct= tpct=$(_parse_curve "$3" "$tp"); _sysfs_set_speed "$2" "$tpct" 2>/dev/null
+        s= s=$(echo "$(_config_read)" | jq -r ".fans[\"$2\"].speed // 100")
+        _config_set_fan "$2" "curve" "$3" "$s"; echo "OK|fan=$2|curve=$3|target=$tpct" ;;
+    "--set-profile")
+        [[ -z $2 ]] && { echo "Usage: --set-profile quiet|balanced|performance"; exit 1; }
+        _config_apply_profile_to_fans "$2"; set_var "FAN_PROFILE" "$2"
+        if _has_acpi_platform_profile; then
+            case "$2" in quiet) _acpi_set_profile "quiet" ;; balanced) _acpi_set_profile "balanced" ;; performance) _acpi_set_profile "performance" ;; esac 2>/dev/null
         fi
-
-        set_var "FAN_PROFILE" "$profile"
-        set_var "FAN_ENABLED" "true"
-        rx_log_file "success" "Profile '${profile}' applied"
-        echo "OK|profile=${profile}"
-        ;;
-
+        echo "OK|profile=$2" ;;
     "--reset")
-        engine=$(_detect_engine)
-        if [[ $engine == "liquidctl" ]]; then
-            _liquidctl_reset
-        else
-            _sysfs_reset
-        fi
-        set_var "FAN_PROFILE" "auto"
-        set_var "FAN_ENABLED" "false"
-        rx_log_file "success" "All fans reset to defaults"
-        ;;
-
+        while IFS='|' read -r _ _ _ _ _ _ hw_id fan_idx; do
+            [[ -n $hw_id ]] && _sysfs_set_auto "${hw_id}_${hw_name}_fan${fan_idx}" 2>/dev/null
+        done < <(_sysfs_fans)
+        _sysfs_reset_all 2>/dev/null
+        _config_write '{"master":false,"profile":"balanced","fans":{}}'
+        set_var "FAN_ENABLED" "false"; set_var "FAN_PROFILE" "balanced"
+        echo "OK|reset=true" ;;
     "--daemon-tick")
-        enabled=$(get_var "FAN_ENABLED" "false")
-        [[ $enabled != "true" ]] && exit 0
-
-        engine=$(get_var "FAN_ENGINE" "auto")
-        [[ $engine == "auto" ]] && engine=$(_detect_engine)
-
-        profile=$(get_var "FAN_PROFILE" "balanced")
-        curve=$(_get_default_curve "$profile")
-
-        current_temp=$(_get_coretemp)
-        [[ -z $current_temp || $current_temp -eq 0 ]] && exit 0
-
-        fan_count=0
-        while IFS='|' read -r hw label rpm pct temp writable; do
-            safe_label="${label// /_}"
-            custom_curve=$(get_var "FAN_CURVE_${safe_label}" "")
-            use_curve="${custom_curve:-$curve}"
-            target_pct=$(_parse_curve "$use_curve" "$current_temp")
-            [[ $target_pct -gt 100 ]] && target_pct=100
-            [[ $target_pct -lt 0 ]] && target_pct=0
-            _sysfs_set_speed "$label" "$target_pct" 2>/dev/null
-            fan_count=$((fan_count + 1))
-        done < <(_sysfs_fans)
-
-        echo "${current_temp}C: ${fan_count} fans → ${profile}"
-        ;;
-
-    "--setup-apply")
-        engine=""
-        profile=""
-        for arg in "$@"; do
-            case "$arg" in
-                engine=*) engine="${arg#engine=}" ;;
-                profile=*) profile="${arg#profile=}" ;;
+        master=$(echo "$(_config_read)" | jq -r '.master')
+        [[ $master != "true" ]] && exit 0
+        cpu_temp=$(_get_cpu_temp); [[ $cpu_temp -eq 0 ]] && exit 0
+        profile=$(echo "$(_config_read)" | jq -r '.profile // "balanced"')
+        default_curve=$(_get_default_curve "$profile")
+        fc=0
+        while IFS='|' read -r hw_name label rpm pct temp_val writable hw_id fan_idx; do
+            [[ -z $hw_name ]] && continue
+            fid="${hw_id}_${hw_name}_fan${fan_idx}"
+            fm="auto" fc2="" fs=100
+            fdata= fdata=$(echo "$(_config_read)" | jq -r ".fans[\"$fid\"] // empty")
+            [[ -n $fdata ]] && { fm=$(echo "$fdata" | jq -r '.mode // "auto"'); fc2=$(echo "$fdata" | jq -r '.curve // ""'); fs=$(echo "$fdata" | jq -r '.speed // 100'); }
+            case "$fm" in
+                curve)
+                    uc="${fc2:-$default_curve}"
+                    tgt=$(_parse_curve "$uc" "$cpu_temp")
+                    [[ $tgt -gt 100 ]] && tgt=100; [[ $tgt -lt 0 ]] && tgt=0
+                    _sysfs_set_speed "$fid" "$tgt" 2>/dev/null; fc=$((fc+1)) ;;
+                manual) _sysfs_set_speed "$fid" "$fs" 2>/dev/null; fc=$((fc+1)) ;;
             esac
-        done
-
-        [[ -z $engine ]] && engine=$(_detect_engine)
-        [[ -z $profile ]] && profile="balanced"
-
-        set_var "FAN_ENGINE" "$engine"
-        set_var "FAN_PROFILE" "$profile"
-        set_var "FAN_ENABLED" "true"
-
-        curve=""
-        curve=$(_get_default_curve "$profile")
-
-        fan_count=0
-        while IFS='|' read -r hw label rpm pct temp writable; do
-            safe_label="${label// /_}"
-            custom_curve=$(get_var "FAN_CURVE_${safe_label}" "")
-            use_curve="${custom_curve:-$curve}"
-            _sysfs_set_curve "$label" "$use_curve"
-            set_var "FAN_CURVE_${safe_label}" "$use_curve"
-            fan_count=$((fan_count + 1))
         done < <(_sysfs_fans)
-
-        echo "OK|engine=${engine}|profile=${profile}|fans=${fan_count}"
-        rx_log_file "success" "Fan setup applied: engine=${engine} profile=${profile} fans=${fan_count}"
-        ;;
-
-    "--cpu-temp")
-        _get_coretemp
-        ;;
-
-    *)
-        echo "Usage: $0 --{detect|status|list-fans|list-temps|set-speed|set-curve|reset|profile|scan-engines|setup-get|setup-apply} [args]"
-        exit 1
-        ;;
+        echo "${cpu_temp}C: ${fc} fans -> ${profile}" ;;
+    "--setup-get")
+        echo "engine=$(echo "$(_config_read)" | jq -r '.engine // "auto"')"
+        echo "profile=$(echo "$(_config_read)" | jq -r '.profile // "balanced"')" ;;
+    "--setup-apply")
+        ep="" pp=""
+        for arg in "$@"; do case "$arg" in engine=*) ep="${arg#engine=}" ;; profile=*) pp="${arg#profile=}" ;; esac; done
+        [[ -z $ep ]] && ep=$(_detect_engine); [[ -z $pp ]] && pp="balanced"
+        _config_apply_profile_to_fans "$pp"; set_var "FAN_PROFILE" "$pp"; set_var "FAN_ENABLED" "true"
+        n=0; while IFS='|' read -r hw_name _ _ _ _ _ _ _; do [[ -n $hw_name ]] && n=$((n+1)); done < <(_sysfs_fans)
+        echo "OK|engine=${ep}|profile=${pp}|fans=${n}" ;;
+    "--ensure-sudoers")
+        [[ $EUID -ne 0 ]] && { echo "ERR|must be root"; exit 1; }
+        cat <<'SEOF' > /etc/sudoers.d/99-retro-fans
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/fans_core.sh
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/firmware/acpi/platform_profile
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon*/pwm*
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon*/pwm*_enable
+SEOF
+        chmod 440 /etc/sudoers.d/99-retro-fans
+        echo "OK|sudoers=true" ;;
+    "--cpu-temp") _get_cpu_temp ;;
+    *)          echo "Usage: $0 --{json|detect|status|list-fans|list-temps|set-master|set-mode|set-speed|set-curve|set-profile|reset|cpu-temp|setup-get|setup-apply|scan-engines|ensure-sudoers}"
+        exit 1 ;;
 esac

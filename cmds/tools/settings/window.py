@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from settings.pages.shell_dashboard import ShellDashboardPage
     from settings.pages.disk import DiskPage
     from settings.pages.env_vars import EnvVarsPage
+    from settings.pages.fan_control import FanControlPage
     from settings.pages.fonts import FontsPage
     from settings.pages.grub import GrubPage
     from settings.pages.layer_rules import LayerRulesPage
@@ -562,6 +563,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.themes", "ThemesPage", "_themes_page", "themes", "Themes"),
             ("settings.pages.wallpapers", "WallpapersPage", "_wallpapers_page", "wallpapers", "Wallpapers"),
             ("settings.pages.users", "UsersPage", "_users_page", "users", "Users"),
+            ("settings.pages.fan_control", "FanControlPage", "_fan_control_page", "fan_control", "Fan Control"),
             ("settings.pages.settings", "SettingsPage", "_settings_page", "settings", "Settings"),
             ("settings.pages.xdg", "XdgPage", "_xdg_page", "xdg", "Default Apps"),
         ]
@@ -1349,6 +1351,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls_name == "SettingsPage":
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name == "FanControlPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

@@ -30,6 +30,7 @@ cmd_fans() {
             case "$engine" in
                 liquidctl) eng_icon="󰣆" ;;
                 lm-sensors) eng_icon="󰔏" ;;
+                acpi_platform) eng_icon="󰏲"; eng_color="$SUCCESS" ;;
                 sysfs)
                     eng_icon="󰈐"
                     eng_color="$MUTE"
@@ -45,64 +46,74 @@ cmd_fans() {
 
         "status")
             local data
-            data=$(bash "$core" --status 2>/dev/null)
+            data=$(bash "$core" --json 2>/dev/null)
             [[ -z $data ]] && rx_log "error" "Failed to get fan status" && return 1
 
-            local engine profile cpu_temp
-            local -a fan_lines=()
-            while IFS=: read -r key val; do
-                case "$key" in
-                    engine) engine="$val" ;;
-                    profile) profile="$val" ;;
-                    cpu_temp) cpu_temp="$val" ;;
-                    fan_*) fan_lines+=("$key=$val") ;;
-                esac
-            done <<<"$data"
+            local engine cpu_temp master profile
+            engine=$(echo "$data" | jq -r '.engine')
+            cpu_temp=$(echo "$data" | jq -r '.cpu_temp')
+            master=$(echo "$data" | jq -r '.master')
+            profile=$(echo "$data" | jq -r '.profile')
 
             local engine_color="$PINK"
             [[ $engine == "sysfs" ]] && engine_color="$MUTE"
-            [[ $engine == "auto" || -z $engine ]] && engine="none" && engine_color="$MUTE"
+            [[ $engine == "acpi_platform" ]] && engine_color="$SUCCESS"
+            [[ -z $engine || $engine == "null" ]] && engine="none" && engine_color="$MUTE"
 
             local prof_color="$SUCCESS"
-            [[ $profile == "balanced" ]] && prof_color="$SUCCESS"
             [[ $profile == "performance" ]] && prof_color="$WARN"
             [[ $profile == "quiet" ]] && prof_color="$SUCCESS"
-            [[ $profile == "auto" ]] && prof_color="$MUTE"
-            [[ -z $profile ]] && profile="auto" && prof_color="$MUTE"
+            [[ -z $profile || $profile == "null" ]] && profile="auto" && prof_color="$MUTE"
 
             local temp_color="$SUCCESS"
-            [[ -n $temp_val ]] && [[ $temp_val -gt 50 ]] && temp_color="$WARN"
-            [[ -n $temp_val ]] && [[ $temp_val -gt 70 ]] && temp_color="$ERROR"
-            rx_table_row "󰔏" "CPU Temp:" "$cpu_temp" "$temp_color" "24"
+            [[ $cpu_temp -gt 50 ]] && temp_color="$WARN"
+            [[ $cpu_temp -gt 70 ]] && temp_color="$ERROR"
+
+            local master_str="off"
+            [[ $master == "true" ]] && master_str="on"
+
+            rx_table_row "󰔏" "CPU Temp:" "${cpu_temp}°C" "$temp_color" "24"
             rx_table_row "󰈐" "Engine:" "${engine}" "$engine_color" "24"
             rx_table_row "󰥲" "Profile:" "${profile}" "$prof_color" "24"
+            rx_table_row "󱠝" "Master:" "${master_str}" "$PINK" "24"
             rx_table_separator
 
-            for line in "${fan_lines[@]}"; do
-                local fk="${line%%=*}"
-                local fv="${line#*=}"
-                local display_key="${fk#fan_}"
-                display_key="${display_key//_/ }"
-                rx_table_row "󱠝" "${display_key}:" "$fv" "$PINK" "24"
-            done
+            local fans_json
+            fans_json=$(echo "$data" | jq -c '.fans[]')
+            while IFS= read -r fan; do
+                local flabel=$(echo "$fan" | jq -r '.label')
+                local frpm=$(echo "$fan" | jq -r '.rpm')
+                local fpct=$(echo "$fan" | jq -r '.pct')
+                local ftemp=$(echo "$fan" | jq -r '.temp')
+                local fmode=$(echo "$fan" | jq -r '.mode')
+                local fw=$(echo "$fan" | jq -r '.writable')
+                local w_color="$MUTE"
+                [[ $fw == "yes" ]] && w_color="$PINK"
+                rx_table_row "󱠝" "${flabel}:" "${frpm}rpm (${fpct}%) [${ftemp}] ${fmode}" "$w_color" "24"
+            done <<<"$fans_json"
 
             rx_table_separator
             rx_table_spacer
             ;;
 
+        "json")
+            bash "$core" --json 2>/dev/null
+            ;;
+
         "set")
             local fan="$subarg"
             local pct="$1"
-            [[ -z $fan ]] && rx_log "error" "Usage: retro fans set <fan_name> <percentage>" && return 1
-            [[ -z $pct ]] && rx_log "error" "Usage: retro fans set <fan_name> <percentage>" && return 1
+            [[ -z $fan ]] && rx_log "error" "Usage: retro fans set <fan_id> <percentage>" && return 1
+            [[ -z $pct ]] && rx_log "error" "Usage: retro fans set <fan_id> <percentage>" && return 1
             [[ ! $pct =~ ^[0-9]+$ ]] && rx_log "error" "Percentage must be a number" && return 1
             [[ $pct -lt 0 || $pct -gt 100 ]] && rx_log "error" "Percentage must be 0-100" && return 1
 
-            bash "$core" --set-speed "$fan" "$pct" 2>/dev/null
-            if [[ $? -eq 0 ]]; then
+            local result
+            result=$(bash "$core" --set-speed "$fan" "$pct" 2>/dev/null)
+            if echo "$result" | grep -q "^OK"; then
                 rx_log "success" "Fan ${PINK}${fan}${RESET} set to ${PINK}${pct}%${RESET}"
             else
-                rx_log "error" "Failed to set fan speed. Try: ${PINK}retro fans list-fans${RESET}"
+                rx_log "error" "Failed to set fan speed. Try: ${PINK}retro fans list${RESET}"
                 return 1
             fi
             ;;
@@ -113,7 +124,7 @@ cmd_fans() {
             [[ -z $data ]] && rx_log "error" "No controllable fans detected" && return 1
 
             rx_table_header "󱠝" "Detected Fans"
-            while IFS='|' read -r hw label rpm pct temp writable; do
+            while IFS='|' read -r hw_name label rpm pct temp writable hw_id fan_idx; do
                 local w_color="$MUTE"
                 [[ $writable == "yes" ]] && w_color="$PINK"
                 rx_table_row "󱠝" "${label}:" "${rpm}rpm (${pct}%)" "$w_color" "24"
@@ -128,14 +139,25 @@ cmd_fans() {
             [[ -z $data ]] && rx_log "error" "No temperature sensors detected" && return 1
 
             rx_table_header "󰔏" "Temperature Sensors"
-            while IFS='|' read -r hw label temp; do
+            while IFS='|' read -r hw_name label temp; do
                 local t_color="$SUCCESS"
-                [[ -n $t_val ]] && [[ $t_val -gt 50 ]] && t_color="$WARN"
-                [[ -n $t_val ]] && [[ $t_val -gt 70 ]] && t_color="$ERROR"
                 rx_table_row "󰔏" "${label}:" "$temp" "$t_color" "24"
             done <<<"$data"
             rx_table_separator
             rx_table_spacer
+            ;;
+
+        "master")
+            local val="${subarg,,}"
+            [[ -z $val ]] && rx_log "error" "Usage: retro fans master <on|off>" && return 1
+            local result
+            result=$(bash "$core" --set-master "$val" 2>/dev/null)
+            if echo "$result" | grep -q "^OK"; then
+                rx_log "success" "Fan master control ${PINK}${val}${RESET}"
+            else
+                rx_log "error" "Failed to set master control"
+                return 1
+            fi
             ;;
 
         "profile")
@@ -147,11 +169,39 @@ cmd_fans() {
             esac
 
             local result
-            result=$(bash "$core" --profile "$profile" 2>/dev/null)
+            result=$(bash "$core" --set-profile "$profile" 2>/dev/null)
             if echo "$result" | grep -q "^OK"; then
                 rx_log "success" "Fan profile set to ${PINK}${profile}${RESET}"
             else
                 rx_log "error" "Failed to apply profile"
+                return 1
+            fi
+            ;;
+
+        "mode")
+            local fan="$subarg"
+            local mode="$1"
+            [[ -z $fan || -z $mode ]] && rx_log "error" "Usage: retro fans mode <fan_id> <auto|curve|manual>" && return 1
+            local result
+            result=$(bash "$core" --set-mode "$fan" "$mode" 2>/dev/null)
+            if echo "$result" | grep -q "^OK"; then
+                rx_log "success" "Fan ${PINK}${fan}${RESET} mode set to ${PINK}${mode}${RESET}"
+            else
+                rx_log "error" "Failed to set fan mode"
+                return 1
+            fi
+            ;;
+
+        "curve")
+            local fan="$subarg"
+            local curve="$1"
+            [[ -z $fan || -z $curve ]] && rx_log "error" "Usage: retro fans curve <fan_id> <temp:pct,...>" && return 1
+            local result
+            result=$(bash "$core" --set-curve "$fan" "$curve" 2>/dev/null)
+            if echo "$result" | grep -q "^OK"; then
+                rx_log "success" "Fan ${PINK}${fan}${RESET} curve applied"
+            else
+                rx_log "error" "Failed to set curve"
                 return 1
             fi
             ;;
@@ -171,18 +221,10 @@ cmd_fans() {
                 local e_color="$PINK"
                 local e_icon="󱠝"
                 case "$eng" in
-                    liquidctl)
-                        e_icon="󰣆"
-                        e_color="$SUCCESS"
-                        ;;
-                    lm-sensors)
-                        e_icon="󰔏"
-                        e_color="$SUCCESS"
-                        ;;
-                    sysfs)
-                        e_icon="󰈐"
-                        e_color="$MUTE"
-                        ;;
+                    liquidctl)     e_icon="󰣆"; e_color="$SUCCESS" ;;
+                    lm-sensors)    e_icon="󰔏"; e_color="$SUCCESS" ;;
+                    acpi_platform) e_icon="󰏲"; e_color="$SUCCESS" ;;
+                    sysfs)         e_icon="󰈐"; e_color="$MUTE" ;;
                 esac
                 rx_table_row "$e_icon" "$eng" "" "$e_color" "18"
             done <<<"$engines"
@@ -192,7 +234,7 @@ cmd_fans() {
 
         "setup")
             rx_setup_parse "${setup_args[@]:1}"
-            rx_setup_validate "engine,profile" "engine:in=liquidctl,lm-sensors,sysfs|profile:in=quiet,balanced,performance" || return 1
+            rx_setup_validate "engine,profile" "engine:in=liquidctl,lm-sensors,sysfs,acpi_platform|profile:in=quiet,balanced,performance" || return 1
 
             local config_data
             config_data=$(bash "$core" --setup-get 2>/dev/null)
@@ -230,13 +272,6 @@ cmd_fans() {
                     fi
                 fi
 
-                local detected_engine
-                detected_engine=$(bash "$core" --detect 2>/dev/null)
-                local auto_engine
-                while IFS='=' read -r key val; do
-                    [[ $key == "engine" ]] && auto_engine="$val"
-                done <<<"$detected_engine"
-
                 local -a avail_engines=()
                 local scan_data
                 scan_data=$(bash "$core" --scan-engines 2>/dev/null)
@@ -245,12 +280,12 @@ cmd_fans() {
                 done <<<"$scan_data"
 
                 if [[ ${#avail_engines[@]} -eq 0 ]]; then
-                    rx_log "error" "No cooling engines detected. Install: ${PINK}liquidctl lm-sensors${RESET}"
+                    rx_log "error" "No cooling engines detected"
                     return 1
                 fi
 
                 local eng_default="$cur_engine"
-                [[ $eng_default == "auto" ]] && eng_default="$auto_engine"
+                [[ $eng_default == "auto" ]] && eng_default="${avail_engines[0]}"
                 engine_input=$(rx_input_choice "" "Select Cooling Engine" "$eng_default" "${avail_engines[@]}")
 
                 local -a profiles=("quiet" "balanced" "performance")
@@ -284,19 +319,23 @@ cmd_fans() {
             rx_help_cmd "status" "Show fan speeds, temps, and cooling status" 40
             rx_help_cmd "detect" "Auto-detect cooling hardware" 40
             rx_help_cmd "setup" "Interactive cooling setup wizard" 40
-            rx_help_cmd "list-fans" "List all controllable fans" 40
-            rx_help_cmd "list-temps" "List all temperature sensors" 40
-            rx_help_cmd "set <fan> <pct>" "Set manual fan speed (0-100%)" 40
+            rx_help_cmd "list" "List all controllable fans" 40
+            rx_help_cmd "temps" "List all temperature sensors" 40
+            rx_help_cmd "set <id> <pct>" "Set manual fan speed (0-100%)" 40
             rx_help_cmd "profile <name>" "Apply profile: quiet, balanced, performance" 40
+            rx_help_cmd "master <on|off>" "Enable/disable master fan control" 40
+            rx_help_cmd "mode <id> <mode>" "Set fan mode: auto, curve, manual" 40
+            rx_help_cmd "curve <id> <curve>" "Set custom fan curve (temp:pct,...)" 40
             rx_help_cmd "reset" "Reset fans to auto mode" 40
             rx_help_cmd "engines" "List available cooling engines" 40
+            rx_help_cmd "json" "Machine-readable JSON status" 40
             rx_help_examples
             rx_help_example "retro fans status" "Show cooling status" 30
             rx_help_example "retro fans detect" "Auto-detect hardware" 30
-            rx_help_example "retro fans setup" "Interactive setup" 30
-            rx_help_example "retro fans setup -o profile=quiet -y" "Non-interactive setup" 30
-            rx_help_example "retro fans set cpu 75" "Set CPU fan to 75%" 30
             rx_help_example "retro fans profile balanced" "Apply balanced profile" 30
+            rx_help_example "retro fans master on" "Enable fan control" 30
+            rx_help_example "retro fans set hwmon6_hp_fan1 75" "Set fan to 75%" 30
+            rx_help_example "retro fans curve hwmon6_hp_fan1 30:30,50:50,70:75,85:100" "Set curve" 30
             rx_help_spacer
             ;;
 
@@ -308,4 +347,4 @@ cmd_fans() {
     esac
 }
 
-register_command "TOOLS" "fans" "Fan and cooling management (liquidctl, lm-sensors, sysfs)" "cmd_fans"
+register_command "TOOLS" "fans" "Fan and cooling management (liquidctl, sysfs, ACPI)" "cmd_fans"
