@@ -5,6 +5,12 @@ local Battery = require("battery")
 local Events = {}
 
 function Events.on_power_disconnect(cap)
+    -- Auto-disable caffeine when unplugging
+    if Watcher.get_var("PWR_CAFFEINE_ON_CHARGE") == "true" then
+        Watcher.set_var("HYPRIDLE_CAFFEINE_ENABLE", "false")
+        Watcher.log("power", "Caffeine disabled (unplugged)", "info")
+    end
+
     if Watcher.get_var("BAT_SAVER_ON_PWR_DIS") == "true" and Watcher.get_var("BAT_SAVER_ACTIVE") ~= "true" then
         Power.set_profile("saver")
     end
@@ -14,6 +20,12 @@ end
 
 function Events.on_power_connect(cap)
     Power.restore_previous()
+
+    -- Auto-enable caffeine when charging
+    if Watcher.get_var("PWR_CAFFEINE_ON_CHARGE") == "true" then
+        Watcher.set_var("HYPRIDLE_CAFFEINE_ENABLE", "true")
+        Watcher.log("power", "Caffeine enabled (charging)", "info")
+    end
 
     if Watcher.get_var("BAT_SAVER_ON_PWR_DIS") == "true" and Watcher.get_var("BAT_SAVER_ACTIVE") == "true" then
         Battery.set_saver("false")
