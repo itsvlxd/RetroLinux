@@ -158,6 +158,11 @@ EOF
 
     _write_shell_pinned_apps
 
+    if [[ -n $root_device ]]; then
+        sudo timeshift --delete-all 2>/dev/null || true
+        sudo timeshift --create --comments "Initial system backup" --tags "O" 2>/dev/null || true
+    fi
+
     sudo rm -f /etc/sudoers.d/retro-post-install
     rm "$HOME/.retro_install"
 
