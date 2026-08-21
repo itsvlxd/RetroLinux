@@ -883,3 +883,24 @@ def load_dashboard() -> dict:
 
 def save_dashboard(data: dict) -> None:
     save_shell_json("dashboard", data)
+
+
+# ── notifications.json ─────────────────────────────────────────────────
+
+NOTIFICATIONS_DEFAULTS: dict = {
+    "soundEnabled": True,
+    "soundFile": "retro-default.mp3",
+    "soundVolume": 40,
+}
+
+
+def notifications_path() -> Path:
+    return shell_config_dir() / "notifications.json"
+
+
+def load_notifications() -> dict:
+    return load_shell_json("notifications", NOTIFICATIONS_DEFAULTS)
+
+
+def save_notifications(data: dict) -> None:
+    save_shell_json("notifications", data)

@@ -18,6 +18,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk
 from settings.ui import make_page_layout
 from settings.ui.icons import (
     ABOUT_ICON,
+    NOTIFICATION_ICON,
     APPS_ICON,
     AUDIO_ICON,
     AUTOSTART_ICON,
@@ -87,6 +88,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("shell_dock", "Dock", "Dock applications", DOCK_ICON),
     ("shell_desktop", "Desktop", "Desktop widgets", DESKTOP_ICON),
     ("shell_lock", "Lockscreen", "Lock screen styling", LOCK_ICON),
+    ("shell_notifications", "Notifications", "Notification sound settings", NOTIFICATION_ICON),
     ("shell_presets", "Presets", "Shell presets", PRESETS_ICON),
     # Input
     ("binds", "Keybinds", "Keyboard shortcuts and bindings", BINDS_ICON),

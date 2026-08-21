@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from settings.pages.shell_dock import ShellDockPage
     from settings.pages.shell_frame import ShellFramePage
     from settings.pages.shell_lock import ShellLockPage
+    from settings.pages.shell_notifications import ShellNotificationsPage
     from settings.pages.shell_notch import ShellNotchPage
     from settings.pages.shell_overview import ShellOverviewPage
     from settings.pages.shell_presets import ShellPresetsPage
@@ -569,6 +570,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.shell_sidebar", "ShellSidebarPage", "_shell_sidebar_page", "shell_sidebar", "Sidebar"),
             ("settings.pages.shell_frame", "ShellFramePage", "_shell_frame_page", "shell_frame", "Frame"),
             ("settings.pages.shell_lock", "ShellLockPage", "_shell_lock_page", "shell_lock", "Lockscreen"),
+            ("settings.pages.shell_notifications", "ShellNotificationsPage", "_shell_notifications_page", "shell_notifications", "Notifications"),
             ("settings.pages.shell_workspaces", "ShellWorkspacesPage", "_shell_workspaces_page", "shell_workspaces", "Workspaces"),
             ("settings.pages.shell_overview", "ShellOverviewPage", "_shell_overview_page", "shell_overview", "Overview"),
             ("settings.pages.misc", "MiscPage", "_misc_page", "misc", "Miscellaneous"),
@@ -991,6 +993,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         if shell_frame_page is not None and shell_frame_page.is_dirty():
             counts["shell_frame"] = 1
         shell_lock_page = getattr(self, "_shell_lock_page", None)
+        shell_notifications_page = getattr(self, "_shell_notifications_page", None)
+        if shell_notifications_page is not None and shell_notifications_page.is_dirty():
+            counts["shell_notifications"] = 1
         if shell_lock_page is not None and shell_lock_page.is_dirty():
             counts["shell_lock"] = 1
         shell_workspaces_page = getattr(self, "_shell_workspaces_page", None)
@@ -1351,6 +1356,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls_name == "ShellPresetsPage":
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name == "ShellNotificationsPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

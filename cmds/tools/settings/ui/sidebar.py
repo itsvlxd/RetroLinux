@@ -8,6 +8,7 @@ from gi.repository import Adw, Gtk
 
 from settings.ui.icons import (
     ABOUT_ICON,
+    NOTIFICATION_ICON,
     APPS_ICON,
     AUDIO_ICON,
     AUTOSTART_ICON,
@@ -260,6 +261,7 @@ class Sidebar:
         add_row(shell, "shell_dock", "Dock", DOCK_ICON)
         add_row(shell, "shell_desktop", "Desktop", DESKTOP_ICON)
         add_row(shell, "shell_lock", "Lockscreen", LOCK_ICON)
+        add_row(shell, "shell_notifications", "Notifications", NOTIFICATION_ICON)
         add_row(shell, "shell_presets", "Presets", PRESETS_ICON)
 
         input_cat = new_category("Input")
