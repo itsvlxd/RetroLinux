@@ -13,9 +13,12 @@ cmd_settings() {
 
     if [[ "$1" == "--debug" ]]; then
         shift
+        echo "[settings.sh] RETRO_DIR=$RETRO_DIR" >&2
+        echo "[settings.sh] Launching python -m settings $*" >&2
         PYTHONUNBUFFERED=1 \
         PYTHONPATH="$RETRO_DIR/cmds/tools:$RETRO_DIR/scripts:$RETRO_DIR:$PYTHONPATH" \
             python -m settings "$@"
+        echo "[settings.sh] Python exited with code $?" >&2
     else
         PYTHONPATH="$RETRO_DIR/cmds/tools:$RETRO_DIR/scripts:$RETRO_DIR:$PYTHONPATH" \
             nohup python -m settings "$@" >/dev/null 2>&1 &
