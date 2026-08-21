@@ -78,12 +78,103 @@ def _run_core_pkexec(*args: str) -> bool:
         return False
 
 
+# User-friendly profile names and their possible system equivalents
+_PROFILE_MAP: dict[str, list[str]] = {
+    "Quiet": ["quiet", "low-power", "powersave"],
+    "Cool": ["cool"],
+    "Balanced": ["balanced", "normal"],
+    "Performance": ["performance", "high-performance"],
+}
+
+
+def _read_hw_temps() -> dict[str, str]:
+    """Read temperatures from available hardware sensors."""
+    temps: dict[str, str] = {}
+
+    # CPU temperature
+    try:
+        for z in sorted(os.listdir("/sys/class/thermal/")):
+            if not z.startswith("thermal_zone"):
+                continue
+            path = f"/sys/class/thermal/{z}"
+            try:
+                ttype = open(f"{path}/type").read().strip()
+                if ttype in ("x86_pkg_temp", "cpu-thermal", "coretemp"):
+                    temp = int(open(f"{path}/temp").read().strip()) / 1000
+                    temps["CPU"] = f"{temp:.0f}°C"
+                    break
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
+
+    # GPU temperature (AMD/NVIDIA via hwmon)
+    try:
+        for d in sorted(os.listdir("/sys/class/drm/")):
+            if not d.startswith("card"):
+                continue
+            hwmon = f"/sys/class/drm/{d}/device/hwmon"
+            if not os.path.isdir(hwmon):
+                continue
+            for hm in os.listdir(hwmon):
+                p = f"{hwmon}/{hm}/temp1_input"
+                if os.path.isfile(p):
+                    temp = int(open(p).read().strip()) / 1000
+                    temps["GPU"] = f"{temp:.0f}°C"
+                    break
+            if "GPU" in temps:
+                break
+    except OSError:
+        pass
+
+    # NVMe SSD temperature
+    try:
+        for name in sorted(os.listdir("/sys/class/hwmon/")):
+            path = f"/sys/class/hwmon/{name}"
+            try:
+                label_file = f"{path}/name"
+                if os.path.isfile(label_file):
+                    label = open(label_file).read().strip().lower()
+                    if "nvme" in label or "nvme" in name:
+                        temp_file = f"{path}/temp1_input"
+                        if os.path.isfile(temp_file):
+                            temp = int(open(temp_file).read().strip()) / 1000
+                            temps["SSD"] = f"{temp:.0f}°C"
+                            break
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
+
+    # Battery temperature (if available)
+    try:
+        bat_path = "/sys/class/power_supply/BAT*"
+        import glob as glob_mod
+        for bat in sorted(glob_mod.glob(bat_path)):
+            temp_file = f"{bat}/temp"
+            if os.path.isfile(temp_file):
+                temp = int(open(temp_file).read().strip()) / 1000
+                temps["Battery"] = f"{temp:.0f}°C"
+                break
+    except (OSError, ValueError):
+        pass
+
+    return temps
+
+
 def _load_acpi_profiles() -> list[str]:
-    """Load available ACPI platform profile choices from the system."""
+    """Load available ACPI platform profile choices from the system.
+
+    Returns user-friendly profile names that are actually available.
+    """
     try:
         with open("/sys/firmware/acpi/platform_profile_choices", "r") as f:
-            profiles = [line.strip() for line in f.read().splitlines() if line.strip()]
-        return profiles
+            available = [line.strip().lower() for line in f.read().splitlines() if line.strip()]
+        result = []
+        for name, choices in _PROFILE_MAP.items():
+            if any(c in available for c in choices):
+                result.append(name)
+        return result if result else ["Quiet", "Balanced", "Performance"]
     except (FileNotFoundError, PermissionError):
         return ["Quiet", "Balanced", "Performance"]
 
@@ -208,7 +299,8 @@ class FanControlPage:
         self._engine_lbl: Gtk.Label | None = None
         self._temp_lbl: Gtk.Label | None = None
         self._profile_dd: Gtk.DropDown | None = None
-        self._acpi_lbl: Gtk.Label | None = None
+        self._temps_lbl: Gtk.Label | None = None
+        self._refreshing = False
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         _ensure_fan_sudoers()
@@ -219,7 +311,7 @@ class FanControlPage:
         refresh_btn.connect("clicked", lambda _: self._refresh())
         header.pack_start(refresh_btn)
 
-        # Profile group — ACPI platform profiles
+        # Profile group — ACPI platform profiles + Hardware temps
         profile_group = Adw.PreferencesGroup(title="Profile")
 
         # Load available ACPI profiles from the system
@@ -229,16 +321,17 @@ class FanControlPage:
         self._profile_dd = Gtk.DropDown(model=profile_model)
         self._profile_dd.set_valign(Gtk.Align.CENTER)
         self._profile_dd.connect("notify::selected", self._on_profile_changed)
-        prof_row = Adw.ActionRow(title="Profile", subtitle="ACPI platform profile")
+        prof_row = Adw.ActionRow(title="Profile", subtitle="Power profile")
         prof_row.add_suffix(self._profile_dd)
         profile_group.add(prof_row)
 
-        # ACPI platform profile status label
-        self._acpi_lbl = Gtk.Label(label="", halign=Gtk.Align.START)
-        self._acpi_lbl.set_valign(Gtk.Align.CENTER)
-        acpi_row = Adw.ActionRow(title="ACPI Platform Profile")
-        acpi_row.add_suffix(self._acpi_lbl)
-        profile_group.add(acpi_row)
+        # Hardware temperatures
+        self._temps_lbl = Gtk.Label(label="", halign=Gtk.Align.START)
+        self._temps_lbl.set_valign(Gtk.Align.CENTER)
+        self._temps_lbl.set_selectable(True)
+        temps_row = Adw.ActionRow(title="Temperatures", subtitle="CPU · GPU · SSD · Battery")
+        temps_row.add_suffix(self._temps_lbl)
+        profile_group.add(temps_row)
 
         self._content_box.append(profile_group)
 
@@ -250,6 +343,13 @@ class FanControlPage:
         return toolbar_view
 
     def _refresh(self) -> None:
+        self._refreshing = True
+        try:
+            self._refresh_impl()
+        finally:
+            self._refreshing = False
+
+    def _refresh_impl(self) -> None:
         data = _run_core("--json")
         if not data:
             return
@@ -290,19 +390,33 @@ class FanControlPage:
             if _acpi_profiles:
                 self._profile_dd.set_selected(0)
 
-        if self._acpi_lbl:
-            acpi = info.get("acpi_choices", "")
-            self._acpi_lbl.set_text(acpi if acpi else "Not available")
+        # Update hardware temperatures
+        if self._temps_lbl:
+            temps = _read_hw_temps()
+            if temps:
+                parts = [f"{k}: {v}" for k, v in temps.items()]
+                self._temps_lbl.set_text("  ·  ".join(parts))
+            else:
+                self._temps_lbl.set_text("No sensors detected")
 
     def _on_profile_changed(self, _dd, _pspec) -> None:
+        # Skip if this change is from _refresh() resetting the model
+        if self._refreshing:
+            return
         global _profile_change_pending
         _profile_change_pending = True
         # Schedule the flag to be cleared after 3 seconds
-        GLib.timeout_add(3000, lambda _: (_profile_change_pending.__class__.__setattr__("_profile_change_pending", False)))
+        def _clear_flag():
+            global _profile_change_pending
+            _profile_change_pending = False
+            return False  # Don't repeat
+        GLib.timeout_add(3000, _clear_flag)
         profile = self._profile_dd.get_selected()
         if profile is not None and profile < len(_acpi_profiles):
             profile_name = _acpi_profiles[profile]
-            threading.Thread(target=_run_core_pkexec, args=("--set-profile", profile_name), daemon=True).start()
+            # Map user-friendly name to first available system profile name
+            system_name = _PROFILE_MAP.get(profile_name, [profile_name.lower()])[0]
+            threading.Thread(target=_run_core_pkexec, args=("--set-profile", system_name), daemon=True).start()
         self._mark_dirty()
 
     def _mark_dirty(self) -> None:
@@ -346,6 +460,6 @@ class FanControlPage:
         }]
 
     def destroy(self) -> None:
-        if self._tick_source:
-            GLib.source_remove(self._tick_source)
-            self._tick_source = None
+        if self._timer:
+            GLib.source_remove(self._timer)
+            self._timer = 0

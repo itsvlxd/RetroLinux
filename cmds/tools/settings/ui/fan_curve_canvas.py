@@ -174,7 +174,7 @@ class FanCurveCanvas(Gtk.DrawingArea):
             self._drag_origin_x = x
             self._drag_origin_y = y
             gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-            self.set_cursor(*get_cursor_grab())
+            self.set_cursor(get_cursor_grab())
         else:
             gesture.set_state(Gtk.EventSequenceState.DENIED)
 
@@ -199,7 +199,7 @@ class FanCurveCanvas(Gtk.DrawingArea):
 
     def _on_drag_end(self, _gesture, _x, _y) -> None:
         self._dragging = None
-        self.set_cursor(*get_cursor_none())
+        self.set_cursor(None)  # Reset to default cursor
         if self._drag_end_cb:
             self._drag_end_cb(self.points)
 
@@ -209,6 +209,6 @@ class FanCurveCanvas(Gtk.DrawingArea):
         w, h = self.get_width(), self.get_height()
         idx = self._hit_test(x, y, w, h)
         if idx is not None:
-            self.set_cursor(*get_cursor_grab())
+            self.set_cursor(get_cursor_grab())
         else:
-            self.set_cursor(*get_cursor_none())
+            self.set_cursor(None)  # Reset to default cursor
