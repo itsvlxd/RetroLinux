@@ -18,5 +18,5 @@ setup_modules() {
     "$RETRO_DIR/retro.sh" -i all -a root $type_flag -y
     "$RETRO_DIR/retro.sh" -i all -a user $type_flag -y
 
-    rx_log "success" "Module installation complete"
+    rx_log "success" "All modules installed successfully"
 }

@@ -70,7 +70,7 @@ This document serves as the **single source of truth** for all RetroLinux develo
 | Backend core scripts | `scripts/` | `audio_core.sh`, `battery_core.sh`, `benchmark_core.sh`, `bluetooth_core.sh`, `cleanup_core.sh`, `disk_core.sh`, `display_core.sh`, `driver_core.sh`, `fans_core.sh`, `firewall_core.sh`, `font_core.sh`, `grub_core.sh`, `input_core.sh`, `keyring_core.sh`, `log_core.sh`, `network_core.sh`, `polkit_core.sh`, `power_core.sh`, `service_core.sh`, `shell_core.sh`, `ssh_core.sh`, `system_core.sh`, `test_core.sh`, `theme_core.sh`, `timeshift_core.sh`, `variable_core.sh`, `wallpaper_core.sh`, `window_core.sh`, `xdg_core.sh` |
 | Event daemon core | `daemon/` | `engine.lua`, `event_daemon.lua`, `watcher.lua` |
 | Event handlers | `daemon/events/` | `battery.lua`, `power.lua`, `notifications.lua`, `wallpaper.lua`, `rotation.lua` |
-| Watchers | `daemon/watchers/` | `audio.lua`, `axctl.lua`, `battery.lua`, `bluetooth.lua`, `fans.lua`, `hypridle.lua`, `portal.lua`, `power.lua`, `rotation.lua`, `slideshow.lua`, `ssh.lua`, `timers.lua`, `usb.lua`, `wallpaper.lua` |
+| Watchers | `daemon/watchers/` | `audio.lua`, `axctl.lua`, `battery.lua`, `bluetooth.lua`, `hypridle.lua`, `portal.lua`, `power.lua`, `rotation.lua`, `slideshow.lua`, `ssh.lua`, `timers.lua`, `usb.lua`, `wallpaper.lua` |
 | Standalone scripts | `scripts/lib/` | `system_update.sh` (UI, invoked from events) |
 | Frontend commands | `cmds/tools/` | `audio.sh`, `app.sh`, `battery.sh`, `benchmark.sh`, `bitwarden.sh`, `bluetooth.sh`, `cleanup.sh`, `daemon.sh`, `disk.sh`, `display.sh`, `driver.sh`, `fans.sh`, `fingerprint.sh`, `firewall.sh`, `font.sh`, `grub.sh`, `input.sh`, `keyring.sh`, `log.sh`, `network.sh`, `polkit.sh`, `power.sh`, `service.sh`, `settings.sh`, `shell.sh`, `ssh.sh`, `system.sh`, `theme.sh`, `timeshift.sh`, `variable.sh`, `wallpaper.sh`, `window.sh`, `xdg.sh` |
 | Settings GUI | `cmds/tools/settings/` | `main.py`, `window.py`, `core/`, `ui/`, `pages/`, `data/` (+ `retro-settings.pyz` zipapp) |
@@ -1642,7 +1642,7 @@ The **Daemon System** is a background daemon written in **Lua** that continuousl
 | `daemon/engine.lua` | Core engine - loads watchers, dispatches events via coroutines |
 | `daemon/event_daemon.lua` | CLI interface - loop/trigger/status/list-events/stop |
 | `daemon/watcher.lua` | Shared watcher utilities - variable persistence, logging, sysfs reading |
-| `daemon/watchers/*.lua` | Watcher modules (audio, axctl, battery, bluetooth, fans, hypridle, portal, power, rotation, slideshow, ssh, timers, usb, wallpaper) |
+| `daemon/watchers/*.lua` | Watcher modules (audio, axctl, battery, bluetooth, hypridle, portal, power, rotation, slideshow, ssh, timers, usb, wallpaper) |
 | `daemon/events/*.lua` | Event handler modules (battery, power, notifications, rotation, wallpaper) |
 | `cmds/tools/daemon.sh` | Frontend command to manage the daemon (`cmd_event`, registered as `retro daemon`) |
 
@@ -1712,7 +1712,7 @@ engine:stop()                   -- Stop the engine
 | Slideshow | `watchers/slideshow.lua` | Slideshow timing |
 | Timers | `watchers/timers.lua` | Package/Retro update checks |
 | Axctl | `watchers/axctl.lua` | Axctl touchpad gestures (active when `/tmp/axctl-*.sock` exists) |
-| Fans | `watchers/fans.lua` | Fan control monitoring |
+| Fans | `watchers/fans.lua` | (removed — no writable PWM controls on this hardware) |
 | Hypridle | `watchers/hypridle.lua` | Hypridle idle daemon monitoring |
 | Rotation | `watchers/rotation.lua` | Display rotation detection (tick-based) |
 | SSH | `watchers/ssh.lua` | SSH login/failed/close events |

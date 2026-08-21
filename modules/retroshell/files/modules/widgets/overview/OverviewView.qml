@@ -125,4 +125,22 @@ Item {
             overviewLoader.item.selectPrevMatch();
         }
     }
+
+    function keyboardInitialize() {
+        if (overviewLoader.item && overviewLoader.item.keyboardInitialize) {
+            overviewLoader.item.keyboardInitialize();
+        }
+    }
+
+    function keyboardMove(direction) {
+        if (overviewLoader.item && overviewLoader.item.keyboardMove) {
+            overviewLoader.item.keyboardMove(direction);
+        }
+    }
+
+    function activateSelectedWindow() {
+        if (overviewLoader.item && overviewLoader.item.activateSelectedWindow) {
+            overviewLoader.item.activateSelectedWindow();
+        }
+    }
 }

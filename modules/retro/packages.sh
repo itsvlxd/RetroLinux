@@ -19,8 +19,10 @@ net-tools
 inetutils
 base-devel
 lm_sensors
+calfrnnoise
 brightnessctl
 pacman-contrib
+lsp-plugins-lv2
 iio-sensor-proxy
 
 # GTK

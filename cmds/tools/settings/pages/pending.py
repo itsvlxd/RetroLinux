@@ -48,6 +48,7 @@ _CATEGORY_ORDER = (
     "Env Variables",
     "Window Rules",
     "Layer Rules",
+    "Fan Control",
 )
 
 # Visual label and CSS class for each kind of change.

@@ -1,22 +1,32 @@
 """Main application window with sidebar navigation."""
 
 import subprocess
+import sys as _sys
 import time
 from collections import Counter
 from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 from pathlib import Path
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
-from hyprland_config import Rule, coerce_config_value
-from hyprland_socket import HyprlandError
-from hyprland_state import ANIM_LOOKUP, HyprlandState
+def _dbg(msg: str) -> None:
+    if "--debug" in _sys.argv or "-d" in _sys.argv:
+        print(f"[window] {msg}", file=_sys.stderr, flush=True)
 
+_dbg("importing gi.repository")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+_dbg("importing hyprland_config")
+from hyprland_config import Rule, coerce_config_value
+_dbg("importing hyprland_socket")
+from hyprland_socket import HyprlandError
+_dbg("importing hyprland_state")
+from hyprland_state import ANIM_LOOKUP, HyprlandState
+_dbg("importing settings.core modules")
 from settings.core import config, schema
 from settings.core.settings import apply_saved_config_path, open_settings
 from settings.core.state import AppState
 from settings.core.undo import OptionChange, PairedOptionChange, UndoManager
 from settings.pages.section import SectionPage
+_dbg("window module fully imported")
 if TYPE_CHECKING:
     from settings.data.bezier_data import get_curve_store as _get_curve_store_type
     from settings.pages.about import AboutPage
@@ -33,6 +43,7 @@ if TYPE_CHECKING:
     from settings.pages.shell_dashboard import ShellDashboardPage
     from settings.pages.disk import DiskPage
     from settings.pages.env_vars import EnvVarsPage
+    from settings.pages.fan_control import FanControlPage
     from settings.pages.fonts import FontsPage
     from settings.pages.grub import GrubPage
     from settings.pages.layer_rules import LayerRulesPage
@@ -95,6 +106,7 @@ CSS_PATH = settings_pkg_dir() / "style.css"
 
 class RetroSettingsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
+        _dbg("RetroSettingsWindow.__init__ start")
         self._target_page = kwargs.pop("target_page", None)
         self._nav_ready = False
         super().__init__(**kwargs)
@@ -103,16 +115,19 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self.set_default_size(1025, 656)
         self.set_size_request(1025, 656)
 
+        _dbg("opening GSettings")
         self._settings = open_settings()
         apply_saved_config_path(self._settings)
 
-        # Warm the managed-config cache so the first ``saved_sections`` access
-        # below doesn't pay for a parse synchronously during widget construction.
+        _dbg("warming config cache")
         config.read_cached()
+        _dbg("creating HyprlandState")
         self.hypr = HyprlandState()
         self._hyprland_available = self.hypr.online
+        _dbg(f"Hyprland available={self._hyprland_available}")
         if self._hyprland_available:
-            self.hypr.reload_compositor()  # Reset runtime state to match config files
+            _dbg("reloading compositor")
+            self.hypr.reload_compositor()
         self._has_touchpad = self.hypr.has_touchpad() if self._hyprland_available else True
         self._has_touchscreen = (
             bool((self.hypr.get_devices() or {}).get("touch"))
@@ -120,6 +135,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         # Load the option catalog matching the running compositor version.
         # Falls back to the bundled catalog when Hyprland is offline or the
         # version cannot be resolved (see core.schema.load_schema).
+        _dbg("loading schema")
         self._schema = schema.load_schema(version=self.hypr.version)
         # Gestures are workspace-swipe only, which fires from a touchpad or
         # touchscreen. With neither, drop the whole page rather than show an
@@ -169,6 +185,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         self._lazy_section_specs: dict[str, tuple] = {}
         self._lazy_standalone_specs: dict[str, tuple] = {}
 
+        _dbg("starting _build_ui")
         _t0 = time.monotonic()
         self._load_css()
         self._build_ui()
@@ -562,6 +579,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.themes", "ThemesPage", "_themes_page", "themes", "Themes"),
             ("settings.pages.wallpapers", "WallpapersPage", "_wallpapers_page", "wallpapers", "Wallpapers"),
             ("settings.pages.users", "UsersPage", "_users_page", "users", "Users"),
+            ("settings.pages.fan_control", "FanControlPage", "_fan_control_page", "fan_control", "Fan Control"),
             ("settings.pages.settings", "SettingsPage", "_settings_page", "settings", "Settings"),
             ("settings.pages.xdg", "XdgPage", "_xdg_page", "xdg", "Default Apps"),
         ]
@@ -1349,6 +1367,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls_name == "SettingsPage":
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name == "FanControlPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

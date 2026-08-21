@@ -2,11 +2,20 @@
 
 import signal
 import sys
+import time as _time
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+def _dbg(msg: str) -> None:
+    if "--debug" in sys.argv or "-d" in sys.argv:
+        print(f"[SETTINGS-DBG] {msg}", file=sys.stderr, flush=True)
 
-from settings.constants import APPLICATION_ID, settings_pkg_dir
-from settings.window import RetroSettingsWindow
+_dbg(f"Starting ({_time.monotonic():.3f})")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+_dbg(f"GTK loaded ({_time.monotonic():.3f})")
+
+from settings.constants import APPLICATION_ID, settings_pkg_dir  # noqa: E402
+_dbg(f"constants loaded ({_time.monotonic():.3f})")
+from settings.window import RetroSettingsWindow  # noqa: E402
+_dbg(f"window module loaded ({_time.monotonic():.3f})")
 
 
 class RetroSettingsApp(Adw.Application):
@@ -37,6 +46,7 @@ def main():
     debug = "--debug" in sys.argv
     if debug:
         sys.argv.remove("--debug")
+        _dbg(f"Debug mode enabled, argv={sys.argv}")
 
     target_page = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
     if target_page:
@@ -53,6 +63,7 @@ def main():
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _on_signal)
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _on_signal)
 
+    _dbg(f"Entering GTK main loop ({_time.monotonic():.3f})")
     return app.run(sys.argv)
 
 

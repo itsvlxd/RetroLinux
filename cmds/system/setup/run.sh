@@ -40,6 +40,18 @@ _ensure_aur_helper() {
     fi
 }
 
+_write_shell_pinned_apps() {
+    local terminal_app="${RETRO_TERMINAL_CMD:-kitty}"
+    local filemanager="${FILEMANAGER_CHOICE:-nemo}"
+    local browser="${BROWSER_CHOICE:-firefox}"
+    [[ $browser == "zen-browser-bin" ]] && browser="zen"
+
+    mkdir -p "$HOME/.local/share/retroshell"
+    cat > "$HOME/.local/share/retroshell/pinnedapps.json" <<EOF
+{"apps":["$terminal_app","io.github.retrolinux.settings","$filemanager","$browser","io.github.kolunmi.Bazaar"]}
+EOF
+}
+
 run_postinstall() {
     SETUP_LOG="/var/log/retrolinux-setup.log"
     if ! sudo mkdir -p /var/log 2>/dev/null || ! sudo touch "$SETUP_LOG" 2>/dev/null; then
@@ -117,6 +129,18 @@ run_postinstall() {
 
     retro audio eq download JackHack96
 
+    mkdir -p "$HOME/.config/pipewire/pipewire.conf.d"
+    cat > "$HOME/.config/pipewire/pipewire.conf.d/99-echo-cancel.conf" <<'EOF'
+context.modules = [
+    { name = libpipewire-module-echo-cancel
+      args = {
+          # Adjust latency if you notice any audio stuttering
+          node.latency = 1024/48000
+      }
+    }
+]
+EOF
+
     retro polkit setup --needed -y
     if [[ ${FIREWALL_ENABLED:-true} == "true" ]]; then
         sudo systemctl enable nftables 2>/dev/null || true
@@ -131,6 +155,8 @@ run_postinstall() {
     fi
 
     retro shell start
+
+    _write_shell_pinned_apps
 
     sudo rm -f /etc/sudoers.d/retro-post-install
     rm "$HOME/.retro_install"

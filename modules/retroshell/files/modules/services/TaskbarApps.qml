@@ -33,6 +33,51 @@ Singleton {
         Config.savePinnedApps();
     }
 
+    // Index of an app in the pinned list, or -1 if not pinned
+    function pinnedIndex(appId) {
+        const pinnedApps = Config.pinnedApps?.apps || [];
+        const normalized = appId.toLowerCase();
+        for (let i = 0; i < pinnedApps.length; i++) {
+            if (pinnedApps[i].toLowerCase() === normalized) return i;
+        }
+        return -1;
+    }
+
+    // Pin an app at the given index (inserting if missing, moving if present)
+    function pinApp(appId, index) {
+        let pinnedApps = (Config.pinnedApps?.apps || []).slice();
+        const normalized = appId.toLowerCase();
+        const existing = pinnedApps.findIndex(id => id.toLowerCase() === normalized);
+        const clamped = Math.max(0, Math.min(index, existing >= 0 ? pinnedApps.length - 1 : pinnedApps.length));
+
+        if (existing >= 0) {
+            if (existing !== clamped) {
+                pinnedApps.splice(existing, 1);
+                pinnedApps.splice(clamped, 0, appId);
+            }
+        } else {
+            pinnedApps.splice(clamped, 0, appId);
+        }
+
+        Config.pinnedApps.apps = pinnedApps;
+        Config.savePinnedApps();
+    }
+
+    // Reorder a pinned app to the given index within the pinned list
+    function reorderPinned(appId, toIndex) {
+        const normalized = appId.toLowerCase();
+        let pinnedApps = (Config.pinnedApps?.apps || []).slice();
+        const from = pinnedApps.findIndex(id => id.toLowerCase() === normalized);
+        if (from < 0) return;
+
+        pinnedApps.splice(from, 1);
+        const clamped = Math.max(0, Math.min(toIndex, pinnedApps.length));
+        pinnedApps.splice(clamped, 0, appId);
+
+        Config.pinnedApps.apps = pinnedApps;
+        Config.savePinnedApps();
+    }
+
     // Get entry
     function getDesktopEntry(appId) {
         if (!appId) return null;

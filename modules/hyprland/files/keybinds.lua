@@ -49,9 +49,14 @@ end
 
 hl.bind(mainMod .. " + S", Retro.open_screenshot)
 
--- Scroll through existing workspaces with mainMod + scroll
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
+-- Cursor zoom with mainMod + arrow keys / scroll / keys
+hl.bind(mainMod .. " + down", Retro.zoom_in)
+hl.bind(mainMod .. " + up", Retro.zoom_out)
+hl.bind(mainMod .. " + mouse_down", Retro.zoom_out)
+hl.bind(mainMod .. " + mouse_up", Retro.zoom_in)
+hl.bind(mainMod .. " + equal", Retro.zoom_in, { repeating = true })
+hl.bind(mainMod .. " + minus", Retro.zoom_out, { repeating = true })
+hl.bind(mainMod .. " + Z", Retro.zoom_toggle)
 
 -- Move/resize windows with mainMod + LMB/RMB and dragging
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })

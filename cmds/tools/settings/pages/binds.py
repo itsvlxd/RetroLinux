@@ -148,9 +148,9 @@ class BindsPage(SectionPage):
         before the normal enrichment pass.
         """
         retro_map: dict = {}
-        _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+        _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)(?:\s*,\s*\{[^}]*\})?\)')
         _EXPR_RETRO = re.compile(
-            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]+)"\s*,\s*(Retro\.\w+)\)'
+            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]+)"\s*,\s*(Retro\.\w+)(?:\s*,\s*\{[^}]*\})?\)'
         )
         # Variable → modifier translation from the module's keybinds.lua.
         _KNOWN_MOD_VARS: dict[str, str] = {"mainMod": "SUPER"}
@@ -208,9 +208,9 @@ class BindsPage(SectionPage):
         Actions category when no override exists.
         """
         self._module_retro_binds.clear()
-        _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)\)')
+        _LITERAL_RETRO = re.compile(r'hl\.bind\("([^"]+)",\s*(Retro\.\w+)(?:\s*,\s*\{[^}]*\})?\)')
         _EXPR_RETRO = re.compile(
-            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]+)"\s*,\s*(Retro\.\w+)\)'
+            r'hl\.bind\((\w+)\s*\.\.\s*"([^"]+)"\s*,\s*(Retro\.\w+)(?:\s*,\s*\{[^}]*\})?\)'
         )
         _KNOWN_MOD_VARS: dict[str, str] = {"mainMod": "SUPER"}
 

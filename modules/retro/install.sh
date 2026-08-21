@@ -455,6 +455,18 @@ EOF
     rx_log "success" "Sudoers rule added for security tools (firewall, SSH, faillock)"
 }
 
+setup_fan_sudoers() {
+    sudo rm -f /etc/sudoers.d/99-retro-fans
+    cat <<EOF | sudo tee /etc/sudoers.d/99-retro-fans >/dev/null
+%wheel ALL=(ALL) NOPASSWD: /opt/retrolinux/scripts/fans_core.sh
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/firmware/acpi/platform_profile
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon*/pwm*
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/hwmon/hwmon*/pwm*_enable
+EOF
+    sudo chmod 440 /etc/sudoers.d/99-retro-fans
+    rx_log "success" "Sudoers rule added for fan control"
+}
+
 if [[ $SECONDARY_INSTALL != "true" ]]; then
     install_settings_desktop
     setup_theme_sudoers
@@ -462,6 +474,7 @@ if [[ $SECONDARY_INSTALL != "true" ]]; then
     setup_smartctl_sudoers
     setup_nopasswd_tools
     setup_security_sudoers
+    setup_fan_sudoers
     patch_os_release
 
     SYSTEM_SCRIPT="$RETRO_DIR/scripts/system_core.sh"

@@ -282,6 +282,13 @@ execute_logic() {
     fi
 
     [[ -f $post_hook ]] && (cd "$mod_path" && bash "./post.sh" "$type")
+
+    case "$type" in
+        "install") rx_log "success" "Module ${PINK}$name${RESET} installed successfully" ;;
+        "uninstall") rx_log "success" "Module ${PINK}$name${RESET} uninstalled successfully" ;;
+        "pull") rx_log "success" "Module ${PINK}$name${RESET} updated successfully" ;;
+        "mirror") rx_log "success" "Module ${PINK}$name${RESET} mirrored successfully" ;;
+    esac
 }
 
 rx_default_install() {
@@ -297,7 +304,7 @@ rx_default_pull() {
 
     if [[ -d $dest ]]; then
         if [[ -L $dest ]]; then
-            rx_log "success" "$name is already linked."
+            rx_log "success" "Module ${PINK}$name${RESET} is already linked, skipping"
         else
             rx_mirror_pull "$dest" "$src"
         fi
