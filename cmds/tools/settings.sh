@@ -12,13 +12,15 @@ cmd_settings() {
     fi
 
     if [[ "$1" == "--debug" ]]; then
+        shift
+        PYTHONUNBUFFERED=1 \
         PYTHONPATH="$RETRO_DIR/cmds/tools:$RETRO_DIR/scripts:$RETRO_DIR:$PYTHONPATH" \
-            python -m settings "$@" &
+            python -m settings "$@"
     else
         PYTHONPATH="$RETRO_DIR/cmds/tools:$RETRO_DIR/scripts:$RETRO_DIR:$PYTHONPATH" \
             nohup python -m settings "$@" >/dev/null 2>&1 &
+        disown
     fi
-    disown
 }
 
 register_command "TOOLS" "settings" "Open the Retro Settings GUI" "cmd_settings"
