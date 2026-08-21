@@ -7,7 +7,10 @@ rx_log_register "fans"
 SUDO_CMD=""
 [[ $EUID -ne 0 ]] && SUDO_CMD="sudo"
 
-_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/retro"
+_rx_home() {
+    [[ $EUID -eq 0 && -n $SUDO_USER ]] && echo "/home/$SUDO_USER" || echo "$HOME"
+}
+_CONFIG_DIR="${XDG_CONFIG_HOME:-$(_rx_home)/.config}/retro"
 _CONFIG_FILE="${_CONFIG_DIR}/fan_config.json"
 
 _hwmon_dirs() {

@@ -41,17 +41,24 @@ class FanCurveEditorDialog:
         name_lbl.add_css_class("dim-label")
         name_row.append(name_lbl)
         self._name_entry = Gtk.Entry(hexpand=True, placeholder_text="Curve name")
-        self._name_entry.set_text(initial_curve if initial_curve in self._store.get_all_curve_names() else "")
+        # Load saved user curves into the entry
+        all_names = self._store.get_all_curve_names()
+        self._name_entry.set_text(initial_curve if initial_curve in all_names else "")
         name_row.append(self._name_entry)
         content.append(name_row)
 
-        # Preset buttons
+        # Preset buttons + user curve dropdown
         preset_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         for pname in ["quiet", "balanced", "performance"]:
             btn = Gtk.Button(label=pname.capitalize())
             btn.add_css_class("flat")
             btn.connect("clicked", self._on_preset, pname)
             preset_box.append(btn)
+        # User curve dropdown — stored as instance var for later access
+        self._user_curve_dd = Gtk.DropDown(model=Gtk.StringList.new(all_names))
+        self._user_curve_dd.set_tooltip_text("Saved user curves")
+        self._user_curve_dd.connect("notify::selected", self._on_user_curve_selected)
+        preset_box.append(self._user_curve_dd)
         content.append(preset_box)
 
         # Canvas
@@ -88,6 +95,14 @@ class FanCurveEditorDialog:
         add_btn.add_css_class("flat")
         add_btn.connect("clicked", self._on_add_point)
         action_box.append(add_btn)
+
+        # Delete user curve button
+        if len(all_names) > 0:
+            del_btn = Gtk.Button(label="Delete Curve")
+            del_btn.add_css_class("flat")
+            del_btn.add_css_class("destructive-action")
+            del_btn.connect("clicked", self._on_delete_curve)
+            action_box.append(del_btn)
 
         remove_btn = Gtk.Button(label="Remove Point")
         remove_btn.add_css_class("flat")
@@ -139,6 +154,44 @@ class FanCurveEditorDialog:
         if len(points) > 2:
             points.pop()
             self._canvas.set_points(points)
+
+    def _on_user_curve_selected(self, _dd) -> None:
+        # Read the selected curve name from the dropdown model, not from the entry
+        model = self._user_curve_dd.get_model()
+        if model is None:
+            return
+        sel = self._user_curve_dd.get_selected()
+        if sel < 0:
+            return
+        name = model[sel]
+        if not name:
+            return
+        pts = self._store.get_curve_points(name)
+        if pts:
+            self._canvas.set_points(pts)
+            # Also update the name entry
+            self._name_entry.set_text(name)
+            self._on_curve_changed(self._canvas.points)
+
+    def _on_delete_curve(self, _btn) -> None:
+        name = self._name_entry.get_text().strip()
+        if not name:
+            return
+        self._store.delete_user_curve(name)
+        # Refresh the dropdown model using stored reference
+        all_names = self._store.get_all_curve_names()
+        if self._user_curve_dd is not None:
+            self._user_curve_dd.set_model(Gtk.StringList.new(all_names))
+            # Reset selection to first item (or cleared if empty)
+            if len(all_names) > 0:
+                self._user_curve_dd.set_selected(0)
+            else:
+                self._user_curve_dd.set_selected(-1)
+        # Reset name entry and canvas
+        self._name_entry.set_text("")
+        self._canvas.set_points(self._store.get_curve_points("balanced"))
+        if self._on_curve_changed:
+            self._on_curve_changed(self._canvas.points)
 
     def _on_save(self, _btn) -> None:
         name = self._name_entry.get_text().strip()

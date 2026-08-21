@@ -23,6 +23,7 @@ _FANS_CORE = os.path.join(_RETRO_DIR, "scripts", "fans_core.sh")
 
 _REFRESH_MS = 2000
 _sudoers_done = False
+_profile_change_pending = False
 
 
 def _ensure_fan_sudoers() -> None:
@@ -273,7 +274,7 @@ class FanControlPage:
             self._temp_lbl.set_text(f"{info.get('cpu_temp', 0)}°C")
 
         profile_names = {"quiet": 0, "balanced": 1, "performance": 2}
-        if self._profile_dd:
+        if self._profile_dd and not _profile_change_pending:
             self._profile_dd.handler_block_by_func(self._on_profile_changed)
             self._profile_dd.set_selected(profile_names.get(info.get("profile", "balanced"), 1))
             self._profile_dd.handler_unblock_by_func(self._on_profile_changed)
@@ -312,6 +313,9 @@ class FanControlPage:
     def _on_profile_changed(self, _dd, _pspec) -> None:
         names = {0: "quiet", 1: "balanced", 2: "performance"}
         profile = names.get(self._profile_dd.get_selected(), "balanced")
+        _profile_change_pending = True
+        # Schedule the flag to be cleared after 3 seconds
+        GLib.timeout_add(3000, lambda: (_profile_change_pending.__class__.__setattr__("_profile_change_pending", False) if hasattr(_profile_change_pending, "__class__") else False) or True)
         threading.Thread(target=_run_core_pkexec, args=("--set-profile", profile), daemon=True).start()
         self._mark_dirty()
 
