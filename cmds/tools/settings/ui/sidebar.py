@@ -42,6 +42,7 @@ from settings.ui.icons import (
     POWER_ICON,
     PRESETS_ICON,
     QUICKSHARE_ICON,
+    SERVICE_CONTROL_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -307,6 +308,7 @@ class Sidebar:
         add_row(system, "grub", "Bootloader", GRUB_ICON)
         add_row(system, "driver", "Drivers", DRIVER_ICON)
         add_row(system, "daemon", "Daemon", DAEMON_ICON)
+        add_row(system, "service_control", "Services", SERVICE_CONTROL_ICON)
         add_row(system, "xdg", "Default Apps", APPS_ICON)
         add_row(system, "backups", "Backups", TIMESHIFT_ICON)
 

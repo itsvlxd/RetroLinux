@@ -52,6 +52,7 @@ from settings.ui.icons import (
     POWER_ICON,
     PRESETS_ICON,
     QUICKSHARE_ICON,
+    SERVICE_CONTROL_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -122,6 +123,7 @@ PAGE_REGISTRY: list[tuple[str, str, str, str]] = [
     ("grub", "Bootloader", "Boot entries and kernel options", GRUB_ICON),
     ("driver", "Drivers", "Hardware drivers", DRIVER_ICON),
     ("daemon", "Daemon", "Retro background services", DAEMON_ICON),
+    ("service_control", "Services", "Manage systemd services", SERVICE_CONTROL_ICON),
     ("xdg", "Default Apps", "Default apps, MIME types and directories", APPS_ICON),
     ("backups", "Backups", "Timeshift system snapshots", TIMESHIFT_ICON),
     # Advanced
