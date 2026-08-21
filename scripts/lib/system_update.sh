@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RETRO_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$RETRO_DIR/lib/colors.sh"
+source "$RETRO_DIR/lib/git.sh"
 source "$RETRO_DIR/lib/logo.sh"
 source "$RETRO_DIR/lib/variable.sh"
 
