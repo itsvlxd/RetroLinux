@@ -198,6 +198,21 @@ RETRO_ACTIONS: dict = {
         "label": "Open Settings",
         "standard": ("exec", "retro settings"),
     },
+    "retro_zoom_in": {
+        "lua_fn": "Retro.zoom_in",
+        "label": "Zoom In",
+        "standard": ("exec", "hyprctl keyword cursor:zoom_factor 1.5"),
+    },
+    "retro_zoom_out": {
+        "lua_fn": "Retro.zoom_out",
+        "label": "Zoom Out",
+        "standard": ("exec", "hyprctl keyword cursor:zoom_factor 1.0"),
+    },
+    "retro_zoom_toggle": {
+        "lua_fn": "Retro.zoom_toggle",
+        "label": "Toggle Zoom",
+        "standard": ("exec", "hyprctl keyword cursor:zoom_factor 1.0"),
+    },
 }
 
 # --- Derived maps (do not edit manually) ---
