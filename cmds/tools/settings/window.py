@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from settings.pages.bluetooth import BluetoothPage
     from settings.pages.changelog import ChangelogPage
     from settings.pages.daemon import DaemonPage
+    from settings.pages.service_control import ServiceControlPage
     from settings.pages.shell_dashboard import ShellDashboardPage
     from settings.pages.disk import DiskPage
     from settings.pages.env_vars import EnvVarsPage
@@ -552,6 +553,7 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             ("settings.pages.bluetooth", "BluetoothPage", "_bluetooth_page", "bluetooth", "Bluetooth"),
             ("settings.pages.network", "NetworkPage", "_network_page", "network", "Network"),
             ("settings.pages.daemon", "DaemonPage", "_daemon_page", "daemon", "Daemon"),
+            ("settings.pages.service_control", "ServiceControlPage", "_service_control_page", "service_control", "Services"),
             ("settings.pages.shell_dashboard", "ShellDashboardPage", "_shell_dashboard_page", "shell_dashboard", "Dashboard"),
             ("settings.pages.disk", "DiskPage", "_disk_page", "disks", "Disks"),
             ("settings.pages.driver", "DriverPage", "_driver_page", "driver", "Drivers"),
@@ -1380,6 +1382,10 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())
         elif cls_name == "FanControlPage":
+            page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
+            self._section_pages.append(page)  # type: ignore[attr-defined]
+            self._search_page_builder.add_entries(page.get_search_entries())
+        elif cls_name == "ServiceControlPage":
             page._on_dirty_changed = self._on_section_dirty  # type: ignore[attr-defined]
             self._section_pages.append(page)  # type: ignore[attr-defined]
             self._search_page_builder.add_entries(page.get_search_entries())

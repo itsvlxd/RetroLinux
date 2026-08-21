@@ -50,6 +50,13 @@ class ShellNotificationsPage:
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar, _page_box, content_box, _scrolled = make_page_layout(header=header)
 
+        # Test notification button in header
+        test_btn = Gtk.Button(icon_name="preferences-system-notifications-symbolic")
+        test_btn.set_tooltip_text("Send test notification")
+        test_btn.add_css_class("flat")
+        test_btn.connect("clicked", self._on_test_notification)
+        header.pack_start(test_btn)
+
         sounds_group = Adw.PreferencesGroup(
             title="Sounds",
             description="Sound, volume, and enable/disable.",
@@ -136,22 +143,62 @@ class ShellNotificationsPage:
         spin.connect("value-changed", lambda *a, k=key, m=mrow: (setattr(self, '_data', {**self._data, k: m.value}), m.refresh(), self._notify_dirty()))
         return mrow
 
-    # ── Preview ──
+    # ── Sound playback ──
 
-    def _on_preview(self, _btn) -> None:
+    def _play_sound(self) -> None:
+        """Play the currently configured notification sound."""
         sound_file = self._data.get("soundFile", NOTIFICATIONS_DEFAULTS["soundFile"])
         volume = int(self._data.get("soundVolume", NOTIFICATIONS_DEFAULTS["soundVolume"]))
+        enabled = self._data.get("soundEnabled", NOTIFICATIONS_DEFAULTS["soundEnabled"])
+        if not enabled:
+            return
         path = os.path.join(_SND_DIR, sound_file)
         if not os.path.exists(path):
             return
         pa_vol = int(volume * 65536 / 100)
         try:
-            subprocess.run(["paplay", "--volume", str(pa_vol), path], capture_output=True, timeout=5)
+            subprocess.Popen(
+                ["paplay", "--volume", str(pa_vol), path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         except Exception:
             try:
-                subprocess.run(["mpg123", "-q", "--gain", str(volume), path], capture_output=True, timeout=5)
+                subprocess.Popen(
+                    ["mpg123", "-q", "--gain", str(volume), path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             except Exception:
                 pass
+
+    # ── Preview ──
+
+    def _on_test_notification(self, _btn) -> None:
+        """Send a test notification and play the notification sound."""
+        # Send the desktop notification
+        try:
+            subprocess.Popen(
+                [
+                    "notify-send",
+                    "-a", "RetroLinux Settings",
+                    "-i", "preferences-system-notifications-symbolic",
+                    "-u", "normal",
+                    "Test Notification",
+                    "This is a test notification from RetroLinux Settings.",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+
+        # Play the notification sound (notify-send goes through system daemon,
+        # not Quickshell's NotificationServer, so we play the sound here)
+        self._play_sound()
+
+    def _on_preview(self, _btn) -> None:
+        self._play_sound()
 
     # ── Change plumbing ──
 
