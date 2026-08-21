@@ -1,3 +1,19 @@
+# [1.7.0](https://github.com/itsvlxd/RetroLinux/compare/v1.6.0...v1.7.0) (2026-08-21)
+
+
+### Bug Fixes
+
+* **load:** fix shell redundant restart ([7c0d9fd](https://github.com/itsvlxd/RetroLinux/commit/7c0d9fdd6b83db02081e5d0fd6fc5991828c3418))
+* **scripts:** fix update git errors ([fbb1414](https://github.com/itsvlxd/RetroLinux/commit/fbb1414063d5b8e864ab92da3e054993f27d4989))
+
+
+### Features
+
+* **retro:** add shell themes, make retro wallpaper non optional & various bug fixes ([#12](https://github.com/itsvlxd/RetroLinux/issues/12)) ([6680bb2](https://github.com/itsvlxd/RetroLinux/commit/6680bb2aa1d62ad778202dedbb57e8885eb18b1f))
+* **retroshell:** add 6 new shell themes ([cd10636](https://github.com/itsvlxd/RetroLinux/commit/cd1063686a63ada6c4870e2cec88a626b6d0b5c4))
+* **settings:** make retrolinux be first in presets list ([edae403](https://github.com/itsvlxd/RetroLinux/commit/edae403e304dc4bf1e972d8af99ad1ab4747e89c))
+* **setup:** make retro wallpaper collection non optional ([e5eaece](https://github.com/itsvlxd/RetroLinux/commit/e5eaece3e299d67136dbf9d53c829ffe51e017b1))
+
 # [1.6.0](https://github.com/itsvlxd/RetroLinux/compare/v1.5.0...v1.6.0) (2026-08-20)
 
 
