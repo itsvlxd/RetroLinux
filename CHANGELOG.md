@@ -1,3 +1,28 @@
+# [1.8.0](https://github.com/itsvlxd/RetroLinux/compare/v1.7.0...v1.8.0) (2026-08-21)
+
+
+### Bug Fixes
+
+* **fan:** fix fan curve persistance ([8abc47d](https://github.com/itsvlxd/RetroLinux/commit/8abc47d362467e960666db15045bece23940ca7b))
+* **lib:** improve module and package end-of-operation log messages ([cd7eaa3](https://github.com/itsvlxd/RetroLinux/commit/cd7eaa3e481e7d3e3a644a9658dee5c72720678f))
+* **settings:** add more debug logs in retro settings ([507df5e](https://github.com/itsvlxd/RetroLinux/commit/507df5e8918fb629823581961f8ff3c17d4b95e4))
+* **settings:** fix retro settings debug ([1b9feab](https://github.com/itsvlxd/RetroLinux/commit/1b9feab10a6f0a6399fc41256bb2075d9d9d7778))
+* **settings:** moneky-patch hyprland state version handling ([ea05c8b](https://github.com/itsvlxd/RetroLinux/commit/ea05c8bd9b47b55b3c3496e76dd794fd16c50e79))
+
+
+### Features
+
+* **audio:** add pipewire echo cancel lib ([60b785e](https://github.com/itsvlxd/RetroLinux/commit/60b785eac6bbad22521febe3de461d6ff1d7c0a8))
+* **fans:** add fan control settings with custom curve control ([670360f](https://github.com/itsvlxd/RetroLinux/commit/670360fd5f72a0179d4623a49e8245c311e0fee1))
+* **hyprland:** add zoom keybind ([036af5f](https://github.com/itsvlxd/RetroLinux/commit/036af5fbf909512b4b20a28459e5172c5fe945a7))
+* **retro:** add audio packages ([b19d6ec](https://github.com/itsvlxd/RetroLinux/commit/b19d6ece6852543580a534d944a04154e8cc4d12))
+* **retro:** add overview arrow keys, shell scale for bar and dock, zoom keybind ([#13](https://github.com/itsvlxd/RetroLinux/issues/13)) ([19f8411](https://github.com/itsvlxd/RetroLinux/commit/19f8411f1f53b0345f19536462e36dad9592c310))
+* **retroshell:** add arrow keys navigation ([01d82a6](https://github.com/itsvlxd/RetroLinux/commit/01d82a6406bf50685822da8ff84f2e66a57ba674))
+* **retroshell:** add scale for bar elements ([ee287ac](https://github.com/itsvlxd/RetroLinux/commit/ee287ace5f667fafb36ae53f96da571c17783bb1))
+* **retroshell:** add scale for dock ([a50b00a](https://github.com/itsvlxd/RetroLinux/commit/a50b00ac3915a844c3b34ee06568181dc4a5ba65))
+* **retroshell:** add support for draging dock pinned apps ([162c733](https://github.com/itsvlxd/RetroLinux/commit/162c73315bb577a85358dc9f2413d35a5b6af75a))
+* **setup:** add mkdir step for pipewire in the run ([0424182](https://github.com/itsvlxd/RetroLinux/commit/042418217f96ce808b6b6887b9becee1970c0ade))
+
 # [1.7.0](https://github.com/itsvlxd/RetroLinux/compare/v1.6.0...v1.7.0) (2026-08-21)
 
 
