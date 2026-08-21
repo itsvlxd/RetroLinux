@@ -129,6 +129,18 @@ run_postinstall() {
 
     retro audio eq download JackHack96
 
+    mkdir -p "$HOME/.config/pipewire/pipewire.conf.d"
+    cat > "$HOME/.config/pipewire/pipewire.conf.d/99-echo-cancel.conf" <<'EOF'
+context.modules = [
+    { name = libpipewire-module-echo-cancel
+      args = {
+          # Adjust latency if you notice any audio stuttering
+          node.latency = 1024/48000
+      }
+    }
+]
+EOF
+
     retro polkit setup --needed -y
     if [[ ${FIREWALL_ENABLED:-true} == "true" ]]; then
         sudo systemctl enable nftables 2>/dev/null || true
