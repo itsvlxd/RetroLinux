@@ -51,7 +51,7 @@ class ShellNotificationsPage:
         toolbar, _page_box, content_box, _scrolled = make_page_layout(header=header)
 
         # Test notification button in header
-        test_btn = Gtk.Button(icon_name="preferences-system-notifications-symbolic")
+        test_btn = Gtk.Button(icon_name="feather-bell-symbolic")
         test_btn.set_tooltip_text("Send test notification")
         test_btn.add_css_class("flat")
         test_btn.connect("clicked", self._on_test_notification)
@@ -175,14 +175,13 @@ class ShellNotificationsPage:
     # ── Preview ──
 
     def _on_test_notification(self, _btn) -> None:
-        """Send a test notification and play the notification sound."""
-        # Send the desktop notification
+        """Send a test notification."""
         try:
             subprocess.Popen(
                 [
                     "notify-send",
                     "-a", "RetroLinux Settings",
-                    "-i", "preferences-system-notifications-symbolic",
+                    "-i", "feather-bell-symbolic",
                     "-u", "normal",
                     "Test Notification",
                     "This is a test notification from RetroLinux Settings.",
@@ -192,10 +191,6 @@ class ShellNotificationsPage:
             )
         except Exception:
             pass
-
-        # Play the notification sound (notify-send goes through system daemon,
-        # not Quickshell's NotificationServer, so we play the sound here)
-        self._play_sound()
 
     def _on_preview(self, _btn) -> None:
         self._play_sound()
