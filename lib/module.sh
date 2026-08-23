@@ -98,6 +98,17 @@ get_module_files() {
     echo "$raw" | jq -r '.[]? // empty' 2>/dev/null
 }
 
+get_module_dependencies() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    local raw
+    raw=$(rx_get_json "$json_file" "dependencies" "" 2>/dev/null)
+    [[ -z $raw ]] && return 0
+    echo "$raw" | jq -r '.[]? // empty' 2>/dev/null
+}
+
 get_module_uninstall_pkgs() {
     local name="$1"
     local mod_path="$RETRO_DIR/modules/$name"
@@ -213,6 +224,20 @@ execute_logic() {
     local post_hook="$mod_path/post.sh"
 
     [[ ! -d $mod_path ]] && rx_log "error" "Module '$name' not found." && return 1
+
+    local dep
+    while IFS= read -r dep; do
+        [[ -z $dep ]] && continue
+        if [[ $type == "install" ]]; then
+            local dep_path="$RETRO_DIR/modules/$dep"
+            if [[ -d $dep_path ]]; then
+                if ! rx_module_status "$dep" >/dev/null 2>&1; then
+                    rx_log "info" "Installing dependency: ${PINK}$dep${RESET}..."
+                    execute_logic "install" "$dep"
+                fi
+            fi
+        fi
+    done <<< "$(get_module_dependencies "$name")"
 
     local mod_access=$(get_module_access "$name")
     if [[ $mod_access == "root" && $EUID -ne 0 ]]; then

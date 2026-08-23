@@ -42,7 +42,10 @@ for mod_dir in "${MODULES_DIRS[@]}"; do
             if .uninstall_pkgs != null and (.uninstall_pkgs | type != "boolean") then "invalid uninstall_pkgs" else empty end,
             if .gui != null and (.gui | type != "boolean") then "invalid gui" else empty end,
             if .files != null and (.files | type != "array") then "invalid files (must be array)" else empty end,
-            if .files != null and (.files | all(. | type == "string") | not) then "invalid files (must be array of strings)" else empty end
+            if .files != null and (.files | all(. | type == "string") | not) then "invalid files (must be array of strings)" else empty end,
+            if .dependency != null and (.dependency | type != "string") then "invalid dependency" else empty end,
+            if .dependencies != null and (.dependencies | type != "array") then "invalid dependencies (must be array)" else empty end,
+            if .dependencies != null and (.dependencies | all(. | type == "string") | not) then "invalid dependencies (must be array of strings)" else empty end
         ] | join(", ")
     ' "$json_file")
 
