@@ -1,0 +1,4 @@
+zsh
+fzf
+eza
+git
