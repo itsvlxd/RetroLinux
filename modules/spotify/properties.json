@@ -5,8 +5,5 @@
   "access": "user",
   "defaults": true,
   "mode": "mirror",
-  "config": "./files",
-  "install": "~/.config/spicetify",
-  "overwrite": false,
   "gui": true
 }
