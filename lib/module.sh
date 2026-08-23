@@ -87,6 +87,17 @@ get_module_check() {
     rx_get_json "$json_file" "check" "" 2>/dev/null
 }
 
+get_module_files() {
+    local name="$1"
+    local mod_path="$RETRO_DIR/modules/$name"
+    local json_file="$mod_path/properties.json"
+
+    local raw
+    raw=$(rx_get_json "$json_file" "files" "" 2>/dev/null)
+    [[ -z $raw ]] && return 0
+    echo "$raw" | jq -r '.[]? // empty' 2>/dev/null
+}
+
 get_module_uninstall_pkgs() {
     local name="$1"
     local mod_path="$RETRO_DIR/modules/$name"
@@ -295,18 +306,47 @@ rx_default_install() {
     local name="$1"
     IFS='|' read -r src dest <<<"$(get_module_paths "$name")"
 
-    [[ -d $src ]] && rx_link "$src" "$dest"
+    local tracked_files
+    tracked_files=$(get_module_files "$name")
+
+    if [[ -n $tracked_files ]]; then
+        rx_log "info" "Linking specific tracked files for ${PINK}$name${RESET}..."
+        while IFS= read -r file; do
+            [[ -z $file ]] && continue
+            local repo_file="$src/$file"
+            local system_file="$dest/$file"
+            [[ -e $repo_file ]] && rx_link "$repo_file" "$system_file"
+        done <<< "$tracked_files"
+    else
+        [[ -d $src ]] && rx_link "$src" "$dest"
+    fi
 }
 
 rx_default_pull() {
     local name="$1"
     IFS='|' read -r src dest <<<"$(get_module_paths "$name")"
 
-    if [[ -d $dest ]]; then
-        if [[ -L $dest ]]; then
-            rx_log "success" "Module ${PINK}$name${RESET} is already linked, skipping"
-        else
-            rx_mirror_pull "$dest" "$src"
+    local tracked_files
+    tracked_files=$(get_module_files "$name")
+
+    if [[ -n $tracked_files ]]; then
+        rx_log "info" "Pulling specific tracked files for ${PINK}$name${RESET}..."
+        while IFS= read -r file; do
+            [[ -z $file ]] && continue
+            local system_file="$dest/$file"
+            local repo_file="$src/$file"
+            if [[ -e $system_file ]]; then
+                mkdir -p "$(dirname "$repo_file")"
+                cp "$system_file" "$repo_file"
+            fi
+        done <<< "$tracked_files"
+    else
+        if [[ -d $dest ]]; then
+            if [[ -L $dest ]]; then
+                rx_log "success" "Module ${PINK}$name${RESET} is already linked, skipping"
+            else
+                rx_mirror_pull "$dest" "$src"
+            fi
         fi
     fi
 }
