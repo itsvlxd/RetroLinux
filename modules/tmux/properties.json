@@ -1,0 +1,13 @@
+{
+    "title": "Tmux",
+    "description": "Tmux configuration with tpm, neovim integration, and productivity plugins",
+    "type": "extra",
+    "access": "user",
+    "defaults": true,
+    "mode": "install",
+    "config": "./files",
+    "install": "~/.config/tmux",
+    "overwrite": true,
+    "check": "tmux",
+    "files": ["tmux.conf", "scripts/battery.sh", "scripts/cpu.sh", "scripts/num_to_icon.sh"]
+}
