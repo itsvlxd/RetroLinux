@@ -9,5 +9,6 @@
   "install": "~",
   "overwrite": false,
   "check": "zsh",
-  "files": [".zshrc", ".p10k.zsh"]
+  "files": [".zshrc", ".p10k.zsh"],
+  "dependencies": ["tmux"]
 }
