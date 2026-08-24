@@ -8,6 +8,7 @@ from gi.repository import Adw, Gtk
 
 from settings.ui.icons import (
     ABOUT_ICON,
+    NOTIFICATION_ICON,
     APPS_ICON,
     AUDIO_ICON,
     AUTOSTART_ICON,
@@ -41,6 +42,7 @@ from settings.ui.icons import (
     POWER_ICON,
     PRESETS_ICON,
     QUICKSHARE_ICON,
+    SERVICE_CONTROL_ICON,
     SETTINGS_ICON,
     SHELL_THEME_ICON,
     SIDEBAR_ICON,
@@ -260,6 +262,7 @@ class Sidebar:
         add_row(shell, "shell_dock", "Dock", DOCK_ICON)
         add_row(shell, "shell_desktop", "Desktop", DESKTOP_ICON)
         add_row(shell, "shell_lock", "Lockscreen", LOCK_ICON)
+        add_row(shell, "shell_notifications", "Notifications", NOTIFICATION_ICON)
         add_row(shell, "shell_presets", "Presets", PRESETS_ICON)
 
         input_cat = new_category("Input")
@@ -305,6 +308,7 @@ class Sidebar:
         add_row(system, "grub", "Bootloader", GRUB_ICON)
         add_row(system, "driver", "Drivers", DRIVER_ICON)
         add_row(system, "daemon", "Daemon", DAEMON_ICON)
+        add_row(system, "service_control", "Services", SERVICE_CONTROL_ICON)
         add_row(system, "xdg", "Default Apps", APPS_ICON)
         add_row(system, "backups", "Backups", TIMESHIFT_ICON)
 

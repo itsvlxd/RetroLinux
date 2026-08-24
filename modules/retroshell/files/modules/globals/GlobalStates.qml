@@ -12,6 +12,29 @@ Singleton {
     property var wallpaperManager: null
     property string avatarCacheBuster: ""
 
+    // Theme color mode ("dark"/"light") — single source of truth for the shell
+    property string themeMode: "dark"
+
+    function setThemeMode(mode) {
+        if (mode !== "dark" && mode !== "light")
+            return;
+        if (root.themeMode === mode)
+            return;
+        root.themeMode = mode;
+        var rd = Quickshell.env("RETRO_DIR");
+        if (!rd)
+            return;
+        var proc = Qt.createQmlObject('
+            import Quickshell
+            import Quickshell.Io
+            Process {
+                running: true
+                command: ["bash", "' + rd + '/scripts/theme_core.sh", "--mode", "' + mode + '"]
+                onExited: function () { destroy(); }
+            }
+        ', root);
+    }
+
     function pickUserAvatar() {
         filePickerProcess.running = true;
     }
@@ -95,12 +118,36 @@ Singleton {
         setCompositorLayout(availableLayouts[nextIndex]);
     }
 
+    // Read the persisted theme mode at startup so the shell stays in sync
+    function loadInitialThemeMode() {
+        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        var proc = Qt.createQmlObject('
+            import Quickshell
+            import Quickshell.Io
+            Process {
+                running: false
+                stdout: StdioCollector {
+                    onStreamFinished: {
+                        var val = text.trim();
+                        if (val === "dark" || val === "light") {
+                            root.themeMode = val;
+                        }
+                        destroy();
+                    }
+                }
+            }
+        ', root);
+        proc.command = ["bash", "-c", "source '" + cfg + "/variables.sh' 2>/dev/null; echo $RETRO_THEME_MODE"];
+        proc.running = true;
+    }
+
 
     // Ensure LockscreenService singleton is loaded
     Component.onCompleted: {
         LockscreenService.toString();
         getLayoutProcess.running = true;
         screenshotTimedMode = Config.tools.screenshotTimerEnabled;
+        root.loadInitialThemeMode();
     }
 
     // Persistent launcher state across monitors

@@ -49,6 +49,7 @@ _CATEGORY_ORDER = (
     "Window Rules",
     "Layer Rules",
     "Fan Control",
+    "Notifications",
 )
 
 # Visual label and CSS class for each kind of change.

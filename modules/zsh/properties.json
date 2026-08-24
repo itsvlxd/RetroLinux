@@ -1,0 +1,14 @@
+{
+  "title": "Zsh",
+  "description": "Zsh configuration with Powerlevel10k, zinit, and productivity plugins",
+  "type": "extra",
+  "access": "user",
+  "defaults": true,
+  "mode": "install",
+  "config": "./files",
+  "install": "~",
+  "overwrite": false,
+  "check": "zsh",
+  "files": [".zshrc", ".p10k.zsh"],
+  "dependencies": ["tmux"]
+}

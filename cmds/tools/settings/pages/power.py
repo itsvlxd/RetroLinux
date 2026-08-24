@@ -272,6 +272,9 @@ class PowerPage:
         self._pwr_btn_long_row: Adw.ComboRow | None = None
         self._lid_row: Adw.ComboRow | None = None
         self._has_hibernate = False
+        self._caffeine_on_charge_switch: Adw.SwitchRow | None = None
+        self._caffeine_on_charge_original = False
+
         self._check_hibernate()
 
         # ── Hypridle state ──
@@ -317,6 +320,16 @@ class PowerPage:
         cr.connect("notify::selected", self._on_profile_changed)
         self._profile_row = cr
         group.add(cr)
+
+        # Caffeine on Charging
+        self._caffeine_on_charge_switch = Adw.SwitchRow(
+            title="Caffeine on Charging",
+            subtitle="Automatically enable caffeine mode when plugged in to prevent sleep",
+        )
+        self._caffeine_on_charge_original = self._orig.get("caffeine_on_charge", "false") == "true"
+        self._caffeine_on_charge_switch.set_active(self._caffeine_on_charge_original)
+        self._caffeine_on_charge_switch.connect("notify::active", self._on_caffeine_on_charge_changed)
+        group.add(self._caffeine_on_charge_switch)
 
         for label, desc, _var, key in [
             ("AC Saver", "AC power limit for power-saver mode", "PWR_AC_SAVER", "ac_saver"),
@@ -495,6 +508,8 @@ class PowerPage:
         ]:
             self._orig[key] = get_var(var) or ""
 
+        self._orig["caffeine_on_charge"] = get_var("PWR_CAFFEINE_ON_CHARGE", "false") or "false"
+
         try:
             r = subprocess.run(["bash", _PWR_CORE, "--get"], capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
             self._orig["profile"] = r.stdout.strip() or "balanced"
@@ -639,6 +654,9 @@ class PowerPage:
                 set_var(var_name, val)
             self._logind_changed = True
             self._check_dirty()
+
+    def _on_caffeine_on_charge_changed(self, sw: Adw.SwitchRow, _pspec) -> None:
+        self._check_dirty()
 
     def _on_logout_cmd_changed(self, entry: Gtk.Entry) -> None:
         from lib.python.variable import set_var
@@ -807,6 +825,12 @@ class PowerPage:
             if get_var("RETRO_LOGOUT_CMD", "") != self._orig.get("logout_cmd", ""):
                 self._dirty = True
 
+        # Caffeine on charge
+        if self._caffeine_on_charge_switch is not None:
+            caffeine_current = "true" if self._caffeine_on_charge_switch.get_active() else "false"
+            if caffeine_current != self._orig.get("caffeine_on_charge", "false"):
+                self._dirty = True
+
         # Hypridle side
         self._hypridle_changed = self._enable_idle_value != self._enable_idle_original or any(
             getattr(self._general, f.name) != getattr(self._original_general, f.name)
@@ -846,6 +870,12 @@ class PowerPage:
             self._orig[key] = get_var(var_name, "suspend")
         self._orig["logout_cmd"] = get_var("RETRO_LOGOUT_CMD", "")
 
+        # Caffeine on charge
+        if self._caffeine_on_charge_switch is not None:
+            caffeine_val = "true" if self._caffeine_on_charge_switch.get_active() else "false"
+            set_var("PWR_CAFFEINE_ON_CHARGE", caffeine_val)
+            self._orig["caffeine_on_charge"] = caffeine_val
+
         # Hypridle side
         write_hypridle(general=self._general, listeners=self._listeners)
         set_var("HYPRIDLE_ENABLE", "true" if self._enable_idle_value else "false")
@@ -878,6 +908,10 @@ class PowerPage:
                 row.set_selected(idx)
         if hasattr(self, "_logout_entry"):
             self._logout_entry.set_text(self._orig.get("logout_cmd") or _DEFAULT_LOGOUT_CMD)
+
+        # Caffeine on charge
+        if self._caffeine_on_charge_switch is not None:
+            self._caffeine_on_charge_switch.set_active(self._orig.get("caffeine_on_charge", "false") == "true")
 
         # Hypridle side
         self._general = IdleGeneral(

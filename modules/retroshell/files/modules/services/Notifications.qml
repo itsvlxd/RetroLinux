@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import qs.config
 
 Singleton {
     id: root
@@ -141,7 +142,21 @@ Singleton {
     property var popupList: list.filter(notif => notif.popup)
     property bool popupInhibited: silent
     property var latestTimeForApp: ({})
-    property var totalCounts: ({})  // Conteo total independiente del almacenamiento: {appName: {summary: count}}
+    property var totalCounts: ({})
+
+    function playNotifSound() {
+        if (!Config.notifications?.soundEnabled || root.silent) return;
+        const file = Config.notifications?.soundFile ?? "retro-default.mp3";
+        const vol = Config.notifications?.soundVolume ?? 40;
+        const paVol = Math.round(vol * 65536 / 100);
+        const path = Quickshell.shellDir + "/assets/sound/" + file;
+        notifSoundProc.command = ["paplay", "--volume", String(paVol), path];
+        notifSoundProc.running = true;
+    }
+
+    Process {
+        id: notifSoundProc
+    }
 
     Component {
         id: notifComponent
@@ -340,6 +355,8 @@ Singleton {
             }
 
             root.notify(newNotifObject);
+
+            try { root.playNotifSound(); } catch(e) { console.log("NotificationSound error:", e); }
         }
     }
 

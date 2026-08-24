@@ -19,11 +19,14 @@ _write_json_field() {
     local file="$1"
     local field="$2"
     local value="$3"
-    if grep -q "\"${field}\"" "$file" 2>/dev/null; then
-        sudo sed -i "s|\"${field}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"${field}\": \"${value}\"|" "$file"
-    else
-        sudo sed -i "/\"schedule_daily\"/s|$|\n  \"${field}\": \"${value}\",|" "$file"
-    fi
+    sudo python3 -c "
+import json
+with open('$file') as f:
+    cfg = json.load(f)
+cfg['$field'] = '$value'
+with open('$file', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
 }
 
 _check_timeshift() {

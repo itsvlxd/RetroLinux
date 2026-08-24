@@ -23,6 +23,7 @@ import "defaults/tools.js" as ToolsDefaults
 import "defaults/dock.js" as DockDefaults
 import "defaults/ai.js" as AiDefaults
 import "defaults/dashboard.js" as DashboardDefaults
+import "defaults/notifications.js" as NotificationsDefaults
 import "ConfigValidator.js" as ConfigValidator
 
 Singleton {
@@ -57,11 +58,12 @@ Singleton {
     property bool systemReady: false
     property bool dockReady: false
     property bool dashboardReady: false
+    property bool notificationsReady: false
     property bool aiReady: false
     property bool toolsReady: false
     property bool keybindsInitialLoadComplete: false
 
-    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && aiReady && toolsReady
+    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && notificationsReady && aiReady && toolsReady
 
     // Compatibility aliases
     property alias loader: themeLoader
@@ -1258,6 +1260,47 @@ Singleton {
 
         adapter: JsonAdapter {
             property list<string> apps: ["kitty", "io.github.retrolinux.settings", "nemo", "firefox", "io.github.kolunmi.Bazaar"]
+        }
+    }
+
+    // ============================================
+    // NOTIFICATIONS MODULE
+    // ============================================
+    FileView {
+        id: notificationsLoader
+        path: root.configDir + "/notifications.json"
+        atomicWrites: true
+        watchChanges: true
+        onLoaded: {
+            if (!root.notificationsReady) {
+                validateModule("notifications", notificationsLoader, NotificationsDefaults.data, () => {
+                    root.notificationsReady = true;
+                });
+            }
+        }
+        onLoadFailed: {
+            if (error.toString().includes("FileNotFound") && !root.notificationsReady) {
+                handleMissingConfig("notifications", notificationsLoader, NotificationsDefaults.data, () => {
+                    root.notificationsReady = true;
+                });
+            }
+        }
+        onFileChanged: {
+            root.pauseAutoSave = true;
+            reload();
+            root.pauseAutoSave = false;
+        }
+        onPathChanged: reload()
+        onAdapterUpdated: {
+            if (root.notificationsReady && !root.pauseAutoSave) {
+                notificationsLoader.writeAdapter();
+            }
+        }
+
+        adapter: JsonAdapter {
+            property bool soundEnabled: true
+            property string soundFile: "retro-default.mp3"
+            property int soundVolume: 40
         }
     }
 
@@ -3583,6 +3626,9 @@ Singleton {
     // Dashboard configuration
     property QtObject dashboard: dashboardLoader.adapter
 
+    // Notifications configuration
+    property QtObject notifications: notificationsLoader.adapter
+
     // Pinned apps configuration (stored in dataPath)
     property QtObject pinnedApps: pinnedAppsLoader.adapter
 
@@ -3625,6 +3671,9 @@ Singleton {
     }
     function saveDock() {
         dockLoader.writeAdapter();
+    }
+    function saveNotifications() {
+        notificationsLoader.writeAdapter();
     }
     function savePinnedApps() {
         pinnedAppsLoader.writeAdapter();

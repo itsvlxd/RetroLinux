@@ -24,6 +24,7 @@ _FANS_CORE = os.path.join(_RETRO_DIR, "scripts", "fans_core.sh")
 _REFRESH_MS = 2000
 _sudoers_done = False
 _profile_change_pending = False
+_acpi_profiles = []
 
 
 def _ensure_fan_sudoers() -> None:
@@ -75,6 +76,107 @@ def _run_core_pkexec(*args: str) -> bool:
         return r.returncode == 0 and r.stdout.strip().startswith("OK")
     except Exception:
         return False
+
+
+# User-friendly profile names and their possible system equivalents
+_PROFILE_MAP: dict[str, list[str]] = {
+    "Quiet": ["quiet", "low-power", "powersave"],
+    "Cool": ["cool"],
+    "Balanced": ["balanced", "normal"],
+    "Performance": ["performance", "high-performance"],
+}
+
+
+def _read_hw_temps() -> dict[str, str]:
+    """Read temperatures from available hardware sensors."""
+    temps: dict[str, str] = {}
+
+    # CPU temperature
+    try:
+        for z in sorted(os.listdir("/sys/class/thermal/")):
+            if not z.startswith("thermal_zone"):
+                continue
+            path = f"/sys/class/thermal/{z}"
+            try:
+                ttype = open(f"{path}/type").read().strip()
+                if ttype in ("x86_pkg_temp", "cpu-thermal", "coretemp"):
+                    temp = int(open(f"{path}/temp").read().strip()) / 1000
+                    temps["CPU"] = f"{temp:.0f}°C"
+                    break
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
+
+    # GPU temperature (AMD/NVIDIA via hwmon)
+    try:
+        for d in sorted(os.listdir("/sys/class/drm/")):
+            if not d.startswith("card"):
+                continue
+            hwmon = f"/sys/class/drm/{d}/device/hwmon"
+            if not os.path.isdir(hwmon):
+                continue
+            for hm in os.listdir(hwmon):
+                p = f"{hwmon}/{hm}/temp1_input"
+                if os.path.isfile(p):
+                    temp = int(open(p).read().strip()) / 1000
+                    temps["GPU"] = f"{temp:.0f}°C"
+                    break
+            if "GPU" in temps:
+                break
+    except OSError:
+        pass
+
+    # NVMe SSD temperature
+    try:
+        for name in sorted(os.listdir("/sys/class/hwmon/")):
+            path = f"/sys/class/hwmon/{name}"
+            try:
+                label_file = f"{path}/name"
+                if os.path.isfile(label_file):
+                    label = open(label_file).read().strip().lower()
+                    if "nvme" in label or "nvme" in name:
+                        temp_file = f"{path}/temp1_input"
+                        if os.path.isfile(temp_file):
+                            temp = int(open(temp_file).read().strip()) / 1000
+                            temps["SSD"] = f"{temp:.0f}°C"
+                            break
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
+
+    # Battery temperature (if available)
+    try:
+        bat_path = "/sys/class/power_supply/BAT*"
+        import glob as glob_mod
+        for bat in sorted(glob_mod.glob(bat_path)):
+            temp_file = f"{bat}/temp"
+            if os.path.isfile(temp_file):
+                temp = int(open(temp_file).read().strip()) / 1000
+                temps["Battery"] = f"{temp:.0f}°C"
+                break
+    except (OSError, ValueError):
+        pass
+
+    return temps
+
+
+def _load_acpi_profiles() -> list[str]:
+    """Load available ACPI platform profile choices from the system.
+
+    Returns user-friendly profile names that are actually available.
+    """
+    try:
+        with open("/sys/firmware/acpi/platform_profile_choices", "r") as f:
+            available = [line.strip().lower() for line in f.read().splitlines() if line.strip()]
+        result = []
+        for name, choices in _PROFILE_MAP.items():
+            if any(c in available for c in choices):
+                result.append(name)
+        return result if result else ["Quiet", "Balanced", "Performance"]
+    except (FileNotFoundError, PermissionError):
+        return ["Quiet", "Balanced", "Performance"]
 
 
 class _FanRow:
@@ -197,7 +299,8 @@ class FanControlPage:
         self._engine_lbl: Gtk.Label | None = None
         self._temp_lbl: Gtk.Label | None = None
         self._profile_dd: Gtk.DropDown | None = None
-        self._acpi_lbl: Gtk.Label | None = None
+        self._temps_lbl: Gtk.Label | None = None
+        self._refreshing = False
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         _ensure_fan_sudoers()
@@ -208,43 +311,29 @@ class FanControlPage:
         refresh_btn.connect("clicked", lambda _: self._refresh())
         header.pack_start(refresh_btn)
 
-        # Master control
-        master_group = Adw.PreferencesGroup(title="Fan Control")
+        # Profile group — ACPI platform profiles + Hardware temps
+        profile_group = Adw.PreferencesGroup(title="Profile")
 
-        self._master_switch = Gtk.Switch()
-        self._master_switch.set_valign(Gtk.Align.CENTER)
-        self._master_switch.connect("notify::active", self._on_master_toggled)
-        master_row = Adw.ActionRow(title="Master Control", subtitle="Enable manual fan curve control")
-        master_row.add_prefix(Gtk.Image.new_from_icon_name("system-run-symbolic"))
-        master_row.add_suffix(self._master_switch)
-        master_group.add(master_row)
-
-        self._engine_lbl = Gtk.Label(label="—", halign=Gtk.Align.START)
-        self._engine_lbl.set_valign(Gtk.Align.CENTER)
-        eng_row = Adw.ActionRow(title="Engine")
-        eng_row.add_suffix(self._engine_lbl)
-        master_group.add(eng_row)
-
-        self._temp_lbl = Gtk.Label(label="—", halign=Gtk.Align.START)
-        self._temp_lbl.set_valign(Gtk.Align.CENTER)
-        temp_row = Adw.ActionRow(title="CPU Temperature")
-        temp_row.add_suffix(self._temp_lbl)
-        master_group.add(temp_row)
-
-        self._profile_dd = Gtk.DropDown(model=Gtk.StringList.new(["Quiet", "Balanced", "Performance"]))
+        # Load available ACPI profiles from the system
+        global _acpi_profiles
+        _acpi_profiles = _load_acpi_profiles()
+        profile_model = Gtk.StringList.new(_acpi_profiles)
+        self._profile_dd = Gtk.DropDown(model=profile_model)
         self._profile_dd.set_valign(Gtk.Align.CENTER)
         self._profile_dd.connect("notify::selected", self._on_profile_changed)
-        prof_row = Adw.ActionRow(title="Profile")
+        prof_row = Adw.ActionRow(title="Profile", subtitle="Power profile")
         prof_row.add_suffix(self._profile_dd)
-        master_group.add(prof_row)
+        profile_group.add(prof_row)
 
-        self._acpi_lbl = Gtk.Label(label="", halign=Gtk.Align.START)
-        self._acpi_lbl.set_valign(Gtk.Align.CENTER)
-        acpi_row = Adw.ActionRow(title="ACPI Platform Profile")
-        acpi_row.add_suffix(self._acpi_lbl)
-        master_group.add(acpi_row)
+        # Hardware temperatures
+        self._temps_lbl = Gtk.Label(label="", halign=Gtk.Align.START)
+        self._temps_lbl.set_valign(Gtk.Align.CENTER)
+        self._temps_lbl.set_selectable(True)
+        temps_row = Adw.ActionRow(title="Temperatures", subtitle="CPU · GPU · SSD · Battery")
+        temps_row.add_suffix(self._temps_lbl)
+        profile_group.add(temps_row)
 
-        self._content_box.append(master_group)
+        self._content_box.append(profile_group)
 
         # Fan list
         self._fans_group = Adw.PreferencesGroup(title="Fans")
@@ -254,6 +343,13 @@ class FanControlPage:
         return toolbar_view
 
     def _refresh(self) -> None:
+        self._refreshing = True
+        try:
+            self._refresh_impl()
+        finally:
+            self._refreshing = False
+
+    def _refresh_impl(self) -> None:
         data = _run_core("--json")
         if not data:
             return
@@ -261,27 +357,6 @@ class FanControlPage:
             info = json.loads(data)
         except (json.JSONDecodeError, ValueError):
             return
-
-        # Overview
-        if self._master_switch is not None:
-            self._master_switch.handler_block_by_func(self._on_master_toggled)
-            self._master_switch.set_active(info.get("master", False))
-            self._master_switch.handler_unblock_by_func(self._on_master_toggled)
-
-        if self._engine_lbl:
-            self._engine_lbl.set_text(info.get("engine", "—"))
-        if self._temp_lbl:
-            self._temp_lbl.set_text(f"{info.get('cpu_temp', 0)}°C")
-
-        profile_names = {"quiet": 0, "balanced": 1, "performance": 2}
-        if self._profile_dd and not _profile_change_pending:
-            self._profile_dd.handler_block_by_func(self._on_profile_changed)
-            self._profile_dd.set_selected(profile_names.get(info.get("profile", "balanced"), 1))
-            self._profile_dd.handler_unblock_by_func(self._on_profile_changed)
-
-        if self._acpi_lbl:
-            acpi = info.get("acpi_choices", "")
-            self._acpi_lbl.set_text(acpi if acpi else "Not available")
 
         # Fans
         fans = info.get("fans", [])
@@ -305,18 +380,43 @@ class FanControlPage:
                 self._fan_rows.append(row)
                 self._fans_group.add(row.widget)
 
-    def _on_master_toggled(self, switch, _pspec) -> None:
-        val = "on" if switch.get_active() else "off"
-        threading.Thread(target=_run_core_pkexec, args=("--set-master", val), daemon=True).start()
-        self._mark_dirty()
+        # Profile — use ACPI profiles from the system
+        global _acpi_profiles
+        _acpi_profiles = _load_acpi_profiles()
+        if self._profile_dd:
+            profile_model = Gtk.StringList.new(_acpi_profiles)
+            self._profile_dd.set_model(profile_model)
+            # Select the first available profile
+            if _acpi_profiles:
+                self._profile_dd.set_selected(0)
+
+        # Update hardware temperatures
+        if self._temps_lbl:
+            temps = _read_hw_temps()
+            if temps:
+                parts = [f"{k}: {v}" for k, v in temps.items()]
+                self._temps_lbl.set_text("  ·  ".join(parts))
+            else:
+                self._temps_lbl.set_text("No sensors detected")
 
     def _on_profile_changed(self, _dd, _pspec) -> None:
-        names = {0: "quiet", 1: "balanced", 2: "performance"}
-        profile = names.get(self._profile_dd.get_selected(), "balanced")
+        # Skip if this change is from _refresh() resetting the model
+        if self._refreshing:
+            return
+        global _profile_change_pending
         _profile_change_pending = True
         # Schedule the flag to be cleared after 3 seconds
-        GLib.timeout_add(3000, lambda: (_profile_change_pending.__class__.__setattr__("_profile_change_pending", False) if hasattr(_profile_change_pending, "__class__") else False) or True)
-        threading.Thread(target=_run_core_pkexec, args=("--set-profile", profile), daemon=True).start()
+        def _clear_flag():
+            global _profile_change_pending
+            _profile_change_pending = False
+            return False  # Don't repeat
+        GLib.timeout_add(3000, _clear_flag)
+        profile = self._profile_dd.get_selected()
+        if profile is not None and profile < len(_acpi_profiles):
+            profile_name = _acpi_profiles[profile]
+            # Map user-friendly name to first available system profile name
+            system_name = _PROFILE_MAP.get(profile_name, [profile_name.lower()])[0]
+            threading.Thread(target=_run_core_pkexec, args=("--set-profile", system_name), daemon=True).start()
         self._mark_dirty()
 
     def _mark_dirty(self) -> None:
@@ -358,3 +458,8 @@ class FanControlPage:
             "_group_label": "Fan Control",
             "_section_label": "System",
         }]
+
+    def destroy(self) -> None:
+        if self._timer:
+            GLib.source_remove(self._timer)
+            self._timer = 0

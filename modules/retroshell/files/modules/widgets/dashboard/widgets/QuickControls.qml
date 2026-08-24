@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
+import qs.modules.globals
 import qs.config
 import "../controls"
 
@@ -18,8 +19,7 @@ StyledRect {
     radius: Styling.radius(4)
     
     property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth, 2: quickshare, 3: caffeine
-    property bool darkMode: true
-    property bool dlLocked: false
+    property bool darkMode: GlobalStates.themeMode === "dark"
 
     property var controlOrder: (Config.dashboard && Config.dashboard.controlOrder)
         ? Config.dashboard.controlOrder
@@ -37,21 +37,11 @@ StyledRect {
         return undefined;
     }
 
-    Process { id: dlProc; running: false; stdout: SplitParser {} }
-    Timer { id: dlUnlock; interval: 3000; repeat: false; onTriggered: dlLocked = false }
-
-    Process { id: modeReadProc; running: false
-        stdout: StdioCollector {
-            onStreamFinished: { darkMode = text.trim() !== "light"; }
-        }
+    function toggleThemeMode() {
+        var newMode = root.darkMode ? "light" : "dark";
+        GlobalStates.setThemeMode(newMode);
     }
 
-    Component.onCompleted: {
-        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
-        modeReadProc.command = ["bash", "-c", "source '" + cfg + "/variables.sh' 2>/dev/null; echo $RETRO_THEME_MODE"];
-        modeReadProc.running = true;
-    }
-    
     onVisibleChanged: {
         if (!visible) {
             root.expandedPanel = -1;
@@ -372,13 +362,7 @@ StyledRect {
             isActive: root.darkMode
             tooltipText: root.darkMode ? "Dark Mode" : "Light Mode"
             onClicked: {
-                if (root.dlLocked) return;
-                root.dlLocked = true;
-                root.darkMode = !root.darkMode;
-                var rd = Quickshell.env("RETRO_DIR");
-                dlProc.command = ["bash", rd + "/scripts/theme_core.sh", "--mode", root.darkMode ? "dark" : "light"];
-                dlProc.running = true;
-                root.dlUnlock.start();
+                root.toggleThemeMode();
             }
         }
     }

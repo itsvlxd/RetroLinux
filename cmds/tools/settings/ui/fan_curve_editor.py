@@ -155,7 +155,7 @@ class FanCurveEditorDialog:
             points.pop()
             self._canvas.set_points(points)
 
-    def _on_user_curve_selected(self, _dd) -> None:
+    def _on_user_curve_selected(self, _dd, _pspec) -> None:
         # Read the selected curve name from the dropdown model, not from the entry
         model = self._user_curve_dd.get_model()
         if model is None:

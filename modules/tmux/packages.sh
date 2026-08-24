@@ -1,0 +1,4 @@
+git
+fzf
+tmux
+zoxide
