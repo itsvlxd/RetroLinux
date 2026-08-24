@@ -48,6 +48,14 @@ QtObject {
             return;
         }
 
+        if (command.indexOf("theme-mode ") === 0) {
+            var mode = command.substring("theme-mode ".length).trim();
+            if (mode === "dark" || mode === "light") {
+                GlobalStates.setThemeMode(mode);
+            }
+            return;
+        }
+
         switch (command) {
             // Launcher (Standalone Notch Module)
             case "launcher": toggleLauncher(); break;
