@@ -18,6 +18,7 @@ system:
 """
 
 from collections.abc import Iterable
+import json
 import os
 import shutil
 import subprocess
@@ -263,6 +264,27 @@ class ShellDesktopPage:
                 edit_btn.set_tooltip_text("Change face")
                 edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_face(i))
                 row.add_suffix(edit_btn)
+            elif wid == "storage":
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Choose storage device")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_storage(i))
+                row.add_suffix(edit_btn)
+            elif wid in ("network", "network2x4", "network1x4", "network1x3"):
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Network widget options")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_network(i))
+                row.add_suffix(edit_btn)
+            elif wid == "bluetooth":
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Bluetooth priority")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_bluetooth(i))
+                row.add_suffix(edit_btn)
             elif wid == "worldclock":
                 edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
                 edit_btn.set_valign(Gtk.Align.CENTER)
@@ -390,6 +412,162 @@ class ShellDesktopPage:
             sel = combo.get_selected()
             if 0 <= sel < len(faces):
                 widget["face"] = faces[sel]
+                self._notify_dirty()
+                self._rebuild_widgets()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── Storage device editor ──
+
+    @staticmethod
+    def _list_storage_devices() -> list[str]:
+        """Detected block-device mount points (e.g. ['/', '/home'])."""
+        devices = []
+
+        def _collect(node):
+            for mp in node.get("mountpoints", []) or []:
+                if mp and not mp.startswith("[") and mp not in devices:
+                    devices.append(mp)
+            for child in node.get("children", []) or []:
+                _collect(child)
+
+        try:
+            out = subprocess.run(
+                ["lsblk", "-J", "-o", "NAME,MOUNTPOINTS"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                data = json.loads(out.stdout)
+                for block in data.get("blockdevices", []):
+                    _collect(block)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            pass
+        if not devices:
+            devices = ["/"]
+        return devices
+
+    def _on_edit_storage(self, idx: int) -> None:
+        """Let the user pick which storage device the widget displays."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+        devices = self._list_storage_devices()
+        current = widget.get("device") or (devices[0] if devices else "/")
+        if current not in devices:
+            current = devices[0] if devices else "/"
+
+        group = Adw.PreferencesGroup()
+        combo = Adw.ComboRow(title="Storage device")
+        combo.set_model(Gtk.StringList.new(devices))
+        combo.set_selected(devices.index(current))
+        group.add(combo)
+
+        dialog = Adw.AlertDialog(
+            heading="Device Storage",
+            body="Pick the storage device this widget should measure.",
+            extra_child=group,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            sel = combo.get_selected()
+            if 0 <= sel < len(devices):
+                widget["device"] = devices[sel]
+                self._notify_dirty()
+                self._rebuild_widgets()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── Network widget editor ──
+
+    def _on_edit_network(self, idx: int) -> None:
+        """Let the user choose whether the public IP is hidden by default."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+        current = widget.get("hideIp", True)
+
+        group = Adw.PreferencesGroup()
+        switch = Adw.SwitchRow(title="Hide public IP by default",
+                               subtitle="Mask the WAN address; reveal with the eye icon")
+        switch.set_active(bool(current))
+        group.add(switch)
+
+        dialog = Adw.AlertDialog(
+            heading="Network Monitor",
+            body="Options for the network widget.",
+            extra_child=group,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            widget["hideIp"] = bool(switch.get_active())
+            self._notify_dirty()
+            self._rebuild_widgets()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── Bluetooth widget editor ──
+
+    def _on_edit_bluetooth(self, idx: int) -> None:
+        """Let the user pick which device type is shown first when connected."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+
+        priority_options = [
+            ("automatic", "Automatic"),
+            ("audio", "Headphones / Audio"),
+            ("gamepad", "Gamepad"),
+            ("phone", "Phone"),
+            ("mouse", "Mouse"),
+            ("keyboard", "Keyboard"),
+            ("watch", "Watch"),
+            ("speaker", "Speaker"),
+            ("other", "Other"),
+        ]
+        labels = [label for _pid, label in priority_options]
+        ids = [pid for pid, _label in priority_options]
+        current = widget.get("devicePriority") or "automatic"
+        if current not in ids:
+            current = "automatic"
+
+        group = Adw.PreferencesGroup()
+        combo = Adw.ComboRow(title="Priority device type",
+                             subtitle="Which connected device is shown first")
+        combo.set_model(Gtk.StringList.new(labels))
+        combo.set_selected(ids.index(current))
+        group.add(combo)
+
+        dialog = Adw.AlertDialog(
+            heading="Bluetooth Widget",
+            body="Choose which type of connected device to display first.",
+            extra_child=group,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            sel = combo.get_selected()
+            if 0 <= sel < len(ids):
+                widget["devicePriority"] = ids[sel]
                 self._notify_dirty()
                 self._rebuild_widgets()
 
@@ -607,7 +785,7 @@ class ShellDesktopPage:
                 entry = dict(existing)
                 entry["id"] = wid
                 entry["type"] = w.get("type", existing.get("type", wid))
-                for extra in ("face", "timezones"):
+                for extra in ("face", "timezones", "device", "hideIp", "devicePriority"):
                     if w.get(extra) is not None:
                         entry[extra] = w[extra]
                 merged.append(entry)
