@@ -41,6 +41,15 @@ Item {
             usageProc.command = ["bash", rd + "/scripts/battery_core.sh", "--usage", "10"];
             usageProc.running = true;
         }
+        if (popupOpen && Battery.available) {
+            batteryInfoProc.command = ["bash", "-c",
+                "BAT=$(find /sys/class/power_supply/BAT* -maxdepth 0 2>/dev/null | head -1);" +
+                "cat \"$BAT/cycle_count\" 2>/dev/null || echo 0;" +
+                "cat \"$BAT/energy_full_design\" 2>/dev/null || echo 0;" +
+                "cat \"$BAT/energy_full\" 2>/dev/null || echo 0;" +
+                "cat \"$BAT/power_now\" 2>/dev/null || cat \"$BAT/current_now\" 2>/dev/null || echo 0"];
+            batteryInfoProc.running = true;
+        }
         if (popupOpen && !Battery.available) {
             var rd = Quickshell.env("RETRO_DIR");
             sysInfoProc.command = ["python3", rd + "/modules/retroshell/files/scripts/system_monitor.py", "3000", "/"];
@@ -96,6 +105,11 @@ Item {
     property int dimBrightness: 30
     property bool saverCardHovered: false
     property bool dimCardHovered: false
+
+    property string batteryHealth: "N/A"
+    property real batteryHealthPct: 0
+    property int batteryCycles: 0
+    property real batteryWatts: 0
 
     function getWattageText(profileName) {
         var retroProfile = profileName.replace("power-", "");
@@ -188,6 +202,26 @@ Item {
     }
 
     Process { id: dimBrightnessSetProc; running: false; stdout: SplitParser {} }
+
+    Process {
+        id: batteryInfoProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = text.trim().split("\n");
+                if (lines.length >= 4) {
+                    var cycles = parseInt(lines[0]) || 0;
+                    batteryCycles = cycles;
+                    var eDesign = parseFloat(lines[1]) || 0;
+                    var eFull = parseFloat(lines[2]) || 0;
+                    batteryHealthPct = eDesign > 0 ? Math.round(eFull / eDesign * 100) : 0;
+                    batteryHealth = batteryHealthPct + "%";
+                    var pNow = parseFloat(lines[3]) || 0;
+                    batteryWatts = parseFloat((pNow / 1000000).toFixed(1));
+                }
+            }
+        }
+    }
 
     Component.onCompleted: {
         var rd = Quickshell.env("RETRO_DIR");
@@ -449,7 +483,7 @@ Item {
         bar: root.bar
 
         contentWidth: Math.max(300, mainColumn.implicitWidth + batteryPopup.popupPadding * 2)
-        contentHeight: (Battery.available ? (64 + 4 + 64) : 64) + 36 + batteryPopup.popupPadding * 2
+        contentHeight: (Battery.available ? (64 + 4 + 50 + 4 + 64) : 64) + 36 + batteryPopup.popupPadding * 2
 
         ColumnLayout {
             id: mainColumn
@@ -582,6 +616,52 @@ Item {
                         font.bold: true
                         color: root.batteryColor
                         opacity: 0.8
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 50
+                spacing: 4
+                visible: Battery.available
+
+                Repeater {
+                    model: [
+                        { title: "Health",  value: batteryHealth },
+                        { title: "Capacity", value: Math.round(Battery.percentage) + "%" },
+                        { title: "Watts",   value: batteryWatts + "W" }
+                    ]
+
+                    delegate: StyledRect {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        variant: "common"
+                        enableShadow: false
+                        radius: Styling.radius(0)
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 2
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: modelData.title
+                                font.family: Styling.defaultFont
+                                font.pixelSize: Styling.fontSize(-1)
+                                color: Colors.primary
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: modelData.value
+                                font.family: Styling.defaultFont
+                                font.pixelSize: Styling.fontSize(2)
+                                font.bold: true
+                                color: Colors.overBackground
+                            }
+                        }
                     }
                 }
             }
