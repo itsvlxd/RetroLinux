@@ -981,6 +981,7 @@ Singleton {
             property int spacingVertical: 16
             property string textColor: "overBackground"
             property bool editMode: false
+            property bool perMonitor: false
             property list<string> widgetOrder: []
             property list<var> widgets: []
         }

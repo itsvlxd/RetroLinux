@@ -194,6 +194,17 @@ class ShellDesktopPage:
                               subtitle="Theme color for desktop icon labels")
         content_box.append(group)
 
+        # Desktop widget scope (global vs per monitor)
+        scope_group = Adw.PreferencesGroup(
+            title="Widget Scope",
+            description="Whether desktop widgets appear on all monitors or per monitor.",
+        )
+        self._add_switch(scope_group, "perMonitor", "Widgets per monitor",
+                         subtitle="Each monitor shows only the widgets placed on it "
+                                  "(drag a widget onto a screen to assign it)",
+                         default_value=False)
+        content_box.append(scope_group)
+
         # Desktop widgets (edit mode + widget list in one group)
         self._widget_group = Adw.PreferencesGroup(
             title="Desktop Widgets",
@@ -318,12 +329,12 @@ class ShellDesktopPage:
                 edit_btn.set_tooltip_text("Battery rings options")
                 edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_batteryring(i))
                 row.add_suffix(edit_btn)
-            elif wid in ("devto", "devto2x4"):
+            elif wid == "feed":
                 edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
                 edit_btn.set_valign(Gtk.Align.CENTER)
                 edit_btn.add_css_class("flat")
-                edit_btn.set_tooltip_text("Feed tag")
-                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_devto(i))
+                edit_btn.set_tooltip_text("Feed options")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_feed(i))
                 row.add_suffix(edit_btn)
             elif wid == "worldclock":
                 edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
@@ -819,42 +830,122 @@ class ShellDesktopPage:
         dialog.connect("response", _on_response)
         dialog.present(self._window)
 
-    # ── DEV.to feed editor ──
+    # ── Feed editor ──
 
-    def _on_edit_devto(self, idx: int) -> None:
-        """Let the user pick the feed tag for the DEV.to widget."""
+    def _on_edit_feed(self, idx: int) -> None:
+        """Let the user pick source, query, daily.dev key and auto-swipe."""
         if idx < 0 or idx >= len(self._widgets):
             return
         widget = self._widgets[idx]
 
-        tag_options = [
-            ("", "All tags"),
+        source_options = [
+            ("devto", "DEV.to"),
+            ("hackernews", "Hacker News"),
+            ("dailydev", "daily.dev (needs API key)"),
+        ]
+        source_labels = [label for _v, label in source_options]
+        source_ids = [v for v, _l in source_options]
+        cur_source = widget.get("source") or "devto"
+        if cur_source not in source_ids:
+            cur_source = "devto"
+
+        query_options = [
+            ("", "All topics"),
             ("linux", "linux"),
             ("rust", "rust"),
             ("webdev", "webdev"),
             ("javascript", "javascript"),
+            ("typescript", "typescript"),
             ("python", "python"),
             ("go", "go"),
+            ("java", "java"),
             ("devops", "devops"),
+            ("security", "security"),
+            ("cloud", "cloud"),
+            ("kubernetes", "kubernetes"),
+            ("database", "database"),
             ("ai", "ai"),
+            ("machine-learning", "machine-learning"),
+            ("react", "react"),
+            ("opensource", "opensource"),
+            ("productivity", "productivity"),
+            ("career", "career"),
+            ("hardware", "hardware"),
         ]
-        labels = [label for _v, label in tag_options]
-        ids = [v for v, _l in tag_options]
-        current = widget.get("tag") or ""
-        sel = 0
-        if current in ids:
-            sel = ids.index(current)
+        query_labels = [label for _v, label in query_options]
+        query_ids = [v for v, _l in query_options]
+        cur_query = widget.get("tag") or ""
+        # Custom topics not in the list → show in the entry instead.
+        is_custom = cur_query not in query_ids and cur_query != ""
 
         group = Adw.PreferencesGroup()
-        combo = Adw.ComboRow(title="Feed tag",
-                             subtitle="Which DEV.to tag to show")
-        combo.set_model(Gtk.StringList.new(labels))
-        combo.set_selected(sel)
-        group.add(combo)
+
+        source_combo = Adw.ComboRow(title="Source", subtitle="Where articles come from")
+        source_combo.set_model(Gtk.StringList.new(source_labels))
+        source_combo.set_selected(source_ids.index(cur_source))
+        group.add(source_combo)
+
+        query_combo = Adw.ComboRow(title="Topic", subtitle="Preset tag / search query")
+        query_combo.set_model(Gtk.StringList.new(query_labels))
+        query_combo.set_selected(query_ids.index(cur_query) if not is_custom else 0)
+        group.add(query_combo)
+
+        custom_entry = Gtk.Entry(placeholder_text="Custom topic (e.g. gamedev, embedded)")
+        custom_entry.set_text(cur_query if is_custom else "")
+        custom_entry.set_hexpand(True)
+        custom_row = Adw.ActionRow(title="Custom topic",
+                                   subtitle="Overrides the preset topic")
+        custom_row.add_suffix(custom_entry)
+        group.add(custom_row)
+
+        key_entry = Gtk.PasswordEntry(placeholder_text="daily.dev API key")
+        key_entry.set_text(widget.get("apiKey", ""))
+        key_entry.set_hexpand(True)
+        key_entry.set_sensitive(cur_source == "dailydev")
+        key_row = Adw.ActionRow(title="daily.dev API key",
+                                subtitle="Required only for daily.dev")
+        key_row.add_suffix(key_entry)
+        group.add(key_row)
+
+        def _on_source_changed(_row, *_args):
+            sel = source_combo.get_selected()
+            is_daily = 0 <= sel < len(source_ids) and source_ids[sel] == "dailydev"
+            key_entry.set_sensitive(is_daily)
+
+        source_combo.connect("notify::selected", _on_source_changed)
+
+        auto_switch = Adw.SwitchRow(title="Auto-swipe",
+                                    subtitle="Advance to the next article automatically")
+        auto_switch.set_active(bool(widget.get("autoSwipe", True)))
+        group.add(auto_switch)
+
+        font_interval, interval_spin = make_spin_int_row(
+            "Auto-swipe interval",
+            value=int(widget.get("swipeInterval", 30)),
+            lower=10, upper=120, step=5, page_step=10,
+            subtitle="Seconds between automatic swipes",
+        )
+        group.add(font_interval)
+        suffix_lbl = Gtk.Label(label="sec")
+        suffix_lbl.add_css_class("dim-label")
+        suffix_lbl.set_valign(Gtk.Align.CENTER)
+        font_interval.add_suffix(suffix_lbl)
+
+        count_row, count_spin = make_spin_int_row(
+            "Articles to preload",
+            value=int(widget.get("count", 5)),
+            lower=3, upper=10, step=1, page_step=2,
+            subtitle="How many articles to load (3–10)",
+        )
+        group.add(count_row)
+        count_suffix = Gtk.Label(label="articles")
+        count_suffix.add_css_class("dim-label")
+        count_suffix.set_valign(Gtk.Align.CENTER)
+        count_row.add_suffix(count_suffix)
 
         dialog = Adw.AlertDialog(
-            heading="Developer Feed",
-            body="Pick the DEV.to tag for this widget.",
+            heading="Dev Feed",
+            body="Configure the article feed widget.",
             extra_child=group,
         )
         dialog.add_response("cancel", "Cancel")
@@ -865,11 +956,22 @@ class ShellDesktopPage:
         def _on_response(_dialog_obj, response):
             if response != "save":
                 return
-            s = combo.get_selected()
-            if 0 <= s < len(ids):
-                widget["tag"] = ids[s]
-                self._notify_dirty()
-                self._rebuild_widgets()
+            s = source_combo.get_selected()
+            if 0 <= s < len(source_ids):
+                widget["source"] = source_ids[s]
+            custom = custom_entry.get_text().strip()
+            if custom:
+                widget["tag"] = custom
+            else:
+                q = query_combo.get_selected()
+                if 0 <= q < len(query_ids):
+                    widget["tag"] = query_ids[q]
+            widget["apiKey"] = key_entry.get_text().strip()
+            widget["autoSwipe"] = bool(auto_switch.get_active())
+            widget["swipeInterval"] = int(interval_spin.get_value())
+            widget["count"] = int(count_spin.get_value())
+            self._notify_dirty()
+            self._rebuild_widgets()
 
         dialog.connect("response", _on_response)
         dialog.present(self._window)
@@ -1085,7 +1187,7 @@ class ShellDesktopPage:
                 entry = dict(existing)
                 entry["id"] = wid
                 entry["type"] = w.get("type", existing.get("type", wid))
-                for extra in ("face", "handStyle", "timezones", "device", "hideIp", "devicePriority", "noteId", "openFullscreen", "fontSize", "hiddenDevices", "tag"):
+                for extra in ("face", "handStyle", "timezones", "device", "hideIp", "devicePriority", "noteId", "openFullscreen", "fontSize", "hiddenDevices", "tag", "monitor", "source", "apiKey", "autoSwipe", "swipeInterval", "count"):
                     if w.get(extra) is not None:
                         entry[extra] = w[extra]
                 merged.append(entry)

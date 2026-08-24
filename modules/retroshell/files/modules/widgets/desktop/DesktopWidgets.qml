@@ -19,6 +19,9 @@ Item {
 
     anchors.fill: parent
 
+    // Screen name this layer belongs to (empty for the global/first case).
+    property string screenName: ""
+
     Connections {
         target: Config.desktop
         function onEditModeChanged() {
@@ -31,9 +34,18 @@ Item {
 
     // Loaded widgets: [{id, type, x, y, width, height}] (x/y normalized 0..1)
     property var widgets: []
-    readonly property var widgetOrder: root.widgets.map(function (w) { return w.id; })
+    // Widgets visible on THIS monitor. Global (off) shows all; per-monitor
+    // shows unassigned widgets plus ones matching this screen's name.
+    readonly property var visibleWidgets: {
+        if (!Config.desktop.perMonitor) return root.widgets;
+        return root.widgets.filter(function (w) {
+            var m = w.monitor;
+            return m === undefined || m === "" || m === root.screenName;
+        });
+    }
+    readonly property var widgetOrder: root.visibleWidgets.map(function (w) { return w.id; })
     // Whether any widgets are present (used to activate the desktop layer).
-    readonly property bool hasWidgets: root.widgets.length > 0
+    readonly property bool hasWidgets: root.visibleWidgets.length > 0
 
     FileView {
         id: widgetsFileView
@@ -94,8 +106,7 @@ Item {
         "note": { label: "Note", icon: Icons.notepad },
         "batteryring": { label: "Battery Rings", icon: Icons.batteryFull },
         "batteryring2x4": { label: "Battery Rings 2x4", icon: Icons.batteryFull },
-        "devto": { label: "Developer Feed", icon: Icons.globe },
-        "devto2x4": { label: "Developer Feed 2x4", icon: Icons.globe },
+        "feed": { label: "Dev Feed", icon: Icons.globe },
         "sysmonitor": { label: "System Monitor", icon: Icons.cpu },
         "battery": { label: "Battery", icon: Icons.batteryFull }
     })
@@ -134,8 +145,7 @@ Item {
         case "note": return noteComponent;
         case "batteryring": return batteryRingComponent;
         case "batteryring2x4": return batteryRingWideComponent;
-        case "devto": return devtoComponent;
-        case "devto2x4": return devtoWideComponent;
+        case "feed": return feedComponent;
         case "sysmonitor": return sysMonitorComponent;
         case "battery": return batteryComponent;
         }
@@ -166,8 +176,7 @@ Item {
         case "note": return [160, 160];
         case "batteryring": return [160, 160];
         case "batteryring2x4": return [320, 160];
-        case "devto": return [160, 160];
-        case "devto2x4": return [320, 160];
+        case "feed": return [320, 160];
         case "sysmonitor": return [160, 160];
         case "battery": return [160, 160];
         }
@@ -196,6 +205,12 @@ Item {
         if (w.fontSize !== undefined) e.fontSize = w.fontSize;
         if (w.hiddenDevices !== undefined) e.hiddenDevices = w.hiddenDevices;
         if (w.tag !== undefined) e.tag = w.tag;
+        if (w.monitor !== undefined) e.monitor = w.monitor;
+        if (w.source !== undefined) e.source = w.source;
+        if (w.apiKey !== undefined) e.apiKey = w.apiKey;
+        if (w.autoSwipe !== undefined) e.autoSwipe = w.autoSwipe;
+        if (w.swipeInterval !== undefined) e.swipeInterval = w.swipeInterval;
+        if (w.count !== undefined) e.count = w.count;
         return e;
     }
 
@@ -207,6 +222,8 @@ Item {
                 var e = root.cloneWidgetEntry(list[i]);
                 e.x = nx;
                 e.y = ny;
+                if (Config.desktop.perMonitor)
+                    e.monitor = root.screenName;
                 list[i] = e;
                 break;
             }
@@ -278,11 +295,12 @@ Item {
 
     // Add a widget of the given type at a normalized position (or center).
     function addWidget(type, nx, ny) {
-        if (root.widgetOrder.indexOf(type) !== -1)
-            return;
+        for (var i = 0; i < root.widgets.length; i++) {
+            if (root.widgets[i].id === type)
+                return;
+        }
         var size = root.widgetSizeFor(type);
-        var list = root.widgets.slice();
-        list.push({
+        var entry = {
             id: type,
             type: type,
             x: (nx !== undefined && nx !== null) ? nx : 0.5,
@@ -290,7 +308,11 @@ Item {
             width: size[0],
             height: size[1],
             locked: false
-        });
+        };
+        if (Config.desktop.perMonitor)
+            entry.monitor = root.screenName;
+        var list = root.widgets.slice();
+        list.push(entry);
         root.widgets = list;
         root.saveWidgets();
     }
@@ -523,13 +545,8 @@ Item {
     }
 
     Component {
-        id: devtoComponent
-        DevtoWidget {}
-    }
-
-    Component {
-        id: devtoWideComponent
-        DevtoWidget { wide: true }
+        id: feedComponent
+        FeedWidget {}
     }
 
     Component {

@@ -675,6 +675,7 @@ PanelWindow {
         id: desktopWidgets
         anchors.fill: parent
         z: 50
+        screenName: screen ? screen.name : ""
     }
 
     Rectangle {
