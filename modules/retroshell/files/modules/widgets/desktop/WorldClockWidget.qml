@@ -13,7 +13,7 @@ WidgetHost {
     id: root
 
     implicitWidth: 320
-    implicitHeight: 160
+    implicitHeight: 80
     contentMargins: 0
 
     readonly property var timezones: (root.widgetData && root.widgetData.timezones && root.widgetData.timezones.length > 0)
@@ -115,7 +115,7 @@ WidgetHost {
 
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 14
+                anchors.margins: 6
                 spacing: 6
 
                 Repeater {
@@ -144,7 +144,7 @@ WidgetHost {
                                 text: content.timeFor(modelData)
                                 color: Colors.overBackground
                                 font.family: Config.theme.font
-                                font.pixelSize: 26
+                                font.pixelSize: 20
                                 font.weight: Font.Bold
                                 Layout.alignment: Qt.AlignHCenter
                             }

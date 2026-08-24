@@ -127,7 +127,7 @@ Item {
         case "music2x4": return [320, 160];
         case "clockdigital": return [160, 160];
         case "clockanalog": return [160, 160];
-        case "worldclock": return [320, 160];
+        case "worldclock": return [320, 80];
         case "storage": return [160, 160];
         case "sysmonitor": return [160, 160];
         case "battery": return [160, 160];
