@@ -100,7 +100,7 @@ StyledRect {
 
             Text {
                 text: WeatherService.weatherSymbol
-                font.pixelSize: 24; font.family: Config.theme.font
+                font.pixelSize: 24; font.family: Config.emojiFont
                 color: Colors.overBackground
                 Layout.alignment: Qt.AlignVCenter
             }
@@ -160,6 +160,7 @@ StyledRect {
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: fItem.modelData.emoji || ""
+                            font.family: Config.emojiFont
                             font.pixelSize: Styling.fontSize(2)
                         }
                         Text {

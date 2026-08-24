@@ -8,6 +8,7 @@ var data = {
     "fontSize": 14,
     "monoFont": "Iosevka Nerd Font Mono",
     "monoFontSize": 14,
+    "emojiFont": "Noto Color Emoji",
     "tintIcons": false,
     "enableCorners": true,
     "animDuration": 300,

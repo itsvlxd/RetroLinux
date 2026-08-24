@@ -104,6 +104,30 @@ Singleton {
         command: ["bash", "-c", `test -f '${root.configDir}/hyprland.json' && ! test -f '${root.configDir}/compositor.json' && mv '${root.configDir}/hyprland.json' '${root.configDir}/compositor.json' && echo 'Migrated hyprland.json to compositor.json' || true`]
     }
 
+    // Read RETRO_FONT_EMOJI from variables.sh so the shell respects the retro
+    // emoji font, and apply it to the theme's emojiFont (persisted on save).
+    Process {
+        id: emojiFontProcess
+        running: false
+        command: []
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var val = text.trim();
+                if (val && root.themeReady) {
+                    root.theme.emojiFont = val;
+                    console.log("[Config] emojiFont from RETRO_FONT_EMOJI:", val);
+                }
+            }
+        }
+    }
+
+    function loadEmojiFont() {
+        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        emojiFontProcess.command = ["bash", "-c", "source '" + cfg + "/variables.sh' 2>/dev/null; echo $RETRO_FONT_EMOJI"];
+        emojiFontProcess.running = true;
+    }
+
     // ============================================
     // THEME MODULE
     // ============================================
@@ -116,6 +140,7 @@ Singleton {
             if (!root.themeReady) {
                 validateModule("theme", themeLoader, ThemeDefaults.data, () => {
                     root.themeReady = true;
+                    root.loadEmojiFont();
                 });
             }
         }
@@ -146,6 +171,7 @@ Singleton {
             property int fontSize: 14
             property string monoFont: "Iosevka Nerd Font Mono"
             property int monoFontSize: 14
+            property string emojiFont: "Noto Color Emoji"
             property bool tintIcons: false
             property bool enableCorners: true
             property int animDuration: 300
@@ -950,9 +976,13 @@ Singleton {
 
         adapter: JsonAdapter {
             property bool enabled: false
+            property bool showIcons: true
             property int iconSize: 40
             property int spacingVertical: 16
             property string textColor: "overBackground"
+            property bool editMode: false
+            property list<string> widgetOrder: []
+            property list<var> widgets: []
         }
     }
 
@@ -3533,6 +3563,7 @@ Singleton {
 
     property int roundness: theme.roundness
     property string defaultFont: theme.font
+    property string emojiFont: theme.emojiFont
     property int animDuration: theme.animDuration
     property bool tintIcons: theme.tintIcons
 
@@ -3610,6 +3641,10 @@ Singleton {
 
     // Desktop configuration
     property QtObject desktop: desktopLoader.adapter
+
+    // Whether the desktop layer (wallpaper + widgets) should be present.
+    // Active when the desktop is enabled OR any widgets are placed.
+    readonly property bool desktopLayerActive: desktop.enabled || (desktop.widgetOrder && desktop.widgetOrder.length > 0)
 
     // Lockscreen configuration
     property QtObject lockscreen: lockscreenLoader.adapter

@@ -2,7 +2,11 @@
 
 var data = {
     "enabled": false,
+    "showIcons": true,
     "iconSize": 40,
     "spacingVertical": 16,
-    "textColor": "overBackground"
+    "textColor": "overBackground",
+    "editMode": false,
+    "widgetOrder": [],
+    "widgets": []
 }

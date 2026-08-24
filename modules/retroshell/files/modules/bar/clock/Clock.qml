@@ -106,7 +106,7 @@ Item {
                 text: root.weatherAvailable ? WeatherService.weatherSymbol : root.currentDayAbbrev
                 color: root.popupOpen ? buttonBg.item : Colors.overBackground
                 font.pixelSize: root.weatherAvailable ? 16 : Config.theme.fontSize
-                font.family: Config.theme.font
+                font.family: root.weatherAvailable ? Config.emojiFont : Config.theme.font
                 font.bold: !root.weatherAvailable
             }
 
@@ -157,7 +157,7 @@ Item {
                 text: root.weatherAvailable ? WeatherService.weatherSymbol : root.currentDayAbbrev
                 color: root.popupOpen ? buttonBg.item : Colors.overBackground
                 font.pixelSize: root.weatherAvailable ? 16 : Config.theme.fontSize
-                font.family: Config.theme.font
+                font.family: root.weatherAvailable ? Config.emojiFont : Config.theme.font
                 font.bold: !root.weatherAvailable
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.NoWrap
@@ -510,6 +510,7 @@ Item {
                                             Text {
                                                 anchors.horizontalCenter: parent.horizontalCenter
                                                 text: forecastDayRow.modelData.emoji
+                                                font.family: Config.emojiFont
                                                 font.pixelSize: Styling.fontSize(4)
                                             }
 

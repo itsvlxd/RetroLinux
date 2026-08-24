@@ -42,7 +42,7 @@ StyledRect {
             text: weatherContainer.weatherSymbol
             color: Colors.overBackground
             font.pixelSize: 16
-            font.family: Config.theme.font
+            font.family: Config.emojiFont
             font.bold: true
             layer.enabled: true
             layer.effect: Shadow {}
@@ -75,7 +75,7 @@ StyledRect {
             text: weatherContainer.weatherSymbol
             color: Colors.overBackground
             font.pixelSize: 16
-            font.family: Config.theme.font
+            font.family: Config.emojiFont
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.NoWrap

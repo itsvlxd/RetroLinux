@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import qs.modules.desktop
+import qs.modules.widgets.desktop
 import qs.modules.services
 import qs.modules.theme
 import qs.config
@@ -28,7 +29,7 @@ PanelWindow {
     WlrLayershell.keyboardFocus: iconContainer._editActive ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
 
-    visible: Config.desktop.enabled
+    visible: Config.desktopLayerActive
 
     Component.onCompleted: {
         DesktopService.initialize();
@@ -39,6 +40,7 @@ PanelWindow {
     Item {
         id: iconContainer
         anchors.fill: parent
+        visible: Config.desktop.showIcons
         anchors.margins: 16
         anchors.bottomMargin: desktop.barPosition === "bottom" ? desktop.barSize + 16 : 16
         anchors.topMargin: desktop.barPosition === "top" ? desktop.barSize + 16 : 16
@@ -308,7 +310,26 @@ PanelWindow {
                     }
                 });
 
-                Visibilities.contextMenu.openCustomMenu(menuItems, 200, 32, "desktop");
+                // ── Widgets section ──
+                menuItems.push({ isSeparator: true, text: "" });
+                menuItems.push({
+                    text: (Config.desktop.editMode ? "Disable" : "Enable") + " Edit Mode",
+                    icon: Icons.edit,
+                    isSeparator: false,
+                    onTriggered: function () {
+                        Config.desktop.editMode = !Config.desktop.editMode;
+                    }
+                });
+                menuItems.push({
+                    text: (Config.desktop.showIcons ? "Hide" : "Show") + " Desktop Icons",
+                    icon: Icons.squaresFour,
+                    isSeparator: false,
+                    onTriggered: function () {
+                        Config.desktop.showIcons = !Config.desktop.showIcons;
+                    }
+                });
+
+                Visibilities.contextMenu.openCustomMenu(menuItems, 260, 32, "desktop");
             }
         }
 
@@ -477,7 +498,7 @@ PanelWindow {
                                   onTriggered: function () { DesktopService.trashFile(delegateRoot.path); DesktopService.refreshTrash(); } }
                             ];
                         }
-                        Visibilities.contextMenu.openCustomMenu(items, 200, 32, "desktop");
+                        Visibilities.contextMenu.openCustomMenu(items, 260, 32, "desktop");
                     }
 
                     opacity: dragHandler.active ? 0.3 : 1.0
@@ -649,13 +670,20 @@ PanelWindow {
         }
     }
 
+    // Floating desktop widget layer (above icons, below bar)
+    DesktopWidgets {
+        id: desktopWidgets
+        anchors.fill: parent
+        z: 50
+    }
+
     Rectangle {
         anchors.centerIn: parent
         width: 200
         height: 60
         color: Qt.rgba(0, 0, 0, 0.7)
         radius: Styling.radius(0)
-        visible: !DesktopService.initialLoadComplete
+        visible: Config.desktop.showIcons && !DesktopService.initialLoadComplete
 
         Text {
             anchors.centerIn: parent
