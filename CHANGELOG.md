@@ -1,3 +1,31 @@
+# [1.9.0](https://github.com/itsvlxd/RetroLinux/compare/v1.8.0...v1.9.0) (2026-08-24)
+
+
+### Bug Fixes
+
+* **retroshell:** fix dashboard dark mode toggle quick control ([1ca92f7](https://github.com/itsvlxd/RetroLinux/commit/1ca92f7f543eec20388d140c6c74591e99037995))
+* **retroshell:** fix notification sound effects ([fbb9ecb](https://github.com/itsvlxd/RetroLinux/commit/fbb9ecbdbc04d433ca8a2ddc968381e4a04d5bb0))
+* **settings:** fix fan control page ([e317de4](https://github.com/itsvlxd/RetroLinux/commit/e317de4269d820bc4788a79259fc8937055cf971))
+* **settings:** remove the fake notification sound and change bell icon ([1014628](https://github.com/itsvlxd/RetroLinux/commit/1014628b23934f6f8125993f3643445a8a57ec8d))
+* **spotify:** fix spotify not installing spicetify properly ([b637176](https://github.com/itsvlxd/RetroLinux/commit/b637176f1de1f14d65c0cb27fb543e0ac2f493a3))
+* **timeshift:** fix timeshift setup file ([10e5d59](https://github.com/itsvlxd/RetroLinux/commit/10e5d590424c3bcdda60d5a3bbaab813f984abbc))
+
+
+### Features
+
+* **lib:** add module specific files props ([23f522e](https://github.com/itsvlxd/RetroLinux/commit/23f522e2b95f344bb3e10472b67ee9d6180af0f9))
+* **modules:** add module dependencies ([52686c4](https://github.com/itsvlxd/RetroLinux/commit/52686c49bf3a0379704cfed9e3e55d42f7f72c05))
+* **power:** add caffeine on charge ([bbba39b](https://github.com/itsvlxd/RetroLinux/commit/bbba39bf82d820dd0a539fd6f483e6700e314957))
+* **retroshell:** add notification sounds ([e92cd21](https://github.com/itsvlxd/RetroLinux/commit/e92cd2133dd62fa51982f987abf453a64fd26ad2))
+* **retro:** sound notifications, fan control, service page, zsh & tmux ([#14](https://github.com/itsvlxd/RetroLinux/issues/14)) ([8aee23a](https://github.com/itsvlxd/RetroLinux/commit/8aee23aa8cad9a9f8ecc7e4934cd5ddf5a2d2b6d))
+* **settings:** add fan curve profile ([f63bfeb](https://github.com/itsvlxd/RetroLinux/commit/f63bfeb9e7811594a177bd7b2151bb0bcba5a97c))
+* **settings:** add shell notification sounds ([1660d1a](https://github.com/itsvlxd/RetroLinux/commit/1660d1af9fbe3c6ebce5afe609b50cf1aff3c169))
+* **settings:** feat service page ([1fd03ed](https://github.com/itsvlxd/RetroLinux/commit/1fd03ed100888721dfbe8087d2941c626028936e))
+* **tmux:** add tmux module ([1630011](https://github.com/itsvlxd/RetroLinux/commit/1630011e4d8f0a91746fd6d5c60f28a8589fac15))
+* **zsh:** add tmux as dep ([1b9dc0d](https://github.com/itsvlxd/RetroLinux/commit/1b9dc0d6204832d507a093cc1ab25601334acd25))
+* **zsh:** add zoxide integration in zsh ([9385029](https://github.com/itsvlxd/RetroLinux/commit/93850299ea846fdd995dfeb304e1ff585a98c780))
+* **zsh:** add zsh terminal module ([8497db5](https://github.com/itsvlxd/RetroLinux/commit/8497db569968dc54056b93882de556eb1672d2a3))
+
 # [1.8.0](https://github.com/itsvlxd/RetroLinux/compare/v1.7.0...v1.8.0) (2026-08-21)
 
 
