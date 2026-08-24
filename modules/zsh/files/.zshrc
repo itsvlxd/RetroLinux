@@ -73,6 +73,7 @@ alias la='eza -lah --icons=always --git'
 alias tree='eza --tree --level=2 --icons=always'
 
 eval "$(fzf --zsh)"
+eval "$(zoxide init zsh)"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
