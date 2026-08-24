@@ -18,8 +18,8 @@ WidgetHost {
 
     readonly property string source: (root.widgetData && root.widgetData.source)
         ? String(root.widgetData.source) : "devto"
-    readonly property string tag: (root.widgetData && root.widgetData.tag)
-        ? String(root.widgetData.tag) : "linux"
+    readonly property string tag: (root.widgetData && root.widgetData.tag !== undefined)
+        ? String(root.widgetData.tag) : ""
     readonly property string apiKey: (root.widgetData && root.widgetData.apiKey)
         ? String(root.widgetData.apiKey) : ""
     readonly property bool autoSwipe: (root.widgetData && root.widgetData.autoSwipe !== undefined)

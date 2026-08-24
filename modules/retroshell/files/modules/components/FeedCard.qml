@@ -33,10 +33,6 @@ Rectangle {
         return "DEV";
     }
 
-    function feedTitle() {
-        return "Dev Feed";
-    }
-
     readonly property real brandMaxWidth: 92
 
     // Auto-scale the badge font so the brand always fits the badge.
@@ -124,26 +120,20 @@ Rectangle {
                     horizontalAlignment: Text.AlignHCenter
                 }
             }
+        }
 
-            Text {
-                Layout.fillWidth: true
-                text: root.feedTitle()
-                color: "#FFFFFF"
-                font.family: Config.theme.font
-                font.pixelSize: 13
-                font.weight: Font.Bold
-                elide: Text.ElideRight
-                Layout.alignment: Qt.AlignVCenter
-            }
-
-            // Tag pill
-            Rectangle {
-                Layout.alignment: Qt.AlignVCenter
-                visible: root.tag.length > 0
-                height: 16
-                width: tagPillText.implicitWidth + 10
-                radius: 8
-                color: Qt.rgba(0, 0, 0, 0.45)
+        // Tag pill (top-right)
+        Rectangle {
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            visible: root.tag.length > 0
+            height: 16
+            width: tagPillText.implicitWidth + 10
+            radius: 8
+            color: Qt.rgba(0, 0, 0, 0.45)
+            z: 5
 
                 Text {
                     id: tagPillText
@@ -155,7 +145,6 @@ Rectangle {
                     font.weight: Font.Bold
                 }
             }
-        }
 
         // ── Bottom article overlay ──
         ColumnLayout {
