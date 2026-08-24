@@ -535,6 +535,11 @@ DESKTOP_WIDGET_CATALOG: dict = {
     "power": ("Power & Performance", "Power draw, thermals and profile switcher", "battery-level-80-symbolic"),
     "power1x3": ("Power & Performance 1x3", "Slim strip with profile switcher", "battery-level-80-symbolic"),
     "bluetooth": ("Bluetooth", "Connected devices, battery and quick pair", "bluetooth-symbolic"),
+    "note": ("Note", "Pinned editable note on the desktop", "text-x-generic-symbolic"),
+    "batteryring": ("Battery Rings", "Apple-style circular battery gauge", "battery-symbolic"),
+    "batteryring2x4": ("Battery Rings 2x4", "Battery rings for up to 4 devices", "battery-symbolic"),
+    "devto": ("Developer Feed", "Top DEV.to articles for a tag", "globe-symbolic"),
+    "devto2x4": ("Developer Feed 2x4", "Stack of three DEV.to articles", "globe-symbolic"),
     "sysmonitor": ("System Monitor", "CPU, RAM and disk usage", "utilities-system-monitor-symbolic"),
     "battery": ("Battery", "Battery level and charging state", "battery-symbolic"),
 }
@@ -560,6 +565,11 @@ DESKTOP_WIDGET_SIZES: dict = {
     "power": (160, 160),
     "power1x3": (240, 80),
     "bluetooth": (160, 160),
+    "note": (160, 160),
+    "batteryring": (160, 160),
+    "batteryring2x4": (320, 160),
+    "devto": (160, 160),
+    "devto2x4": (320, 160),
     "sysmonitor": (160, 160),
     "battery": (160, 160),
 }

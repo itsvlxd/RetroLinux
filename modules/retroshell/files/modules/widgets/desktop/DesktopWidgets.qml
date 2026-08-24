@@ -91,6 +91,11 @@ Item {
         "power": { label: "Power & Performance", icon: Icons.lightning },
         "power1x3": { label: "Power & Performance 1x3", icon: Icons.lightning },
         "bluetooth": { label: "Bluetooth", icon: Icons.bluetooth },
+        "note": { label: "Note", icon: Icons.notepad },
+        "batteryring": { label: "Battery Rings", icon: Icons.batteryFull },
+        "batteryring2x4": { label: "Battery Rings 2x4", icon: Icons.batteryFull },
+        "devto": { label: "Developer Feed", icon: Icons.globe },
+        "devto2x4": { label: "Developer Feed 2x4", icon: Icons.globe },
         "sysmonitor": { label: "System Monitor", icon: Icons.cpu },
         "battery": { label: "Battery", icon: Icons.batteryFull }
     })
@@ -126,6 +131,11 @@ Item {
         case "power": return powerComponent;
         case "power1x3": return powerMiniComponent;
         case "bluetooth": return bluetoothComponent;
+        case "note": return noteComponent;
+        case "batteryring": return batteryRingComponent;
+        case "batteryring2x4": return batteryRingWideComponent;
+        case "devto": return devtoComponent;
+        case "devto2x4": return devtoWideComponent;
         case "sysmonitor": return sysMonitorComponent;
         case "battery": return batteryComponent;
         }
@@ -153,6 +163,11 @@ Item {
         case "power": return [160, 160];
         case "power1x3": return [240, 80];
         case "bluetooth": return [160, 160];
+        case "note": return [160, 160];
+        case "batteryring": return [160, 160];
+        case "batteryring2x4": return [320, 160];
+        case "devto": return [160, 160];
+        case "devto2x4": return [320, 160];
         case "sysmonitor": return [160, 160];
         case "battery": return [160, 160];
         }
@@ -171,10 +186,16 @@ Item {
             locked: w.locked === true
         };
         if (w.face !== undefined) e.face = w.face;
+        if (w.handStyle !== undefined) e.handStyle = w.handStyle;
         if (w.timezones !== undefined) e.timezones = w.timezones;
         if (w.device !== undefined) e.device = w.device;
         if (w.hideIp !== undefined) e.hideIp = w.hideIp;
         if (w.devicePriority !== undefined) e.devicePriority = w.devicePriority;
+        if (w.noteId !== undefined) e.noteId = w.noteId;
+        if (w.openFullscreen !== undefined) e.openFullscreen = w.openFullscreen;
+        if (w.fontSize !== undefined) e.fontSize = w.fontSize;
+        if (w.hiddenDevices !== undefined) e.hiddenDevices = w.hiddenDevices;
+        if (w.tag !== undefined) e.tag = w.tag;
         return e;
     }
 
@@ -216,6 +237,21 @@ Item {
             if (list[i].id === id) {
                 var e = root.cloneWidgetEntry(list[i]);
                 e.face = face;
+                list[i] = e;
+                break;
+            }
+        }
+        root.widgets = list;
+        root.saveWidgets();
+    }
+
+    // Persist a hand-style change for a widget id (analog clock).
+    function updateWidgetHandStyle(id, handStyle) {
+        var list = root.widgets.slice();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === id) {
+                var e = root.cloneWidgetEntry(list[i]);
+                e.handStyle = handStyle;
                 list[i] = e;
                 break;
             }
@@ -358,6 +394,11 @@ Item {
                                 root.updateWidgetFace(witem.modelData, face);
                             });
                         }
+                        if (item.handStyleSelected) {
+                            item.handStyleSelected.connect(function (handStyle) {
+                                root.updateWidgetHandStyle(witem.modelData, handStyle);
+                            });
+                        }
                         item.requestRemove.connect(function () {
                             root.removeWidget(witem.modelData);
                         });
@@ -464,6 +505,31 @@ Item {
     Component {
         id: bluetoothComponent
         BluetoothWidget {}
+    }
+
+    Component {
+        id: noteComponent
+        NoteWidget {}
+    }
+
+    Component {
+        id: batteryRingComponent
+        BatteryRingWidget {}
+    }
+
+    Component {
+        id: batteryRingWideComponent
+        BatteryRingWidget { wide: true }
+    }
+
+    Component {
+        id: devtoComponent
+        DevtoWidget {}
+    }
+
+    Component {
+        id: devtoWideComponent
+        DevtoWidget { wide: true }
     }
 
     Component {

@@ -26,7 +26,7 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Bottom
     WlrLayershell.namespace: "retroshell:desktop"
-    WlrLayershell.keyboardFocus: iconContainer._editActive ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: iconContainer._editActive ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
     exclusionMode: ExclusionMode.Ignore
 
     visible: Config.desktopLayerActive

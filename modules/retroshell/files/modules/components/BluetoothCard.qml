@@ -91,7 +91,7 @@ Rectangle {
                       : Icons.bluetoothOff
                 font.family: Icons.font
                 font.pixelSize: 15
-                color: root.isEnabled ? Colors.blue : Colors.outline
+                color: root.isEnabled ? Colors.primary : Colors.outline
                 Layout.alignment: Qt.AlignVCenter
             }
 

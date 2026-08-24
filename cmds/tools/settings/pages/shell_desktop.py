@@ -48,9 +48,20 @@ if TYPE_CHECKING:
 
 # Available faces/styles per widget type (matched by the shell widgets).
 CLOCK_FACES: dict = {
-    "clockanalog": ["classic", "numeric", "roman", "dots", "minimal", "sector"],
+    "clockanalog": ["classic", "numeric", "roman", "dots", "minimal", "sector", "skeleton", "rings", "bold", "tall", "track", "diamond", "bauhaus", "railway"],
     "clockdigital": ["classic", "minimal", "compact", "large"],
     "battery": ["gauge", "juice", "bars"],
+}
+
+# Hand styles for the analog clock (matched by the shell widget).
+CLOCK_HAND_STYLES: dict = {
+    "clockanalog": ["taper", "classic", "thin"],
+}
+
+CLOCK_HAND_STYLE_LABELS: dict = {
+    "taper": "Tapered",
+    "classic": "Classic Lines",
+    "thin": "Thin",
 }
 
 CLOCK_FACE_LABELS: dict = {
@@ -60,6 +71,14 @@ CLOCK_FACE_LABELS: dict = {
     "dots": "Dots",
     "minimal": "Minimal",
     "sector": "Sector",
+    "skeleton": "Skeleton",
+    "rings": "Rings",
+    "bold": "Bold",
+    "tall": "Tall",
+    "track": "Track",
+    "diamond": "Diamond",
+    "bauhaus": "Bauhaus",
+    "railway": "Railway",
     "compact": "Compact",
     "large": "Large",
     "gauge": "Gauge",
@@ -285,6 +304,27 @@ class ShellDesktopPage:
                 edit_btn.set_tooltip_text("Bluetooth priority")
                 edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_bluetooth(i))
                 row.add_suffix(edit_btn)
+            elif wid == "note":
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Choose note")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_note(i))
+                row.add_suffix(edit_btn)
+            elif wid in ("batteryring", "batteryring2x4"):
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Battery rings options")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_batteryring(i))
+                row.add_suffix(edit_btn)
+            elif wid in ("devto", "devto2x4"):
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Feed tag")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_devto(i))
+                row.add_suffix(edit_btn)
             elif wid == "worldclock":
                 edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
                 edit_btn.set_valign(Gtk.Align.CENTER)
@@ -381,7 +421,8 @@ class ShellDesktopPage:
         if idx < 0 or idx >= len(self._widgets):
             return
         widget = self._widgets[idx]
-        faces = CLOCK_FACES.get(widget.get("id"), [])
+        wid = widget.get("id")
+        faces = CLOCK_FACES.get(wid, [])
         if not faces:
             return
         current = widget.get("face") or "classic"
@@ -395,6 +436,22 @@ class ShellDesktopPage:
         ))
         combo.set_selected(faces.index(current))
         group.add(combo)
+
+        hand_combo = None
+        hand_ids: list[str] = []
+        hand_styles = CLOCK_HAND_STYLES.get(wid, [])
+        if hand_styles:
+            hand_ids = list(hand_styles)
+            cur_hand = widget.get("handStyle") or "taper"
+            if cur_hand not in hand_ids:
+                cur_hand = hand_ids[0]
+            hand_combo = Adw.ComboRow(title="Hand style",
+                                      subtitle="How the clock hands are drawn")
+            hand_combo.set_model(Gtk.StringList.new(
+                [CLOCK_HAND_STYLE_LABELS.get(h, h) for h in hand_styles]
+            ))
+            hand_combo.set_selected(hand_ids.index(cur_hand))
+            group.add(hand_combo)
 
         dialog = Adw.AlertDialog(
             heading="Widget Face",
@@ -412,8 +469,12 @@ class ShellDesktopPage:
             sel = combo.get_selected()
             if 0 <= sel < len(faces):
                 widget["face"] = faces[sel]
-                self._notify_dirty()
-                self._rebuild_widgets()
+            if hand_combo is not None:
+                hs = hand_combo.get_selected()
+                if 0 <= hs < len(hand_ids):
+                    widget["handStyle"] = hand_ids[hs]
+            self._notify_dirty()
+            self._rebuild_widgets()
 
         dialog.connect("response", _on_response)
         dialog.present(self._window)
@@ -568,6 +629,245 @@ class ShellDesktopPage:
             sel = combo.get_selected()
             if 0 <= sel < len(ids):
                 widget["devicePriority"] = ids[sel]
+                self._notify_dirty()
+                self._rebuild_widgets()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── Note widget editor ──
+
+    @staticmethod
+    def _list_notes() -> list[dict]:
+        """Notes from the retroshell notes store: [{id, title, label}]."""
+        base = os.path.expanduser("~/.local/share/retroshell-notes")
+        try:
+            with open(os.path.join(base, "index.json")) as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            return []
+        notes = []
+        for nid in data.get("order", []):
+            meta = (data.get("notes", {}) or {}).get(nid)
+            if not meta:
+                continue
+            title = meta.get("title", "Untitled")
+            ext = ".md" if meta.get("isMarkdown") else ".html"
+            preview = ""
+            try:
+                with open(os.path.join(base, "notes", nid + ext)) as f:
+                    for line in f:
+                        line = line.strip().strip("#").strip()
+                        if line and line != title:
+                            preview = line
+                            break
+            except OSError:
+                pass
+            label = title
+            if preview:
+                label = "%s — %s" % (title, preview[:28])
+            notes.append({"id": nid, "title": title, "label": label})
+        return notes
+
+    def _on_edit_note(self, idx: int) -> None:
+        """Let the user pick note, font size, background and fullscreen."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+        notes = self._list_notes()
+        current = widget.get("noteId") or ""
+
+        group = Adw.PreferencesGroup()
+
+        note_combo = None
+        ids: list[str] = []
+        if notes:
+            labels = [n["label"] for n in notes]
+            ids = [n["id"] for n in notes]
+            sel = 0
+            if current in ids:
+                sel = ids.index(current)
+            note_combo = Adw.ComboRow(title="Note to display",
+                                      subtitle="Defaults to the most recent note")
+            note_combo.set_model(Gtk.StringList.new(labels))
+            note_combo.set_selected(sel)
+            group.add(note_combo)
+
+        font_row, font_spin = make_spin_int_row(
+            "Font size",
+            value=int(widget.get("fontSize", 11)),
+            lower=8,
+            upper=24,
+            step=1,
+            page_step=2,
+            subtitle="Size of the note text",
+        )
+        group.add(font_row)
+        suffix_lbl = Gtk.Label(label="px")
+        suffix_lbl.add_css_class("dim-label")
+        suffix_lbl.set_valign(Gtk.Align.CENTER)
+        font_row.add_suffix(suffix_lbl)
+
+        fullscreen_switch = Adw.SwitchRow(
+            title="Open in fullscreen on click",
+            subtitle="Show the note in the full notes editor instead of editing inline",
+        )
+        fullscreen_switch.set_active(bool(widget.get("openFullscreen", False)))
+        group.add(fullscreen_switch)
+
+        dialog = Adw.AlertDialog(
+            heading="Note Widget",
+            body="Configure the note widget.",
+            extra_child=group,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            if note_combo is not None:
+                s = note_combo.get_selected()
+                if 0 <= s < len(ids):
+                    widget["noteId"] = ids[s]
+            widget["fontSize"] = int(font_spin.get_value())
+            widget["openFullscreen"] = bool(fullscreen_switch.get_active())
+            self._notify_dirty()
+            self._rebuild_widgets()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── Battery rings widget editor ──
+
+    @staticmethod
+    def _list_bluetooth_devices() -> list[dict]:
+        """Paired bluetooth devices: [{id, name}] (address + alias)."""
+        try:
+            out = subprocess.run(
+                ["bluetoothctl", "devices"],
+                capture_output=True, text=True, timeout=5,
+            )
+            known = []
+            for line in out.stdout.splitlines():
+                parts = line.split(" ")
+                if len(parts) >= 2 and parts[0] == "Device":
+                    known.append((parts[1], " ".join(parts[2:]) or "Unknown device"))
+
+            devices = []
+            for addr, name in known[:15]:
+                try:
+                    info = subprocess.run(
+                        ["bluetoothctl", "info", addr],
+                        capture_output=True, text=True, timeout=3,
+                    )
+                    if "Paired: yes" in info.stdout:
+                        devices.append({"id": addr, "name": name})
+                except (OSError, subprocess.TimeoutExpired):
+                    continue
+            return devices
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+
+    def _on_edit_batteryring(self, idx: int) -> None:
+        """Let the user choose which devices the battery rings show."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+        hidden = widget.get("hiddenDevices") or []
+
+        group = Adw.PreferencesGroup()
+
+        host_switch = Adw.SwitchRow(title="Host battery",
+                                    subtitle="Show the laptop's battery")
+        host_switch.set_active("host" not in hidden)
+        group.add(host_switch)
+
+        device_switches = []
+        for dev in self._list_bluetooth_devices():
+            sw = Adw.SwitchRow(title=dev["name"], subtitle=dev["id"])
+            sw.set_active(dev["id"] not in hidden)
+            group.add(sw)
+            device_switches.append((dev["id"], sw))
+
+        dialog = Adw.AlertDialog(
+            heading="Battery Rings",
+            body="Choose which devices appear. Only connected devices with a "
+                 "battery reading are shown.",
+            extra_child=group,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            new_hidden = []
+            if not host_switch.get_active():
+                new_hidden.append("host")
+            for dev_id, sw in device_switches:
+                if not sw.get_active():
+                    new_hidden.append(dev_id)
+            widget["hiddenDevices"] = new_hidden
+            self._notify_dirty()
+            self._rebuild_widgets()
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── DEV.to feed editor ──
+
+    def _on_edit_devto(self, idx: int) -> None:
+        """Let the user pick the feed tag for the DEV.to widget."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+
+        tag_options = [
+            ("", "All tags"),
+            ("linux", "linux"),
+            ("rust", "rust"),
+            ("webdev", "webdev"),
+            ("javascript", "javascript"),
+            ("python", "python"),
+            ("go", "go"),
+            ("devops", "devops"),
+            ("ai", "ai"),
+        ]
+        labels = [label for _v, label in tag_options]
+        ids = [v for v, _l in tag_options]
+        current = widget.get("tag") or ""
+        sel = 0
+        if current in ids:
+            sel = ids.index(current)
+
+        group = Adw.PreferencesGroup()
+        combo = Adw.ComboRow(title="Feed tag",
+                             subtitle="Which DEV.to tag to show")
+        combo.set_model(Gtk.StringList.new(labels))
+        combo.set_selected(sel)
+        group.add(combo)
+
+        dialog = Adw.AlertDialog(
+            heading="Developer Feed",
+            body="Pick the DEV.to tag for this widget.",
+            extra_child=group,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            s = combo.get_selected()
+            if 0 <= s < len(ids):
+                widget["tag"] = ids[s]
                 self._notify_dirty()
                 self._rebuild_widgets()
 
@@ -785,7 +1085,7 @@ class ShellDesktopPage:
                 entry = dict(existing)
                 entry["id"] = wid
                 entry["type"] = w.get("type", existing.get("type", wid))
-                for extra in ("face", "timezones", "device", "hideIp", "devicePriority"):
+                for extra in ("face", "handStyle", "timezones", "device", "hideIp", "devicePriority", "noteId", "openFullscreen", "fontSize", "hiddenDevices", "tag"):
                     if w.get(extra) is not None:
                         entry[extra] = w[extra]
                 merged.append(entry)

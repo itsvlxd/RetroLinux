@@ -224,9 +224,9 @@ WidgetHost {
                 }
             }
 
-            // Settings gear (always visible)
+            // Settings gear (edit mode only)
             StyledRect {
-                anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 anchors.right: parent.right
                 anchors.margins: 6
                 width: 22
@@ -234,6 +234,7 @@ WidgetHost {
                 radius: 11
                 variant: gearHover.hovered ? "focus" : "common"
                 z: 20
+                visible: Config.desktop.editMode
 
                 Text {
                     anchors.centerIn: parent

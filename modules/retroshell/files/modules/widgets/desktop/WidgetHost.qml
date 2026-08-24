@@ -27,6 +27,9 @@ Item {
     // card edges (e.g. album-art backgrounds clipped to the rounded corners).
     property real contentMargins: 8
 
+    // Whether the host card draws its theme border (off for borderless cards).
+    property bool cardBorder: true
+
     // Fractional position (0..1) within the layer.
     property real normX: root.widgetData && root.widgetData.x !== undefined ? root.widgetData.x : 0.5
     property real normY: root.widgetData && root.widgetData.y !== undefined ? root.widgetData.y : 0.5
@@ -46,6 +49,7 @@ Item {
         variant: "pane"
         radius: Styling.radius(6)
         enableShadow: true
+        enableBorder: root.cardBorder
 
         Loader {
             id: contentLoader
