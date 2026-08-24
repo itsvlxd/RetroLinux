@@ -9,13 +9,17 @@ Rectangle {
     id: root
 
     property bool showBackground: true
+    property bool wide: false
+    property bool showBorder: true
     property string title: "Device Storage"
     property var segments: []
     property real totalGB: 512
+    // Header used value; -1 = compute from segment sizes.
+    property real usedGB: -1
     property real gapSize: 3
     property int padding: 16
 
-    readonly property real usedGB: {
+    readonly property real computedUsedGB: {
         var s = 0;
         for (var i = 0; i < root.segments.length; i++)
             s += Number(root.segments[i].sizeGB || 0);
@@ -31,7 +35,7 @@ Rectangle {
         visible: root.showBackground
         radius: 20
         border.color: Colors.outlineVariant
-        border.width: 1
+        border.width: root.showBorder ? 1 : 0
         gradient: Gradient {
             GradientStop { position: 0.0; color: Colors.surfaceContainer }
             GradientStop { position: 1.0; color: Colors.surfaceContainerLow }
@@ -43,21 +47,52 @@ Rectangle {
         anchors.margins: root.padding
         spacing: 6
 
-        // Header subtitle
-        Text {
-            text: root.title
-            color: Colors.outline
-            font.family: Config.theme.font
-            font.pixelSize: 10
-            font.weight: Font.Medium
+        // Header: title left, stat right (wide) / title alone (compact)
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Text {
+                text: root.title
+                color: Colors.outline
+                font.family: Config.theme.font
+                font.pixelSize: root.wide ? 12 : 10
+                font.weight: Font.Medium
+                Layout.fillWidth: root.wide
+                elide: Text.ElideRight
+            }
+
+            // Stat line (wide, right-aligned)
+            RowLayout {
+                visible: root.wide
+                Layout.alignment: Qt.AlignRight
+                spacing: 4
+
+                Text {
+                    text: Math.round(root.usedGB >= 0 ? root.usedGB : root.computedUsedGB) + " GB"
+                    color: Colors.overBackground
+                    font.family: Config.theme.font
+                    font.pixelSize: 22
+                    font.weight: Font.Bold
+                }
+
+                Text {
+                    text: "/ " + Math.round(root.totalGB) + " GB"
+                    color: Colors.outline
+                    font.family: Config.theme.font
+                    font.pixelSize: 13
+                    Layout.alignment: Qt.AlignBaseline
+                }
+            }
         }
 
-        // Stat line: used (bold) + total (muted, baseline-aligned)
+        // Stat line (compact): used (bold) + total (muted, baseline-aligned)
         RowLayout {
+            visible: !root.wide
             spacing: 4
 
             Text {
-                text: Math.round(root.usedGB) + " GB"
+                text: Math.round(root.usedGB >= 0 ? root.usedGB : root.computedUsedGB) + " GB"
                 color: Colors.overBackground
                 font.family: Config.theme.font
                 font.pixelSize: 20
@@ -77,7 +112,7 @@ Rectangle {
         Rectangle {
             id: track
             Layout.fillWidth: true
-            height: 9
+            height: 30
             radius: height / 2
             color: Colors.surfaceContainerHigh
             border.color: Colors.outlineVariant
@@ -109,7 +144,7 @@ Rectangle {
                         Rectangle {
                             id: segBody
                             anchors.fill: parent
-                            radius: height / 2
+                            radius: 6
                             color: Qt.color(modelData.color || Colors.primary)
                             clip: true
 
@@ -142,12 +177,12 @@ Rectangle {
             }
         }
 
-        // Category legend (2x2 grid)
+        // Category legend (2x2 grid compact / single row wide)
         GridLayout {
             Layout.fillWidth: true
             Layout.topMargin: 6
-            columns: 2
-            columnSpacing: 10
+            columns: root.wide ? root.segments.length : 2
+            columnSpacing: root.wide ? 4 : 10
             rowSpacing: 3
 
             Repeater {
@@ -165,14 +200,30 @@ Rectangle {
                         Layout.alignment: Qt.AlignVCenter
                     }
 
-                    Text {
-                        text: modelData.label
-                        color: Colors.overBackground
-                        font.family: Config.theme.font
-                        font.pixelSize: 10
-                        elide: Text.ElideRight
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 0
+
+                        Text {
+                            text: modelData.label
+                            color: Colors.overBackground
+                            font.family: Config.theme.font
+                            font.pixelSize: root.wide ? 10 : 10
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+
+                        Text {
+                            visible: root.wide
+                            text: Math.round(Number(modelData.sizeGB || 0)) + " GB"
+                            color: Qt.color(modelData.color || Colors.primary)
+                            font.family: Config.theme.font
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                        }
                     }
                 }
             }

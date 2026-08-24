@@ -83,6 +83,14 @@ Item {
         "clockanalog": { label: "Analog Clock", icon: Icons.clock },
         "worldclock": { label: "World Clock", icon: Icons.clock },
         "storage": { label: "Device Storage", icon: Icons.disk },
+        "storage2x4": { label: "Device Storage 2x4", icon: Icons.disk },
+        "network": { label: "Network Monitor", icon: Icons.wifiHigh },
+        "network2x4": { label: "Network Monitor 2x4", icon: Icons.wifiHigh },
+        "network1x4": { label: "Network Monitor Slim", icon: Icons.wifiHigh },
+        "network1x3": { label: "Network Monitor 1x3", icon: Icons.wifiHigh },
+        "power": { label: "Power & Performance", icon: Icons.lightning },
+        "power1x3": { label: "Power & Performance 1x3", icon: Icons.lightning },
+        "bluetooth": { label: "Bluetooth", icon: Icons.bluetooth },
         "sysmonitor": { label: "System Monitor", icon: Icons.cpu },
         "battery": { label: "Battery", icon: Icons.batteryFull }
     })
@@ -110,6 +118,14 @@ Item {
         case "clockanalog": return clockAnalogComponent;
         case "worldclock": return worldClockComponent;
         case "storage": return storageComponent;
+        case "storage2x4": return storageWideComponent;
+        case "network": return networkComponent;
+        case "network2x4": return networkWideComponent;
+        case "network1x4": return networkSlimComponent;
+        case "network1x3": return networkMiniComponent;
+        case "power": return powerComponent;
+        case "power1x3": return powerMiniComponent;
+        case "bluetooth": return bluetoothComponent;
         case "sysmonitor": return sysMonitorComponent;
         case "battery": return batteryComponent;
         }
@@ -129,6 +145,14 @@ Item {
         case "clockanalog": return [160, 160];
         case "worldclock": return [320, 80];
         case "storage": return [160, 160];
+        case "storage2x4": return [320, 160];
+        case "network": return [160, 160];
+        case "network2x4": return [320, 160];
+        case "network1x4": return [320, 80];
+        case "network1x3": return [240, 80];
+        case "power": return [160, 160];
+        case "power1x3": return [240, 80];
+        case "bluetooth": return [160, 160];
         case "sysmonitor": return [160, 160];
         case "battery": return [160, 160];
         }
@@ -148,6 +172,9 @@ Item {
         };
         if (w.face !== undefined) e.face = w.face;
         if (w.timezones !== undefined) e.timezones = w.timezones;
+        if (w.device !== undefined) e.device = w.device;
+        if (w.hideIp !== undefined) e.hideIp = w.hideIp;
+        if (w.devicePriority !== undefined) e.devicePriority = w.devicePriority;
         return e;
     }
 
@@ -397,6 +424,46 @@ Item {
     Component {
         id: storageComponent
         StorageWidget {}
+    }
+
+    Component {
+        id: storageWideComponent
+        StorageWidget { wide: true; showBorder: false }
+    }
+
+    Component {
+        id: networkComponent
+        NetworkWidget {}
+    }
+
+    Component {
+        id: networkWideComponent
+        NetworkWidget { variant: "wide" }
+    }
+
+    Component {
+        id: networkSlimComponent
+        NetworkWidget { variant: "slim" }
+    }
+
+    Component {
+        id: networkMiniComponent
+        NetworkWidget { variant: "mini" }
+    }
+
+    Component {
+        id: powerComponent
+        PowerWidget {}
+    }
+
+    Component {
+        id: powerMiniComponent
+        PowerWidget { variant: "mini" }
+    }
+
+    Component {
+        id: bluetoothComponent
+        BluetoothWidget {}
     }
 
     Component {

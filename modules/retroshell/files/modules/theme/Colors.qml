@@ -61,6 +61,7 @@ FileView {
         property color lightCyan: "#84d5c4"
         property color lightGreen: "#b7d085"
         property color lightMagenta: "#fcb0d5"
+        property color lightOrange: "#ffb88a"
         property color lightRed: "#ffb4ab"
         property color lightYellow: "#dec56e"
         property color magenta: "#fcb0d5"
@@ -98,6 +99,12 @@ FileView {
         property color overWhiteContainer: "#9eeffd"
         property color overYellow: "#3b2f00"
         property color overYellowContainer: "#fce186"
+        property color orange: "#ffb88a"
+        property color orangeContainer: "#5a2e00"
+        property color orangeSource: "#ff9500"
+        property color orangeValue: "#ff9500"
+        property color overOrange: "#3c1a00"
+        property color overOrangeContainer: "#ffdcc0"
         property color outline: "#a08c8b"
         property color outlineVariant: "#534342"
         property color primary: "#ffb3ae"
@@ -174,12 +181,17 @@ FileView {
     property color lightCyan: adapter.lightCyan
     property color lightGreen: adapter.lightGreen
     property color lightMagenta: adapter.lightMagenta
+    property color lightOrange: adapter.lightOrange
     property color lightRed: adapter.lightRed
     property color lightYellow: adapter.lightYellow
     property color magenta: adapter.magenta
     property color magentaContainer: adapter.magentaContainer
     property color magentaSource: adapter.magentaSource
     property color magentaValue: adapter.magentaValue
+    property color orange: adapter.orange
+    property color orangeContainer: adapter.orangeContainer
+    property color orangeSource: adapter.orangeSource
+    property color orangeValue: adapter.orangeValue
     property color overBackground: adapter.overBackground
     property color overBlue: adapter.overBlue
     property color overBlueContainer: adapter.overBlueContainer
@@ -191,6 +203,8 @@ FileView {
     property color overGreenContainer: adapter.overGreenContainer
     property color overMagenta: adapter.overMagenta
     property color overMagentaContainer: adapter.overMagentaContainer
+    property color overOrange: adapter.overOrange
+    property color overOrangeContainer: adapter.overOrangeContainer
     property color overPrimary: adapter.overPrimary
     property color overPrimaryContainer: adapter.overPrimaryContainer
     property color overPrimaryFixed: adapter.overPrimaryFixed
@@ -249,5 +263,5 @@ FileView {
     property color success: adapter.green
 
     // List of available color names for color pickers (excludes internal/source colors)
-    readonly property var availableColorNames: ["background", "surface", "surfaceBright", "surfaceContainer", "surfaceContainerHigh", "surfaceContainerHighest", "surfaceContainerLow", "surfaceContainerLowest", "surfaceDim", "surfaceTint", "surfaceVariant", "primary", "primaryContainer", "primaryFixed", "primaryFixedDim", "secondary", "secondaryContainer", "secondaryFixed", "secondaryFixedDim", "tertiary", "tertiaryContainer", "tertiaryFixed", "tertiaryFixedDim", "error", "errorContainer", "overBackground", "overSurface", "overSurfaceVariant", "overPrimary", "overPrimaryContainer", "overPrimaryFixed", "overPrimaryFixedVariant", "overSecondary", "overSecondaryContainer", "overSecondaryFixed", "overSecondaryFixedVariant", "overTertiary", "overTertiaryContainer", "overTertiaryFixed", "overTertiaryFixedVariant", "overError", "overErrorContainer", "outline", "outlineVariant", "inversePrimary", "inverseSurface", "inverseOnSurface", "shadow", "scrim", "blue", "blueContainer", "overBlue", "overBlueContainer", "lightBlue", "cyan", "cyanContainer", "overCyan", "overCyanContainer", "lightCyan", "green", "greenContainer", "overGreen", "overGreenContainer", "lightGreen", "magenta", "magentaContainer", "overMagenta", "overMagentaContainer", "lightMagenta", "red", "redContainer", "overRed", "overRedContainer", "lightRed", "yellow", "yellowContainer", "overYellow", "overYellowContainer", "lightYellow", "white", "whiteContainer", "overWhite", "overWhiteContainer"]
+    readonly property var availableColorNames: ["background", "surface", "surfaceBright", "surfaceContainer", "surfaceContainerHigh", "surfaceContainerHighest", "surfaceContainerLow", "surfaceContainerLowest", "surfaceDim", "surfaceTint", "surfaceVariant", "primary", "primaryContainer", "primaryFixed", "primaryFixedDim", "secondary", "secondaryContainer", "secondaryFixed", "secondaryFixedDim", "tertiary", "tertiaryContainer", "tertiaryFixed", "tertiaryFixedDim", "error", "errorContainer", "overBackground", "overSurface", "overSurfaceVariant", "overPrimary", "overPrimaryContainer", "overPrimaryFixed", "overPrimaryFixedVariant", "overSecondary", "overSecondaryContainer", "overSecondaryFixed", "overSecondaryFixedVariant", "overTertiary", "overTertiaryContainer", "overTertiaryFixed", "overTertiaryFixedVariant", "overError", "overErrorContainer", "outline", "outlineVariant", "inversePrimary", "inverseSurface", "inverseOnSurface", "shadow", "scrim", "blue", "blueContainer", "overBlue", "overBlueContainer", "lightBlue", "cyan", "cyanContainer", "overCyan", "overCyanContainer", "lightCyan", "green", "greenContainer", "overGreen", "overGreenContainer", "lightGreen", "magenta", "magentaContainer", "overMagenta", "overMagentaContainer", "lightMagenta", "lightOrange", "red", "redContainer", "overRed", "overRedContainer", "lightRed", "yellow", "yellowContainer", "overYellow", "overYellowContainer", "lightYellow", "orange", "orangeContainer", "overOrange", "overOrangeContainer", "white", "whiteContainer", "overWhite", "overWhiteContainer"]
 }
