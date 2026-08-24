@@ -330,6 +330,7 @@ THEME_DEFAULTS: dict = {
     "fontSize": 14,
     "monoFont": "Iosevka Nerd Font Mono",
     "monoFontSize": 14,
+    "emojiFont": "Noto Color Emoji",
     "tintIcons": False,
     "enableCorners": True,
     "animDuration": 300,
@@ -503,10 +504,51 @@ def save_dock(data: dict) -> None:
 # Mirrors ``modules/retroshell/files/config/defaults/desktop.js``.
 DESKTOP_DEFAULTS: dict = {
     "enabled": False,
+    "showIcons": True,
     "iconSize": 40,
     "spacingVertical": 16,
     "textColor": "overBackground",
+    "editMode": False,
+    "widgetOrder": [],
+    "widgets": [],
 }
+
+# Catalog of desktop widgets the user can add/remove.
+# ``id`` -> (label, description, icon). Extend this list to add more widgets.
+DESKTOP_WIDGET_CATALOG: dict = {
+    "calendar": ("Calendar 4x4", "Large square month calendar", "x-office-calendar-symbolic"),
+    "calendar2x4": ("Calendar 2x4", "Wide compact month calendar", "x-office-calendar-symbolic"),
+    "weather": ("Weather", "Animated weather scene with 7-day forecast", "weather-clear-symbolic"),
+    "weather2x4": ("Weather 2x4", "Wide weather card with condition disc and forecast", "weather-clear-symbolic"),
+    "weather2x2": ("Weather 2x2", "Simple square animated weather card", "weather-clear-symbolic"),
+    "music2x2": ("Music Player 2x2", "Square music player with artwork and controls", "multimedia-player-symbolic"),
+    "music2x4": ("Music Player 2x4", "Tall music player with circular seek disc and controls", "multimedia-player-symbolic"),
+    "clockdigital": ("Digital Clock", "Big time and date", "appointment-new-symbolic"),
+    "clockanalog": ("Analog Clock", "Circular clock face with hands", "appointment-new-symbolic"),
+    "worldclock": ("World Clock", "Up to 4 timezones side by side", "appointment-new-symbolic"),
+    "storage": ("Device Storage", "Apple-style storage breakdown card", "drive-harddisk-symbolic"),
+    "sysmonitor": ("System Monitor", "CPU, RAM and disk usage", "utilities-system-monitor-symbolic"),
+    "battery": ("Battery", "Battery level and charging state", "battery-symbolic"),
+}
+
+# Fixed default size (px) for each widget type, used when none is stored.
+DESKTOP_WIDGET_SIZES: dict = {
+    "calendar": (320, 320),
+    "calendar2x4": (320, 160),
+    "weather": (320, 240),
+    "weather2x4": (320, 160),
+    "weather2x2": (160, 160),
+    "music2x2": (160, 160),
+    "music2x4": (320, 160),
+    "clockdigital": (160, 160),
+    "clockanalog": (160, 160),
+    "worldclock": (320, 160),
+    "storage": (160, 160),
+    "sysmonitor": (160, 160),
+    "battery": (160, 160),
+}
+
+DESKTOP_MIN_WIDGETS = 0
 
 
 def desktop_path() -> Path:
@@ -519,6 +561,45 @@ def load_desktop() -> dict:
 
 def save_desktop(data: dict) -> None:
     save_shell_json("desktop", data)
+
+
+# ── desktop_widgets.json ────────────────────────────────────────────────
+# Dedicated file for desktop widget instances. Kept separate from
+# desktop.json because Quickshell's JsonAdapter does not load top-level
+# array properties; the shell's DesktopWidgets reads/writes this file with
+# manual JSON so the widget list/positions round-trip reliably.
+
+def desktop_widgets_path() -> Path:
+    return shell_config_dir() / "desktop_widgets.json"
+
+
+def load_desktop_widgets() -> list[dict]:
+    """Return the list of desktop widget instances ``[{id,type,x,y,width,height}]``."""
+    try:
+        data = json.loads(desktop_widgets_path().read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    if isinstance(data, dict) and isinstance(data.get("widgets"), list):
+        return data["widgets"]
+    return []
+
+
+def save_desktop_widgets(widgets: list[dict]) -> None:
+    """Atomically write the desktop widget instances to desktop_widgets.json."""
+    path = desktop_widgets_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".desktop_widgets.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump({"widgets": widgets}, fh, indent=1)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 # ── system.json (Misc/OCR) ──────────────────────────────────────────────
