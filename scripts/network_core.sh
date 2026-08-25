@@ -667,6 +667,15 @@ img.save(sys.argv[2], 'PNG')
     echo "$output"
 }
 
+speed_test() {
+    local script="$RETRO_DIR/scripts/speedtest_stream.py"
+    if [[ ! -f "$script" ]]; then
+        echo "result=error|reason=speedtest_script_not_found"
+        return 1
+    fi
+    python3 "$script"
+}
+
 wifi_forget() {
     local name="$1"
     [[ -z $name ]] && echo "result=error|reason=name_required" && return 1
@@ -735,6 +744,7 @@ case "$1" in
     "--wifi-autoconnect") wifi_autoconnect ;;
     "--wifi-saved") wifi_saved ;;
     "--wifi-qr") wifi_qr "$2" ;;
+    "--speed-test") speed_test ;;
     "--wifi-forget") wifi_forget "$2" ;;
     "--ethernet-status") ethernet_status "$2" ;;
     "--network-status") network_status ;;

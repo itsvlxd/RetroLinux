@@ -463,6 +463,60 @@ Singleton {
         }
     }
 
+    // Speed test
+    property bool speedTestRunning: false
+    property string speedTestPhase: ""
+    property real speedTestPing: 0
+    property real speedTestDown: 0
+    property real speedTestUp: 0
+
+    function runSpeedTest() {
+        if (speedTestRunning) return;
+        speedTestRunning = true;
+        speedTestPhase = "ping";
+        speedTestPing = 0;
+        speedTestDown = 0;
+        speedTestUp = 0;
+        var rd = Quickshell.env("RETRO_DIR");
+        speedTestProc.command = ["bash", rd + "/scripts/network_core.sh", "--speed-test"];
+        speedTestProc.running = true;
+    }
+
+    Process {
+        id: speedTestProc
+        running: false
+        stdout: SplitParser {
+            onRead: data => {
+                try {
+                    var msg = JSON.parse(data.trim());
+                    if (msg.type === "phase") {
+                        root.speedTestPhase = msg.phase;
+                    } else if (msg.type === "ping") {
+                        root.speedTestPing = msg.value;
+                    } else if (msg.type === "download") {
+                        root.speedTestDown = msg.value;
+                    } else if (msg.type === "download_done") {
+                        root.speedTestDown = msg.value;
+                    } else if (msg.type === "upload") {
+                        root.speedTestUp = msg.value;
+                    } else if (msg.type === "upload_done") {
+                        root.speedTestUp = msg.value;
+                    } else if (msg.type === "done") {
+                        root.speedTestRunning = false;
+                        root.speedTestPhase = "";
+                    } else if (msg.type === "error") {
+                        root.speedTestRunning = false;
+                        root.speedTestPhase = "";
+                    }
+                } catch (e) {}
+            }
+        }
+        onExited: (exitCode, exitStatus) => {
+            root.speedTestRunning = false;
+            root.speedTestPhase = "";
+        }
+    }
+
     Timer {
         id: fastStatsTimer
         interval: 2000

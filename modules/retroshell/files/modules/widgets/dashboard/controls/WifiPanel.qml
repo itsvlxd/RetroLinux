@@ -19,6 +19,7 @@ Item {
 
     property bool showQr: false
     property string qrImagePath: ""
+    property bool showSpeedTest: false
 
     function formatBytes(bytes) {
         if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + " GB";
@@ -74,6 +75,7 @@ Item {
             width: networkList.width
             height: titlebar.height
                 + (showQr && qrImagePath !== "" ? 196 : 0)
+                + (showSpeedTest ? 144 : 0)
                 + (NetworkService.wifi ? 148 : 0)
                 + 2
 
@@ -89,16 +91,15 @@ Item {
 
                 actions: [
                     {
-                        icon: Icons.qrCode,
-                        tooltip: "Share WiFi via QR code",
-                        enabled: NetworkService.wifi && NetworkService.active !== null,
+                        icon: Icons.timer,
+                        tooltip: "Run speed test",
+                        enabled: NetworkService.wifi && !NetworkService.speedTestRunning,
                         onClicked: function () {
-                            if (showQr) {
-                                showQr = false;
+                            if (showSpeedTest) {
+                                showSpeedTest = false;
                             } else {
-                                var rd = Quickshell.env("RETRO_DIR");
-                                qrGenProc.command = ["bash", rd + "/scripts/network_core.sh", "--wifi-qr"];
-                                qrGenProc.running = true;
+                                NetworkService.runSpeedTest();
+                                showSpeedTest = true;
                             }
                             networkList.positionViewAtBeginning();
                         }
@@ -126,6 +127,21 @@ Item {
                         onClicked: function () {
                             NetworkService.rescanWifi();
                         }
+                    },
+                    {
+                        icon: Icons.qrCode,
+                        tooltip: "Share WiFi via QR code",
+                        enabled: NetworkService.wifi && NetworkService.active !== null,
+                        onClicked: function () {
+                            if (showQr) {
+                                showQr = false;
+                            } else {
+                                var rd = Quickshell.env("RETRO_DIR");
+                                qrGenProc.command = ["bash", rd + "/scripts/network_core.sh", "--wifi-qr"];
+                                qrGenProc.running = true;
+                            }
+                            networkList.positionViewAtBeginning();
+                        }
                     }
                 ]
 
@@ -137,52 +153,10 @@ Item {
                 }
             }
 
-            // QR Code display
-            Item {
-                id: qrDisplay
-                anchors.top: titlebar.bottom
-                anchors.topMargin: 4
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root.contentWidth
-                height: showQr && qrImagePath !== "" ? 180 : 0
-                visible: showQr && qrImagePath !== ""
-                clip: true
-
-                StyledRect {
-                    anchors.fill: parent
-                    variant: "common"
-                    enableShadow: false
-                    radius: Styling.radius(0)
-
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        Image {
-                            Layout.alignment: Qt.AlignHCenter
-                            source: qrImagePath !== "" ? "file://" + qrImagePath : ""
-                            Layout.preferredWidth: 130
-                            Layout.preferredHeight: 130
-                            fillMode: Image.PreserveAspectFit
-                            cache: false
-                        }
-
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: "Scan to connect"
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-2)
-                            color: Colors.overBackground
-                            opacity: 0.7
-                        }
-                    }
-                }
-            }
-
             // Network stats card
             Item {
                 id: statsCard
-                anchors.top: showQr && qrImagePath !== "" ? qrDisplay.bottom : titlebar.bottom
+                anchors.top: titlebar.bottom
                 anchors.topMargin: 4
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: root.contentWidth
@@ -483,6 +457,187 @@ Item {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Speed test card
+            Item {
+                id: speedTestCard
+                anchors.top: dnsCard.bottom
+                anchors.topMargin: 4
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: root.contentWidth
+                height: showSpeedTest ? 140 : 0
+                visible: showSpeedTest
+                clip: true
+
+                StyledRect {
+                    anchors.fill: parent
+                    variant: "common"
+                    enableShadow: false
+                    radius: Styling.radius(0)
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 6
+
+                        // Title
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: NetworkService.speedTestRunning
+                                ? (NetworkService.speedTestPhase === "ping" ? "Testing ping..."
+                                   : NetworkService.speedTestPhase === "download" ? "Testing download..."
+                                   : "Testing upload...")
+                                : (NetworkService.speedTestDown > 0 ? "Speed Test Results" : "Speed Test")
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.bold: true
+                            color: Colors.overBackground
+                        }
+
+                        // 3-column results: Download, Upload, Ping
+                        Row {
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 28
+
+                            // Download
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: Icons.arrowDown
+                                    font.family: Icons.font
+                                    font.pixelSize: 16
+                                    color: NetworkService.speedTestPhase === "download" ? Colors.primary : Colors.overSurfaceVariant
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: NetworkService.speedTestDown > 0 ? NetworkService.speedTestDown.toFixed(1) : "---"
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(3)
+                                    font.bold: true
+                                    color: Colors.overBackground
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: "Mbit/s"
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(-4)
+                                    color: Colors.primary
+                                }
+                            }
+
+                            // Upload
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: Icons.arrowUp
+                                    font.family: Icons.font
+                                    font.pixelSize: 16
+                                    color: NetworkService.speedTestPhase === "upload" ? Colors.primary : Colors.overSurfaceVariant
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: NetworkService.speedTestUp > 0 ? NetworkService.speedTestUp.toFixed(1) : "---"
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(3)
+                                    font.bold: true
+                                    color: Colors.overBackground
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: "Mbit/s"
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(-4)
+                                    color: Colors.primary
+                                }
+                            }
+
+                            // Ping
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: Icons.clock
+                                    font.family: Icons.font
+                                    font.pixelSize: 16
+                                    color: NetworkService.speedTestPhase === "ping" ? Colors.primary : Colors.overSurfaceVariant
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: NetworkService.speedTestPing > 0 ? NetworkService.speedTestPing.toFixed(1) : "---"
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(3)
+                                    font.bold: true
+                                    color: Colors.overBackground
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: "ms"
+                                    font.family: Config.theme.font
+                                    font.pixelSize: Styling.fontSize(-4)
+                                    color: Colors.primary
+                                }
+                            }
+                        }
+
+                        // Idle prompt
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: !NetworkService.speedTestRunning && NetworkService.speedTestDown === 0
+                            text: "Tap the timer button to start"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-3)
+                            color: Colors.overSurfaceVariant
+                        }
+                    }
+                }
+            }
+
+            // QR Code display
+            Item {
+                id: qrDisplay
+                anchors.top: speedTestCard.visible ? speedTestCard.bottom : dnsCard.bottom
+                anchors.topMargin: 4
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: root.contentWidth
+                height: showQr && qrImagePath !== "" ? 180 : 0
+                visible: showQr && qrImagePath !== ""
+                clip: true
+
+                StyledRect {
+                    anchors.fill: parent
+                    variant: "common"
+                    enableShadow: false
+                    radius: Styling.radius(0)
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        Image {
+                            Layout.alignment: Qt.AlignHCenter
+                            source: qrImagePath !== "" ? "file://" + qrImagePath : ""
+                            Layout.preferredWidth: 130
+                            Layout.preferredHeight: 130
+                            fillMode: Image.PreserveAspectFit
+                            cache: false
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Scan to connect"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            color: Colors.overBackground
+                            opacity: 0.7
                         }
                     }
                 }
