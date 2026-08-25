@@ -101,6 +101,9 @@ wifi_connect() {
         nmcli connection modify "$ssid" 802-11-wireless.cloned-mac-address "random" 2>/dev/null
         nmcli connection up "$ssid" 2>/dev/null
 
+        nmcli connection modify "$ssid" ipv4.dns "1.1.1.1 1.0.0.1" 2>/dev/null
+        nmcli connection modify "$ssid" ipv4.ignore-auto-dns yes 2>/dev/null
+
         return 0
     fi
 
@@ -490,8 +493,178 @@ check_internet() {
     ping -c 1 -W 3 1.1.1.1 &>/dev/null
 }
 
+set_dns_provider() {
+    local provider="$1"
+    local iface="${2:-$(get_wifi_interfaces | head -1)}"
+
+    [[ -z $provider ]] && echo "result=error|reason=provider_required" && return 1
+
+    local dns1="" dns2=""
+
+    case "$provider" in
+        cloudflare)  dns1="1.1.1.1"; dns2="1.0.0.1" ;;
+        google)      dns1="8.8.8.8"; dns2="8.8.4.4" ;;
+        cloud9)      dns1="9.9.9.9"; dns2="149.112.112.112" ;;
+        dhcp)
+            local conn_name
+            conn_name=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$iface$" | cut -d: -f1)
+            if [[ -n $conn_name ]]; then
+                nmcli connection modify "$conn_name" ipv4.method auto >/dev/null 2>&1
+                nmcli connection modify "$conn_name" ipv4.dns "" >/dev/null 2>&1
+                nmcli connection modify "$conn_name" ipv4.ignore-auto-dns no >/dev/null 2>&1
+                nmcli connection down "$conn_name" >/dev/null 2>&1
+                ip addr flush dev "$iface" 2>/dev/null
+                sleep 1
+                nmcli connection up "$conn_name" >/dev/null 2>&1
+            fi
+            echo "result=success|provider=dhcp|iface=$iface"
+            return 0
+            ;;
+        *)
+            echo "result=error|reason=unknown_provider|provider=$provider"
+            return 1
+            ;;
+    esac
+
+    local conn_name
+    conn_name=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$iface$" | cut -d: -f1)
+
+    if [[ -n $conn_name ]]; then
+        nmcli connection modify "$conn_name" ipv4.dns "$dns1 $dns2" >/dev/null 2>&1
+        nmcli connection modify "$conn_name" ipv4.ignore-auto-dns yes >/dev/null 2>&1
+        nmcli connection down "$conn_name" >/dev/null 2>&1
+        ip addr flush dev "$iface" 2>/dev/null
+        sleep 1
+        nmcli connection up "$conn_name" >/dev/null 2>&1
+    fi
+
+    echo "result=success|provider=$provider|dns1=$dns1|dns2=$dns2|iface=$iface"
+}
+
+get_dns_provider() {
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
+    local conn_name
+    conn_name=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$iface$" | cut -d: -f1)
+
+    if [[ -n $conn_name ]]; then
+        local ignore_dns
+        ignore_dns=$(nmcli -t -f ipv4.ignore-auto-dns connection show "$conn_name" 2>/dev/null | sed 's/ipv4.ignore-auto-dns://')
+
+        if [[ "$ignore_dns" == "no" || -z "$ignore_dns" ]]; then
+            echo "provider=dhcp"
+            return 0
+        fi
+
+        local dns_servers
+        dns_servers=$(nmcli -t -f ipv4.dns connection show "$conn_name" 2>/dev/null | sed 's/ipv4.dns://')
+
+        if echo "$dns_servers" | grep -q "1.1.1.1"; then
+            echo "provider=cloudflare"
+        elif echo "$dns_servers" | grep -q "8.8.8.8"; then
+            echo "provider=google"
+        elif echo "$dns_servers" | grep -q "9.9.9.9"; then
+            echo "provider=cloud9"
+        else
+            echo "provider=custom|dns=$dns_servers"
+        fi
+    else
+        echo "provider=dhcp"
+    fi
+}
+
+net_stats() {
+    local DEV=$(ip route show default 2>/dev/null | awk '/default/{print $5}' | head -1)
+    [[ -z "$DEV" ]] && exit 1
+
+    local PING=$(ping -c 1 -W 2 8.8.8.8 2>/dev/null | grep 'time=' | sed 's/.*time=\([0-9.]*\).*/\1/')
+    local LOSS=$(ping -c 3 -W 2 8.8.8.8 2>/dev/null | grep -o '[0-9]*% packet loss' | grep -o '[0-9]*')
+    local RX=$(cat "/sys/class/net/$DEV/statistics/rx_bytes" 2>/dev/null || echo 0)
+    local TX=$(cat "/sys/class/net/$DEV/statistics/tx_bytes" 2>/dev/null || echo 0)
+    local IP=$(ip -4 addr show "$DEV" 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1)
+    local GW=$(ip route show default 2>/dev/null | awk '{print $3}' | head -1)
+
+    local STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/retro"
+    mkdir -p "$STATE_DIR" 2>/dev/null
+    local STATE_FILE="$STATE_DIR/net_stats.json"
+
+    local CUM_RX=$RX CUM_TX=$TX
+    if [[ -f "$STATE_FILE" ]]; then
+        local prev_rx prev_tx prev_dev
+        prev_dev=$(grep '^dev=' "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+        prev_rx=$(grep '^rx=' "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+        prev_tx=$(grep '^tx=' "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+
+        if [[ -n "$prev_dev" && -n "$prev_rx" && -n "$prev_tx" ]]; then
+            if [[ "$prev_dev" != "$DEV" ]]; then
+                CUM_RX=$RX
+                CUM_TX=$TX
+            elif (( RX < prev_rx || TX < prev_tx )); then
+                CUM_RX=$(( prev_rx + RX ))
+                CUM_TX=$(( prev_tx + TX ))
+            else
+                CUM_RX=$RX
+                CUM_TX=$TX
+            fi
+        fi
+    fi
+
+    cat > "$STATE_FILE" <<EOF
+dev=$DEV
+rx=$CUM_RX
+tx=$CUM_TX
+EOF
+
+    echo "${PING:-0}|${LOSS:-0}|${RX:-0}|${TX:-0}|${IP:-N/A}|${GW:-N/A}|${CUM_RX}|${CUM_TX}"
+}
+
 wifi_saved() {
     nmcli -t -f NAME,TYPE connection show 2>/dev/null | grep ":802-11-wireless" | sed 's/:802-11-wireless//'
+}
+
+wifi_qr() {
+    local iface="${1:-$(get_wifi_interfaces | head -1)}"
+
+    local ssid
+    ssid=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | grep "GENERAL.CONNECTION:" | sed 's/GENERAL.CONNECTION://')
+    [[ -z "$ssid" || "$ssid" == "--" ]] && exit 1
+
+    local password
+    password=$(nmcli -s -t -f 802-11-wireless-security.psk connection show "$ssid" 2>/dev/null | sed 's/802-11-wireless-security.psk://')
+    [[ -z "$password" ]] && exit 1
+
+    local ssid_escaped password_escaped
+    ssid_escaped=$(printf '%s' "$ssid" | sed 's/\\/\\\\/g; s/;/\\;/g; s/:/\\:/g')
+    password_escaped=$(printf '%s' "$password" | sed 's/\\/\\\\/g; s/;/\\;/g; s/:/\\:/g')
+
+    local qr_string="WIFI:T:WPA;S:${ssid_escaped};P:${password_escaped};;"
+
+    local tmp_png tmp_rgb output_dir output
+    tmp_png=$(mktemp /tmp/wifi_qr_XXXXXX.png)
+    tmp_rgb=$(mktemp /tmp/wifi_qr_XXXXXX.rgb)
+
+    qrencode -o "$tmp_png" -s 8 -m 2 "$qr_string" 2>/dev/null
+    [[ $? -ne 0 ]] && rm -f "$tmp_png" "$tmp_rgb" && exit 1
+
+    python3 -c "
+from PIL import Image
+import sys
+img = Image.open(sys.argv[1]).convert('RGB')
+img.save(sys.argv[2], 'RGB')
+" "$tmp_png" "$tmp_rgb" 2>/dev/null
+
+    output_dir="${XDG_CACHE_HOME:-$HOME/.cache}/retro"
+    mkdir -p "$output_dir" 2>/dev/null
+    output="$output_dir/wifi_qr.png"
+
+    python3 -c "
+from PIL import Image
+import sys
+img = Image.open(sys.argv[1]).convert('RGB')
+img.save(sys.argv[2], 'PNG')
+" "$tmp_rgb" "$output" 2>/dev/null
+
+    rm -f "$tmp_png" "$tmp_rgb"
+    echo "$output"
 }
 
 wifi_forget() {
@@ -561,6 +734,7 @@ case "$1" in
     "--wifi-status") wifi_status "$2" ;;
     "--wifi-autoconnect") wifi_autoconnect ;;
     "--wifi-saved") wifi_saved ;;
+    "--wifi-qr") wifi_qr "$2" ;;
     "--wifi-forget") wifi_forget "$2" ;;
     "--ethernet-status") ethernet_status "$2" ;;
     "--network-status") network_status ;;
@@ -573,4 +747,7 @@ case "$1" in
     "--set-dns") set_dns "$2" "$3" "$4" ;;
     "--interface-info") interface_info "$2" ;;
     "--check-internet") check_internet && echo "result=online" || echo "result=offline" ;;
+    "--net-stats") net_stats ;;
+    "--set-dns-provider") set_dns_provider "$2" "$3" ;;
+    "--get-dns-provider") get_dns_provider "$2" ;;
 esac

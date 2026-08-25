@@ -211,6 +211,7 @@ Singleton {
         updateConnectionType.startCheck();
         wifiStatusProcess.running = true;
         updateNetworkName.running = true;
+        getDnsProvider();
         
         if (uiOpen) {
             updateNetworkStrength.running = true;
@@ -401,8 +402,128 @@ Singleton {
         WifiAccessPoint {}
     }
 
+    // Net stats properties
+    property bool netStatsActive: false
+    property real netPingMs: 0
+    property real netPacketLoss: 0
+    property string netDeviceIp: "N/A"
+    property string netGatewayIp: "N/A"
+    property real netDownloadSpeed: 0
+    property real netUploadSpeed: 0
+    property real netTotalDownloaded: 0
+    property real netTotalUploaded: 0
+    property real _netPrevRxBytes: 0
+    property real _netPrevTxBytes: 0
+    property real _netPrevTimestamp: 0
+
+    // DNS provider
+    property string netDnsProvider: "cloudflare"
+
+    function setDnsProvider(provider) {
+        var rd = Quickshell.env("RETRO_DIR");
+        dnsProviderProc.command = ["bash", rd + "/scripts/network_core.sh", "--set-dns-provider", provider];
+        dnsProviderProc.running = true;
+    }
+
+    function getDnsProvider() {
+        var rd = Quickshell.env("RETRO_DIR");
+        dnsGetProc.command = ["bash", rd + "/scripts/network_core.sh", "--get-dns-provider"];
+        dnsGetProc.running = true;
+    }
+
+    Process {
+        id: dnsProviderProc
+        running: false
+        property string buffer: ""
+        stdout: SplitParser {
+            onRead: data => dnsProviderProc.buffer += data + "\n"
+        }
+        onExited: (exitCode, exitStatus) => {
+            var text = dnsProviderProc.buffer.trim();
+            dnsProviderProc.buffer = "";
+            if (text.includes("result=success")) {
+                var providerMatch = text.match(/provider=(\w+)/);
+                if (providerMatch) root.netDnsProvider = providerMatch[1];
+            }
+        }
+    }
+
+    Process {
+        id: dnsGetProc
+        running: false
+        property string buffer: ""
+        stdout: SplitParser {
+            onRead: data => dnsGetProc.buffer += data + "\n"
+        }
+        onExited: (exitCode, exitStatus) => {
+            var text = dnsGetProc.buffer.trim();
+            dnsGetProc.buffer = "";
+            var providerMatch = text.match(/provider=(\w+)/);
+            if (providerMatch) root.netDnsProvider = providerMatch[1];
+        }
+    }
+
+    Timer {
+        id: fastStatsTimer
+        interval: 2000
+        repeat: true
+        running: root.netStatsActive
+        onTriggered: root._pollNetStats()
+    }
+
+    Timer {
+        id: slowStatsTimer
+        interval: 60000
+        repeat: true
+        running: !root.netStatsActive
+        onTriggered: root._pollNetStats()
+    }
+
+    function _pollNetStats() {
+        var rd = Quickshell.env("RETRO_DIR");
+        netStatsProc.command = ["bash", rd + "/scripts/network_core.sh", "--net-stats"];
+        netStatsProc.running = true;
+    }
+
+    Process {
+        id: netStatsProc
+        running: false
+        property string buffer: ""
+        stdout: SplitParser {
+            onRead: data => netStatsProc.buffer += data + "\n"
+        }
+        onExited: (exitCode, exitStatus) => {
+            var text = netStatsProc.buffer.trim();
+            netStatsProc.buffer = "";
+            var parts = text.split("|");
+            if (parts.length < 8) return;
+
+            root.netPingMs = parseFloat(parts[0]) || 0;
+            root.netPacketLoss = parseFloat(parts[1]) || 0;
+            var rxBytes = parseFloat(parts[2]) || 0;
+            var txBytes = parseFloat(parts[3]) || 0;
+            root.netDeviceIp = parts[4] || "N/A";
+            root.netGatewayIp = parts[5] || "N/A";
+            root.netTotalDownloaded = parseFloat(parts[6]) || 0;
+            root.netTotalUploaded = parseFloat(parts[7]) || 0;
+
+            var now = Date.now();
+            if (root._netPrevTimestamp > 0) {
+                var elapsed = (now - root._netPrevTimestamp) / 1000;
+                if (elapsed > 0) {
+                    root.netDownloadSpeed = Math.max(0, (rxBytes - root._netPrevRxBytes) / elapsed);
+                    root.netUploadSpeed = Math.max(0, (txBytes - root._netPrevTxBytes) / elapsed);
+                }
+            }
+            root._netPrevRxBytes = rxBytes;
+            root._netPrevTxBytes = txBytes;
+            root._netPrevTimestamp = now;
+        }
+    }
+
     Component.onCompleted: {
         update();
         wifiStatusProcess.running = true;
+        _pollNetStats();
     }
 }
