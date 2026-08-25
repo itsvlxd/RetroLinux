@@ -29,12 +29,15 @@ Item {
     }
 
     Component.onCompleted: {
-        NetworkService.netStatsActive = true;
         initialScanTimer.start();
     }
 
-    Component.onDestruction: {
-        NetworkService.netStatsActive = false;
+    onVisibleChanged: {
+        if (visible) {
+            NetworkService.netStatsActive = true;
+        } else {
+            NetworkService.netStatsActive = false;
+        }
     }
 
     Timer {

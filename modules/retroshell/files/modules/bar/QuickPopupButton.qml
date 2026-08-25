@@ -23,6 +23,7 @@ Item {
     property real startRadius: radius
     property real endRadius: radius
     property bool layerEnabled: true
+    property bool hasOpened: false
 
     property bool isHovered: false
     readonly property bool popupOpen: popup.isOpen
@@ -79,7 +80,10 @@ Item {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: popup.toggle()
+            onClicked: {
+                root.hasOpened = true;
+                popup.toggle();
+            }
         }
     }
 
@@ -93,7 +97,7 @@ Item {
 
         Loader {
             anchors.fill: parent
-            active: popup.isOpen
+            active: root.hasOpened
             source: root.panelSource
             asynchronous: true
             onLoaded: {
