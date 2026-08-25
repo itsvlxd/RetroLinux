@@ -141,6 +141,12 @@ context.modules = [
 ]
 EOF
 
+    # Add user to input group for typing sounds (libinput/evtest access)
+    if ! id -nG "$USER" | tr ' ' '\n' | grep -qx input; then
+        sudo usermod -aG input "$USER" 2>/dev/null || true
+        rx_log "info" "Added user to input group"
+    fi
+
     retro polkit setup --needed -y
     if [[ ${FIREWALL_ENABLED:-true} == "true" ]]; then
         sudo systemctl enable nftables 2>/dev/null || true

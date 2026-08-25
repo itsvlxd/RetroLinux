@@ -24,6 +24,7 @@ import "defaults/dock.js" as DockDefaults
 import "defaults/ai.js" as AiDefaults
 import "defaults/dashboard.js" as DashboardDefaults
 import "defaults/notifications.js" as NotificationsDefaults
+import "defaults/typing_sounds.js" as TypingSoundsDefaults
 import "ConfigValidator.js" as ConfigValidator
 
 Singleton {
@@ -59,11 +60,12 @@ Singleton {
     property bool dockReady: false
     property bool dashboardReady: false
     property bool notificationsReady: false
+    property bool typingSoundsReady: false
     property bool aiReady: false
     property bool toolsReady: false
     property bool keybindsInitialLoadComplete: false
 
-    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && notificationsReady && aiReady && toolsReady
+    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && notificationsReady && aiReady && toolsReady && typingSoundsReady
 
     // Compatibility aliases
     property alias loader: themeLoader
@@ -1377,6 +1379,49 @@ Singleton {
             property int sidebarWidth: 400
             property string sidebarPosition: "right"
             property bool sidebarPinnedOnStartup: false
+        }
+    }
+
+    // ============================================
+    // TYPING SOUNDS MODULE
+    // ============================================
+    FileView {
+        id: typingSoundsLoader
+        path: root.configDir + "/typing_sounds.json"
+        atomicWrites: true
+        watchChanges: true
+        onLoaded: {
+            if (!root.typingSoundsReady) {
+                validateModule("typingSounds", typingSoundsLoader, TypingSoundsDefaults.data, () => {
+                    root.typingSoundsReady = true;
+                });
+            }
+        }
+        onLoadFailed: {
+            if (error.toString().includes("FileNotFound") && !root.typingSoundsReady) {
+                handleMissingConfig("typingSounds", typingSoundsLoader, TypingSoundsDefaults.data, () => {
+                    root.typingSoundsReady = true;
+                });
+            }
+        }
+        onFileChanged: {
+            root.pauseAutoSave = true;
+            reload();
+            root.pauseAutoSave = false;
+        }
+        onPathChanged: reload()
+        onAdapterUpdated: {
+            if (root.typingSoundsReady && !root.pauseAutoSave) {
+                typingSoundsLoader.writeAdapter();
+            }
+        }
+
+        adapter: JsonAdapter {
+            property bool enabled: false
+            property int volume: 100
+            property bool mouseEnabled: false
+            property string selectedPackId: "nk-cream"
+            property string selectedDevicePath: "all"
         }
     }
 
@@ -3671,6 +3716,9 @@ Singleton {
     // AI configuration
     property QtObject ai: aiLoader.adapter
 
+    // Typing Sounds configuration
+    property QtObject typingSounds: typingSoundsLoader.adapter
+
     // Module save functions
     function saveBar() {
         barLoader.writeAdapter();
@@ -3716,6 +3764,9 @@ Singleton {
     }
     function saveAi() {
         aiLoader.writeAdapter();
+    }
+    function saveTypingSounds() {
+        typingSoundsLoader.writeAdapter();
     }
 
     // Color helpers

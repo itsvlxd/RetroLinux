@@ -288,6 +288,7 @@ ShellRoot {
                 _ = GlobalShortcuts.appId; // Force init (IPC pipe listener)
                 _ = Shazam.available; // Force init (availability probe)
                 _ = Tesseract.available; // Force init (availability probe)
+                _ = TypingSoundsService.enabled; // Force init (typing sounds daemon)
             });
         }
     }

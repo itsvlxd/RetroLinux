@@ -58,6 +58,7 @@ _CONTROL_LABELS = {
     "bluetooth": "Bluetooth",
     "quickshare": "Quick Share",
     "caffeine": "Caffeine",
+    "typingSounds": "Typing Sounds",
     "darkmode": "Dark Mode",
     "nightlight": "Night Light",
 }
@@ -67,6 +68,7 @@ _CONTROL_DESCRIPTIONS = {
     "bluetooth": "Toggle Bluetooth and manage paired devices",
     "quickshare": "Toggle Quick Share file transfer",
     "caffeine": "Inhibit sleep with an optional timer",
+    "typingSounds": "Mechanical keyboard typing sounds",
     "darkmode": "Switch between dark and light theme",
     "nightlight": "Toggle the warm night-light filter",
 }
@@ -76,6 +78,7 @@ _CONTROL_ICONS = {
     "bluetooth": "bluetooth-symbolic",
     "quickshare": "send-to-symbolic",
     "caffeine": "caffeine-symbolic",
+    "typingSounds": "input-keyboard-symbolic",
     "darkmode": "darkmode-symbolic",
     "nightlight": "nightlight-symbolic",
 }

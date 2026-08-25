@@ -36,6 +36,7 @@ case "$1" in
             fi
             rm -f "$PID_FILE"
         fi
+        rm -rf "${HOME}/.cache/quickshell/qmlcache" "${HOME}/.cache/quickshell/qtpipelinecache-"* 2>/dev/null
         export QS_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'")
         export QT_QPA_PLATFORMTHEME=qt6ct
         nohup qs -p "$SHELL_DIR/shell.qml" >/dev/null 2>&1 &
@@ -91,6 +92,7 @@ case "$1" in
     "--restart")
         bash "$0" --stop
         sleep 0.5
+        rm -rf "${HOME}/.cache/quickshell/qmlcache" "${HOME}/.cache/quickshell/qtpipelinecache-"* 2>/dev/null
         bash "$0" --start
         ;;
     *)

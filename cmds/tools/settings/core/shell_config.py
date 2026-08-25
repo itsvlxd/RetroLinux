@@ -136,6 +136,7 @@ BAR_RIGHT_ITEMS: dict = {
     "battery": ("Battery", "Show battery level", "battery-symbolic"),
     "clock": ("Time, Weather & Calendar", "Time, date, calendar and weather", "clock-symbolic"),
     "power": ("Power Button", "Open the power menu", "system-shutdown-symbolic"),
+    "typingSounds": ("Typing Sounds", "Mechanical keyboard typing sounds", "input-keyboard-symbolic"),
 }
 
 # Unified catalog of every reorderable bar item (left + right), so an item keeps
@@ -976,7 +977,7 @@ def save_tools(data: dict) -> None:
 # hot-action buttons. Groups are all reorderable but never removable; the
 # QuickControls buttons can be added/removed down to DASHBOARD_MIN_CONTROLS.
 DASHBOARD_WIDGET_IDS = ("player", "quickactions", "notifications", "controls")
-DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight")
+DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "typingSounds", "darkmode", "nightlight")
 DASHBOARD_MIN_CONTROLS = 5
 
 DASHBOARD_DEFAULTS: dict = {
@@ -1016,3 +1017,74 @@ def load_notifications() -> dict:
 
 def save_notifications(data: dict) -> None:
     save_shell_json("notifications", data)
+
+
+# ── typing_sounds.json ────────────────────────────────────────────────
+
+# Bundled sound pack directory inside the retroshell module.
+TYPING_SOUNDS_PACKS_DIR = Path("/opt/retrolinux/modules/retroshell/files/assets/typing-sounds-soundpacks")
+
+# Catalog of bundled sound packs: id -> display name.
+# Scanned dynamically at runtime; this dict provides fallback names.
+TYPING_SOUNDS_PACK_NAMES: dict = {
+    "nk-cream": "NK Cream",
+    "cherrymx-black-abs": "Cherry MX Black (ABS)",
+    "cherrymx-black-pbt": "Cherry MX Black (PBT)",
+    "cherrymx-blue-abs": "Cherry MX Blue (ABS)",
+    "cherrymx-blue-pbt": "Cherry MX Blue (PBT)",
+    "cherrymx-brown-abs": "Cherry MX Brown (ABS)",
+    "cherrymx-brown-pbt": "Cherry MX Brown (PBT)",
+    "cherrymx-red-abs": "Cherry MX Red (ABS)",
+    "cherrymx-red-pbt": "Cherry MX Red (PBT)",
+    "cream-travel": "Cream Travel",
+    "eg-crystal-purple": "EG Crystal Purple",
+    "eg-oreo": "EG Oreo",
+    "holy-pandas": "Holy Pandas",
+    "mxblack-travel": "MX Black Travel",
+    "mxblue-travel": "MX Blue Travel",
+    "mxbrown-travel": "MX Brown Travel",
+    "topre-purple-hybrid-pbt": "Topre Purple Hybrid (PBT)",
+    "turquoise": "Turquoise",
+}
+
+TYPING_SOUNDS_DEFAULTS: dict = {
+    "enabled": False,
+    "volume": 100,
+    "mouseEnabled": False,
+    "selectedPackId": "nk-cream",
+    "selectedDevicePath": "all",
+}
+
+
+def typing_sounds_path() -> Path:
+    return shell_config_dir() / "typing_sounds.json"
+
+
+def load_typing_sounds() -> dict:
+    return load_shell_json("typing_sounds", TYPING_SOUNDS_DEFAULTS)
+
+
+def save_typing_sounds(data: dict) -> None:
+    save_shell_json("typing_sounds", data)
+
+
+def scan_typing_sound_packs() -> list[dict]:
+    """Return list of {id, name} for every bundled sound pack."""
+    packs: list[dict] = []
+    if not TYPING_SOUNDS_PACKS_DIR.is_dir():
+        return packs
+    for d in sorted(TYPING_SOUNDS_PACKS_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        config_file = d / "config.json"
+        if config_file.exists():
+            try:
+                import json
+                cfg = json.loads(config_file.read_text())
+                name = cfg.get("name", d.name)
+            except (json.JSONDecodeError, OSError):
+                name = TYPING_SOUNDS_PACK_NAMES.get(d.name, d.name)
+        else:
+            name = TYPING_SOUNDS_PACK_NAMES.get(d.name, d.name)
+        packs.append({"id": d.name, "name": name})
+    return packs

@@ -8,5 +8,6 @@ unzip curl
 brightnessctl networkmanager syntax-highlighting
 wl-clipboard slurp hyprpicker upower gpu-screen-recorder
 pulseaudio-utils mpg123
+libinput evtest
 
 go

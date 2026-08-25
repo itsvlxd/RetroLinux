@@ -576,6 +576,7 @@ Item {
         case "battery": return batteryComponent;
         case "clock": return clockComponent;
         case "power": return powerComponent;
+        case "typingSounds": return typingSoundsComponent;
         }
         return undefined;
     }
@@ -804,6 +805,19 @@ Item {
         PowerButton {
             vertical: root.orientation === "vertical"
             enableShadow: root.shadowsEnabled
+        }
+    }
+
+    Component {
+        id: typingSoundsComponent
+        Bar.QuickPopupButton {
+            iconName: TypingSoundsService.enabled ? Icons.keyboard : Icons.keyboard
+            tooltipText: "Typing Sounds"
+            panelSource: "../widgets/dashboard/controls/TypingSoundsPanel.qml"
+            isActive: TypingSoundsService.enabled
+            bar: root
+            vertical: root.orientation === "vertical"
+            layerEnabled: root.shadowsEnabled
         }
     }
 }
