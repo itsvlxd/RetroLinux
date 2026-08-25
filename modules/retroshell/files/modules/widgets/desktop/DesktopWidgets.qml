@@ -108,7 +108,10 @@ Item {
         "batteryring2x4": { label: "Battery Rings 2x4", icon: Icons.batteryFull },
         "feed": { label: "Dev Feed", icon: Icons.globe },
         "sysmonitor": { label: "System Monitor", icon: Icons.cpu },
-        "battery": { label: "Battery", icon: Icons.batteryFull }
+        "battery": { label: "Battery", icon: Icons.batteryFull },
+        "photo": { label: "Photo 2x2", icon: Icons.folder },
+        "photo2x4": { label: "Photo 2x4", icon: Icons.folder },
+        "photo4x2": { label: "Photo 4x2", icon: Icons.folder }
     })
 
     // Look up a widget's data entry by id.
@@ -148,6 +151,9 @@ Item {
         case "feed": return feedComponent;
         case "sysmonitor": return sysMonitorComponent;
         case "battery": return batteryComponent;
+        case "photo": return photoComponent;
+        case "photo2x4": return photoWideComponent;
+        case "photo4x2": return photoTallComponent;
         }
         return null;
     }
@@ -179,6 +185,9 @@ Item {
         case "feed": return [320, 160];
         case "sysmonitor": return [160, 160];
         case "battery": return [160, 160];
+        case "photo": return [160, 160];
+        case "photo2x4": return [320, 160];
+        case "photo4x2": return [160, 320];
         }
         return [280, 240];
     }
@@ -211,6 +220,8 @@ Item {
         if (w.autoSwipe !== undefined) e.autoSwipe = w.autoSwipe;
         if (w.swipeInterval !== undefined) e.swipeInterval = w.swipeInterval;
         if (w.count !== undefined) e.count = w.count;
+        if (w.imagePath !== undefined) e.imagePath = w.imagePath;
+        if (w.showBorder !== undefined) e.showBorder = w.showBorder;
         return e;
     }
 
@@ -557,6 +568,21 @@ Item {
     Component {
         id: batteryComponent
         BatteryWidget {}
+    }
+
+    Component {
+        id: photoComponent
+        PhotoWidget {}
+    }
+
+    Component {
+        id: photoWideComponent
+        PhotoWidget { implicitWidth: 320 }
+    }
+
+    Component {
+        id: photoTallComponent
+        PhotoWidget { implicitHeight: 320 }
     }
 
     // Hint shown when in edit mode with no widgets yet.

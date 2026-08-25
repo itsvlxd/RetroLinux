@@ -542,6 +542,9 @@ DESKTOP_WIDGET_CATALOG: dict = {
     "feed": ("Dev Feed", "Full-cover article feed (DEV.to / Hacker News / daily.dev)", "globe-symbolic"),
     "sysmonitor": ("System Monitor", "CPU, RAM and disk usage", "utilities-system-monitor-symbolic"),
     "battery": ("Battery", "Battery level and charging state", "battery-symbolic"),
+    "photo": ("Photo 2x2", "Display an image on your desktop", "image-x-generic-symbolic"),
+    "photo2x4": ("Photo 2x4", "Display a wide image on your desktop", "image-x-generic-symbolic"),
+    "photo4x2": ("Photo 4x2", "Display a portrait image on your desktop", "image-x-generic-symbolic"),
 }
 
 # Fixed default size (px) for each widget type, used when none is stored.
@@ -571,6 +574,9 @@ DESKTOP_WIDGET_SIZES: dict = {
     "feed": (320, 160),
     "sysmonitor": (160, 160),
     "battery": (160, 160),
+    "photo": (160, 160),
+    "photo2x4": (320, 160),
+    "photo4x2": (160, 320),
 }
 
 DESKTOP_MIN_WIDGETS = 0

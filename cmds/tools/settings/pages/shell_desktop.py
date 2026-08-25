@@ -26,7 +26,7 @@ import sys
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk
 
 from settings.core.pending import PendingChange
 from settings.core.shell_config import (
@@ -335,6 +335,13 @@ class ShellDesktopPage:
                 edit_btn.add_css_class("flat")
                 edit_btn.set_tooltip_text("Feed options")
                 edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_feed(i))
+                row.add_suffix(edit_btn)
+            elif wid in ("photo", "photo2x4", "photo4x2"):
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Choose image")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_photo(i))
                 row.add_suffix(edit_btn)
             elif wid == "worldclock":
                 edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
@@ -976,6 +983,88 @@ class ShellDesktopPage:
         dialog.connect("response", _on_response)
         dialog.present(self._window)
 
+    # ── Photo widget image picker ──
+
+    def _on_edit_photo(self, idx: int) -> None:
+        """Let the user pick an image file for the photo widget."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Choose an image")
+        filt = Gtk.FileFilter()
+        filt.set_name("Images")
+        for mime in ("image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif", "image/bmp"):
+            filt.add_mime_type(mime)
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(filt)
+        dialog.set_filters(filters)
+
+        current_path = widget.get("imagePath") or ""
+        current_name = os.path.basename(current_path) if current_path else ""
+
+        group = Adw.PreferencesGroup()
+
+        path_row = Adw.ActionRow(title="Current image", subtitle=current_name or "(placeholder)")
+        group.add(path_row)
+
+        clear_btn = Gtk.Button(label="Clear image")
+        clear_btn.set_valign(Gtk.Align.CENTER)
+        clear_btn.add_css_class("flat")
+        clear_btn.set_tooltip_text("Remove image and show default placeholder")
+
+        def _on_clear(_btn):
+            widget["imagePath"] = ""
+            self._notify_dirty()
+            self._rebuild_widgets()
+
+        clear_btn.connect("clicked", _on_clear)
+        path_row.add_suffix(clear_btn)
+
+        border_switch = Adw.SwitchRow(
+            title="Show border",
+            subtitle="Display the themed inner border around the image",
+        )
+        border_switch.set_active(bool(widget.get("showBorder", True)))
+        group.add(border_switch)
+
+        dlg = Adw.AlertDialog(
+            heading="Photo Widget",
+            body="Set a custom image for this widget.",
+            extra_child=group,
+        )
+        dlg.add_response("pick", "Choose image")
+        dlg.add_response("cancel", "Close")
+        dlg.set_default_response("pick")
+        dlg.set_close_response("cancel")
+
+        def _on_response(_dlg_obj, response):
+            if response == "pick":
+                def on_chosen(_file_dlg, result):
+                    try:
+                        gfile = _file_dlg.open_finish(result)
+                    except GLib.Error:
+                        return
+                    if not gfile:
+                        return
+                    path = gfile.get_path()
+                    if not path or not os.path.isfile(path):
+                        return
+                    widget["imagePath"] = path
+                    widget["showBorder"] = bool(border_switch.get_active())
+                    self._notify_dirty()
+                    self._rebuild_widgets()
+
+                dialog.open(self._window, None, on_chosen)
+            else:
+                widget["showBorder"] = bool(border_switch.get_active())
+                self._notify_dirty()
+                self._rebuild_widgets()
+
+        dlg.connect("response", _on_response)
+        dlg.present(self._window)
+
     # ── World clock timezone editor ──
 
     def _on_edit_timezones(self, idx: int) -> None:
@@ -1187,7 +1276,7 @@ class ShellDesktopPage:
                 entry = dict(existing)
                 entry["id"] = wid
                 entry["type"] = w.get("type", existing.get("type", wid))
-                for extra in ("face", "handStyle", "timezones", "device", "hideIp", "devicePriority", "noteId", "openFullscreen", "fontSize", "hiddenDevices", "tag", "monitor", "source", "apiKey", "autoSwipe", "swipeInterval", "count"):
+                for extra in ("face", "handStyle", "timezones", "device", "hideIp", "devicePriority", "noteId", "openFullscreen", "fontSize", "hiddenDevices", "tag", "monitor", "source", "apiKey", "autoSwipe", "swipeInterval", "count", "imagePath", "showBorder"):
                     if w.get(extra) is not None:
                         entry[extra] = w[extra]
                 merged.append(entry)

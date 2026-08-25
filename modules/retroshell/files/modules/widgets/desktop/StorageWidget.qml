@@ -25,10 +25,12 @@ WidgetHost {
     property bool showBorder: true
 
     property var sampleSegments: [
-        { label: "System & Apps", sizeGB: 120, color: "#FF3B30", striped: false },
-        { label: "Home Directory", sizeGB: 180, color: "#34C759", striped: false },
-        { label: "Cache & Containers", sizeGB: 45, color: "#FF9500", striped: false },
-        { label: "System Root", sizeGB: 30, color: "#D1D1D6", striped: true }
+        { label: "System", sizeGB: 120, color: "#FF3B30", striped: false },
+        { label: "Home", sizeGB: 180, color: "#34C759", striped: false },
+        { label: "Apps", sizeGB: 80, color: "#007AFF", striped: false },
+        { label: "Cache", sizeGB: 45, color: "#FF9500", striped: false },
+        { label: "Root", sizeGB: 30, color: "#D1D1D6", striped: true },
+        { label: "Other", sizeGB: 57, color: "#8E8E93", striped: true }
     ]
     property real sampleTotal: 512
 

@@ -69,7 +69,10 @@ Rectangle {
                 spacing: 4
 
                 Text {
-                    text: Math.round(root.usedGB >= 0 ? root.usedGB : root.computedUsedGB) + " GB"
+                    text: {
+                        var gb = root.usedGB >= 0 ? root.usedGB : root.computedUsedGB;
+                        return (gb < 10 ? gb.toFixed(1) : Math.round(gb)) + " GB";
+                    }
                     color: Colors.overBackground
                     font.family: Config.theme.font
                     font.pixelSize: 22
@@ -77,7 +80,7 @@ Rectangle {
                 }
 
                 Text {
-                    text: "/ " + Math.round(root.totalGB) + " GB"
+                    text: "/ " + (root.totalGB < 10 ? root.totalGB.toFixed(1) : Math.round(root.totalGB)) + " GB"
                     color: Colors.outline
                     font.family: Config.theme.font
                     font.pixelSize: 13
@@ -92,7 +95,10 @@ Rectangle {
             spacing: 4
 
             Text {
-                text: Math.round(root.usedGB >= 0 ? root.usedGB : root.computedUsedGB) + " GB"
+                text: {
+                    var gb = root.usedGB >= 0 ? root.usedGB : root.computedUsedGB;
+                    return (gb < 10 ? gb.toFixed(1) : Math.round(gb)) + " GB";
+                }
                 color: Colors.overBackground
                 font.family: Config.theme.font
                 font.pixelSize: 20
@@ -205,7 +211,10 @@ Rectangle {
                         spacing: 0
 
                         Text {
-                            text: modelData.label
+                            text: {
+                                var gb = Number(modelData.sizeGB || 0);
+                                return gb > 0 ? modelData.label : "Unknown";
+                            }
                             color: Colors.overBackground
                             font.family: Config.theme.font
                             font.pixelSize: root.wide ? 10 : 10
@@ -216,7 +225,10 @@ Rectangle {
 
                         Text {
                             visible: root.wide
-                            text: Math.round(Number(modelData.sizeGB || 0)) + " GB"
+                            text: {
+                                var gb = Number(modelData.sizeGB || 0);
+                                return gb > 0 ? (gb < 10 ? gb.toFixed(1) : Math.round(gb)) + " GB" : "—";
+                            }
                             color: Qt.color(modelData.color || Colors.primary)
                             font.family: Config.theme.font
                             font.pixelSize: 10
