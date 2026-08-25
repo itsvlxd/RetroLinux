@@ -116,13 +116,6 @@ Item {
                         }
                     },
                     {
-                        icon: Icons.gear,
-                        tooltip: "Open Network Settings",
-                        onClicked: function () {
-                            Quickshell.execDetached(["retro", "settings", "network"]);
-                        }
-                    },
-                    {
                         icon: Icons.sync,
                         tooltip: "Rescan networks",
                         enabled: NetworkService.wifiEnabled,
