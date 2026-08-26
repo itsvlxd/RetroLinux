@@ -110,15 +110,9 @@ Rectangle {
                                 ctx.lineCap = "round";
                                 ctx.strokeStyle = root.ringColor(slotItem.pct, slotItem.charging);
 
-                                if (slotItem.charging) {
-                                    ctx.shadowColor = "#30D158";
-                                    ctx.shadowBlur = 12;
-                                }
-
                                 ctx.beginPath();
                                 ctx.arc(cx, cy, r, start, end, false);
                                 ctx.stroke();
-                                ctx.shadowBlur = 0;
                             }
                         }
 

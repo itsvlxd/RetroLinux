@@ -350,6 +350,13 @@ class ShellDesktopPage:
                 edit_btn.set_tooltip_text("Edit timezones")
                 edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_timezones(i))
                 row.add_suffix(edit_btn)
+            elif wid == "sysmonitor2x4":
+                edit_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+                edit_btn.set_valign(Gtk.Align.CENTER)
+                edit_btn.add_css_class("flat")
+                edit_btn.set_tooltip_text("Graph settings")
+                edit_btn.connect("clicked", lambda _b, i=idx: self._on_edit_sysmonitor2x4(i))
+                row.add_suffix(edit_btn)
 
             remove_btn = Gtk.Button(icon_name="user-trash-symbolic")
             remove_btn.set_valign(Gtk.Align.CENTER)
@@ -1128,6 +1135,56 @@ class ShellDesktopPage:
                 warn.add_response("ok", "OK")
                 warn.set_default_response("ok")
                 warn.present(self._window)
+
+        dialog.connect("response", _on_response)
+        dialog.present(self._window)
+
+    # ── System Monitor 2x4 graph settings ──
+
+    def _on_edit_sysmonitor2x4(self, idx: int) -> None:
+        """Toggle which metrics the system monitor sparkline graph shows."""
+        if idx < 0 or idx >= len(self._widgets):
+            return
+        widget = self._widgets[idx]
+
+        group = Adw.PreferencesGroup()
+
+        switches = {}
+        for key, label in [("showCpu", "CPU Usage"), ("showGpu", "GPU Usage"), ("showRam", "RAM Usage"), ("showDisk", "Disk Usage")]:
+            row = Adw.SwitchRow(title=label)
+            row.set_active(widget.get(key, key != "showDisk"))
+            group.add(row)
+            switches[key] = row
+
+        temp_group = Adw.PreferencesGroup()
+        temp_group.add(Adw.SwitchRow(title="Show Temperatures", subtitle="Display temps next to usage values"))
+        for key, label in [("showCpuTemp", "CPU Temperature"), ("showGpuTemp", "GPU Temperature"), ("showDiskTemp", "Disk Temperature")]:
+            row = Adw.SwitchRow(title=label)
+            row.set_active(widget.get(key, key in ("showCpuTemp", "showGpuTemp")))
+            temp_group.add(row)
+            switches[key] = row
+
+        container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        container.append(group)
+        container.append(temp_group)
+
+        dialog = Adw.AlertDialog(
+            heading="Graph Settings",
+            body="Toggle which metrics appear on the sparkline graph and legend.",
+            extra_child=container,
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def _on_response(_dialog_obj, response):
+            if response != "save":
+                return
+            for key, sw in switches.items():
+                widget[key] = sw.get_active()
+            self._notify_dirty()
+            self._rebuild_widgets()
 
         dialog.connect("response", _on_response)
         dialog.present(self._window)

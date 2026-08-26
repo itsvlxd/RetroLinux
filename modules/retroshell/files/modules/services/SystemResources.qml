@@ -50,6 +50,7 @@ Singleton {
     property var gpuHistories: []
     property var cpuTempHistory: []
     property var gpuTempHistories: []
+    property var diskTempHistory: []
     property int maxHistoryPoints: 50
     property int totalDataPoints: 0
 
@@ -165,6 +166,7 @@ Singleton {
         cpuHistory = pushHistory(cpuHistory, cpuUsage / 100);
         cpuTempHistory = pushHistory(cpuTempHistory, cpuTemp);
         ramHistory = pushHistory(ramHistory, ramUsage / 100);
+        diskTempHistory = pushHistory(diskTempHistory, diskTemp);
 
         if (gpuDetected && gpuCount > 0) {
             let newGpuHistories = gpuHistories.slice();

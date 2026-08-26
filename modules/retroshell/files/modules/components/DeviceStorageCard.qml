@@ -148,35 +148,9 @@ Rectangle {
                         height: segRow.height
 
                         Rectangle {
-                            id: segBody
                             anchors.fill: parent
                             radius: 6
                             color: Qt.color(modelData.color || Colors.primary)
-                            clip: true
-
-                            // Subtle 45° diagonal stripe overlay (prominent on striped)
-                            Canvas {
-                                anchors.fill: parent
-                                visible: segBody.width > 0
-                                onWidthChanged: requestPaint()
-                                onHeightChanged: requestPaint()
-                                Component.onCompleted: requestPaint()
-
-                                onPaint: {
-                                    var ctx = getContext("2d");
-                                    ctx.clearRect(0, 0, width, height);
-                                    var striped = modelData.striped === true || modelData.hasStripes === true;
-                                    var stripeSpacing = 7;
-                                    ctx.strokeStyle = Qt.rgba(0, 0, 0, striped ? 0.30 : 0.12);
-                                    ctx.lineWidth = 2.5;
-                                    ctx.beginPath();
-                                    for (var x = -height; x < width + height; x += stripeSpacing) {
-                                        ctx.moveTo(x, height);
-                                        ctx.lineTo(x + height, 0);
-                                    }
-                                    ctx.stroke();
-                                }
-                            }
                         }
                     }
                 }

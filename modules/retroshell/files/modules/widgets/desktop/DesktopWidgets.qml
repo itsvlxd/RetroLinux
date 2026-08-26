@@ -108,6 +108,7 @@ Item {
         "batteryring2x4": { label: "Battery Rings 2x4", icon: Icons.batteryFull },
         "feed": { label: "Dev Feed", icon: Icons.globe },
         "sysmonitor": { label: "System Monitor", icon: Icons.cpu },
+        "sysmonitor2x4": { label: "System Monitor 2x4", icon: Icons.cpu },
         "battery": { label: "Battery", icon: Icons.batteryFull },
         "photo": { label: "Photo 2x2", icon: Icons.folder },
         "photo2x4": { label: "Photo 2x4", icon: Icons.folder },
@@ -150,6 +151,7 @@ Item {
         case "batteryring2x4": return batteryRingWideComponent;
         case "feed": return feedComponent;
         case "sysmonitor": return sysMonitorComponent;
+        case "sysmonitor2x4": return sysPulseComponent;
         case "battery": return batteryComponent;
         case "photo": return photoComponent;
         case "photo2x4": return photoWideComponent;
@@ -184,6 +186,7 @@ Item {
         case "batteryring2x4": return [320, 160];
         case "feed": return [320, 160];
         case "sysmonitor": return [160, 160];
+        case "sysmonitor2x4": return [320, 160];
         case "battery": return [160, 160];
         case "photo": return [160, 160];
         case "photo2x4": return [320, 160];
@@ -222,6 +225,13 @@ Item {
         if (w.count !== undefined) e.count = w.count;
         if (w.imagePath !== undefined) e.imagePath = w.imagePath;
         if (w.showBorder !== undefined) e.showBorder = w.showBorder;
+        if (w.showCpu !== undefined) e.showCpu = w.showCpu;
+        if (w.showGpu !== undefined) e.showGpu = w.showGpu;
+        if (w.showRam !== undefined) e.showRam = w.showRam;
+        if (w.showDisk !== undefined) e.showDisk = w.showDisk;
+        if (w.showCpuTemp !== undefined) e.showCpuTemp = w.showCpuTemp;
+        if (w.showGpuTemp !== undefined) e.showGpuTemp = w.showGpuTemp;
+        if (w.showDiskTemp !== undefined) e.showDiskTemp = w.showDiskTemp;
         return e;
     }
 
@@ -563,6 +573,11 @@ Item {
     Component {
         id: sysMonitorComponent
         SystemMonitorWidget {}
+    }
+
+    Component {
+        id: sysPulseComponent
+        SystemPulseWidget {}
     }
 
     Component {
