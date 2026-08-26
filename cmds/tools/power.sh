@@ -232,12 +232,12 @@ cmd_power() {
                     use_bat_s="$sg_bats"; use_bat_b="$sg_batb"; use_bat_p="$sg_batp"
                 else
                     rx_log "info" "Configure custom wattage limits:"
-                    use_ac_s=$(rx_input_numeric "AC Saver (W)" "$sg_ac" 1 200)
-                    use_ac_b=$(rx_input_numeric "AC Balanced (W)" "$sg_bal" 1 200)
-                    use_ac_p=$(rx_input_numeric "AC Performance (W)" "$sg_perf" 1 200)
-                    use_bat_s=$(rx_input_numeric "BAT Saver (W)" "$sg_bats" 1 200)
-                    use_bat_b=$(rx_input_numeric "BAT Balanced (W)" "$sg_batb" 1 200)
-                    use_bat_p=$(rx_input_numeric "BAT Performance (W)" "$sg_batp" 1 200)
+                    use_ac_s=$(rx_input_numeric "AC Saver (W)" "$sg_ac" 1 250)
+                    use_ac_b=$(rx_input_numeric "AC Balanced (W)" "$sg_bal" 1 250)
+                    use_ac_p=$(rx_input_numeric "AC Performance (W)" "$sg_perf" 1 250)
+                    use_bat_s=$(rx_input_numeric "BAT Saver (W)" "$sg_bats" 1 250)
+                    use_bat_b=$(rx_input_numeric "BAT Balanced (W)" "$sg_batb" 1 250)
+                    use_bat_p=$(rx_input_numeric "BAT Performance (W)" "$sg_batp" 1 250)
                 fi
 
                 rx_setup_summary "󰐋" "Power Setup Summary" \

@@ -25,7 +25,7 @@ readonly INTEL_DB=(
     "1360P|15,28,64|10,15,28" "1260P|15,28,64|10,15,28" "1355U|10,15,25|7,10,15"
     "1255U|10,15,25|7,10,15" "11800H|25,45,95|15,25,45" "11370H|15,28,50|10,18,28"
     "10875H|25,45,95|15,25,45" "10750H|20,45,75|12,20,35" "14900K|65,125,253|35,65,95"
-    "13900K|65,125,253|35,65,95" "12900K|65,125,241|35,65,95" "11900K|65,125,250|35,65,95"
+    "13900K|65,125,253|35,65,95" "12900KS|60,150,241|45,65,95" "12900K|65,125,241|35,65,95" "11900K|65,125,250|35,65,95"
     "10900K|65,125,250|35,65,95" "9900K|65,95,210|35,65,95" "8700K|65,95,140|35,65,95"
     "10300H|15,35,50|10,18,30" "1135G7|12,20,32|8,12,18" "1235U|7,15,25|5,10,15"
     "6700HQ|15,35,45|12,25,35"
@@ -63,6 +63,26 @@ get_pwr_var() {
         esac
     fi
     echo "$val"
+}
+
+rapl_write_limit() {
+    local dir="$1"
+    local idx="$2"
+    local uw="$3"
+
+    local limit_file="$dir/constraint_${idx}_power_limit_uw"
+    [[ -f $limit_file ]] || return 0
+
+    local max_uw=$(cat "$dir/constraint_${idx}_max_power_uw" 2>/dev/null)
+    if [[ $max_uw =~ ^[0-9]+$ && $max_uw -gt 0 && $uw -gt $max_uw ]]; then
+        rx_log "warn" "${dir##*/} PL${idx}: requested $((uw / 1000000))W exceeds hardware max ($((max_uw / 1000000))W), clamping"
+        uw=$max_uw
+    fi
+
+    if ! echo "$uw" >"$limit_file" 2>/dev/null; then
+        rx_log "warn" "Failed to set ${dir##*/} PL${idx} to $((uw / 1000000))W"
+        return 1
+    fi
 }
 
 sync_hardware_power() {
@@ -147,6 +167,11 @@ set_profile() {
     fi
     set_var "PWR_CURRENT" "$profile"
 
+    if [[ $profile != "saver" ]] && [[ $(get_var "BAT_SAVER_FORCED") == "true" ]]; then
+        set_var "BAT_SAVER_FORCED" "false"
+        set_var "BAT_SAVER_ACTIVE" "false"
+    fi
+
     local watts=$(get_pwr_var "$profile")
     local microwatts=$((watts * 1000000))
 
@@ -171,8 +196,8 @@ set_profile() {
                 for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do echo "performance" >"$epp" 2>/dev/null; done
 
                 if [[ -d /sys/class/powercap/intel-rapl:0 ]]; then
-                    echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw 2>/dev/null
-                    echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_1_power_limit_uw 2>/dev/null
+                    rapl_write_limit "/sys/class/powercap/intel-rapl:0" 0 "$microwatts"
+                    rapl_write_limit "/sys/class/powercap/intel-rapl:0" 1 "$microwatts"
                     echo "27983872" >/sys/class/powercap/intel-rapl:0/constraint_0_time_window_us 2>/dev/null
                 fi
                 ;;
@@ -183,8 +208,8 @@ set_profile() {
                 for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do echo "balance_performance" >"$epp" 2>/dev/null; done
 
                 if [[ -d /sys/class/powercap/intel-rapl:0 ]]; then
-                    echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw 2>/dev/null
-                    echo "$((microwatts + 5000000))" >/sys/class/powercap/intel-rapl:0/constraint_1_power_limit_uw 2>/dev/null
+                    rapl_write_limit "/sys/class/powercap/intel-rapl:0" 0 "$microwatts"
+                    rapl_write_limit "/sys/class/powercap/intel-rapl:0" 1 "$((microwatts + 5000000))"
                     echo "976" >/sys/class/powercap/intel-rapl:0/constraint_0_time_window_us 2>/dev/null
                 fi
                 ;;
@@ -195,18 +220,13 @@ set_profile() {
                 for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do echo "power" >"$epp" 2>/dev/null; done
 
                 if [[ -d /sys/class/powercap/intel-rapl:0 ]]; then
-                    echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw 2>/dev/null
-                    echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_1_power_limit_uw 2>/dev/null
+                    rapl_write_limit "/sys/class/powercap/intel-rapl:0" 0 "$microwatts"
+                    rapl_write_limit "/sys/class/powercap/intel-rapl:0" 1 "$microwatts"
                     echo "976" >/sys/class/powercap/intel-rapl:0/constraint_0_time_window_us 2>/dev/null
                 fi
 
-                if [[ -f /sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw ]]; then
-                    echo "$microwatts" >/sys/class/powercap/intel-rapl:1/constraint_0_power_limit_uw 2>/dev/null
-                fi
-
-                if [[ -f /sys/class/powercap/intel-rapl:0:1/constraint_0_power_limit_uw ]]; then
-                    echo "3000000" >/sys/class/powercap/intel-rapl:0:1/constraint_0_power_limit_uw 2>/dev/null
-                fi
+                rapl_write_limit "/sys/class/powercap/intel-rapl:1" 0 "$microwatts"
+                rapl_write_limit "/sys/class/powercap/intel-rapl:0:1" 0 "3000000"
 
                 set_var "BAT_SAVER_FORCED" "true"
                 set_var "BAT_SAVER_ACTIVE" "true"
@@ -231,9 +251,7 @@ set_profile() {
             echo "$amd_boost" >/sys/devices/system/cpu/cpufreq/boost 2>/dev/null
         fi
 
-        if [[ -f /sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw ]]; then
-            echo "$microwatts" >/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw 2>/dev/null
-        fi
+        rapl_write_limit "/sys/class/powercap/intel-rapl:0" 0 "$microwatts"
     fi
 
     return 0
