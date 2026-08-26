@@ -150,6 +150,7 @@ class WallpapersPage:
         self._notify_dirty = lambda: None
         self._pending_static: bool | None = None
         self._pending_static_bat: bool | None = None
+        self._pending_static_fullscreen: bool | None = None
         self._pending_collection: str | None = None
         self._pending_slideshow: bool | None = None
         self._pending_interval: int | None = None
@@ -158,6 +159,7 @@ class WallpapersPage:
         self._needs_opt = False
         self._static_row: Gtk.Widget | None = None
         self._bat_row: Gtk.Widget | None = None
+        self._fullscreen_row: Gtk.Widget | None = None
         self._col_row: Gtk.Widget | None = None
         self._col_delete_btn: Gtk.Widget | None = None
         self._slide_row: Gtk.Widget | None = None
@@ -165,6 +167,7 @@ class WallpapersPage:
         self._res_row: Gtk.Widget | None = None
         self._static_switch: Gtk.Widget | None = None
         self._bat_switch: Gtk.Widget | None = None
+        self._fullscreen_switch: Gtk.Widget | None = None
         self._slide_switch: Gtk.Widget | None = None
         self._interval_spin: Gtk.SpinButton | None = None
         self._spin_w: Gtk.SpinButton | None = None
@@ -179,6 +182,7 @@ class WallpapersPage:
         self._wall_anim_preview: bool = bool(load_tools().get("wallpaperAnimatedPreview", True))
         self._static_actions: RowActions | None = None
         self._bat_actions: RowActions | None = None
+        self._fullscreen_actions: RowActions | None = None
         self._col_actions: RowActions | None = None
         self._slide_actions: RowActions | None = None
         self._interval_actions: RowActions | None = None
@@ -189,6 +193,7 @@ class WallpapersPage:
         for row, var, actions in (
             (self._static_row, "WALL_STATIC_FORCED", self._static_actions),
             (self._bat_row, "WALL_STATIC_ON_BAT", self._bat_actions),
+            (self._fullscreen_row, "WALL_STATIC_ON_FULLSCREEN", self._fullscreen_actions),
             (self._col_row, "RETRO_WALL_COLLECTION", self._col_actions),
             (self._slide_row, "WALL_SLIDESHOW_ACTIVE", self._slide_actions),
             (self._interval_row, "WALL_SLIDESHOW_INTERVAL", self._interval_actions),
@@ -220,6 +225,10 @@ class WallpapersPage:
             if self._pending_static_bat is None:
                 return None
             return "true" if self._pending_static_bat else "false"
+        if var_name == "WALL_STATIC_ON_FULLSCREEN":
+            if self._pending_static_fullscreen is None:
+                return None
+            return "true" if self._pending_static_fullscreen else "false"
         if var_name == "RETRO_WALL_COLLECTION":
             return self._pending_collection
         if var_name == "WALL_SLIDESHOW_ACTIVE":
@@ -239,6 +248,8 @@ class WallpapersPage:
             return self._pending_static is not None
         if var_name == "WALL_STATIC_ON_BAT":
             return self._pending_static_bat is not None
+        if var_name == "WALL_STATIC_ON_FULLSCREEN":
+            return self._pending_static_fullscreen is not None
         if var_name == "RETRO_WALL_COLLECTION":
             return self._pending_collection is not None
         if var_name == "WALL_SLIDESHOW_ACTIVE":
@@ -256,6 +267,8 @@ class WallpapersPage:
             self._pending_static = value == "true"
         elif var_name == "WALL_STATIC_ON_BAT":
             self._pending_static_bat = value == "true"
+        elif var_name == "WALL_STATIC_ON_FULLSCREEN":
+            self._pending_static_fullscreen = value == "true"
         elif var_name == "RETRO_WALL_COLLECTION":
             self._pending_collection = value
         elif var_name == "WALL_SLIDESHOW_ACTIVE":
@@ -272,6 +285,8 @@ class WallpapersPage:
             self._pending_static = None
         elif var_name == "WALL_STATIC_ON_BAT":
             self._pending_static_bat = None
+        elif var_name == "WALL_STATIC_ON_FULLSCREEN":
+            self._pending_static_fullscreen = None
         elif var_name == "RETRO_WALL_COLLECTION":
             self._pending_collection = None
         elif var_name == "WALL_SLIDESHOW_ACTIVE":
@@ -291,6 +306,9 @@ class WallpapersPage:
         elif var_name == "WALL_STATIC_ON_BAT":
             if self._bat_switch is not None:
                 self._bat_switch.set_active(value == "true")  # type: ignore[union-attr]
+        elif var_name == "WALL_STATIC_ON_FULLSCREEN":
+            if self._fullscreen_switch is not None:
+                self._fullscreen_switch.set_active(value == "true")  # type: ignore[union-attr]
         elif var_name == "RETRO_WALL_COLLECTION":
             def_val = value
             if self._col_row is not None and def_val in self._collections:
@@ -331,7 +349,8 @@ class WallpapersPage:
         any_dirty = any(
             self._has_pending(v)
             for v in (
-                "WALL_STATIC_FORCED", "WALL_STATIC_ON_BAT", "RETRO_WALL_COLLECTION",
+                "WALL_STATIC_FORCED", "WALL_STATIC_ON_BAT", "WALL_STATIC_ON_FULLSCREEN",
+                "RETRO_WALL_COLLECTION",
                 "WALL_SLIDESHOW_ACTIVE", "WALL_SLIDESHOW_INTERVAL", "WALL_RESOLUTION",
                 "WALL_GPU_OFFLOAD",
             )
@@ -460,6 +479,21 @@ class WallpapersPage:
         pref_group.add(bat_row)
         self._bat_row = bat_row
         self._bat_switch = bat_row
+
+        fullscreen_row = Adw.SwitchRow(title="Static on Fullscreen")
+        fullscreen_row.set_subtitle("Pauses live wallpapers when a fullscreen app is running")
+        fullscreen_row.set_active(get_var("WALL_STATIC_ON_FULLSCREEN", "true") == "true")
+        fullscreen_row.connect("notify::active", self._on_static_fullscreen_toggled)
+        self._fullscreen_actions = RowActions(
+            fullscreen_row,
+            on_discard=lambda: self._discard_var("WALL_STATIC_ON_FULLSCREEN"),
+            on_reset=lambda: self._reset_var("WALL_STATIC_ON_FULLSCREEN"),
+        )
+        fullscreen_row.add_suffix(self._fullscreen_actions.box)
+        self._fullscreen_actions.reorder_first()
+        pref_group.add(fullscreen_row)
+        self._fullscreen_row = fullscreen_row
+        self._fullscreen_switch = fullscreen_row
 
         col_result = subprocess.run(
             ["bash", str(WALLPAPER_CORE), "--collection", "list"],
@@ -903,6 +937,14 @@ class WallpapersPage:
                 "_section_label": "Settings",
             },
             {
+                "key": "wallpapers:static_on_fullscreen",
+                "label": "Static on Fullscreen",
+                "description": "Pauses live wallpapers when a fullscreen app is running",
+                "_group_id": "wallpapers",
+                "_group_label": "Wallpapers",
+                "_section_label": "Settings",
+            },
+            {
                 "key": "wallpapers:gpu_offload",
                 "label": "GPU Offload",
                 "description": "Select GPU offload mode for video wallpaper rendering",
@@ -956,6 +998,14 @@ class WallpapersPage:
         if self._setting_value:
             return
         self._pending_static_bat = switch.get_active()
+        self._dirty = True
+        self._notify_dirty()
+        self._refresh_managed()
+
+    def _on_static_fullscreen_toggled(self, switch, _pspec):
+        if self._setting_value:
+            return
+        self._pending_static_fullscreen = switch.get_active()
         self._dirty = True
         self._notify_dirty()
         self._refresh_managed()
@@ -1084,6 +1134,7 @@ class WallpapersPage:
         self._dirty = False
         self._pending_static = None
         self._pending_static_bat = None
+        self._pending_static_fullscreen = None
         self._pending_collection = None
         self._pending_slideshow = None
         self._pending_interval = None
@@ -1100,6 +1151,13 @@ class WallpapersPage:
         if self._pending_static_bat is not None:
             from lib.python.variable import set_var
             set_var("WALL_STATIC_ON_BAT", "true" if self._pending_static_bat else "false")
+            subprocess.Popen(
+                ["retro", "app", "all", "refresh"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        if self._pending_static_fullscreen is not None:
+            from lib.python.variable import set_var
+            set_var("WALL_STATIC_ON_FULLSCREEN", "true" if self._pending_static_fullscreen else "false")
             subprocess.Popen(
                 ["retro", "app", "all", "refresh"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
