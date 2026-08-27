@@ -75,12 +75,12 @@ rapl_write_limit() {
 
     local max_uw=$(cat "$dir/constraint_${idx}_max_power_uw" 2>/dev/null)
     if [[ $max_uw =~ ^[0-9]+$ && $max_uw -gt 0 && $uw -gt $max_uw ]]; then
-        rx_log "warn" "${dir##*/} PL${idx}: requested $((uw / 1000000))W exceeds hardware max ($((max_uw / 1000000))W), clamping"
+        rx_log_file "warn" "${dir##*/} PL${idx}: requested $((uw / 1000000))W exceeds hardware max ($((max_uw / 1000000))W), clamping"
         uw=$max_uw
     fi
 
     if ! echo "$uw" >"$limit_file" 2>/dev/null; then
-        rx_log "warn" "Failed to set ${dir##*/} PL${idx} to $((uw / 1000000))W"
+        rx_log_file "warn" "Failed to set ${dir##*/} PL${idx} to $((uw / 1000000))W"
         return 1
     fi
 }
