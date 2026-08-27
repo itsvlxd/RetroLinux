@@ -5,6 +5,6 @@
   "access": "user",
   "defaults": false,
   "mode": "mirror",
-  "gui": "false",
+  "gui": false,
   "overwrite": false
 }
