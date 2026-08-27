@@ -49,31 +49,31 @@ return {
 					elseif cur_sink ~= "" and last_sink_id == "" then
 						Watcher.log("audio", "Default sink appeared: " .. cur_sink, "info")
 					end
-
-					if primary_sink ~= "" then
-						local primary_id = Audio.get_sink_id_by_persistent(primary_sink)
-						if primary_id ~= "" then
-							if cur_sink ~= primary_id then
-								Watcher.log(
-									"audio",
-									"Enforcing primary sink: "
-										.. primary_sink
-										.. " (ID "
-										.. primary_id
-										.. "), current was "
-										.. cur_sink,
-									"info"
-								)
-								Audio.set_default("sink", primary_id)
-								cur_sink = primary_id
-							end
-						else
-							Watcher.log("audio", "Primary sink not available: " .. primary_sink, "warn")
-						end
-					end
-
-					last_sink_id = cur_sink
 				end
+
+				if primary_sink ~= "" then
+					local primary_id = Audio.get_sink_id_by_persistent(primary_sink)
+					if primary_id ~= "" then
+						if cur_sink ~= primary_id then
+							Watcher.log(
+								"audio",
+								"Enforcing primary sink: "
+									.. primary_sink
+									.. " (ID "
+									.. primary_id
+									.. "), current was "
+									.. cur_sink,
+								"info"
+							)
+							Audio.set_default("sink", primary_id)
+							cur_sink = primary_id
+						end
+					else
+						Watcher.log("audio", "Primary sink not available: " .. primary_sink, "warn")
+					end
+				end
+
+				last_sink_id = cur_sink
 
 				if primary_sink ~= "" then
 					local primary_id = Audio.get_sink_id_by_persistent(primary_sink)
@@ -125,31 +125,32 @@ return {
 					elseif cur_source ~= "" and last_source_id == "" then
 						Watcher.log("audio", "Default source appeared: " .. cur_source, "info")
 					end
-
-					if primary_source ~= "" then
-						local primary_id = Audio.get_source_id_by_persistent(primary_source)
-						if primary_id ~= "" then
-							if cur_source ~= primary_id then
-								Watcher.log(
-									"audio",
-									"Enforcing primary source: "
-										.. primary_source
-										.. " (ID "
-										.. primary_id
-										.. "), current was "
-										.. cur_source,
-									"info"
-								)
-								Audio.set_default("source", primary_id)
-								cur_source = primary_id
-							end
-						else
-							Watcher.log("audio", "Primary source not available: " .. primary_source, "warn")
-						end
-					end
-
-					last_source_id = cur_source
 				end
+
+				if primary_source ~= "" then
+					local primary_id = Audio.get_source_id_by_persistent(primary_source)
+					if primary_id ~= "" then
+						if cur_source ~= primary_id then
+							Watcher.log(
+								"audio",
+								"Enforcing primary source: "
+									.. primary_source
+									.. " (ID "
+									.. primary_id
+									.. "), current was "
+									.. cur_source,
+								"info"
+							)
+							Audio.set_default("source", primary_id)
+							Audio.clear_bt_filter_defaults()
+							cur_source = primary_id
+						end
+					else
+						Watcher.log("audio", "Primary source not available: " .. primary_source, "warn")
+					end
+				end
+
+				last_source_id = cur_source
 
 				if primary_source ~= "" then
 					local primary_id = Audio.get_source_id_by_persistent(primary_source)

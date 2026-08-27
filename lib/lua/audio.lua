@@ -45,6 +45,9 @@ local function _parse_wpctl_status()
             end
             section = in_audio and "sources" or ""
             sub_section = in_audio and "devices" or ""
+        elseif line:match("^%s*├─ Filters:") or line:match("^%s*└─ Filters:") then
+            section = ""
+            sub_section = ""
         elseif line:match("^%s*├─ Streams:") or line:match("^%s*└─ Streams:") then
             if seen_streams then
                 in_audio = false
@@ -178,6 +181,26 @@ function Audio.set_default(type, id)
     if not type or not id then return false end
     local result = run_cmd("wpctl set-default '" .. id .. "' 2>/dev/null && echo OK || echo ERR")
     return result == "OK"
+end
+
+function Audio.clear_bt_filter_defaults()
+    local status = run_cmd("wpctl status")
+    local in_filters = false
+    for line in status:gmatch("[^\n]+") do
+        if line:match("^%s*├─ Filters:") or line:match("^%s*└─ Filters:") then
+            in_filters = true
+        elseif line:match("^%s*└─") or line:match("^%s*├─%s+Streams:") or line:match("^%s*└─%s+Streams:") then
+            in_filters = false
+        elseif in_filters and line:match("%*") then
+            local id = line:match("(%d+)%.%s")
+            if id then
+                local pw_name = run_cmd("wpctl inspect " .. id .. " 2>/dev/null | grep 'node.name' | head -1 | awk '{print $NF}' | tr -d '\"'")
+                if pw_name and pw_name:match("^bluez_input%.") then
+                    run_cmd("wpctl clear-default '" .. id .. "'")
+                end
+            end
+        end
+    end
 end
 
 function Audio.apply_fallback(type)
