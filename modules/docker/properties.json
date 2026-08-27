@@ -1,0 +1,10 @@
+{
+  "title": "Docker",
+  "description": "Containerization tools and utilities for managing Docker and Podman containers.",
+  "type": "extra",
+  "access": "user",
+  "defaults": false,
+  "mode": "mirror",
+  "gui": "false",
+  "overwrite": false
+}
