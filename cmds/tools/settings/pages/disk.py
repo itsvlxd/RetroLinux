@@ -240,9 +240,6 @@ class DiskIOGraph(Gtk.DrawingArea):
         cr.stroke()
 
 
-# ── Main page ──
-
-
 class DiskPage:
     """Disk management page with health info, mount actions, and setup toggles."""
 
@@ -312,7 +309,12 @@ class DiskPage:
                         ))
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             pass
-        self._disks.sort(key=lambda d: 1 if "USB" in d.disk_type or "Removable" in d.disk_type else 0)
+        self._disks.sort(key=lambda d: (
+            0 if any(m.strip() == "/" for m in d.mounts.split(",")) else
+            1 if "NVMe" in d.disk_type or "SSD" in d.disk_type else
+            2 if "USB" in d.disk_type or "Removable" in d.disk_type else
+            3
+        ))
         self._load_setup_config()
 
     def _load_setup_config(self) -> None:
@@ -427,17 +429,48 @@ class DiskPage:
                 w["temp_lbl"].set_label(disk.temp)
 
             try:
-                uv = float(disk.used_pct.rstrip("%"))
-                w["used_bar"].set_value(uv)
-                w["used_bar"].remove_css_class("level-bar-critical")
-                w["used_bar"].remove_css_class("level-bar-warning")
-                if uv > 95:
-                    w["used_bar"].add_css_class("level-bar-critical")
-                elif uv > 80:
-                    w["used_bar"].add_css_class("level-bar-warning")
-            except ValueError:
-                w["used_bar"].set_value(0)
-            w["used_pct_lbl"].set_label(disk.used_pct)
+                pct_val = float(disk.used_pct.rstrip("%") or 0)
+                size_raw = disk.size.upper().strip()
+                
+                total_gb = 0.0
+                if "PB" in size_raw:
+                    total_gb = float(size_raw.replace("PB", "").replace("P", "").strip()) * 1024 * 1024
+                elif "TB" in size_raw:
+                    total_gb = float(size_raw.replace("TB", "").replace("T", "").strip()) * 1024
+                elif "GB" in size_raw:
+                    total_gb = float(size_raw.replace("GB", "").replace("G", "").strip())
+                elif "MB" in size_raw:
+                    total_gb = float(size_raw.replace("MB", "").replace("M", "").strip()) / 1024
+                else:
+                    if size_raw.endswith("G"):
+                        total_gb = float(size_raw[:-1])
+                    elif size_raw.endswith("T"):
+                        total_gb = float(size_raw[:-1]) * 1024
+                    elif size_raw.endswith("M"):
+                        total_gb = float(size_raw[:-1]) / 1024
+                    else:
+                        total_gb = float(size_raw)
+
+                used_gb_total = (pct_val / 100.0) * total_gb
+                
+                if used_gb_total >= 1024 * 1024:
+                    used_val = used_gb_total / (1024 * 1024)
+                    used_unit = "PB"
+                elif used_gb_total >= 1024:
+                    used_val = used_gb_total / 1024
+                    used_unit = "TB"
+                elif used_gb_total >= 1:
+                    used_val = used_gb_total
+                    used_unit = "GB"
+                else:
+                    used_val = used_gb_total * 1024
+                    used_unit = "MB"
+                
+                used_text = f"{disk.used_pct} - {used_val:.1f}{used_unit}"
+            except Exception:
+                used_text = disk.used_pct
+                
+            w["used_pct_lbl"].set_label(used_text)
 
     def _update_sidebar(self) -> None:
         update_disk_sidebar(self._window, self._disks)
@@ -571,25 +604,56 @@ class DiskPage:
             temp_row = self._info_row("Temperature", temp_lbl)
             expander.add_row(temp_row)
 
-            used_bar = Gtk.LevelBar()
-            used_bar.set_min_value(0)
-            used_bar.set_max_value(100)
-            used_bar.set_size_request(200, 8)
+            # Usage info (e.g., "24% - 120GB")
             try:
-                uv = float(disk.used_pct.rstrip("%"))
-                used_bar.set_value(uv)
-                if uv > 95:
-                    used_bar.add_css_class("level-bar-critical")
-                elif uv > 80:
-                    used_bar.add_css_class("level-bar-warning")
-            except ValueError:
-                used_bar.set_value(0)
-            used_pct_lbl = Gtk.Label(label=disk.used_pct)
+                pct_val = float(disk.used_pct.rstrip("%") or 0)
+                size_raw = disk.size.upper().strip()
+                
+                # Convert to GB base
+                total_gb = 0.0
+                if "PB" in size_raw:
+                    total_gb = float(size_raw.replace("PB", "").replace("P", "").strip()) * 1024 * 1024
+                elif "TB" in size_raw:
+                    total_gb = float(size_raw.replace("TB", "").replace("T", "").strip()) * 1024
+                elif "GB" in size_raw:
+                    total_gb = float(size_raw.replace("GB", "").replace("G", "").strip())
+                elif "MB" in size_raw:
+                    total_gb = float(size_raw.replace("MB", "").replace("M", "").strip()) / 1024
+                else:
+                    # Handle cases like '500G'
+                    if size_raw.endswith("G"):
+                        total_gb = float(size_raw[:-1])
+                    elif size_raw.endswith("T"):
+                        total_gb = float(size_raw[:-1]) * 1024
+                    elif size_raw.endswith("M"):
+                        total_gb = float(size_raw[:-1]) / 1024
+                    else:
+                        total_gb = float(size_raw)
 
-            used_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            used_box.append(used_bar)
-            used_box.append(used_pct_lbl)
-            expander.add_row(self._info_row("Used", used_box))
+                used_gb_total = (pct_val / 100.0) * total_gb
+                
+                if used_gb_total >= 1024 * 1024:
+                    used_val = used_gb_total / (1024 * 1024)
+                    used_unit = "PB"
+                elif used_gb_total >= 1024:
+                    used_val = used_gb_total / 1024
+                    used_unit = "TB"
+                elif used_gb_total >= 1:
+                    used_val = used_gb_total
+                    used_unit = "GB"
+                else:
+                    used_val = used_gb_total * 1024
+                    used_unit = "MB"
+                
+                used_text = f"{disk.used_pct} - {used_val:.1f}{used_unit}"
+            except Exception:
+                used_text = disk.used_pct
+
+            used_row = Adw.ActionRow(title="Used")
+            used_pct_lbl = Gtk.Label(label=used_text)
+            used_pct_lbl.set_halign(Gtk.Align.END)
+            used_row.add_suffix(used_pct_lbl)
+            expander.add_row(used_row)
 
             self._populate_mounts(expander, disk)
 
@@ -599,7 +663,6 @@ class DiskPage:
                 "expander": expander,
                 "health_lbl": health_lbl,
                 "temp_lbl": temp_lbl,
-                "used_bar": used_bar,
                 "used_pct_lbl": used_pct_lbl,
                 "health_icon": health_icon,
                 "wear_lbl": wear_lbl,
@@ -607,9 +670,16 @@ class DiskPage:
 
     def _populate_mounts(self, expander: Adw.ExpanderRow, disk: DiskInfo) -> None:
         if not disk.mounts.strip():
-            if "USB" in disk.disk_type or "Removable" in disk.disk_type:
+            is_removable = "USB" in disk.disk_type or "Removable" in disk.disk_type
+            is_ssd = "SSD" in disk.disk_type or "NVMe" in disk.disk_type
+
+            if is_removable or is_ssd:
                 row = Adw.ActionRow(title="Not mounted")
-                row.set_subtitle("Removable drive detected — no active mount points")
+                if is_removable:
+                    row.set_subtitle("Removable drive detected — no active mount points")
+                else:
+                    row.set_subtitle("SSD/NVMe detected — no active mount points")
+
                 mount_btn = Gtk.Button(label="Auto Mount")
                 mount_btn.set_valign(Gtk.Align.CENTER)
                 mount_btn.add_css_class("suggested-action")
@@ -772,6 +842,20 @@ class DiskPage:
     def _mount_cb(self, dev: str, path: str | None) -> None:
         self._mount(dev, path)
 
+    def _persist_mount(self, dev: str, path: str | None) -> None:
+        cmd = ["pkexec", "bash", _DISK_CORE, "--auto-mount-persist", dev]
+        if path:
+            cmd.append(path)
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+            lines = result.stdout.strip().splitlines()
+            if result.returncode == 0 and any(l.startswith("OK|") for l in lines):
+                self._window.show_toast(f"Persistent mount configured for /dev/{dev}")
+            else:
+                self._window.show_toast(f"Persistent mount failed", timeout=5)
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            self._window.show_toast(f"Persistent mount failed — {e}", timeout=5)
+
     def _auto_mount(self, dev: str) -> None:
         try:
             result = subprocess.run(
@@ -785,12 +869,12 @@ class DiskPage:
             parts = [dev]
 
         for part in parts:
-            self._mount(part, None)
+            self._persist_mount(part, None)
 
         GLib.timeout_add(1500, self._refresh)
 
     def _mount(self, dev: str, path: str | None) -> None:
-        cmd = ["bash", _DISK_CORE, "--mount", dev]
+        cmd = ["pkexec", "bash", _DISK_CORE, "--mount", dev]
         if path:
             cmd.append(path)
         try:
@@ -820,7 +904,7 @@ class DiskPage:
         def do_unmount():
             try:
                 result = subprocess.run(
-                    ["bash", _DISK_CORE, "--umount", mount_path],
+                    ["pkexec", "bash", _DISK_CORE, "--umount", mount_path],
                     capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL,
                 )
                 lines = result.stdout.strip().splitlines()
