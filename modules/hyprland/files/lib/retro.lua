@@ -97,7 +97,7 @@ function Retro.open_editor()
 end
 
 function Retro.shell_run(name)
-	os.execute("setsid retro shell run " .. name .. " >/dev/null 2>&1 &")
+	hl.exec_cmd("retro shell run " .. name)
 end
 
 function Retro.open_launcher()

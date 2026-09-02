@@ -8,19 +8,26 @@ run_cmd() {
     local cmd="$1"
     [[ -z $cmd ]] && echo "ERR|no_command" && return 1
 
-    if [[ -p $PIPE ]]; then
-        echo "$cmd" >"$PIPE" &
-        echo "OK|$cmd"
-    else
-        local pid
-        pid=$(cat "$PID_FILE" 2>/dev/null)
-        if [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
-            qs ipc --pid "$pid" call retroshell run "$cmd" 2>/dev/null && echo "OK|$cmd" || echo "ERR|ipc_failed"
-        else
-            echo "ERR|not_running"
-            return 1
+    # Primary: QuickShell built-in IPC (fast, no blocking)
+    local pid
+    pid=$(cat "$PID_FILE" 2>/dev/null)
+    if [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+        if qs ipc --pid "$pid" call retroshell run "$cmd" 2>/dev/null; then
+            echo "OK|$cmd"
+            return 0
         fi
     fi
+
+    # Fallback: FIFO pipe (with timeout in case no reader)
+    if [[ -p $PIPE ]]; then
+        if timeout 1 bash -c "echo '$cmd' > '$PIPE'" 2>/dev/null; then
+            echo "OK|$cmd"
+            return 0
+        fi
+    fi
+
+    echo "ERR|not_running"
+    return 1
 }
 
 case "$1" in
