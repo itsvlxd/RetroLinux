@@ -146,7 +146,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.themeReady) {
                 handleMissingConfig("theme", themeLoader, ThemeDefaults.data, () => {
                     root.themeReady = true;
@@ -542,7 +542,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.barReady) {
                 handleMissingConfig("bar", barLoader, BarDefaults.data, () => {
                     root.barReady = true;
@@ -613,7 +613,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.workspacesReady) {
                 handleMissingConfig("workspaces", workspacesLoader, WorkspacesDefaults.data, () => {
                     root.workspacesReady = true;
@@ -657,7 +657,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.overviewReady) {
                 handleMissingConfig("overview", overviewLoader, OverviewDefaults.data, () => {
                     root.overviewReady = true;
@@ -699,7 +699,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.notchReady) {
                 handleMissingConfig("notch", notchLoader, NotchDefaults.data, () => {
                     root.notchReady = true;
@@ -745,7 +745,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.compositorReady) {
                 handleMissingConfig("compositor", compositorLoader, CompositorDefaults.data, () => {
                     root.compositorReady = true;
@@ -825,7 +825,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.performanceReady) {
                 handleMissingConfig("performance", performanceLoader, PerformanceDefaults.data, () => {
                     root.performanceReady = true;
@@ -869,7 +869,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.toolsReady) {
                 handleMissingConfig("tools", toolsLoader, ToolsDefaults.data, () => {
                     root.toolsReady = true;
@@ -917,7 +917,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.weatherReady) {
                 handleMissingConfig("weather", weatherLoader, WeatherDefaults.data, () => {
                     root.weatherReady = true;
@@ -957,7 +957,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.desktopReady) {
                 handleMissingConfig("desktop", desktopLoader, DesktopDefaults.data, () => {
                     root.desktopReady = true;
@@ -1004,7 +1004,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.lockscreenReady) {
                 handleMissingConfig("lockscreen", lockscreenLoader, LockscreenDefaults.data, () => {
                     root.lockscreenReady = true;
@@ -1054,7 +1054,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.prefixReady) {
                 handleMissingConfig("prefix", prefixLoader, PrefixDefaults.data, () => {
                     root.prefixReady = true;
@@ -1097,7 +1097,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.systemReady) {
                 handleMissingConfig("system", systemLoader, SystemDefaults.data, () => {
                     root.systemReady = true;
@@ -1180,7 +1180,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.dockReady) {
                 handleMissingConfig("dock", dockLoader, DockDefaults.data, () => {
                     root.dockReady = true;
@@ -1236,7 +1236,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.dashboardReady) {
                 handleMissingConfig("dashboard", dashboardLoader, DashboardDefaults.data, () => {
                     root.dashboardReady = true;
@@ -1311,7 +1311,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.notificationsReady) {
                 handleMissingConfig("notifications", notificationsLoader, NotificationsDefaults.data, () => {
                     root.notificationsReady = true;
@@ -1352,7 +1352,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.aiReady) {
                 handleMissingConfig("ai", aiLoader, AiDefaults.data, () => {
                     root.aiReady = true;
@@ -1397,7 +1397,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.typingSoundsReady) {
                 handleMissingConfig("typingSounds", typingSoundsLoader, TypingSoundsDefaults.data, () => {
                     root.typingSoundsReady = true;

@@ -498,7 +498,7 @@ Item {
                             }
 
                             Connections {
-                                target: parent.parent.node?.audio
+                                target: parent.parent.node?.audio ?? null
                                 ignoreUnknownSignals: true
                                 function onVolumeChanged() {
                                     if (!appSlider.isDragging)

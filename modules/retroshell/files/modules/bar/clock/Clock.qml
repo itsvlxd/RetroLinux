@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs.config
 import qs.modules.theme
 import qs.modules.components
@@ -743,6 +744,7 @@ Item {
                     id: pomodoroWidget
                     anchors.centerIn: parent
                     width: 300
+                    registerIpc: root.bar.screen === Quickshell.screens[0]
                     onRequestPopupOpen: clockPopup.open()
                 }
             }
