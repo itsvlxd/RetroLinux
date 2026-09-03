@@ -591,7 +591,7 @@ Singleton {
             property bool showWeatherTemp: false
             property bool showDayOfWeek: false
             property string batteryStyle: "arch"
-            property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
+            property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam", "docker"]
             property var clockOrder: ["clock", "weather", "pomodoro"]
             property var barLeftOrder: ["launcher", "workspaces", "pin"]
             property var barRightOrder: ["tools", "tray", "wifi", "bluetooth", "controls", "battery", "clock", "power"]

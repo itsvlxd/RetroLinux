@@ -90,13 +90,14 @@ TOOLBOX_ITEMS: dict = {
     "lens": ("Google Lens", "Reverse image search", "system-search-symbolic", None),
     "shazam": ("Shazam", "Recognize playing music", "shazam-symbolic", "songrec"),
     "webcam": ("Webcam Overlay", "Floating webcam preview", "camera-video-symbolic", None),
+    "docker": ("Docker Manager", "Monitor and manage Docker containers", "utilities-system-monitor-symbolic", "docker"),
 }
 
 # Default toolbox order mirrors the current hardcoded layout in ToolsMenu.qml.
 TOOLBOX_DEFAULT_ORDER: list = [
     "screenshot", "screenshots", "separator",
     "recorder", "recordings", "separator",
-    "colorpicker", "ocr", "qr", "lens", "shazam", "webcam",
+    "colorpicker", "ocr", "qr", "lens", "shazam", "webcam", "docker",
 ]
 
 TOOLBOX_MIN_ITEMS = 5
@@ -137,6 +138,7 @@ BAR_RIGHT_ITEMS: dict = {
     "clock": ("Time, Weather & Calendar", "Time, date, calendar and weather", "clock-symbolic"),
     "power": ("Power Button", "Open the power menu", "system-shutdown-symbolic"),
     "typingSounds": ("Typing Sounds", "Mechanical keyboard typing sounds", "input-keyboard-symbolic"),
+    "docker": ("Docker", "Monitor and manage Docker containers", "utilities-system-monitor-symbolic"),
 }
 
 # Unified catalog of every reorderable bar item (left + right), so an item keeps

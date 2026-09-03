@@ -17,6 +17,7 @@ Item {
     property bool isActive: true
     property int popupWidth: 300
     property int popupHeight: 360
+    property int iconPixelSize: 18
 
     property bool vertical: false
     property real radius: 0
@@ -72,8 +73,8 @@ Item {
         Text {
             anchors.centerIn: parent
             text: root.iconName
-            font.family: Icons.font
-            font.pixelSize: 18
+            font.family: root.iconName.includes("<font") ? "" : Icons.font
+            font.pixelSize: root.iconPixelSize
             color: root.popupOpen ? buttonBg.item : (root.isActive ? Styling.srItem("overprimary") : Colors.outline)
         }
 

@@ -79,13 +79,15 @@ ActionGrid {
                 tooltip: "Webcam Overlay",
                 command: ""
             };
+        case "docker":
+            return { icon: Icons.docker, tooltip: "Docker Manager", command: "" };
         }
         return null;
     }
 
     actions: {
         const order = (Config.bar && Config.bar.toolboxOrder)
-            ? Config.bar.toolboxOrder : ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"];
+            ? Config.bar.toolboxOrder : ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam", "docker"];
         const result = [];
         for (let i = 0; i < order.length; i++) {
             const item = itemFor(order[i]);
@@ -203,6 +205,9 @@ ActionGrid {
             root.itemSelected();
         } else if (action.tooltip === "Webcam Overlay") {
             GlobalStates.webcamOverlayVisible = !GlobalStates.webcamOverlayVisible;
+        } else if (action.tooltip === "Docker Manager") {
+            DockerService.refresh();
+            root.itemSelected();
         }
     }
 }
