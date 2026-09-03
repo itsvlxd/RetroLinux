@@ -61,6 +61,7 @@ _CONTROL_LABELS = {
     "typingSounds": "Typing Sounds",
     "darkmode": "Dark Mode",
     "nightlight": "Night Light",
+    "docker": "Docker",
 }
 
 _CONTROL_DESCRIPTIONS = {
@@ -71,6 +72,7 @@ _CONTROL_DESCRIPTIONS = {
     "typingSounds": "Mechanical keyboard typing sounds",
     "darkmode": "Switch between dark and light theme",
     "nightlight": "Toggle the warm night-light filter",
+    "docker": "Manage Docker containers and compose projects",
 }
 
 _CONTROL_ICONS = {
@@ -81,6 +83,7 @@ _CONTROL_ICONS = {
     "typingSounds": "input-keyboard-symbolic",
     "darkmode": "darkmode-symbolic",
     "nightlight": "nightlight-symbolic",
+    "docker": "utilities-system-monitor-symbolic",
 }
 
 

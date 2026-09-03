@@ -981,7 +981,7 @@ def save_tools(data: dict) -> None:
 # hot-action buttons. Groups are all reorderable but never removable; the
 # QuickControls buttons can be added/removed down to DASHBOARD_MIN_CONTROLS.
 DASHBOARD_WIDGET_IDS = ("player", "quickactions", "notifications", "controls")
-DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "typingSounds", "darkmode", "nightlight")
+DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "typingSounds", "darkmode", "nightlight", "docker")
 DASHBOARD_MIN_CONTROLS = 5
 
 DASHBOARD_DEFAULTS: dict = {
