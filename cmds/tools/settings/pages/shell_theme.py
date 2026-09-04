@@ -234,6 +234,9 @@ class ShellThemePage:
         self._editor_rows["opacity"] = self._add_variant_float(
             group, vk, "opacity", "Opacity", lower=0.0, upper=1.0, step=0.01, digits=2,
             subtitle="Fill opacity (0–1)")
+        self._editor_rows["blur"] = self._add_variant_switch(
+            group, vk, "blur", "Blur",
+            subtitle="Compositor blur behind this surface")
 
         if gradient_type in ("linear", "radial"):
             self._editor_rows["borderColor"] = self._add_variant_border_color(
@@ -729,6 +732,46 @@ class ShellThemePage:
         self._wire_variant_change(spin, "value-changed", vk, field, mrow)
         return mrow
 
+    def _add_variant_switch(
+        self,
+        group: Adw.PreferencesGroup,
+        vk: str,
+        field: str,
+        label: str,
+        subtitle: str = "",
+    ) -> ManagedRow:
+        current = bool(self._data.get(vk, {}).get(field, self._variant_default(vk, field)))
+        row = Adw.SwitchRow(title=label, subtitle=subtitle)
+        row.set_active(current)
+        self._editor_add(row)
+
+        def get_value():
+            return row.get_active()
+
+        def set_silent(value):
+            row.set_active(bool(value))
+
+        def on_value_set(value, f=field):
+            self._on_variant_change(f, value)
+
+        mrow = ManagedRow(
+            row,
+            default=self._variant_default(vk, field),
+            baseline=self._saved.get(vk, {}).get(field, self._variant_default(vk, field)),
+            get_value=get_value,
+            set_value_silent=set_silent,
+            on_value_set=on_value_set,
+        )
+
+        def _on_blur_toggled(*_args):
+            self._data[self._current_variant]["blur"] = row.get_active()
+            mrow.refresh()
+            self._push_blur_rules_live()
+            self._notify_dirty()
+
+        row.connect("notify::active", _on_blur_toggled)
+        return mrow
+
     def _add_variant_float(
         self,
         group: Adw.PreferencesGroup,
@@ -888,9 +931,8 @@ class ShellThemePage:
 
     def _wire_change(self, widget: Gtk.Widget, signal: str, key: str, mrow: ManagedRow) -> None:
         def _changed(*_args):
-            self._data[key] = mrow.value
+            self._on_change(key, mrow.value)
             mrow.refresh()
-            self._notify_dirty()
 
         widget.connect(signal, _changed)
 
@@ -917,6 +959,87 @@ class ShellThemePage:
             self._preview.queue_draw()
         if self._on_dirty_changed is not None:
             self._on_dirty_changed()
+
+    # ── Blur layer rules (per-variant, live push + persistence) ──
+
+    _VARIANT_NAMESPACE_MAP: dict[str, str] = {
+        "barbg": "retroshell",
+        "bg": "retroshell",
+        "popup": "retroshell:osd",
+        "internalbg": "retroshell",
+        "pane": "retroshell",
+        "common": "retroshell",
+        "focus": "retroshell",
+        "primary": "retroshell",
+        "primaryfocus": "retroshell",
+        "overprimary": "retroshell",
+        "secondary": "retroshell",
+        "secondaryfocus": "retroshell",
+        "oversecondary": "retroshell",
+        "tertiary": "retroshell",
+        "tertiaryfocus": "retroshell",
+        "overtertiary": "retroshell",
+        "error": "retroshell",
+        "errorfocus": "retroshell",
+        "overerror": "retroshell",
+    }
+
+    def _get_blur_namespaces(self) -> list[str]:
+        ns_set: set[str] = set()
+        for vk in _VARIANT_KEYS:
+            if self._data.get(vk, {}).get("blur", False):
+                vid = _variant_id(vk)
+                ns = self._VARIANT_NAMESPACE_MAP.get(vid)
+                if ns:
+                    ns_set.add(ns)
+        return sorted(ns_set)
+
+    def _build_blur_rule_body(self) -> str | None:
+        ns_list = self._get_blur_namespaces()
+        if not ns_list:
+            return None
+        ns_regex = "^(" + "|".join(ns_list) + ")$"
+        return f"match:namespace {ns_regex}, blur on, ignore_alpha 0.2"
+
+    def _push_blur_rules_live(self) -> None:
+        """Push blur layer rules to Hyprland via IPC for immediate effect."""
+        from hyprland_config import Rule, render_rule_lua
+        from hyprland_socket import eval_lua
+
+        window = self._window
+        if not hasattr(window, "hypr") or window.hypr is None:
+            return
+        ns_list = self._get_blur_namespaces()
+        try:
+            if ns_list:
+                ns_regex = "^(" + "|".join(ns_list) + ")$"
+                rule = Rule(
+                    raw="", kind="layerrule", name="", enabled=True,
+                    matchers=[("namespace", ns_regex)],
+                    effects=[("blur", ""), ("ignore_alpha", "0.2")],
+                )
+                lua_code = render_rule_lua(rule)
+                eval_lua(lua_code)
+            else:
+                # No blur — push empty rule to clear
+                rule = Rule(
+                    raw="", kind="layerrule", name="", enabled=True,
+                    matchers=[("namespace", "^()$")],
+                    effects=[],
+                )
+                lua_code = render_rule_lua(rule)
+                eval_lua(lua_code)
+        except Exception:
+            pass  # Best-effort; persistence handles reboot
+
+    def _blur_rules_to_lines(self) -> list[str]:
+        body = self._build_blur_rule_body()
+        if not body:
+            return []
+        return [f"layerrule = {body}"]
+
+    def get_theme_layer_rules(self) -> list[str]:
+        return self._blur_rules_to_lines()
 
     # ── Lifecycle ──
 

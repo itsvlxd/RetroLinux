@@ -1734,6 +1734,12 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         if sections.layer_rules is not None and self._layer_rules_page is not None:
             sections.layer_rules_nodes = self._layer_rules_page.get_layer_rule_nodes()
 
+        # Theme blur layer rules
+        if self._shell_theme_page is not None:
+            theme_rules = self._shell_theme_page.get_theme_layer_rules()
+            if theme_rules:
+                sections.theme_layer_rules = theme_rules
+
         return sections
 
     def _perform_save(self, *, update_active_profile: bool = True):

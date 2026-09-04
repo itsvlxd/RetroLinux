@@ -161,7 +161,7 @@ PopupWindow {
             id: background
             anchors.fill: parent
             variant: root.variant
-            enableShadow: true
+            enableShadow: !Styling.getStyledRectConfig(root.variant).blur
             radius: Styling.radius(8)
 
             Item {

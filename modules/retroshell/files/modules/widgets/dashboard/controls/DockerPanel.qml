@@ -117,7 +117,7 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             visible: !DockerService.dockerAvailable
-            variant: "common"
+            variant: "popup"
             enableShadow: false
             radius: Styling.radius(0)
 
@@ -163,7 +163,7 @@ Item {
                 id: cCard
                 width: parent.width
                 height: headerRow.height + (cDel.isExpanded ? expandedCol.height : 0)
-                variant: "common"
+                variant: "popup"
                 radius: Styling.radius(0)
                 border.color: cDel.cData.isRunning
                     ? Qt.rgba(Styling.srItem("overprimary").r, Styling.srItem("overprimary").g, Styling.srItem("overprimary").b, 0.5)
@@ -406,7 +406,7 @@ Item {
             width: parent.width - 20
             height: 60
             visible: DockerService.containers.length === 0
-            variant: "common"
+            variant: "popup"
             enableShadow: false
             radius: Styling.radius(0)
 
@@ -446,7 +446,7 @@ Item {
                 id: pCard
                 width: parent.width
                 height: pHeaderRow.height + (pDel.isExpanded ? pExpandedCol.height : 0)
-                variant: "common"
+                variant: "popup"
                 radius: Styling.radius(0)
                 border.color: pDel.pData.runningCount === pDel.pData.totalCount && pDel.pData.totalCount > 0
                     ? Qt.rgba(Styling.srItem("overprimary").r, Styling.srItem("overprimary").g, Styling.srItem("overprimary").b, 0.5)
@@ -669,7 +669,7 @@ Item {
                                         id: sCard
                                         width: parent.width
                                         height: sHeaderRow.height + (sDel.isExpanded ? sExpandedContent.height : 0)
-                                        variant: "common"
+                                        variant: "popup"
                                         radius: Styling.radius(0)
                                         border.color: sDel.sData.isRunning
                                             ? Qt.rgba(Styling.srItem("overprimary").r, Styling.srItem("overprimary").g, Styling.srItem("overprimary").b, 0.4)
@@ -886,7 +886,7 @@ Item {
             width: parent.width - 20
             height: 60
             visible: DockerService.composeProjects.length === 0
-            variant: "common"
+            variant: "popup"
             enableShadow: false
             radius: Styling.radius(0)
 
