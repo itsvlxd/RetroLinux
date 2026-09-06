@@ -999,7 +999,7 @@ class ShellThemePage:
         if not ns_list:
             return None
         ns_regex = "^(" + "|".join(ns_list) + ")$"
-        return f"match:namespace {ns_regex}, blur on, ignore_alpha 0.2"
+        return f"match:namespace {ns_regex}, blur on, ignore_alpha 0.6"
 
     def _push_blur_rules_live(self) -> None:
         """Push blur layer rules to Hyprland via IPC for immediate effect."""
@@ -1016,7 +1016,7 @@ class ShellThemePage:
                 rule = Rule(
                     raw="", kind="layerrule", name="", enabled=True,
                     matchers=[("namespace", ns_regex)],
-                    effects=[("blur", ""), ("ignore_alpha", "0.2")],
+                    effects=[("blur", ""), ("ignore_alpha", "0.6")],
                 )
                 lua_code = render_rule_lua(rule)
                 eval_lua(lua_code)
