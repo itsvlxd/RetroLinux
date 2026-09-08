@@ -1735,8 +1735,9 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             sections.layer_rules_nodes = self._layer_rules_page.get_layer_rule_nodes()
 
         # Theme blur layer rules
-        if self._shell_theme_page is not None:
-            theme_rules = self._shell_theme_page.get_theme_layer_rules()
+        shell_theme_page = getattr(self, "_shell_theme_page", None)
+        if shell_theme_page is not None:
+            theme_rules = shell_theme_page.get_theme_layer_rules()
             if theme_rules:
                 sections.theme_layer_rules = theme_rules
 
