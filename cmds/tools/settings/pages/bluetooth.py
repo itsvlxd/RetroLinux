@@ -58,7 +58,10 @@ class _DeviceRow(Gtk.ListBoxRow):
                  can_send: bool = False,
                  on_connect=None, on_disconnect=None, on_forget=None,
                  on_send=None, on_trust=None, on_pair=None,
-                 radio_on: bool = True, battery: int | None = None):
+                 radio_on: bool = True, battery: int | None = None,
+                 profile_options: list[str] | None = None,
+                 current_profile_idx: int = 0,
+                 on_profile_changed=None):
         super().__init__()
         self.mac = mac
         self.name = name
@@ -66,6 +69,9 @@ class _DeviceRow(Gtk.ListBoxRow):
         self.connected = connected
         self.audio_capable = audio_capable
         self._on_trust = on_trust
+        self._on_profile_changed = on_profile_changed
+        self._profile_dropdown: Gtk.DropDown | None = None
+        self._profile_handler_id: int = 0
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         box.set_margin_top(6)
@@ -119,6 +125,17 @@ class _DeviceRow(Gtk.ListBoxRow):
         self._progress_bar.set_valign(Gtk.Align.CENTER)
         self._progress_bar.set_visible(False)
         btn_box.append(self._progress_bar)
+
+        if profile_options and connected and not is_nearby:
+            profile_model = Gtk.StringList.new(profile_options)
+            self._profile_dropdown = Gtk.DropDown(model=profile_model)
+            self._profile_dropdown.set_size_request(120, -1)
+            self._profile_dropdown.set_tooltip_text("Audio profile")
+            self._profile_dropdown.set_valign(Gtk.Align.CENTER)
+            self._profile_handler_id = self._profile_dropdown.connect(
+                "notify::selected", self._on_profile_selected)
+            self._profile_dropdown.set_selected(min(current_profile_idx, len(profile_options) - 1))
+            btn_box.append(self._profile_dropdown)
 
         if is_nearby:
             if on_pair:
@@ -213,6 +230,18 @@ class _DeviceRow(Gtk.ListBoxRow):
         self._progress_bar.set_fraction(0.0)
         self._progress_bar.set_text("")
 
+    def _on_profile_selected(self, dropdown: Gtk.DropDown, _pspec) -> None:
+        if self._on_profile_changed:
+            self._on_profile_changed(self.mac, dropdown.get_selected())
+
+    def update_profile_options(self, options: list[str], current_idx: int = 0) -> None:
+        if self._profile_dropdown is None:
+            return
+        self._profile_dropdown.handler_block(self._profile_handler_id)
+        self._profile_dropdown.set_model(Gtk.StringList.new(options))
+        self._profile_dropdown.set_selected(min(current_idx, len(options) - 1))
+        self._profile_dropdown.handler_unblock(self._profile_handler_id)
+
 
 class BluetoothPage:
     def __init__(self, window: "RetroSettingsWindow"):
@@ -231,6 +260,8 @@ class BluetoothPage:
         self._paired_listbox: Gtk.ListBox | None = None
         self._device_rows: dict[str, _DeviceRow] = {}
         self._send_progress: dict[str, float] = {}
+        self._audio_profile_info: dict[str, dict] = {}
+        self._audio_profile_map: dict[str, list[tuple]] = {}
 
     def build(self, header: Adw.HeaderBar) -> Adw.ToolbarView:
         toolbar_view, _, self._content_box, _ = make_page_layout(header=header)
@@ -557,6 +588,8 @@ class BluetoothPage:
             self._paired_listbox.remove(child)
 
         self._device_rows.clear()
+        self._audio_profile_info.clear()
+        self._audio_profile_map.clear()
 
         for dev in self._paired_devices:
             mac = dev["mac"]
@@ -566,13 +599,14 @@ class BluetoothPage:
                 capture_output=True, text=True, timeout=3, stdin=subprocess.DEVNULL,
             ).stdout.find("Trusted: yes") != -1
             can_send = cat in ("phone", "computer")
+            is_audio = self._is_audio(cat)
             row = _DeviceRow(
                 mac=mac,
                 name=dev["name"],
                 cat=cat,
                 connected=dev["connected"],
                 trusted=is_trusted,
-                audio_capable=self._is_audio(cat),
+                audio_capable=is_audio,
                 can_send=can_send,
                 radio_on=self._status.get("radio") == "yes",
                 on_connect=self._connect_device,
@@ -581,6 +615,8 @@ class BluetoothPage:
                 on_send=self._send_file,
                 on_trust=self._toggle_trust,
                 battery=dev.get("battery"),
+                profile_options=["Auto (System Default)"] if (is_audio and dev["connected"]) else None,
+                on_profile_changed=self._on_audio_profile_changed if is_audio else None,
             )
             self._paired_listbox.append(row)
             self._device_rows[mac] = row
@@ -600,9 +636,104 @@ class BluetoothPage:
             empty_lbl.set_halign(Gtk.Align.CENTER)
             self._paired_listbox.append(empty_lbl)
 
+        self._load_audio_profiles_async()
+
+    def _update_existing_rows(self) -> None:
+        for dev in self._paired_devices:
+            mac = dev["mac"]
+            row = self._device_rows.get(mac)
+            if row is None:
+                continue
+            was_connected = row.connected
+            row.connected = dev["connected"]
+            row.set_battery(dev.get("battery"))
+            if was_connected != dev["connected"]:
+                row.set_connected(dev["connected"])
+
     @staticmethod
     def _is_audio(cat: str) -> bool:
         return cat in ("audio", "audio+input")
+
+    @staticmethod
+    def _parse_profile_info(raw: str) -> dict | None:
+        if not raw or raw == "NO_CARD":
+            return None
+        result: dict = {"card": "", "active_profile": "", "codec": "", "profiles": []}
+        for line in raw.splitlines():
+            parts = line.split("|")
+            if parts[0] == "CARD" and len(parts) > 1:
+                result["card"] = parts[1]
+            elif parts[0] == "ACTIVE" and len(parts) > 1:
+                result["active_profile"] = parts[1]
+            elif parts[0] == "CODEC" and len(parts) > 1:
+                result["codec"] = parts[1]
+            elif parts[0] == "PROFILE" and len(parts) >= 4:
+                result["profiles"].append((parts[1], parts[2] == "1", parts[3]))
+        return result if result["card"] else None
+
+    def _load_audio_profiles(self, mac: str) -> dict | None:
+        raw = _run(["--profile-info", mac], timeout=5)
+        return self._parse_profile_info(raw)
+
+    def _get_forced_profile_idx(self, mac: str, profiles: list[tuple]) -> int:
+        from lib.python.variable import get_var
+        mac_key = mac.replace(":", "_")
+        forced = get_var(f"BT_FORCE_PROFILE_{mac_key}", "")
+        if not forced:
+            return 0
+        forced_profile = forced.split("|")[0] if "|" in forced else forced
+        for i, (name, _, _) in enumerate(profiles):
+            if name == forced_profile:
+                return i + 1
+        return 0
+
+    def _on_audio_profile_changed(self, mac: str, selected_idx: int) -> None:
+        from lib.python.variable import get_var, set_var
+        info = self._audio_profile_info.get(mac)
+        if not info:
+            return
+        mac_key = mac.replace(":", "_")
+        current_var = get_var(f"BT_FORCE_PROFILE_{mac_key}", "")
+        if selected_idx == 0:
+            if not current_var:
+                return
+            set_var(f"BT_FORCE_PROFILE_{mac_key}", "")
+            self._window.show_toast("Audio profile set to Auto")
+        else:
+            profiles = info["profiles"]
+            if selected_idx - 1 >= len(profiles):
+                return
+            profile_name, _, display = profiles[selected_idx - 1]
+            codec = profile_name.rsplit("-", 1)[-1] if profile_name.count("-") >= 2 else ""
+            new_val = f"{profile_name}|{codec}"
+            if current_var == new_val:
+                return
+            set_var(f"BT_FORCE_PROFILE_{mac_key}", new_val)
+            _run(["--profile-set", mac, profile_name, codec], timeout=5)
+            self._window.show_toast(f"Profile forced: {display}")
+
+    def _load_audio_profiles_async(self) -> None:
+        audio_devices = [d for d in self._paired_devices
+                         if d["connected"] and self._is_audio(d["cat"])]
+        if not audio_devices:
+            return
+
+        def worker():
+            for dev in audio_devices:
+                mac = dev["mac"]
+                info = self._load_audio_profiles(mac)
+                if info and info["profiles"]:
+                    self._audio_profile_info[mac] = info
+                    options = ["Auto (System Default)"] + [p[2] for p in info["profiles"]]
+                    current_idx = self._get_forced_profile_idx(mac, info["profiles"])
+                    self._audio_profile_map[mac] = info["profiles"]
+                    GLib.idle_add(self._apply_audio_profile_to_row, mac, options, current_idx)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_audio_profile_to_row(self, mac: str, options: list[str], current_idx: int) -> None:
+        row = self._device_rows.get(mac)
+        if row:
+            row.update_profile_options(options, current_idx)
 
     def _connect_device(self, mac: str) -> None:
         def do_connect():
@@ -754,9 +885,15 @@ class BluetoothPage:
             self._sidebar_power_switch.set_active(radio_on)
             self._setting_value = False
 
-        # Rebuild paired device list with current connection states + battery
-        self._paired_devices = paired
-        self._rebuild_device_list()
+        old_macs = {d["mac"]: d for d in self._paired_devices}
+        new_macs = {d["mac"]: d for d in paired}
+
+        if old_macs.keys() != new_macs.keys():
+            self._paired_devices = paired
+            self._rebuild_device_list()
+        else:
+            self._paired_devices = paired
+            self._update_existing_rows()
 
     # ── Save lifecycle ──
 

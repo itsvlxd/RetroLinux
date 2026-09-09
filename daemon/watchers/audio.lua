@@ -53,6 +53,7 @@ return {
 
 				if primary_sink ~= "" then
 					local primary_id = Audio.get_sink_id_by_persistent(primary_sink)
+					local is_bt = primary_sink:find("bluez_output") ~= nil
 					if primary_id ~= "" then
 						if cur_sink ~= primary_id then
 							Watcher.log(
@@ -68,7 +69,7 @@ return {
 							Audio.set_default("sink", primary_id)
 							cur_sink = primary_id
 						end
-					else
+					elseif not is_bt then
 						Watcher.log("audio", "Primary sink not available: " .. primary_sink, "warn")
 					end
 				end
@@ -77,8 +78,9 @@ return {
 
 				if primary_sink ~= "" then
 					local primary_id = Audio.get_sink_id_by_persistent(primary_sink)
+					local is_bt = primary_sink:find("bluez_output") ~= nil
 					local available = primary_id ~= ""
-					if not available and not primary_sink_was_unavail then
+					if not available and not primary_sink_was_unavail and not is_bt then
 						primary_sink_was_unavail = true
 						Watcher.log("audio", "Primary sink unavailable: " .. primary_sink, "info")
 						if fallback_sink ~= "" then
@@ -129,6 +131,7 @@ return {
 
 				if primary_source ~= "" then
 					local primary_id = Audio.get_source_id_by_persistent(primary_source)
+					local is_bt = primary_source:find("bluez_input") ~= nil
 					if primary_id ~= "" then
 						if cur_source ~= primary_id then
 							Watcher.log(
@@ -145,7 +148,7 @@ return {
 							Audio.clear_bt_filter_defaults()
 							cur_source = primary_id
 						end
-					else
+					elseif not is_bt then
 						Watcher.log("audio", "Primary source not available: " .. primary_source, "warn")
 					end
 				end
@@ -154,8 +157,9 @@ return {
 
 				if primary_source ~= "" then
 					local primary_id = Audio.get_source_id_by_persistent(primary_source)
+					local is_bt = primary_source:find("bluez_input") ~= nil
 					local available = primary_id ~= ""
-					if not available and not primary_source_was_unavail then
+					if not available and not primary_source_was_unavail and not is_bt then
 						primary_source_was_unavail = true
 						Watcher.log("audio", "Primary source unavailable: " .. primary_source, "info")
 						if fallback_source ~= "" then
