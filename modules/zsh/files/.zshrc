@@ -83,5 +83,7 @@ export PATH="/usr/local/bin:$PATH"
 export RETRO_DIR="/opt/retrolinux"
 export RETRO_CONFIG="/home/vlad/.config/retro"
 
+export MANPAGER="nvim +Man!"
+
 # Include custom settings 
 source ~/.zsh_settings
