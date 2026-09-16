@@ -340,7 +340,7 @@ class PowerPage:
             ("BAT Performance", "Battery power limit for maximum performance mode", "PWR_BAT_PERFORMANCE", "bat_performance"),
         ]:
             val = int(self._orig.get(key, "15")) if self._orig.get(key, "").isdigit() else 15
-            adj = Gtk.Adjustment(value=val, lower=1, upper=200, step_increment=1, page_increment=5)
+            adj = Gtk.Adjustment(value=val, lower=1, upper=250, step_increment=1, page_increment=5)
             row = Adw.ActionRow(title=label, subtitle=desc)
             spin = Gtk.SpinButton(adjustment=adj, digits=0)
             spin.set_valign(Gtk.Align.CENTER)

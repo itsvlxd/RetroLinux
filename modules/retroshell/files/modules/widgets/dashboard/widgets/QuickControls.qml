@@ -18,12 +18,12 @@ StyledRect {
     implicitHeight: columnLayout.implicitHeight + 8
     radius: Styling.radius(4)
     
-    property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth, 2: quickshare, 3: caffeine
+    property int expandedPanel: -1 // -1: none, 0: wifi, 1: bluetooth, 2: quickshare, 3: caffeine, 4: typingSounds, 5: docker
     property bool darkMode: GlobalStates.themeMode === "dark"
 
     property var controlOrder: (Config.dashboard && Config.dashboard.controlOrder)
         ? Config.dashboard.controlOrder
-        : ["wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight"]
+        : ["wifi", "bluetooth", "quickshare", "caffeine", "typingSounds", "darkmode", "nightlight", "docker"]
 
     function controlComponentFor(id) {
         switch (id) {
@@ -32,7 +32,9 @@ StyledRect {
         case "quickshare": return quickshareComponent;
         case "caffeine": return caffeineComponent;
         case "darkmode": return darkModeComponent;
+        case "typingSounds": return typingSoundsComponent;
         case "nightlight": return nightLightComponent;
+        case "docker": return dockerComponent;
         }
         return undefined;
     }
@@ -109,6 +111,8 @@ StyledRect {
             Layout.preferredHeight: {
                 if (root.expandedPanel === -1) return 0;
                 if (root.expandedPanel === 3) return 120;
+                if (root.expandedPanel === 4) return 240;
+                if (root.expandedPanel === 5) return 450;
                 return 280;
             }
             clip: true
@@ -217,11 +221,52 @@ StyledRect {
                         Behavior on opacity { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
                         Behavior on x { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
                     }
+
+                    Loader {
+                        id: typingSoundsLoader
+                        anchors.fill: parent
+                        active: root.expandedPanel === 4
+                        source: "../controls/TypingSoundsPanel.qml"
+                        asynchronous: true
+
+                        opacity: root.expandedPanel === 4 ? 1 : 0
+                        x: root.expandedPanel === 4 ? 0 : (root.expandedPanel < 4 ? width : -width)
+
+                        onLoaded: {
+                            if (item) {
+                                item.maxContentWidth = width;
+                            }
+                        }
+
+                        Behavior on opacity { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                        Behavior on x { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                    }
+
+                    Loader {
+                        id: dockerLoader
+                        anchors.fill: parent
+                        active: root.expandedPanel === 5
+                        source: "../controls/DockerPanel.qml"
+                        asynchronous: true
+
+                        opacity: root.expandedPanel === 5 ? 1 : 0
+                        x: root.expandedPanel === 5 ? 0 : (root.expandedPanel < 5 ? width : -width)
+
+                        onLoaded: {
+                            if (item) {
+                                item.maxContentWidth = width;
+                            }
+                        }
+
+                        Behavior on opacity { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                        Behavior on x { enabled: Config.animDuration > 0; NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } }
+                    }
+
                 }
             }
         }
     }
-    
+
     function togglePanel(index) {
         if (root.expandedPanel === index) {
             root.expandedPanel = -1;
@@ -354,6 +399,20 @@ StyledRect {
     }
 
     Component {
+        id: typingSoundsComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: Icons.keyboard
+            isActive: TypingSoundsService.enabled || root.expandedPanel === 4
+            tooltipText: TypingSoundsService.enabled ? "Typing Sounds: On" : "Typing Sounds: Off"
+            onClicked: TypingSoundsService.saveSetting("enabled", !TypingSoundsService.enabled)
+            onRightClicked: root.togglePanel(4)
+            onLongPressed: root.togglePanel(4)
+        }
+    }
+
+    Component {
         id: darkModeComponent
         ControlButton {
             Layout.preferredWidth: 48
@@ -376,6 +435,20 @@ StyledRect {
             isActive: NightLightService.active
             tooltipText: NightLightService.active ? "Night Light: On" : "Night Light: Off"
             onClicked: NightLightService.toggle()
+        }
+    }
+
+    Component {
+        id: dockerComponent
+        ControlButton {
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            iconName: Icons.docker
+            isActive: root.expandedPanel === 5
+            tooltipText: "Docker"
+            onClicked: root.togglePanel(5)
+            onRightClicked: root.togglePanel(5)
+            onLongPressed: root.togglePanel(5)
         }
     }
 

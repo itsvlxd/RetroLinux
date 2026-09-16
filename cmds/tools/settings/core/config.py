@@ -246,6 +246,7 @@ class ConfigSections:
     layer_rules: list[str] | None = None
     window_rules_nodes: list["Rule"] | None = None
     layer_rules_nodes: list["Rule"] | None = None
+    theme_layer_rules: list[str] | None = None
     gestures: list[str] | None = None
 
 
@@ -708,6 +709,8 @@ def _build_document(values: dict[str, str], sections: ConfigSections) -> Documen
         doc.lines.extend(sections.layer_rules_nodes)
     elif sections.layer_rules:
         _add_section(doc, "Layer rules", sections.layer_rules)
+    if sections.theme_layer_rules:
+        _add_section(doc, "Theme blur rules", sections.theme_layer_rules)
     # Autostart last: ``exec`` re-runs on every reload, so config later in
     # the file that affects the exec'd process (env vars, monitor layout)
     # is already in effect by the time the commands run.

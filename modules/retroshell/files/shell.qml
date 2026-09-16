@@ -45,7 +45,7 @@ ShellRoot {
 
         Loader {
             id: desktopLoader
-            active: Config.desktop.enabled && SuspendManager.wakeReady
+            active: Config.desktopLayerActive && SuspendManager.wakeReady
             required property ShellScreen modelData
             sourceComponent: Desktop {
                 screen: desktopLoader.modelData
@@ -288,6 +288,7 @@ ShellRoot {
                 _ = GlobalShortcuts.appId; // Force init (IPC pipe listener)
                 _ = Shazam.available; // Force init (availability probe)
                 _ = Tesseract.available; // Force init (availability probe)
+                _ = TypingSoundsService.enabled; // Force init (typing sounds daemon)
             });
         }
     }

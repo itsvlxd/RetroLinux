@@ -18,16 +18,20 @@ Item {
     property bool isRunning: false
     property bool isWorkSession: true
     property bool alarmActive: false
+    property bool registerIpc: true
     
     // --- IPC & Notifications ---
-    IpcHandler {
-        target: "pomodoro"
-        function check() {
-            root.requestPopupOpen();
-        }
-        function stop() {
-            root.stopAlarm();
-            root.isRunning = false;
+    Loader {
+        active: root.registerIpc
+        sourceComponent: IpcHandler {
+            target: "pomodoro"
+            function check() {
+                root.requestPopupOpen();
+            }
+            function stop() {
+                root.stopAlarm();
+                root.isRunning = false;
+            }
         }
     }
 

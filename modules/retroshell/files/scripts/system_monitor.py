@@ -168,6 +168,51 @@ class SystemMonitor:
                 continue
         return -1
 
+    def get_disk_temp(self):
+        """NVMe / SATA drive temperature in °C (best-effort)."""
+        base = "/sys/class/hwmon"
+        if not os.path.exists(base):
+            return -1
+        for hwmon in os.listdir(base):
+            path = os.path.join(base, hwmon)
+            try:
+                with open(os.path.join(path, "name"), "r") as f:
+                    name = f.read().strip()
+                if name in ["nvme", "drivetemp", "scsi"]:
+                    for item in os.listdir(path):
+                        if item.startswith("temp") and item.endswith("_input"):
+                            with open(os.path.join(path, item), "r") as f:
+                                val = int(f.read().strip())
+                                if 10000 < val < 120000:
+                                    return val // 1000
+            except Exception:
+                continue
+        return -1
+
+    def get_fan_speed(self):
+        """Max fan RPM across hwmon fan inputs (best-effort)."""
+        base = "/sys/class/hwmon"
+        if not os.path.exists(base):
+            return -1
+        best = -1
+        try:
+            for hwmon in os.listdir(base):
+                path = os.path.join(base, hwmon)
+                if not os.path.isdir(path):
+                    continue
+                for item in os.listdir(path):
+                    if item.startswith("fan") and item.endswith("_input"):
+                        try:
+                            with open(os.path.join(path, item), "r") as f:
+                                val = int(f.read().strip())
+                                if val > best:
+                                    best = val
+                        except (OSError, ValueError):
+                            continue
+        except OSError:
+            return -1
+        return best
+
     def get_mem(self):
         try:
             mem_total = 0
@@ -317,6 +362,8 @@ if __name__ == "__main__":
         while True:
             cpu_usage = monitor.get_cpu()
             cpu_temp = monitor.get_cpu_temp()
+            fan_rpm = monitor.get_fan_speed()
+            disk_temp = monitor.get_disk_temp()
             ram_usage, ram_total, ram_used, ram_avail = monitor.get_mem()
             disk_usage = monitor.get_disk_usage(disks)
             gpu_usages, gpu_temps = monitor.get_gpu_stats()
@@ -325,6 +372,8 @@ if __name__ == "__main__":
                 json.dumps(
                     {
                         "cpu": {"usage": cpu_usage, "temp": cpu_temp},
+                        "fan_rpm": fan_rpm,
+                        "disk_temp": disk_temp,
                         "ram": {
                             "usage": ram_usage,
                             "total": ram_total,

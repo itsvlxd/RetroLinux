@@ -301,6 +301,37 @@ case "$1" in
         _umount_device "$path"
         ;;
 
+    "--auto-mount-persist")
+        dev="$2"
+        path="$3"
+        [[ -z $dev ]] && echo "ERR|missing_device" && exit 1
+
+        uuid=$(blkid -s UUID -o value "/dev/${dev}" 2>/dev/null)
+        fstype=$(blkid -s TYPE -o value "/dev/${dev}" 2>/dev/null)
+        [[ -z $uuid || -z $fstype ]] && echo "ERR|cannot_get_uuid_fstype" && exit 1
+
+        if [[ -z $path ]]; then
+            label=$(blkid -s LABEL -o value "/dev/${dev}" 2>/dev/null || echo "")
+            [[ -z $label ]] && label="${dev}"
+            path="/mnt/${label// /_}"
+        fi
+
+        if grep -q "UUID=${uuid}" /etc/fstab 2>/dev/null; then
+            echo "OK|already_exists"
+            exit 0
+        fi
+
+        $SUDO_CMD mkdir -p "$path" 2>/dev/null
+        echo "UUID=${uuid} ${path} ${fstype} defaults,nofail 0 2" | $SUDO_CMD tee -a /etc/fstab >/dev/null
+
+        $SUDO_CMD mount "/dev/${dev}" "$path" 2>/dev/null
+        if [[ $? -eq 0 ]]; then
+            echo "OK|persisted=${path}"
+        else
+            echo "ERR|fstab_updated_but_mount_failed"
+        fi
+        ;;
+
     "--btrfs-list")
         btrfs_path="${2:-/}"
         _is_btrfs "$btrfs_path" || {

@@ -17,12 +17,14 @@ Item {
     property bool isActive: true
     property int popupWidth: 300
     property int popupHeight: 360
+    property int iconPixelSize: 18
 
     property bool vertical: false
     property real radius: 0
     property real startRadius: radius
     property real endRadius: radius
     property bool layerEnabled: true
+    property bool hasOpened: false
 
     property bool isHovered: false
     readonly property bool popupOpen: popup.isOpen
@@ -71,15 +73,18 @@ Item {
         Text {
             anchors.centerIn: parent
             text: root.iconName
-            font.family: Icons.font
-            font.pixelSize: 18
+            font.family: root.iconName.includes("<font") ? "" : Icons.font
+            font.pixelSize: root.iconPixelSize
             color: root.popupOpen ? buttonBg.item : (root.isActive ? Styling.srItem("overprimary") : Colors.outline)
         }
 
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: popup.toggle()
+            onClicked: {
+                root.hasOpened = true;
+                popup.toggle();
+            }
         }
     }
 
@@ -93,7 +98,7 @@ Item {
 
         Loader {
             anchors.fill: parent
-            active: popup.isOpen
+            active: root.hasOpened
             source: root.panelSource
             asynchronous: true
             onLoaded: {

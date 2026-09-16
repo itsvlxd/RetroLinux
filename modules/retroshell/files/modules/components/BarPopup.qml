@@ -161,7 +161,7 @@ PopupWindow {
             id: background
             anchors.fill: parent
             variant: root.variant
-            enableShadow: true
+            enableShadow: !Config.compositor.blurEnabled
             radius: Styling.radius(8)
 
             Item {

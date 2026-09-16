@@ -576,6 +576,8 @@ Item {
         case "battery": return batteryComponent;
         case "clock": return clockComponent;
         case "power": return powerComponent;
+        case "typingSounds": return typingSoundsComponent;
+        case "docker": return dockerComponent;
         }
         return undefined;
     }
@@ -804,6 +806,34 @@ Item {
         PowerButton {
             vertical: root.orientation === "vertical"
             enableShadow: root.shadowsEnabled
+        }
+    }
+
+    Component {
+        id: typingSoundsComponent
+        Bar.QuickPopupButton {
+            iconName: TypingSoundsService.enabled ? Icons.keyboard : Icons.keyboard
+            tooltipText: "Typing Sounds"
+            panelSource: "../widgets/dashboard/controls/TypingSoundsPanel.qml"
+            isActive: TypingSoundsService.enabled
+            bar: root
+            vertical: root.orientation === "vertical"
+            layerEnabled: root.shadowsEnabled
+        }
+    }
+
+    Component {
+        id: dockerComponent
+        Bar.QuickPopupButton {
+            iconName: Icons.docker
+            tooltipText: "Docker"
+            panelSource: "../widgets/dashboard/controls/DockerPanel.qml"
+            isActive: DockerService.runningCount > 0
+            popupWidth: 350
+            popupHeight: 450
+            bar: root
+            vertical: root.orientation === "vertical"
+            layerEnabled: root.shadowsEnabled
         }
     }
 }

@@ -17,6 +17,8 @@ Singleton {
     property real cpuUsage: 0.0
     property string cpuModel: ""
     property int cpuTemp: -1
+    property int fanRpm: -1
+    property int diskTemp: -1
 
     // RAM metrics
     property real ramUsage: 0.0
@@ -48,6 +50,7 @@ Singleton {
     property var gpuHistories: []
     property var cpuTempHistory: []
     property var gpuTempHistories: []
+    property var diskTempHistory: []
     property int maxHistoryPoints: 50
     property int totalDataPoints: 0
 
@@ -55,11 +58,11 @@ Singleton {
     property int updateInterval: 2000
 
     // Unified monitor process.
-    // Resource-efficient: only runs when dashboard is open.
-    // Optimized GPU polling avoids waking dGPUs.
+    // Lightweight and avoids waking dGPUs; runs whenever disks are configured
+    // so desktop widgets and the dashboard both get live metrics.
     property Process monitorProcess: Process {
         id: monitorProcess
-        running: GlobalStates.dashboardOpen && GlobalStates.dashboardCurrentTab === 2 && root.validDisks.length > 0
+        running: root.validDisks.length > 0
         
         command: {
             let cmd = ["python3", Quickshell.shellDir + "/scripts/system_monitor.py", root.updateInterval.toString()];
@@ -86,6 +89,14 @@ Singleton {
                     if (stats.cpu) {
                         root.cpuUsage = stats.cpu.usage;
                         root.cpuTemp = stats.cpu.temp;
+                    }
+
+                    if (stats.fan_rpm !== undefined) {
+                        root.fanRpm = stats.fan_rpm;
+                    }
+
+                    if (stats.disk_temp !== undefined) {
+                        root.diskTemp = stats.disk_temp;
                     }
                     
                     if (stats.ram) {
@@ -155,6 +166,7 @@ Singleton {
         cpuHistory = pushHistory(cpuHistory, cpuUsage / 100);
         cpuTempHistory = pushHistory(cpuTempHistory, cpuTemp);
         ramHistory = pushHistory(ramHistory, ramUsage / 100);
+        diskTempHistory = pushHistory(diskTempHistory, diskTemp);
 
         if (gpuDetected && gpuCount > 0) {
             let newGpuHistories = gpuHistories.slice();

@@ -1,0 +1,10 @@
+{
+  "title": "Typing Sounds",
+  "description": "Simulate the sound of a mechanical keyboard by playing custom sounds while typing.",
+  "type": "extra",
+  "access": "user",
+  "defaults": false,
+  "mode": "mirror",
+  "dependencies": ["retroshell"],
+  "overwrite": false
+}

@@ -90,13 +90,14 @@ TOOLBOX_ITEMS: dict = {
     "lens": ("Google Lens", "Reverse image search", "system-search-symbolic", None),
     "shazam": ("Shazam", "Recognize playing music", "shazam-symbolic", "songrec"),
     "webcam": ("Webcam Overlay", "Floating webcam preview", "camera-video-symbolic", None),
+    "docker": ("Docker Manager", "Monitor and manage Docker containers", "utilities-system-monitor-symbolic", "docker"),
 }
 
 # Default toolbox order mirrors the current hardcoded layout in ToolsMenu.qml.
 TOOLBOX_DEFAULT_ORDER: list = [
     "screenshot", "screenshots", "separator",
     "recorder", "recordings", "separator",
-    "colorpicker", "ocr", "qr", "lens", "shazam", "webcam",
+    "colorpicker", "ocr", "qr", "lens", "shazam", "webcam", "docker",
 ]
 
 TOOLBOX_MIN_ITEMS = 5
@@ -136,6 +137,8 @@ BAR_RIGHT_ITEMS: dict = {
     "battery": ("Battery", "Show battery level", "battery-symbolic"),
     "clock": ("Time, Weather & Calendar", "Time, date, calendar and weather", "clock-symbolic"),
     "power": ("Power Button", "Open the power menu", "system-shutdown-symbolic"),
+    "typingSounds": ("Typing Sounds", "Mechanical keyboard typing sounds", "input-keyboard-symbolic"),
+    "docker": ("Docker", "Monitor and manage Docker containers", "utilities-system-monitor-symbolic"),
 }
 
 # Unified catalog of every reorderable bar item (left + right), so an item keeps
@@ -330,6 +333,7 @@ THEME_DEFAULTS: dict = {
     "fontSize": 14,
     "monoFont": "Iosevka Nerd Font Mono",
     "monoFontSize": 14,
+    "emojiFont": "Noto Color Emoji",
     "tintIcons": False,
     "enableCorners": True,
     "animDuration": 300,
@@ -503,10 +507,84 @@ def save_dock(data: dict) -> None:
 # Mirrors ``modules/retroshell/files/config/defaults/desktop.js``.
 DESKTOP_DEFAULTS: dict = {
     "enabled": False,
+    "showIcons": True,
     "iconSize": 40,
     "spacingVertical": 16,
     "textColor": "overBackground",
+    "editMode": False,
+    "perMonitor": False,
+    "widgetOrder": [],
+    "widgets": [],
 }
+
+# Catalog of desktop widgets the user can add/remove.
+# ``id`` -> (label, description, icon). Extend this list to add more widgets.
+DESKTOP_WIDGET_CATALOG: dict = {
+    "calendar": ("Calendar 4x4", "Large square month calendar", "x-office-calendar-symbolic"),
+    "calendar2x4": ("Calendar 2x4", "Wide compact month calendar", "x-office-calendar-symbolic"),
+    "weather": ("Weather", "Animated weather scene with 7-day forecast", "weather-clear-symbolic"),
+    "weather2x4": ("Weather 2x4", "Wide weather card with condition disc and forecast", "weather-clear-symbolic"),
+    "weather2x2": ("Weather 2x2", "Simple square animated weather card", "weather-clear-symbolic"),
+    "music2x2": ("Music Player 2x2", "Square music player with artwork and controls", "multimedia-player-symbolic"),
+    "music2x4": ("Music Player 2x4", "Tall music player with circular seek disc and controls", "multimedia-player-symbolic"),
+    "clockdigital": ("Digital Clock", "Big time and date", "appointment-new-symbolic"),
+    "clockanalog": ("Analog Clock", "Circular clock face with hands", "appointment-new-symbolic"),
+    "worldclock": ("World Clock", "Up to 4 timezones side by side", "appointment-new-symbolic"),
+    "storage": ("Device Storage", "Apple-style storage breakdown card", "drive-harddisk-symbolic"),
+    "storage2x4": ("Device Storage 2x4", "Wide storage card with per-category sizes", "drive-harddisk-symbolic"),
+    "network": ("Network Monitor", "Live bandwidth, sparkline and IPs", "network-wireless-symbolic"),
+    "network2x4": ("Network Monitor 2x4", "Wide bandwidth card with big sparkline", "network-wireless-symbolic"),
+    "network1x4": ("Network Monitor Slim", "Slim horizontal bandwidth strip", "network-wireless-symbolic"),
+    "network1x3": ("Network Monitor 1x3", "Compact strip with speeds and toggle", "network-wireless-symbolic"),
+    "power": ("Power & Performance", "Power draw, thermals and profile switcher", "battery-level-80-symbolic"),
+    "power1x3": ("Power & Performance 1x3", "Slim strip with profile switcher", "battery-level-80-symbolic"),
+    "bluetooth": ("Bluetooth", "Connected devices, battery and quick pair", "bluetooth-symbolic"),
+    "note": ("Note", "Pinned editable note on the desktop", "text-x-generic-symbolic"),
+    "batteryring": ("Battery Rings", "Apple-style circular battery gauge", "battery-symbolic"),
+    "batteryring2x4": ("Battery Rings 2x4", "Battery rings for up to 4 devices", "battery-symbolic"),
+    "feed": ("Dev Feed", "Full-cover article feed (DEV.to / Hacker News / daily.dev)", "globe-symbolic"),
+    "sysmonitor": ("System Monitor", "CPU, RAM and disk usage", "utilities-system-monitor-symbolic"),
+    "sysmonitor2x4": ("System Monitor 2x4", "CPU/GPU/RAM sparkline graph", "utilities-system-monitor-symbolic"),
+    "battery": ("Battery", "Battery level and charging state", "battery-symbolic"),
+    "photo": ("Photo 2x2", "Display an image on your desktop", "image-x-generic-symbolic"),
+    "photo2x4": ("Photo 2x4", "Display a wide image on your desktop", "image-x-generic-symbolic"),
+    "photo4x2": ("Photo 4x2", "Display a portrait image on your desktop", "image-x-generic-symbolic"),
+}
+
+# Fixed default size (px) for each widget type, used when none is stored.
+DESKTOP_WIDGET_SIZES: dict = {
+    "calendar": (320, 320),
+    "calendar2x4": (320, 160),
+    "weather": (320, 240),
+    "weather2x4": (320, 160),
+    "weather2x2": (160, 160),
+    "music2x2": (160, 160),
+    "music2x4": (320, 160),
+    "clockdigital": (160, 160),
+    "clockanalog": (160, 160),
+    "worldclock": (320, 160),
+    "storage": (160, 160),
+    "storage2x4": (320, 160),
+    "network": (160, 160),
+    "network2x4": (320, 160),
+    "network1x4": (320, 80),
+    "network1x3": (240, 80),
+    "power": (160, 160),
+    "power1x3": (240, 80),
+    "bluetooth": (160, 160),
+    "note": (160, 160),
+    "batteryring": (160, 160),
+    "batteryring2x4": (320, 160),
+    "feed": (320, 160),
+    "sysmonitor": (160, 160),
+    "sysmonitor2x4": (320, 160),
+    "battery": (160, 160),
+    "photo": (160, 160),
+    "photo2x4": (320, 160),
+    "photo4x2": (160, 320),
+}
+
+DESKTOP_MIN_WIDGETS = 0
 
 
 def desktop_path() -> Path:
@@ -519,6 +597,45 @@ def load_desktop() -> dict:
 
 def save_desktop(data: dict) -> None:
     save_shell_json("desktop", data)
+
+
+# ── desktop_widgets.json ────────────────────────────────────────────────
+# Dedicated file for desktop widget instances. Kept separate from
+# desktop.json because Quickshell's JsonAdapter does not load top-level
+# array properties; the shell's DesktopWidgets reads/writes this file with
+# manual JSON so the widget list/positions round-trip reliably.
+
+def desktop_widgets_path() -> Path:
+    return shell_config_dir() / "desktop_widgets.json"
+
+
+def load_desktop_widgets() -> list[dict]:
+    """Return the list of desktop widget instances ``[{id,type,x,y,width,height}]``."""
+    try:
+        data = json.loads(desktop_widgets_path().read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    if isinstance(data, dict) and isinstance(data.get("widgets"), list):
+        return data["widgets"]
+    return []
+
+
+def save_desktop_widgets(widgets: list[dict]) -> None:
+    """Atomically write the desktop widget instances to desktop_widgets.json."""
+    path = desktop_widgets_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".desktop_widgets.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump({"widgets": widgets}, fh, indent=1)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 # ── system.json (Misc/OCR) ──────────────────────────────────────────────
@@ -864,7 +981,7 @@ def save_tools(data: dict) -> None:
 # hot-action buttons. Groups are all reorderable but never removable; the
 # QuickControls buttons can be added/removed down to DASHBOARD_MIN_CONTROLS.
 DASHBOARD_WIDGET_IDS = ("player", "quickactions", "notifications", "controls")
-DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "darkmode", "nightlight")
+DASHBOARD_CONTROL_IDS = ("wifi", "bluetooth", "quickshare", "caffeine", "typingSounds", "darkmode", "nightlight", "docker")
 DASHBOARD_MIN_CONTROLS = 5
 
 DASHBOARD_DEFAULTS: dict = {
@@ -904,3 +1021,74 @@ def load_notifications() -> dict:
 
 def save_notifications(data: dict) -> None:
     save_shell_json("notifications", data)
+
+
+# ── typing_sounds.json ────────────────────────────────────────────────
+
+# Bundled sound pack directory inside the retroshell module.
+TYPING_SOUNDS_PACKS_DIR = Path("/opt/retrolinux/modules/retroshell/files/assets/typing-sounds-soundpacks")
+
+# Catalog of bundled sound packs: id -> display name.
+# Scanned dynamically at runtime; this dict provides fallback names.
+TYPING_SOUNDS_PACK_NAMES: dict = {
+    "nk-cream": "NK Cream",
+    "cherrymx-black-abs": "Cherry MX Black (ABS)",
+    "cherrymx-black-pbt": "Cherry MX Black (PBT)",
+    "cherrymx-blue-abs": "Cherry MX Blue (ABS)",
+    "cherrymx-blue-pbt": "Cherry MX Blue (PBT)",
+    "cherrymx-brown-abs": "Cherry MX Brown (ABS)",
+    "cherrymx-brown-pbt": "Cherry MX Brown (PBT)",
+    "cherrymx-red-abs": "Cherry MX Red (ABS)",
+    "cherrymx-red-pbt": "Cherry MX Red (PBT)",
+    "cream-travel": "Cream Travel",
+    "eg-crystal-purple": "EG Crystal Purple",
+    "eg-oreo": "EG Oreo",
+    "holy-pandas": "Holy Pandas",
+    "mxblack-travel": "MX Black Travel",
+    "mxblue-travel": "MX Blue Travel",
+    "mxbrown-travel": "MX Brown Travel",
+    "topre-purple-hybrid-pbt": "Topre Purple Hybrid (PBT)",
+    "turquoise": "Turquoise",
+}
+
+TYPING_SOUNDS_DEFAULTS: dict = {
+    "enabled": False,
+    "volume": 100,
+    "mouseEnabled": False,
+    "selectedPackId": "nk-cream",
+    "selectedDevicePath": "all",
+}
+
+
+def typing_sounds_path() -> Path:
+    return shell_config_dir() / "typing_sounds.json"
+
+
+def load_typing_sounds() -> dict:
+    return load_shell_json("typing_sounds", TYPING_SOUNDS_DEFAULTS)
+
+
+def save_typing_sounds(data: dict) -> None:
+    save_shell_json("typing_sounds", data)
+
+
+def scan_typing_sound_packs() -> list[dict]:
+    """Return list of {id, name} for every bundled sound pack."""
+    packs: list[dict] = []
+    if not TYPING_SOUNDS_PACKS_DIR.is_dir():
+        return packs
+    for d in sorted(TYPING_SOUNDS_PACKS_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        config_file = d / "config.json"
+        if config_file.exists():
+            try:
+                import json
+                cfg = json.loads(config_file.read_text())
+                name = cfg.get("name", d.name)
+            except (json.JSONDecodeError, OSError):
+                name = TYPING_SOUNDS_PACK_NAMES.get(d.name, d.name)
+        else:
+            name = TYPING_SOUNDS_PACK_NAMES.get(d.name, d.name)
+        packs.append({"id": d.name, "name": name})
+    return packs

@@ -56,13 +56,14 @@ PanelWindow {
                 if (coords.length === 2) {
                     let x = parseInt(coords[0].trim());
                     let y = parseInt(coords[1].trim());
-                    menu.x = x;
-                    menu.y = y;
-                    menu.visible = false;
-                    Qt.callLater(() => {
-                        menu.popup();
-                    });
+                    if (isFinite(x) && isFinite(y)) {
+                        menu.x = x;
+                        menu.y = y;
+                    }
                 }
+                // Always open the menu even if the cursor query was empty, so a
+                // transient axctl hiccup never swallows a right-click.
+                menu.popup();
             }
         }
     }
@@ -278,6 +279,20 @@ PanelWindow {
                 menuType = "";
             });
         }
+    }
+
+    Component.onCompleted: {
+        // Warm up the menu popup so the very first right-click opens
+        // immediately (the first popup in a layer surface is otherwise
+        // not ready and gets swallowed).
+        Qt.callLater(() => {
+            if (menu) {
+                menu.x = 0;
+                menu.y = 0;
+                menu.popup();
+                menu.close();
+            }
+        });
     }
 
     Connections {

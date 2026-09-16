@@ -8,7 +8,7 @@ get_default_sink() {
 }
 
 get_default_source() {
-    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Streams:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/ && match($(i-1),/\*/)) {gsub(/\./,"",$i); print $i; exit}}'
+    wpctl status 2>/dev/null | sed -n '/^Audio$/,/^Video$/p' | awk '/Sources:/,/Filters:/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.$/ && match($(i-1),/\*/)) {gsub(/\./,"",$i); print $i; exit}}'
 }
 
 get_sink_volume() {

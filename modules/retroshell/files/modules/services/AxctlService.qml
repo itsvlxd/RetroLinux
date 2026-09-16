@@ -77,8 +77,22 @@ Singleton {
         if (!screen) return null;
         let screenName = screen.name || screen;
         let values = root.monitors.values || [];
+        // Exact match
         for (let i = 0; i < values.length; i++) {
             if (values[i].name === screenName) return values[i];
+        }
+        // Case-insensitive match
+        let lower = screenName.toLowerCase();
+        for (let i = 0; i < values.length; i++) {
+            if (values[i].name && values[i].name.toLowerCase() === lower) return values[i];
+        }
+        // Fallback: match by screen index position
+        let screens = Quickshell.screens || [];
+        for (let i = 0; i < screens.length; i++) {
+            if (screens[i] === screen || (screens[i] && screens[i].name === screenName)) {
+                if (i < values.length) return values[i];
+                break;
+            }
         }
         return null;
     }
@@ -133,21 +147,32 @@ Singleton {
             }
         }
 
+        // Build name→id lookup for workspace names (axctl may report active_workspace as name, not ID)
+        let wsNameToId = {};
+        let wsList = root.workspaces.values || [];
+        for (let i = 0; i < wsList.length; i++) {
+            wsNameToId[wsList[i].name] = wsList[i].id;
+        }
+
         // --- Monitors ---
         if (state.monitors) {
-            let mappedMonitors = state.monitors.map(mon => ({
-                id: parseInt(mon.id) || 0,
-                name: mon.name,
-                focused: mon.is_focused,
-                width: mon.width,
-                height: mon.height,
-                refreshRate: mon.refresh_rate,
-                scale: mon.scale,
-                x: parseInt(mon.metadata ? mon.metadata.x : 0) || 0,
-                y: parseInt(mon.metadata ? mon.metadata.y : 0) || 0,
-                transform: parseInt(mon.metadata ? mon.metadata.transform : 0) || 0,
-                activeWorkspace: { id: parseInt(mon.metadata ? mon.metadata.active_workspace : 0) || 0, name: mon.metadata ? mon.metadata.active_workspace : "" }
-            }));
+            let mappedMonitors = state.monitors.map(mon => {
+                let rawWs = mon.metadata ? mon.metadata.active_workspace : "";
+                let wsId = parseInt(rawWs) || wsNameToId[rawWs] || 0;
+                return {
+                    id: parseInt(mon.id) || 0,
+                    name: mon.name,
+                    focused: mon.is_focused,
+                    width: mon.width,
+                    height: mon.height,
+                    refreshRate: mon.refresh_rate,
+                    scale: mon.scale,
+                    x: parseInt(mon.metadata ? mon.metadata.x : 0) || 0,
+                    y: parseInt(mon.metadata ? mon.metadata.y : 0) || 0,
+                    transform: parseInt(mon.metadata ? mon.metadata.transform : 0) || 0,
+                    activeWorkspace: { id: wsId, name: rawWs }
+                };
+            });
             root.monitors.values = mappedMonitors;
             let focused = mappedMonitors.find(m => m.focused) || null;
             if (focused !== root.focusedMonitor) {

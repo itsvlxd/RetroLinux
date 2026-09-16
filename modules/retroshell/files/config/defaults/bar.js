@@ -29,7 +29,7 @@ var data = {
     "showWeatherTemp": false,
     "showDayOfWeek": false,
     "batteryStyle": "arch",
-    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"],
+    "toolboxOrder": ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam", "docker"],
     "clockOrder": ["clock", "weather", "pomodoro"],
     "barLeftOrder": ["launcher", "workspaces", "pin"],
     "barRightOrder": ["tools", "tray", "wifi", "bluetooth", "controls", "battery", "clock", "power"]

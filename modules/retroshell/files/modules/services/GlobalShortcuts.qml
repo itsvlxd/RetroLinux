@@ -56,6 +56,14 @@ QtObject {
             return;
         }
 
+        if (command.indexOf("desktop-edit ") === 0) {
+            var edit = command.substring("desktop-edit ".length).trim();
+            if (edit === "on" || edit === "off") {
+                Config.desktop.editMode = (edit === "on");
+            }
+            return;
+        }
+
         switch (command) {
             // Launcher (Standalone Notch Module)
             case "launcher": toggleLauncher(); break;

@@ -174,9 +174,11 @@ Item {
             p = layout.mapToItem(dockContainer, 0, 0);
         } else if (clamped >= pinnedCount) {
             var last = rep.itemAt(pinnedCount - 1);
+            if (!last) return root.isVertical ? layout.height : layout.width;
             p = last.mapToItem(dockContainer, root.isVertical ? last.width / 2 : last.width, root.isVertical ? last.height : last.height / 2);
         } else {
             var item = rep.itemAt(clamped);
+            if (!item) return 0;
             p = item.mapToItem(dockContainer, 0, root.isVertical ? 0 : item.height / 2);
         }
         return root.isVertical ? p.y : p.x;

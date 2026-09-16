@@ -55,13 +55,14 @@ cmd_shell() {
             ;;
         run)
             local cmd="${@:2}"
-            local valid_cmds="launcher clipboard emoji tmux notes wallpapers screenshot screenrecord lockscreen overview powermenu tools assistant config dashboard media-play-pause media-next media-prev"
+            local base_cmd="${cmd%% *}"
+            local valid_cmds="launcher clipboard emoji tmux notes wallpapers screenshot screenrecord lockscreen overview powermenu tools assistant config dashboard media-play-pause media-next media-prev desktop-edit theme-mode"
             if [[ -z $cmd ]]; then
-                rx_log "info" "Commands: ${PINK}launcher${RESET}, ${PINK}clipboard${RESET}, ${PINK}emoji${RESET}, ${PINK}tmux${RESET}, ${PINK}notes${RESET}, ${PINK}wallpapers${RESET}, ${PINK}screenshot${RESET}, ${PINK}screenrecord${RESET}, ${PINK}lockscreen${RESET}, ${PINK}overview${RESET}, ${PINK}powermenu${RESET}, ${PINK}tools${RESET}, ${PINK}assistant${RESET}, ${PINK}config${RESET}, ${PINK}dashboard${RESET}, ${PINK}media-play-pause${RESET}, ${PINK}media-next${RESET}, ${PINK}media-prev${RESET}"
+                rx_log "info" "Commands: ${PINK}launcher${RESET}, ${PINK}clipboard${RESET}, ${PINK}emoji${RESET}, ${PINK}tmux${RESET}, ${PINK}notes${RESET}, ${PINK}wallpapers${RESET}, ${PINK}screenshot${RESET}, ${PINK}screenrecord${RESET}, ${PINK}lockscreen${RESET}, ${PINK}overview${RESET}, ${PINK}powermenu${RESET}, ${PINK}tools${RESET}, ${PINK}assistant${RESET}, ${PINK}config${RESET}, ${PINK}dashboard${RESET}, ${PINK}media-play-pause${RESET}, ${PINK}media-next${RESET}, ${PINK}media-prev${RESET}, ${PINK}desktop-edit <on|off>${RESET}, ${PINK}theme-mode <dark|light>${RESET}"
                 return 0
             fi
-            if ! echo "$valid_cmds" | grep -qw "$cmd"; then
-                rx_log "error" "Unknown command: ${PINK}$cmd${RESET}"
+            if ! echo "$valid_cmds" | grep -qw "$base_cmd"; then
+                rx_log "error" "Unknown command: ${PINK}$base_cmd${RESET}"
                 return 1
             fi
             local result=$(bash "$core" --run "$cmd")

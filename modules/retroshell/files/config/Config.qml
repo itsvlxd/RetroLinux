@@ -24,6 +24,7 @@ import "defaults/dock.js" as DockDefaults
 import "defaults/ai.js" as AiDefaults
 import "defaults/dashboard.js" as DashboardDefaults
 import "defaults/notifications.js" as NotificationsDefaults
+import "defaults/typing_sounds.js" as TypingSoundsDefaults
 import "ConfigValidator.js" as ConfigValidator
 
 Singleton {
@@ -59,11 +60,12 @@ Singleton {
     property bool dockReady: false
     property bool dashboardReady: false
     property bool notificationsReady: false
+    property bool typingSoundsReady: false
     property bool aiReady: false
     property bool toolsReady: false
     property bool keybindsInitialLoadComplete: false
 
-    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && notificationsReady && aiReady && toolsReady
+    property bool initialLoadComplete: themeReady && barReady && workspacesReady && overviewReady && notchReady && compositorReady && performanceReady && weatherReady && desktopReady && lockscreenReady && prefixReady && systemReady && dockReady && dashboardReady && notificationsReady && aiReady && toolsReady && typingSoundsReady
 
     // Compatibility aliases
     property alias loader: themeLoader
@@ -104,6 +106,30 @@ Singleton {
         command: ["bash", "-c", `test -f '${root.configDir}/hyprland.json' && ! test -f '${root.configDir}/compositor.json' && mv '${root.configDir}/hyprland.json' '${root.configDir}/compositor.json' && echo 'Migrated hyprland.json to compositor.json' || true`]
     }
 
+    // Read RETRO_FONT_EMOJI from variables.sh so the shell respects the retro
+    // emoji font, and apply it to the theme's emojiFont (persisted on save).
+    Process {
+        id: emojiFontProcess
+        running: false
+        command: []
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var val = text.trim();
+                if (val && root.themeReady) {
+                    root.theme.emojiFont = val;
+                    console.log("[Config] emojiFont from RETRO_FONT_EMOJI:", val);
+                }
+            }
+        }
+    }
+
+    function loadEmojiFont() {
+        var cfg = Quickshell.env("RETRO_CONFIG") || Quickshell.env("HOME") + "/.config/retro";
+        emojiFontProcess.command = ["bash", "-c", "source '" + cfg + "/variables.sh' 2>/dev/null; echo $RETRO_FONT_EMOJI"];
+        emojiFontProcess.running = true;
+    }
+
     // ============================================
     // THEME MODULE
     // ============================================
@@ -116,10 +142,11 @@ Singleton {
             if (!root.themeReady) {
                 validateModule("theme", themeLoader, ThemeDefaults.data, () => {
                     root.themeReady = true;
+                    root.loadEmojiFont();
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.themeReady) {
                 handleMissingConfig("theme", themeLoader, ThemeDefaults.data, () => {
                     root.themeReady = true;
@@ -146,6 +173,7 @@ Singleton {
             property int fontSize: 14
             property string monoFont: "Iosevka Nerd Font Mono"
             property int monoFontSize: 14
+            property string emojiFont: "Noto Color Emoji"
             property bool tintIcons: false
             property bool enableCorners: true
             property int animDuration: 300
@@ -514,7 +542,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.barReady) {
                 handleMissingConfig("bar", barLoader, BarDefaults.data, () => {
                     root.barReady = true;
@@ -563,7 +591,7 @@ Singleton {
             property bool showWeatherTemp: false
             property bool showDayOfWeek: false
             property string batteryStyle: "arch"
-            property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam"]
+            property var toolboxOrder: ["screenshot", "screenshots", "separator", "recorder", "recordings", "separator", "colorpicker", "ocr", "qr", "lens", "shazam", "webcam", "docker"]
             property var clockOrder: ["clock", "weather", "pomodoro"]
             property var barLeftOrder: ["launcher", "workspaces", "pin"]
             property var barRightOrder: ["tools", "tray", "wifi", "bluetooth", "controls", "battery", "clock", "power"]
@@ -585,7 +613,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.workspacesReady) {
                 handleMissingConfig("workspaces", workspacesLoader, WorkspacesDefaults.data, () => {
                     root.workspacesReady = true;
@@ -629,7 +657,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.overviewReady) {
                 handleMissingConfig("overview", overviewLoader, OverviewDefaults.data, () => {
                     root.overviewReady = true;
@@ -671,7 +699,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.notchReady) {
                 handleMissingConfig("notch", notchLoader, NotchDefaults.data, () => {
                     root.notchReady = true;
@@ -717,7 +745,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.compositorReady) {
                 handleMissingConfig("compositor", compositorLoader, CompositorDefaults.data, () => {
                     root.compositorReady = true;
@@ -797,7 +825,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.performanceReady) {
                 handleMissingConfig("performance", performanceLoader, PerformanceDefaults.data, () => {
                     root.performanceReady = true;
@@ -841,7 +869,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.toolsReady) {
                 handleMissingConfig("tools", toolsLoader, ToolsDefaults.data, () => {
                     root.toolsReady = true;
@@ -889,7 +917,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.weatherReady) {
                 handleMissingConfig("weather", weatherLoader, WeatherDefaults.data, () => {
                     root.weatherReady = true;
@@ -929,7 +957,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.desktopReady) {
                 handleMissingConfig("desktop", desktopLoader, DesktopDefaults.data, () => {
                     root.desktopReady = true;
@@ -950,9 +978,14 @@ Singleton {
 
         adapter: JsonAdapter {
             property bool enabled: false
+            property bool showIcons: true
             property int iconSize: 40
             property int spacingVertical: 16
             property string textColor: "overBackground"
+            property bool editMode: false
+            property bool perMonitor: false
+            property list<string> widgetOrder: []
+            property list<var> widgets: []
         }
     }
 
@@ -971,7 +1004,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.lockscreenReady) {
                 handleMissingConfig("lockscreen", lockscreenLoader, LockscreenDefaults.data, () => {
                     root.lockscreenReady = true;
@@ -1021,7 +1054,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.prefixReady) {
                 handleMissingConfig("prefix", prefixLoader, PrefixDefaults.data, () => {
                     root.prefixReady = true;
@@ -1064,7 +1097,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.systemReady) {
                 handleMissingConfig("system", systemLoader, SystemDefaults.data, () => {
                     root.systemReady = true;
@@ -1147,7 +1180,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.dockReady) {
                 handleMissingConfig("dock", dockLoader, DockDefaults.data, () => {
                     root.dockReady = true;
@@ -1203,7 +1236,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.dashboardReady) {
                 handleMissingConfig("dashboard", dashboardLoader, DashboardDefaults.data, () => {
                     root.dashboardReady = true;
@@ -1278,7 +1311,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.notificationsReady) {
                 handleMissingConfig("notifications", notificationsLoader, NotificationsDefaults.data, () => {
                     root.notificationsReady = true;
@@ -1319,7 +1352,7 @@ Singleton {
                 });
             }
         }
-        onLoadFailed: {
+        onLoadFailed: (error) => {
             if (error.toString().includes("FileNotFound") && !root.aiReady) {
                 handleMissingConfig("ai", aiLoader, AiDefaults.data, () => {
                     root.aiReady = true;
@@ -1346,6 +1379,49 @@ Singleton {
             property int sidebarWidth: 400
             property string sidebarPosition: "right"
             property bool sidebarPinnedOnStartup: false
+        }
+    }
+
+    // ============================================
+    // TYPING SOUNDS MODULE
+    // ============================================
+    FileView {
+        id: typingSoundsLoader
+        path: root.configDir + "/typing_sounds.json"
+        atomicWrites: true
+        watchChanges: true
+        onLoaded: {
+            if (!root.typingSoundsReady) {
+                validateModule("typingSounds", typingSoundsLoader, TypingSoundsDefaults.data, () => {
+                    root.typingSoundsReady = true;
+                });
+            }
+        }
+        onLoadFailed: (error) => {
+            if (error.toString().includes("FileNotFound") && !root.typingSoundsReady) {
+                handleMissingConfig("typingSounds", typingSoundsLoader, TypingSoundsDefaults.data, () => {
+                    root.typingSoundsReady = true;
+                });
+            }
+        }
+        onFileChanged: {
+            root.pauseAutoSave = true;
+            reload();
+            root.pauseAutoSave = false;
+        }
+        onPathChanged: reload()
+        onAdapterUpdated: {
+            if (root.typingSoundsReady && !root.pauseAutoSave) {
+                typingSoundsLoader.writeAdapter();
+            }
+        }
+
+        adapter: JsonAdapter {
+            property bool enabled: false
+            property int volume: 100
+            property bool mouseEnabled: false
+            property string selectedPackId: "nk-cream"
+            property string selectedDevicePath: "all"
         }
     }
 
@@ -3533,6 +3609,7 @@ Singleton {
 
     property int roundness: theme.roundness
     property string defaultFont: theme.font
+    property string emojiFont: theme.emojiFont
     property int animDuration: theme.animDuration
     property bool tintIcons: theme.tintIcons
 
@@ -3611,6 +3688,10 @@ Singleton {
     // Desktop configuration
     property QtObject desktop: desktopLoader.adapter
 
+    // Whether the desktop layer (wallpaper + widgets) should be present.
+    // Active when the desktop is enabled OR any widgets are placed.
+    readonly property bool desktopLayerActive: desktop.enabled || (desktop.widgetOrder && desktop.widgetOrder.length > 0)
+
     // Lockscreen configuration
     property QtObject lockscreen: lockscreenLoader.adapter
 
@@ -3634,6 +3715,9 @@ Singleton {
 
     // AI configuration
     property QtObject ai: aiLoader.adapter
+
+    // Typing Sounds configuration
+    property QtObject typingSounds: typingSoundsLoader.adapter
 
     // Module save functions
     function saveBar() {
@@ -3680,6 +3764,9 @@ Singleton {
     }
     function saveAi() {
         aiLoader.writeAdapter();
+    }
+    function saveTypingSounds() {
+        typingSoundsLoader.writeAdapter();
     }
 
     // Color helpers

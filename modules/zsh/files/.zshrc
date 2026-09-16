@@ -77,3 +77,13 @@ eval "$(zoxide init zsh)"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+# Retro PATH
+export PATH="/usr/local/bin:$PATH"
+export RETRO_DIR="/opt/retrolinux"
+export RETRO_CONFIG="/home/vlad/.config/retro"
+
+export MANPAGER="nvim +Man!"
+
+# Include custom settings 
+source ~/.zsh_settings

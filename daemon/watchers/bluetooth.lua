@@ -133,20 +133,10 @@ return {
                         if card and card ~= "" then
                             local current_profile = Bluetooth.get_audio_profile(card)
                             local mac_key = mac:gsub(":", "_")
-                            local forced = Watcher.get_var("BT_FORCE_PROFILE_" .. mac_key, "")
-                            if forced ~= "" then
-                                local forced_profile = forced:match("([^|]+)")
-                                if current_profile ~= forced_profile then
-                                    Watcher.log("bluetooth", "Profile drift on " .. info.name .. ": " .. current_profile .. " -> " .. forced_profile, "info")
-                                    apply_forced_profile(mac)
-                                    last_profile_state[mac] = forced_profile
-                                end
-                            else
-                                local mic_disabled = Watcher.get_var("BT_MIC_DISABLED_" .. mac_key, "")
-                                if mic_disabled == "true" and not current_profile:find("a2dp%-sink") then
-                                    Watcher.log("bluetooth", "Mic disabled, switching " .. info.name .. " to a2dp-sink", "info")
-                                    Bluetooth.set_audio_profile(card, "a2dp-sink")
-                                end
+                            local mic_disabled = Watcher.get_var("BT_MIC_DISABLED_" .. mac_key, "")
+                            if mic_disabled == "true" and not current_profile:find("a2dp%-sink") then
+                                Watcher.log("bluetooth", "Mic disabled, switching " .. info.name .. " to a2dp-sink", "info")
+                                Bluetooth.set_audio_profile(card, "a2dp-sink")
                             end
                         end
                     end
