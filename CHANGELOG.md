@@ -1,3 +1,56 @@
+# [1.10.0](https://github.com/itsvlxd/RetroLinux/compare/v1.9.0...v1.10.0) (2026-09-16)
+
+
+### Bug Fixes
+
+* **audio:** fix audio priority rules ([e5c8f3a](https://github.com/itsvlxd/RetroLinux/commit/e5c8f3a46c37a645084e93154c25e39dbb57828c))
+* **iso:** fix iso build workflow ([310c561](https://github.com/itsvlxd/RetroLinux/commit/310c561f554c5935c3f502fac77e271f9436cde8))
+* **modules:** fix docker module ([2c7d278](https://github.com/itsvlxd/RetroLinux/commit/2c7d278f4839b05a82ead10782a33a33b9cff8ce))
+* **power:** fix power core to use rx_log_file ([5bd92a2](https://github.com/itsvlxd/RetroLinux/commit/5bd92a227167429fb0e146deb8e899a0ec170e91))
+* **retroshell:** add missing lib input package ([06f26fc](https://github.com/itsvlxd/RetroLinux/commit/06f26fca0ff4518f8210603d1450601160f33cc2))
+* **retroshell:** add the right packages to the list ([b7a4b0c](https://github.com/itsvlxd/RetroLinux/commit/b7a4b0cdf2c4345633fc515c6e736c24e12e22c7))
+* **retroshell:** fix minor bugs in the news feed widget ([7fb1809](https://github.com/itsvlxd/RetroLinux/commit/7fb1809269c79b205d7d3134b796b7b5b0fe6d5f))
+* **retroshell:** fix retroshell ip keybind commands ([6008197](https://github.com/itsvlxd/RetroLinux/commit/6008197065e7b2fd0bd36e9f05f4e5855fdbad11))
+* **retroshell:** fix storage and bluetooth widget ([f67f9c1](https://github.com/itsvlxd/RetroLinux/commit/f67f9c115e57ee1bbdd749d9b8669a8ddccebe37))
+* **retroshell:** fix workspace indicator ([27a9cef](https://github.com/itsvlxd/RetroLinux/commit/27a9cef5182f81cd01a6db6e3a3e45d4b5ee7cc4))
+* **settings:** fix settings save button ([cbaf6d7](https://github.com/itsvlxd/RetroLinux/commit/cbaf6d76d2a95494525a38b3786bf255443896f0))
+* **tmus:** fix tmux tpm plugin dir ([1836099](https://github.com/itsvlxd/RetroLinux/commit/183609925c29fda9fcb353cc52fb13de510371bc))
+* **tmux:** fix tmux plugin installer ([1aa6f05](https://github.com/itsvlxd/RetroLinux/commit/1aa6f057f62e279eb57fdc24ffd0542b711ae7b2))
+* **tmux:** fix tmux repeating bug ([a1edf27](https://github.com/itsvlxd/RetroLinux/commit/a1edf27c1e69e5d3b793337fb2b756b3432ee55e))
+
+
+### Features
+
+* **disk:** add persistent auto mount for ssds ([8ec41eb](https://github.com/itsvlxd/RetroLinux/commit/8ec41eb393c7cef4ecff5a4a0c8351dd3e9b0eea))
+* **modules:** add docker module ([85fd89c](https://github.com/itsvlxd/RetroLinux/commit/85fd89cac6ee079868076c50caccb1265cdd623b))
+* **modules:** add typing sounds module ([5cef5cc](https://github.com/itsvlxd/RetroLinux/commit/5cef5cc32a00aa9fe12a642adf407af4c68bee38))
+* **retro:** add desktop widgets, wifi stats/qr share, bluetooth profile override and bug fixes ([#15](https://github.com/itsvlxd/RetroLinux/issues/15)) ([f839662](https://github.com/itsvlxd/RetroLinux/commit/f839662ea69f9736bae29cb72c9907cda58e0fca))
+* **retro:** add keyboard typing sound effects with sound packs ([55e46ea](https://github.com/itsvlxd/RetroLinux/commit/55e46eaa98b9b8a8077b9d423576ac6dc64a02c0))
+* **retro:** add shell check as a package in retro module ([603069c](https://github.com/itsvlxd/RetroLinux/commit/603069c59d06308250684ac21d6a46cf26536bd3))
+* **retroshell:** add battery health capacity and watts cards in the popup menu ([d4c6130](https://github.com/itsvlxd/RetroLinux/commit/d4c6130c5f200afef36ebef0557c61c915afc67f))
+* **retroshell:** add battery ring, more clock faces and hands and notes widget ([1738edd](https://github.com/itsvlxd/RetroLinux/commit/1738edda8879ce3bd9c836fccfc27033ef43e962))
+* **retroshell:** add bluetooth, storage, network & power widgets ([55ebf5e](https://github.com/itsvlxd/RetroLinux/commit/55ebf5ec61c5b9b5d28f01831f1869828554a268))
+* **retroshell:** add blur and ignore alpha for widget panels ([d66b36c](https://github.com/itsvlxd/RetroLinux/commit/d66b36cc6b59ac63d08b378a20d1f7d2f2c77691))
+* **retroshell:** add blur for color varients in the shell ([14c243e](https://github.com/itsvlxd/RetroLinux/commit/14c243e221d0bc339a4d9bfbffe2e535550d422d))
+* **retroshell:** add desktop widgets ([16e4c38](https://github.com/itsvlxd/RetroLinux/commit/16e4c38a296102bbaf93f32b49e094fad893fe66))
+* **retroshell:** add docker widget integration ([3c08ce1](https://github.com/itsvlxd/RetroLinux/commit/3c08ce10a9f7f2ac739dacec4a49b44c2a3cc80f))
+* **retroshell:** add per monitor widget & news feed widget ([2e1ad24](https://github.com/itsvlxd/RetroLinux/commit/2e1ad24a865d71993eb6444ae96aab029a673e51))
+* **retroshell:** add system monitor widget ([8078a2e](https://github.com/itsvlxd/RetroLinux/commit/8078a2e52d6bab83dbfaf60c49687c3deadd49a4))
+* **retroshell:** add wifi speed test in menu ([e248575](https://github.com/itsvlxd/RetroLinux/commit/e248575dc15aec6782a6a63a3ad9c3bb03c5b589))
+* **retroshell:** add wifi stats and qr code share ([fb0a829](https://github.com/itsvlxd/RetroLinux/commit/fb0a829eaadfbb1e192f012dac9b707914ff8d71))
+* **retroshell:** make worldclock be 1x4 ([9e8c2e7](https://github.com/itsvlxd/RetroLinux/commit/9e8c2e78726d9a7f79a942f4d23a866dc447401d))
+* **settings:** add bluetooth headphones profile enforcer ([1902f5a](https://github.com/itsvlxd/RetroLinux/commit/1902f5af0035484011785dfb5e5b4a9bf50ccc34))
+* **settings:** add docker manager into dashboard too ([bbe822d](https://github.com/itsvlxd/RetroLinux/commit/bbe822d8022d562e4b6df584a4d79287530e472d))
+* **settings:** add newly added widgets ([40687e2](https://github.com/itsvlxd/RetroLinux/commit/40687e27e37d99602fd67885fd404b4218ebe255))
+* **settings:** add shell desktop widget settings ([3b64b41](https://github.com/itsvlxd/RetroLinux/commit/3b64b41ad0fd618863c016aba79aa8d64bbf853f))
+* **settings:** add wallapper stop on static ([495d6a6](https://github.com/itsvlxd/RetroLinux/commit/495d6a64d0f4a84aeefa77d4799c1dd3493e2be6))
+* **settings:** increase power limits in settings ([da235bc](https://github.com/itsvlxd/RetroLinux/commit/da235bc4721972bb13132bf578424f7d23042b2c))
+* **shell:** add more ipc commands ([16d18d8](https://github.com/itsvlxd/RetroLinux/commit/16d18d86b8b3a49112c36d39b940d62bcfd5a137))
+* **tmux:** add tmux mouse scroll support ([2c106e8](https://github.com/itsvlxd/RetroLinux/commit/2c106e87a056c94c95b1d80d2f26740a201411d5))
+* **zsh:** add custom zsh settings source file ([469a679](https://github.com/itsvlxd/RetroLinux/commit/469a6799b121f88b4cb330b5b27c45a3a1f9ee19))
+* **zsh:** add nvim as MANPAGER ([e4c59cc](https://github.com/itsvlxd/RetroLinux/commit/e4c59cca0367c88c02e913f78533367de8d3f9ca))
+* **zsh:** add retro dir and config paths ([ea37980](https://github.com/itsvlxd/RetroLinux/commit/ea37980547e203d73d60e317dc4c201bffee5f95))
+
 # [1.9.0](https://github.com/itsvlxd/RetroLinux/compare/v1.8.0...v1.9.0) (2026-08-24)
 
 
