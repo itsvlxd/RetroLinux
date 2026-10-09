@@ -1649,7 +1649,6 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
     # -- Save with animation --
 
     def collect_save_sections(self) -> config.ConfigSections:
-        from settings.pages.workspaces import WorkspacesPage
         """Collect sections to save: dirty sections + previously saved sections.
 
         A section is only included if it was already in settings's managed
@@ -1657,6 +1656,8 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
         Reads through :func:`config.read_cached` — the on-disk file is
         unchanged between the last invalidation and the user clicking Save.
         """
+        from settings.pages.workspaces import WorkspacesPage
+        from settings.core.workspaces import WORKSPACE_RULE_KEYWORDS
         saved_sections = self.saved_sections
         sections = config.ConfigSections()
 
@@ -1685,11 +1686,19 @@ class RetroSettingsWindow(Adw.ApplicationWindow):
             lambda _p: bool(config.collect_section(saved_sections, config.KEYWORD_MONITOR)),
             lambda p: p.get_monitor_lines(),
         )
-        sections.workspaces = emit_if(
-            self._workspaces_page,
-            lambda _p: WorkspacesPage.has_managed_section(saved_sections),
-            lambda p: p.get_workspace_lines(),
-        )
+        if self._workspaces_page is not None:
+            sections.workspaces = emit_if(
+                self._workspaces_page,
+                lambda _p: WorkspacesPage.has_managed_section(saved_sections),
+                lambda p: p.get_workspace_lines(),
+            )
+        else:
+            # The workspaces page is lazy-loaded and may never have been
+            # opened this session. Fall back to the saved lines so an
+            # unrelated save doesn't wipe existing workspace rules.
+            saved_ws = config.collect_section(saved_sections, *WORKSPACE_RULE_KEYWORDS)
+            if saved_ws:
+                sections.workspaces = saved_ws
 
         # Animations: bezier extraction is bespoke (curves used by emitted
         # animations need their definitions emitted alongside), so this one
