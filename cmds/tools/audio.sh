@@ -155,7 +155,7 @@ cmd_audio() {
             if ! [[ $step =~ ^[0-9]+$ ]]; then
                 rx_log "error" "Step must be a number" && return 1
             fi
-            wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ "${step}%+" 2>/dev/null
+            bash "$audio_core" --volume-up "$step" >/dev/null
             rx_log "success" "Volume increased by ${PINK}${step}%%${RESET}"
             ;;
 
@@ -164,7 +164,7 @@ cmd_audio() {
             if ! [[ $step =~ ^[0-9]+$ ]]; then
                 rx_log "error" "Step must be a number" && return 1
             fi
-            wpctl set-volume @DEFAULT_AUDIO_SOURCE@ "${step}%-" 2>/dev/null
+            bash "$audio_core" --volume-down "$step" >/dev/null
             rx_log "success" "Volume decreased by ${PINK}${step}%%${RESET}"
             ;;
 
@@ -184,6 +184,24 @@ cmd_audio() {
             else
                 rx_log "success" "Microphone unmuted"
             fi
+            ;;
+
+        "mic-up")
+            local step="${val1:-5}"
+            if ! [[ $step =~ ^[0-9]+$ ]]; then
+                rx_log "error" "Step must be a number" && return 1
+            fi
+            bash "$audio_core" --mic-up "$step" >/dev/null
+            rx_log "success" "Mic volume increased by ${PINK}${step}%%${RESET}"
+            ;;
+
+        "mic-down")
+            local step="${val1:-5}"
+            if ! [[ $step =~ ^[0-9]+$ ]]; then
+                rx_log "error" "Step must be a number" && return 1
+            fi
+            bash "$audio_core" --mic-down "$step" >/dev/null
+            rx_log "success" "Mic volume decreased by ${PINK}${step}%%${RESET}"
             ;;
 
         "switch")
@@ -838,10 +856,12 @@ EOF
             rx_help_commands "Available commands"
             rx_help_cmd "status" "Show audio status and info"
             rx_help_cmd "volume <0-100>" "Set volume level"
-            rx_help_cmd "up [step]" "Increase volume (default 5%)"
-            rx_help_cmd "down [step]" "Decrease volume (default 5%)"
+            rx_help_cmd "up [step]" "Increase output volume (default 5%)"
+            rx_help_cmd "down [step]" "Decrease output volume (default 5%)"
             rx_help_cmd "mute" "Toggle output mute"
             rx_help_cmd "mic-mute" "Toggle microphone mute"
+            rx_help_cmd "mic-up [step]" "Increase mic volume (default 5%)"
+            rx_help_cmd "mic-down [step]" "Decrease mic volume (default 5%)"
             rx_help_cmd "switch" "Switch output device"
             rx_help_cmd "list" "List all audio devices"
             rx_help_cmd "list-devices" "List all audio devices (alias)"
@@ -856,6 +876,7 @@ EOF
             rx_help_examples
             rx_help_example "retro audio volume 50" "Set volume to 50%"
             rx_help_example "retro audio up 10" "Increase volume by 10%"
+            rx_help_example "retro audio mic-down 10" "Decrease mic volume by 10%"
             rx_help_example "retro audio mute" "Toggle mute"
             rx_help_example "retro audio eq list" "List EQ profiles"
             rx_help_example "retro audio eq Boosted" "Apply Boosted profile"

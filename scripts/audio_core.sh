@@ -243,6 +243,26 @@ volume_down() {
     echo "$new"
 }
 
+mic_up() {
+    local step="${1:-5}"
+    local current=$(get_source_volume)
+    local new=$((current + step))
+    if [[ $(get_var "AUDIO_UNCAP_LIMIT" "false") != "true" ]]; then
+        [[ $new -gt 100 ]] && new=100
+    fi
+    set_source_volume "$new"
+    echo "$new"
+}
+
+mic_down() {
+    local step="${1:-5}"
+    local current=$(get_source_volume)
+    local new=$((current - step))
+    [[ $new -lt 0 ]] && new=0
+    set_source_volume "$new"
+    echo "$new"
+}
+
 toggle_mute() {
     local sink=$(get_default_sink)
     [[ -z $sink ]] && return 1
@@ -893,6 +913,8 @@ case "$1" in
     "--set-volume") set_volume "$2" ;;
     "--volume-up") volume_up "$2" ;;
     "--volume-down") volume_down "$2" ;;
+    "--mic-up") mic_up "$2" ;;
+    "--mic-down") mic_down "$2" ;;
     "--toggle-mute") toggle_mute ;;
     "--set-mute") set_mute "$2" ;;
     "--toggle-mic-mute") toggle_mic_mute ;;
