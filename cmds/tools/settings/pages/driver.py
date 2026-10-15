@@ -32,18 +32,18 @@ def _run(args: list[str], timeout: int = 15) -> str:
         return ""
 
 
-    def _can_sudo() -> bool:
-        if os.geteuid() == 0:
-            return True
-        try:
-            r = subprocess.run(
-                ["id", "-nG"], capture_output=True, text=True, timeout=5,
-                stdin=subprocess.DEVNULL,
-            )
-            groups = r.stdout.split()
-            return bool({"wheel", "sudo"} & set(groups))
-        except Exception:
-            return False
+def _can_sudo() -> bool:
+    if os.geteuid() == 0:
+        return True
+    try:
+        r = subprocess.run(
+            ["id", "-nG"], capture_output=True, text=True, timeout=5,
+            stdin=subprocess.DEVNULL,
+        )
+        groups = r.stdout.split()
+        return bool({"wheel", "sudo"} & set(groups))
+    except Exception:
+        return False
 
 
 class DriverPage:
@@ -495,10 +495,13 @@ class DriverPage:
             if not entries:
                 continue
             label, icon = type_labels.get(typ, (typ, "computer-symbolic"))
-            for comp in entries:
-                self._build_hw_row(group, label, comp, icon)
-                label = None
-            if typ == "CPU" and self._memory_summary:
+            if typ == "AUDIO" and len(entries) > 1:
+                self._build_merged_audio_row(group, entries, icon)
+            else:
+                for comp in entries:
+                    self._build_hw_row(group, label, comp, icon)
+                    label = None
+            if typ == "GPU" and self._memory_summary:
                 self._add_memory_row(group)
 
         self._build_packages_expander(group)
@@ -607,6 +610,21 @@ class DriverPage:
             drop.connect("notify::selected", self._on_dropdown_driver_switch, drop)
             row.add_suffix(drop)
 
+        group.add(row)
+
+    def _build_merged_audio_row(self, group: Adw.PreferencesGroup, entries: list[dict], icon: str) -> None:
+        """Combine multiple audio devices into a single row."""
+        subtitles = []
+        for comp in entries:
+            parts = []
+            if comp["model"]:
+                parts.append(comp["model"])
+            if comp["driver"]:
+                parts.append(comp["driver"])
+            subtitles.append(" \u00b7 ".join(parts))
+        row = Adw.ActionRow(title="Audio", subtitle="\n".join(subtitles))
+        row.add_prefix(Gtk.Image.new_from_icon_name(icon))
+        row.add_suffix(Gtk.Label(label="\u2713"))
         group.add(row)
 
     def _build_packages_section(self) -> None:
