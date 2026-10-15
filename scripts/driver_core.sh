@@ -1,9 +1,10 @@
 #!/bin/bash
 
+RETRO_DIR="${RETRO_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
+
 source "$RETRO_DIR/scripts/log_core.sh"
 rx_log_register "driver"
 
-RETRO_DIR="${RETRO_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
 source "$RETRO_DIR/lib/colors.sh"
 source "$RETRO_DIR/lib/helpers.sh"
 
@@ -84,7 +85,7 @@ detect_gpus() {
             8086) vendor="intel" ;;
         esac
         gpus+=("${pci_id}|${vendor_id}|${vendor}|${model}|${driver}")
-    done < <(lspci | grep -iE "VGA|3D|Display")
+    done < <(lspci | grep -iE "(VGA compatible controller|3D controller|Display controller)")
     if [[ ${#gpus[@]} -eq 0 ]]; then
         echo "NONE"
         return 1
@@ -1392,6 +1393,124 @@ _module_unload() {
     return $rc
 }
 
+FAN_SENSOR_DRIVERS=(nct6775 it87)
+
+_fan_driver_force_ids() {
+    case "$1" in
+        nct6775) echo "0x9803 0xb270 0xb271" ;;
+        it87)    echo "0x8688 0x8628 0x0107" ;;
+        *)       echo "" ;;
+    esac
+}
+
+_modules_tree_ready() {
+    local kver
+    kver=$(uname -r)
+    [[ -f "/lib/modules/${kver}/modules.dep" || -f "/lib/modules/${kver}/modules.builtin" ]]
+}
+
+_installed_kernels_list() {
+    local d
+    for d in /lib/modules/*/; do
+        [[ -d $d ]] && basename "${d%/}"
+    done
+}
+
+_count_fans() {
+    local hw f n=0
+    for hw in /sys/class/hwmon/hwmon*; do
+        for f in "$hw"/fan*_input; do
+            [[ -f $f ]] && n=$((n+1))
+        done
+    done
+    echo "$n"
+}
+
+_fan_driver_state() {
+    local ready="false"
+    _modules_tree_ready && ready="true"
+    echo "KERNEL|$(uname -r)"
+    echo "MODULES_TREE|${ready}"
+    if [[ $ready != "true" ]]; then
+        echo "INSTALLED_KERNELS|$(_installed_kernels_list | paste -sd, -)"
+    fi
+
+    local d st load_state
+    for d in "${FAN_SENSOR_DRIVERS[@]}"; do
+        load_state=$(_module_state "$d")
+        load_state=${load_state%%|*}
+        st="missing"
+        if [[ $load_state == "LOADED" ]]; then
+            st="loaded"
+        elif [[ $(_module_exists "$d") == EXISTS* ]]; then
+            st="available"
+        fi
+        echo "DRIVER|${d}|${st}"
+    done
+    echo "FANS|$(_count_fans)"
+}
+
+_fan_driver_loaded_name() {
+    local d
+    for d in "${FAN_SENSOR_DRIVERS[@]}"; do
+        if lsmod 2>/dev/null | awk '{print $1}' | grep -qx "$d"; then
+            echo "$d"
+            return 0
+        fi
+    done
+    return 1
+}
+
+_fan_modprobe() {
+    if [[ $EUID -eq 0 ]]; then
+        modprobe "$@" 2>/dev/null
+    else
+        sudo modprobe "$@" 2>/dev/null
+    fi
+}
+
+_fan_driver_load() {
+    if ! _modules_tree_ready; then
+        echo "ERR|no_modules|running=$(uname -r)|installed=$(_installed_kernels_list | paste -sd, -)"
+        return 1
+    fi
+
+    local already
+    if already=$(_fan_driver_loaded_name); then
+        echo "OK|module=${already}|fans=$(_count_fans)|already=loaded"
+        return 0
+    fi
+
+    local d ids loaded=""
+    for d in "${FAN_SENSOR_DRIVERS[@]}"; do
+        if _fan_modprobe "$d"; then
+            loaded="$d"
+            break
+        fi
+    done
+
+    if [[ -z $loaded ]]; then
+        for d in "${FAN_SENSOR_DRIVERS[@]}"; do
+            ids=$(_fan_driver_force_ids "$d")
+            for id in $ids; do
+                if _fan_modprobe "$d" "force_id=${id}"; then
+                    loaded="$d"
+                    break 2
+                fi
+            done
+        done
+    fi
+
+    if [[ -z $loaded ]]; then
+        echo "ERR|no_driver|running=$(uname -r)"
+        return 1
+    fi
+
+    sleep 0.3
+    _modules_load_add "$loaded" >/dev/null 2>&1
+    echo "OK|module=${loaded}|fans=$(_count_fans)"
+}
+
 _check_driver_conflicts() {
     local conflicts=""
     if pacman -Qq nvidia >/dev/null 2>&1 && pacman -Qq xf86-video-nouveau >/dev/null 2>&1; then
@@ -2055,6 +2174,8 @@ case "$1" in
     "--module-state") _module_state "$2" ;;
     "--module-load") _module_load "$2" ;;
     "--module-unload") _module_unload "$2" ;;
+    "--fan-driver-state") _fan_driver_state ;;
+    "--fan-driver-load") _fan_driver_load ;;
     "--module-exists") _module_exists "$2" ;;
     "--module-list") _list_all_modules ;;
     "--module-info") _module_info "$2" ;;
