@@ -1909,12 +1909,66 @@ configure_mkinitcpio_nvidia() {
     sudo cp "$mkinit_conf" "$backup"
     echo "result=backup_created|backup=$backup"
 
-    if grep -q "^MODULES=" "$mkinit_conf"; then
-        if ! grep "^MODULES=" "$mkinit_conf" | grep -q "nvidia"; then
-            sudo sed -i 's|^MODULES=\(.*\)|MODULES=\1 nvidia nvidia_drm nvidia_modeset|' "$mkinit_conf"
+    # Repair a previously-broken line where modules were appended
+    # outside the parentheses, e.g. MODULES=() nvidia nvidia_drm ...
+    if grep -qE '^MODULES=\([^)]*\)[[:space:]]+[^[:space:])]' "$mkinit_conf"; then
+        sudo sed -i -E 's|^MODULES=\(([^)]*)\)[[:space:]]+(.*)$|MODULES=(\1 \2)|' "$mkinit_conf"
+    fi
+
+    # NOTE: 'kms' is a HOOK, not a module — it belongs in HOOKS (see below).
+    # MODULES must only contain the actual NVIDIA driver modules:
+    #   MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+    local required_modules=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+
+    # Remove any stray 'kms' token mistakenly placed in MODULES
+    if grep -q "^MODULES=(" "$mkinit_conf" && grep "^MODULES=(" "$mkinit_conf" | grep -qE "\bkms\b"; then
+        sudo sed -i -E '/^MODULES=/ s@kms([[:space:]])@\1@g; /^MODULES=/ s@[[:space:]]kms@ @g; /^MODULES=/ s@[[:space:]]{2,}@ @g' "$mkinit_conf"
+    fi
+
+    local missing_modules=()
+    local mod
+    for mod in "${required_modules[@]}"; do
+        grep "^MODULES=" "$mkinit_conf" | grep -qE "\b${mod}\b" || missing_modules+=("$mod")
+    done
+
+    if [[ ${#missing_modules[@]} -gt 0 ]]; then
+        local missing_str="${missing_modules[*]}"
+        if grep -q "^MODULES=()" "$mkinit_conf"; then
+            sudo sed -i "s|^MODULES=()|MODULES=(${missing_str})|" "$mkinit_conf"
+        elif grep -q "^MODULES=(" "$mkinit_conf"; then
+            sudo sed -i "s|^MODULES=(\(.*\))$|MODULES=(\1 ${missing_str})|" "$mkinit_conf"
+        elif grep -q '^MODULES="' "$mkinit_conf"; then
+            sudo sed -i "s|^MODULES=\"\(.*\)\"\$|MODULES=\"\1 ${missing_str}\"|" "$mkinit_conf"
+        else
+            echo "MODULES=(${missing_str})" | sudo tee -a "$mkinit_conf" >/dev/null
         fi
-    else
-        echo 'MODULES="nvidia nvidia_drm nvidia_modeset"' | sudo tee -a "$mkinit_conf" >/dev/null
+    fi
+
+    # If the array only contains NVIDIA-family modules, normalize it to the
+    # canonical order: MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+    local current_modules current_arr=()
+    current_modules=$(grep -m1 "^MODULES=(" "$mkinit_conf" | sed 's|^MODULES=(||;s|)$||' | xargs)
+    read -ra current_arr <<<"$current_modules"
+    local all_required=true
+    for mod in "${current_arr[@]}"; do
+        echo " ${required_modules[*]} " | grep -q " ${mod} " || { all_required=false; break; }
+    done
+    if [[ $all_required == true && ${#current_arr[@]} -gt 0 ]]; then
+        sudo sed -i "s|^MODULES=([^)]*)\$|MODULES=(${required_modules[*]})|" "$mkinit_conf"
+    fi
+
+    # 'kms' belongs in HOOKS (not MODULES). Ensure it is present in the
+    # HOOKS array, placed directly after 'modconf' (the Arch default).
+    if grep -q "^HOOKS=(" "$mkinit_conf"; then
+        if ! grep "^HOOKS=(" "$mkinit_conf" | grep -qE "\bkms\b"; then
+            if grep "^HOOKS=(" "$mkinit_conf" | grep -q "\bmodconf\b"; then
+                sudo sed -i -E '/^HOOKS=/ s|(modconf)([[:space:]])|\1 kms\2|' "$mkinit_conf"
+            elif grep "^HOOKS=(" "$mkinit_conf" | grep -q "\budev\b"; then
+                sudo sed -i -E '/^HOOKS=/ s|(udev)([[:space:]])|\1 kms\2|' "$mkinit_conf"
+            else
+                sudo sed -i -E '/^HOOKS=/ s|\)$| kms)|' "$mkinit_conf"
+            fi
+        fi
     fi
 
     if command -v mkinitcpio >/dev/null 2>&1; then
