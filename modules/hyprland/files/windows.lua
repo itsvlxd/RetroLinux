@@ -63,3 +63,14 @@ hl.window_rule({
 	match = { class = "kitty" },
 	opacity = vars.retro_kitty_active_opacity .. " 0.8",
 })
+
+hl.window_rule({
+	name = "xwayland-video-bridge-fixes",
+	match = { class = "xwaylandvideobridge" },
+	no_initial_focus = true,
+	no_focus = true,
+	no_anim = true,
+	no_blur = true,
+	max_size = { 1, 1 },
+	opacity = 0.0,
+})
