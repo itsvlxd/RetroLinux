@@ -12,6 +12,7 @@ zenity
 expect
 notify
 udisks2
+zbarimg
 usbutils
 dmidecode
 gstreamer
